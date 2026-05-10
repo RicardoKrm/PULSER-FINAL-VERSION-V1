@@ -1,0 +1,38 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { StrictMode } from 'react';
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
+import Layout from './components/Layout';
+import GenericPage from './pages/GenericPage';
+import SuperAdminEmpresas from './pages/super-admin/Empresas';
+import SuperAdminPerfiles from './pages/super-admin/Perfiles';
+import SuperAdminVisionEvolucion from './pages/super-admin/VisionEvolucion';
+import { ThemeProvider } from './components/ThemeProvider';
+import { CompanyProvider } from './contexts/CompanyContext';
+
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Layout />,
+    children: [
+      { index: true, element: <Navigate to="/super-admin/empresas" replace /> },
+      { path: "super-admin/empresas", element: <SuperAdminEmpresas /> },
+      { path: "super-admin/perfiles", element: <SuperAdminPerfiles /> },
+      { path: "super-admin/vision-evolucion", element: <SuperAdminVisionEvolucion /> },
+      { path: "*", element: <GenericPage /> },
+    ]
+  }
+]);
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <CompanyProvider>
+        <RouterProvider router={router} />
+      </CompanyProvider>
+    </ThemeProvider>
+  );
+}
