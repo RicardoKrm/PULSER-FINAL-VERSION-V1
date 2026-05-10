@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Link, Outlet, useLocation } from 'react-router-dom';
 import { 
   Menu, 
   Bell, 
@@ -96,14 +96,14 @@ export default function Layout() {
         )}
       >
         <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800 shrink-0">
-          <div className="flex items-center gap-3 text-white overflow-hidden whitespace-nowrap">
+          <Link to="/operaciones/alertas" className="flex items-center gap-3 text-white overflow-hidden whitespace-nowrap outline-none">
             <div className="bg-blue-600 p-1.5 rounded-lg shrink-0">
               <Activity className="h-6 w-6 text-white" />
             </div>
             {sidebarOpen && (
-              <span className="font-bold text-xl tracking-tight">PULSER <span className="text-blue-500">TMS</span></span>
+              <span className="font-bold text-xl tracking-tight hover:text-blue-400 transition-colors">PULSER <span className="text-blue-500">TMS</span></span>
             )}
-          </div>
+          </Link>
           {sidebarOpen && (
             <button 
               onClick={() => setSidebarOpen(false)}

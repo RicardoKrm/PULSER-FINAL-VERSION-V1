@@ -64,6 +64,7 @@ export const navigation = [
       { title: 'GPS FleetSat', icon: MapPin, href: '/operaciones/gps' },
       { title: 'CHECK-IN', icon: CheckSquare, href: '/operaciones/checkin' },
       { title: 'Salida de Insumos', icon: Package, href: '/operaciones/insumos' },
+      { title: 'Alertas', icon: AlertCircle, href: '/operaciones/alertas' },
     ],
   },
   {
@@ -113,7 +114,6 @@ export const navigation = [
       { title: 'Tipos de Pausa', icon: Clock, href: '/configuracion/pausas' },
       { title: 'Pulser AI', icon: Cpu, href: '/configuracion/ai' },
       { title: 'Carga Masiva', icon: Zap, href: '/configuracion/carga-masiva' },
-      { title: 'Alertas', icon: AlertCircle, href: '/configuracion/alertas' },
     ],
   },
 ];

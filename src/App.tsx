@@ -18,7 +18,7 @@ const router = createBrowserRouter([
     path: "/",
     element: <Layout />,
     children: [
-      { index: true, element: <Navigate to="/super-admin/empresas" replace /> },
+      { index: true, element: <Navigate to="/operaciones/alertas" replace /> },
       { path: "super-admin/empresas", element: <SuperAdminEmpresas /> },
       { path: "super-admin/perfiles", element: <SuperAdminPerfiles /> },
       { path: "super-admin/vision-evolucion", element: <SuperAdminVisionEvolucion /> },
