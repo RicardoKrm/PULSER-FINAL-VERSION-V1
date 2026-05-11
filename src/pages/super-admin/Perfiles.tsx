@@ -139,8 +139,6 @@ export default function SuperAdminPerfiles() {
 
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
             {navigation.map((module) => {
-              if (module.title === 'Super Administrador') return null; // No mostrar este menú en la asignación
-
               const isModuleEnabled = currentPerms.includes(module.title);
               
               return (

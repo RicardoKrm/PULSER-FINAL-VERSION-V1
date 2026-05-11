@@ -11,6 +11,8 @@ import SuperAdminEmpresas from './pages/super-admin/Empresas';
 import SuperAdminPerfiles from './pages/super-admin/Perfiles';
 import SuperAdminVisionEvolucion from './pages/super-admin/VisionEvolucion';
 import OperacionesAlertas from './pages/operaciones/Alertas';
+import KpiFlota from './pages/dashboard/KpiFlota';
+import KpiRRHH from './pages/dashboard/KpiRRHH';
 import { ThemeProvider } from './components/ThemeProvider';
 import { CompanyProvider } from './contexts/CompanyContext';
 
@@ -24,6 +26,8 @@ const router = createBrowserRouter([
       { path: "super-admin/empresas", element: <SuperAdminEmpresas /> },
       { path: "super-admin/perfiles", element: <SuperAdminPerfiles /> },
       { path: "super-admin/vision-evolucion", element: <SuperAdminVisionEvolucion /> },
+      { path: "dashboard/kpi-flota", element: <KpiFlota /> },
+      { path: "dashboard/kpi-rrhh", element: <KpiRRHH /> },
       { path: "*", element: <GenericPage /> },
     ]
   }
