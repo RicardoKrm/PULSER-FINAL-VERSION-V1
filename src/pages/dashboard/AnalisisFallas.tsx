@@ -287,6 +287,11 @@ export default function AnalisisFallas() {
                     boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
                   }}
                   itemStyle={{ fontSize: '12px' }}
+                  formatter={(value, name) => {
+                    if (name === 'count') return [value, 'Frecuencia'];
+                    if (name === 'cumulative') return [`${value}%`, 'Acumulado'];
+                    return [value, name];
+                  }}
                 />
                 <Bar yAxisId="left" dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={50}>
                   {paretoData.map((entry, index) => (
