@@ -13,6 +13,7 @@ import SuperAdminVisionEvolucion from './pages/super-admin/VisionEvolucion';
 import OperacionesAlertas from './pages/operaciones/Alertas';
 import KpiFlota from './pages/dashboard/KpiFlota';
 import KpiRRHH from './pages/dashboard/KpiRRHH';
+import AnalisisFallas from './pages/dashboard/AnalisisFallas';
 import { ThemeProvider } from './components/ThemeProvider';
 import { CompanyProvider } from './contexts/CompanyContext';
 
@@ -28,6 +29,7 @@ const router = createBrowserRouter([
       { path: "super-admin/vision-evolucion", element: <SuperAdminVisionEvolucion /> },
       { path: "dashboard/kpi-flota", element: <KpiFlota /> },
       { path: "dashboard/kpi-rrhh", element: <KpiRRHH /> },
+      { path: "dashboard/fallas", element: <AnalisisFallas /> },
       { path: "*", element: <GenericPage /> },
     ]
   }
