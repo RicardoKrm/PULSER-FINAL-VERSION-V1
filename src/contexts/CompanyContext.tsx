@@ -38,6 +38,7 @@ interface CompanyContextType {
   setActiveCompanyId: (id: string) => void;
   activeCompany: Company | undefined;
   addCompany: (company: Omit<Company, 'id'>) => void;
+  toggleCompanyStatus: (id: string) => void;
   expirationOptions: ExpirationOption[];
   addExpirationOption: (option: ExpirationOption) => void;
 }
@@ -56,6 +57,14 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     setCompanies([...companies, { ...company, id: newId }]);
   };
 
+  const toggleCompanyStatus = (id: string) => {
+    setCompanies(companies.map(c => 
+      c.id === id 
+        ? { ...c, status: c.status === 'Activo' ? 'Inactivo' : 'Activo' } 
+        : c
+    ));
+  };
+
   const addExpirationOption = (option: ExpirationOption) => {
     if (!expirationOptions.some(opt => opt.value === option.value)) {
       setExpirationOptions([...expirationOptions, option]);
@@ -63,7 +72,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <CompanyContext.Provider value={{ companies, activeCompanyId, setActiveCompanyId, activeCompany, addCompany, expirationOptions, addExpirationOption }}>
+    <CompanyContext.Provider value={{ companies, activeCompanyId, setActiveCompanyId, activeCompany, addCompany, toggleCompanyStatus, expirationOptions, addExpirationOption }}>
       {children}
     </CompanyContext.Provider>
   );

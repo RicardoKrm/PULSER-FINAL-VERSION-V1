@@ -4,7 +4,7 @@ import { Building, Users, Truck, Plus, Shield, Calendar, Filter, X } from 'lucid
 import { cn } from '../../lib/utils';
 
 export default function SuperAdminEmpresas() {
-  const { companies, setActiveCompanyId, activeCompanyId, addCompany, expirationOptions, addExpirationOption } = useCompany();
+  const { companies, setActiveCompanyId, activeCompanyId, addCompany, toggleCompanyStatus, expirationOptions, addExpirationOption } = useCompany();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -145,6 +145,18 @@ export default function SuperAdminEmpresas() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
+                      <button
+                        onClick={() => toggleCompanyStatus(company.id)}
+                        className={cn(
+                          "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border",
+                          company.status === 'Activo'
+                            ? "bg-white border-red-200 text-red-600 hover:bg-red-50 dark:bg-slate-800 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20"
+                            : "bg-white border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:bg-slate-800 dark:border-emerald-900/50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                        )}
+                      >
+                        {company.status === 'Activo' ? 'Desactivar' : 'Activar'}
+                      </button>
+                      
                       {activeCompanyId === company.id ? (
                         <span className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed">
                           Sesión Activa
@@ -152,7 +164,13 @@ export default function SuperAdminEmpresas() {
                       ) : (
                         <button 
                           onClick={() => setActiveCompanyId(company.id)}
-                          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-white hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white transition-colors"
+                          disabled={company.status === 'Inactivo'}
+                          className={cn(
+                            "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                            company.status === 'Inactivo'
+                              ? "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed"
+                              : "bg-slate-800 text-white hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white"
+                          )}
                         >
                           Entrar
                         </button>
