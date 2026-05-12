@@ -63,7 +63,6 @@ export const navigation = [
       { title: 'Crear Servicio', icon: ClipboardList, href: '/operaciones/servicios' },
       { title: 'Programación', icon: CalendarClock, href: '/operaciones/programacion' },
       { title: 'Operaciones', icon: Activity, href: '/operaciones/monitor' },
-      { title: 'Reservas', icon: CalendarClock, href: '/operaciones/reservas' },
       { title: 'GPS FleetSat', icon: MapPin, href: '/operaciones/gps' },
       { title: 'Alertas', icon: AlertCircle, href: '/operaciones/alertas' },
     ],

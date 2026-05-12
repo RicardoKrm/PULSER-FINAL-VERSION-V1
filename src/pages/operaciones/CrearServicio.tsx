@@ -1,167 +1,779 @@
-import React, { useState } from 'react';
-import { Calendar as CalendarIcon, CheckCircle2, AlertCircle } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Calendar as CalendarIcon, CheckCircle2, AlertCircle, Plus, Search, MapPin, Truck, User, FileText, X, Activity, Download, ChevronRight, DollarSign, Clock, FileWarning, ShieldCheck } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+
+const mockServicios = [
+  { id: '1', codigo: 'SRV-001', contrato: 'Minera Escondida - CT1', tipo: 'Minero', subtipo: 'Interno Mina', origen: 'Campamento', destino: 'Rajo', fecha: '2026-05-15T08:00', conductor: 'Juan Pérez', unidad: 'Minibus M-04', estado: 'Programado', ingreso: 150000, costo: 45000 },
+  { id: '2', codigo: 'SRV-002', contrato: 'BHP Billiton - CT2', tipo: 'Sobredimensionada', subtipo: 'Interprovincial', origen: 'Antofagasta', destino: 'Iquique', fecha: '2026-05-16T10:00', conductor: 'Carlos Silva', unidad: 'Tractocamión T-01', estado: 'En Ruta', ingreso: 850000, costo: 320000 },
+  { id: '3', codigo: 'SRV-003', contrato: 'Sin contrato', tipo: 'General', subtipo: 'Urbano', origen: 'Bodega Central', destino: 'Puerto', fecha: '2026-05-14T15:00', conductor: 'Ana Gómez', unidad: 'Camión C-10', estado: 'Completado', ingreso: 120000, costo: 35000 },
+  { id: '4', codigo: 'SRV-004', contrato: 'Codelco - CT3', tipo: 'Peligrosa / MATPEL', subtipo: 'Interprovincial', origen: 'Calama', destino: 'Antofagasta', fecha: '2026-05-17T09:00', conductor: 'Luis Martínez', unidad: 'Camión C-11', estado: 'Programado', ingreso: 600000, costo: 180000 },
+];
 
 export default function CrearServicio() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedServicio, setSelectedServicio] = useState<typeof mockServicios[0] | null>(null);
+  const [editingServicio, setEditingServicio] = useState<typeof mockServicios[0] | null>(null);
+  const [showHojaRuta, setShowHojaRuta] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
+  
+  // States for the creation form to drive real-time validations
+  const [newContrato, setNewContrato] = useState('');
+  const [newFecha, setNewFecha] = useState('');
+  const [newTipoCarga, setNewTipoCarga] = useState('');
+  const [newSubtipo, setNewSubtipo] = useState('');
+  const [newOrigen, setNewOrigen] = useState('');
+  const [newDestino, setNewDestino] = useState('');
+  const [newConductor, setNewConductor] = useState('');
+  const [newUnidad, setNewUnidad] = useState('');
+  const [newIngreso, setNewIngreso] = useState<number | ''>('');
+  const [newCosto, setNewCosto] = useState<number | ''>('');
+
+  const handleNewService = () => {
+    setEditingServicio(null);
+    setNewContrato('');
+    setNewFecha('');
+    setNewTipoCarga('');
+    setNewSubtipo('');
+    setNewOrigen('');
+    setNewDestino('');
+    setNewConductor('');
+    setNewUnidad('');
+    setNewIngreso('');
+    setNewCosto('');
+    setIsModalOpen(true);
+  };
+
+  const handleEditService = () => {
+    if (!selectedServicio) return;
+    setEditingServicio(selectedServicio);
+    setNewContrato(selectedServicio.contrato);
+    setNewFecha(selectedServicio.fecha);
+    setNewTipoCarga(selectedServicio.tipo);
+    setNewSubtipo(selectedServicio.subtipo);
+    setNewOrigen(selectedServicio.origen);
+    setNewDestino(selectedServicio.destino);
+    setNewConductor(selectedServicio.conductor);
+    setNewUnidad(selectedServicio.unidad);
+    setNewIngreso(selectedServicio.ingreso || '');
+    setNewCosto(selectedServicio.costo || '');
+    
+    setSelectedServicio(null);
+    setIsModalOpen(true);
+  };
+
+  const filteredServicios = useMemo(() => {
+    return mockServicios.filter(s => {
+      const matchName = s.codigo.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                        s.contrato.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        s.conductor.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchDate = dateFilter ? s.fecha.startsWith(dateFilter) : true;
+      return matchName && matchDate;
+    });
+  }, [searchTerm, dateFilter]);
+
+  // Real-time validations logic
+  const validations = useMemo(() => {
+    const v = [];
+    if (newSubtipo === 'Interno Mina') {
+      v.push({ type: 'success', text: 'Sincronización de Altitud: Verificando examen de altura del conductor.' });
+    }
+    if (newTipoCarga === 'Peligrosa / MATPEL') {
+      v.push({ type: 'warning', text: 'Carga MATPEL: El conductor debe tener curso MATPEL vigente.' });
+    }
+    if (newConductor === 'Carlos Silva (En ruta)') {
+      v.push({ type: 'error', text: 'Programación Cruzada (Anticolisión): El conductor está en ruta.' });
+    } else if (newConductor) {
+      v.push({ type: 'success', text: 'Documentación en regla: Conductor habilitado (Integración GDC).' });
+    }
+    
+    if (v.length === 0) {
+      v.push({ type: 'info', text: 'Complete los campos para ver validaciones dinámicas.' });
+    }
+    
+    return v;
+  }, [newSubtipo, newTipoCarga, newConductor]);
+
+  const getStatusColor = (estado: string) => {
+    switch(estado) {
+      case 'Programado': return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800/50';
+      case 'En Ruta': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800/50';
+      case 'Completado': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50';
+      default: return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700';
+    }
+  };
+
   return (
-    <div className="w-full">
-      <div className="mb-6 flex justify-between items-center">
+    <div className="w-full relative min-h-screen">
+      <div className="mb-6 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
         <div>
           <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-            Panel de Creación de Servicio (PCS)
+            Panel de Servicios (PCS)
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm font-medium">
-            Tipificación, control y programación dinámica de carga.
+            Tipificación, control y programación dinámica de operaciones.
           </p>
         </div>
-        <button className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-colors flex items-center gap-2">
-          Exportar Excel
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 dark:border-slate-800 dark:text-slate-300 px-4 py-2 rounded-xl font-bold shadow-sm transition-colors flex items-center justify-center gap-2">
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Exportar Excel</span>
+          </button>
+          <button 
+            onClick={handleNewService}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-sm shadow-indigo-600/20 transition-all flex items-center justify-center gap-2"
+          >
+            <Plus className="w-5 h-5" />
+            Nuevo Servicio
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* Izquierda: Formulario nuevo servicio */}
-        <div className="lg:col-span-7 xl:col-span-8">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 xl:p-8">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-6">Nuevo Servicio</h2>
-            
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Contrato Asociado (Opcional)</label>
-                <select className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-sm text-slate-700 dark:text-slate-300 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all">
-                  <option>Sin contrato especifico</option>
-                  <option>Minera Escondida - CT1</option>
-                  <option>BHP Billiton - CT2</option>
-                  <option>Codelco - CT3</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Tipo de Carga</label>
-                <select className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-sm text-slate-700 dark:text-slate-300 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all">
-                  <option>General / Logística</option>
-                  <option>Peligrosa / MATPEL</option>
-                  <option>Sobredimensionada</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Subtipo</label>
-                <select className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-sm text-slate-700 dark:text-slate-300 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all">
-                  <option>Interprovincial</option>
-                  <option>Urbano</option>
-                  <option>Internacional</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Origen</label>
-                  <input type="text" className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-sm text-slate-700 dark:text-slate-300 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Destino</label>
-                  <input type="text" className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-sm text-slate-700 dark:text-slate-300 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Fecha y Hora</label>
-                <div className="relative">
-                  <input type="datetime-local" className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-sm text-slate-700 dark:text-slate-300 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all [color-scheme:light] dark:[color-scheme:dark]" />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Asignación de Conductor</label>
-                <select className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-sm text-slate-700 dark:text-slate-300 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all mb-1">
-                  <option value="" disabled selected>Seleccione conductor...</option>
-                  <option>Juan Pérez (Disponible)</option>
-                  <option>Carlos Silva (En ruta)</option>
-                </select>
-                <p className="text-xs text-slate-500">Si selecciona un conductor bloqueado, el sistema rechazará la orden.</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Asignación de Unidad</label>
-                <select className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-sm text-slate-700 dark:text-slate-300 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all">
-                  <option value="" disabled selected>Seleccione unidad...</option>
-                  <option>Camión 01 (Patente: AB-CD-12)</option>
-                  <option>Camión 02 (Patente: EF-GH-34)</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Ingreso Proyectado ($)</label>
-                  <input type="number" defaultValue={0} min={0} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-sm text-slate-700 dark:text-slate-300 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Costo Proyectado ($)</label>
-                  <input type="number" defaultValue={0} min={0} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-sm text-slate-700 dark:text-slate-300 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" />
-                </div>
-              </div>
-
-              <button className="w-full mt-4 bg-slate-900 hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white font-bold py-3.5 rounded-lg transition-colors">
-                Crear Orden de Servicio
-              </button>
-            </div>
-          </div>
+      {/* Toolbar / Filtros */}
+      <div className="bg-white dark:bg-slate-900 p-4 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm mb-8 flex flex-col md:flex-row gap-4">
+        <div className="flex-1 relative group">
+          <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+          <input 
+            type="text" 
+            placeholder="Buscar por código, contrato o conductor..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-11 pr-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white"
+          />
         </div>
-
-        {/* Derecha: Validaciones en Tiempo Real */}
-        <div className="lg:col-span-5 xl:col-span-4">
-          <div className="sticky top-6">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-6">Validaciones en Tiempo Real</h2>
-            
-            <div className="space-y-4">
-              <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 bg-white dark:bg-slate-900 shadow-sm">
-                <div className="flex gap-3">
-                  <div className="mt-1">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-sm text-slate-900 dark:text-white">Sincronización de Altitud</h4>
-                    <p className="text-sm text-slate-500 mt-1 leading-relaxed">
-                      Si el servicio es "Interno Mina", el sistema filtra automáticamente personal con examen de altura vigente.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 bg-white dark:bg-slate-900 shadow-sm">
-                <div className="flex gap-3">
-                  <div className="mt-1">
-                    <div className="w-2 h-2 rounded-full bg-indigo-500" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-sm text-slate-900 dark:text-white">Programación Cruzada (Anticolisión)</h4>
-                    <p className="text-sm text-slate-500 mt-1 leading-relaxed">
-                      Bloquea la programación si la unidad tiene mantención preventiva agendada en Lion Fix.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 bg-white dark:bg-slate-900 shadow-sm">
-                <div className="flex gap-3">
-                  <div className="mt-1">
-                    <div className="w-2 h-2 rounded-full bg-amber-500" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-sm text-slate-900 dark:text-white">Bloqueo Preventivo</h4>
-                    <p className="text-sm text-slate-500 mt-1 leading-relaxed">
-                      Impide utilizar recursos con documentación fuera de regla (GDC).
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-          </div>
+        <div className="w-full md:w-64 relative group">
+          <CalendarIcon className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors pointer-events-none" />
+          <input 
+            type="date" 
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className="w-full pl-11 pr-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white [color-scheme:light] dark:[color-scheme:dark]"
+          />
         </div>
-
       </div>
+
+      {/* Lista de Servicios */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {filteredServicios.map((servicio) => (
+          <div key={servicio.id} className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 transition-all group flex flex-col">
+            <div className="flex justify-between items-start mb-4 border-b border-slate-100 dark:border-slate-800/60 pb-4">
+              <div>
+                <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">{servicio.codigo}</span>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-1 leading-tight">{servicio.contrato}</h3>
+              </div>
+              <span className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg border ${getStatusColor(servicio.estado)}`}>
+                {servicio.estado}
+              </span>
+            </div>
+            
+            <div className="space-y-3 flex-1 mb-4">
+              <div className="flex items-center gap-3 text-sm">
+                <FileText className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-600 dark:text-slate-300 font-medium">{servicio.tipo} • {servicio.subtipo}</span>
+              </div>
+              <div className="flex items-start gap-3 text-sm">
+                <MapPin className="w-4 h-4 text-slate-400 mt-0.5" />
+                <div>
+                  <p className="text-slate-600 dark:text-slate-300 font-medium"><span className="text-slate-400">Desde:</span> {servicio.origen}</p>
+                  <p className="text-slate-600 dark:text-slate-300 font-medium"><span className="text-slate-400">Hacia:</span> {servicio.destino}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 text-sm">
+                <CalendarIcon className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-600 dark:text-slate-300 font-medium">{new Date(servicio.fecha).toLocaleString('es-CL')}</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm">
+                <User className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-600 dark:text-slate-300 font-medium">{servicio.conductor}</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm">
+                <Truck className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-600 dark:text-slate-300 font-medium">{servicio.unidad}</span>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800/60 mt-auto">
+               <button 
+                 onClick={() => setSelectedServicio(servicio)}
+                 className="w-full py-2.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm font-bold rounded-xl transition-colors"
+               >
+                 Ver Detalle Operativo
+               </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {filteredServicios.length === 0 && (
+        <div className="text-center py-20 bg-slate-50 dark:bg-slate-900/50 rounded-3xl border border-slate-200 dark:border-slate-800 border-dashed">
+          <Activity className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white">No hay servicios</h3>
+          <p className="text-slate-500 mt-1">Prueba ajustando los filtros de búsqueda.</p>
+        </div>
+      )}
+
+      {/* Modal Nuevo Servicio */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => setIsModalOpen(false)}
+            />
+            
+            <motion.div 
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              className="relative w-full max-w-6xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/30">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center">
+                    <Activity className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">{editingServicio ? 'Editar Servicio' : 'Programar Nuevo Servicio'}</h2>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-0.5">Asignación dinámica e inteligencia operativa</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsModalOpen(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-0">
+                <div className="grid grid-cols-1 lg:grid-cols-12 min-h-full">
+                  
+                  {/* Formulario */}
+                  <div className="lg:col-span-8 p-6 md:p-8 border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-slate-800">
+                    <div className="space-y-6">
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Contrato Asociado (Opcional)</label>
+                          <select value={newContrato} onChange={(e) => setNewContrato(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
+                            <option value="">Sin contrato especifico</option>
+                            <option value="Minera Escondida - CT1">Minera Escondida - CT1</option>
+                            <option value="BHP Billiton - CT2">BHP Billiton - CT2</option>
+                            <option value="Codelco - CT3">Codelco - CT3</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Fecha y Hora de Inicio</label>
+                          <input type="datetime-local" value={newFecha} onChange={(e) => setNewFecha(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white [color-scheme:light] dark:[color-scheme:dark]" />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Tipo de Carga</label>
+                          <select value={newTipoCarga} onChange={e => setNewTipoCarga(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
+                            <option value="">Seleccionar tipo...</option>
+                            <option value="Minero">Minero</option>
+                            <option value="General / Logística">General / Logística</option>
+                            <option value="Peligrosa / MATPEL">Peligrosa / MATPEL</option>
+                            <option value="Sobredimensionada">Sobredimensionada</option>
+                            <option value="Personal">Personal</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Subtipo Operativo</label>
+                          <select value={newSubtipo} onChange={e => setNewSubtipo(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
+                            <option value="">Seleccionar subtipo...</option>
+                            <option value="Interprovincial">Interprovincial</option>
+                            <option value="Urbano">Urbano</option>
+                            <option value="Internacional">Internacional</option>
+                            <option value="Interno Mina">Interno Mina</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Punto de Origen</label>
+                          <input type="text" value={newOrigen} onChange={(e) => setNewOrigen(e.target.value)} placeholder="Ej: Bodega Central" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Punto de Destino</label>
+                          <input type="text" value={newDestino} onChange={(e) => setNewDestino(e.target.value)} placeholder="Ej: Puerto Antofagasta" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Asignar Conductor</label>
+                          <select value={newConductor} onChange={e => setNewConductor(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
+                            <option value="">Seleccionar conductor...</option>
+                            <option value="Juan Pérez">Juan Pérez (Disponible)</option>
+                            <option value="Carlos Silva">Carlos Silva (En ruta)</option>
+                            <option value="Luis Martínez">Luis Martínez (Disponible)</option>
+                            <option value="Ana Gómez">Ana Gómez (Disponible)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Asignar Vehículo/Máquina</label>
+                          <select value={newUnidad} onChange={(e) => setNewUnidad(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
+                            <option value="">Seleccionar unidad...</option>
+                            <option value="Camión C-10">Camión C-10 (Operativo)</option>
+                            <option value="Camión C-11">Camión C-11 (Operativo)</option>
+                            <option value="Minibus M-04">Minibus M-04 (Operativo)</option>
+                            <option value="Tractocamión T-01">Tractocamión T-01 (Mantenimiento próximo)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Ingreso Proyectado ($)</label>
+                          <input type="number" value={newIngreso} onChange={e => setNewIngreso(Number(e.target.value))} min={0} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Costo Proyectado ($)</label>
+                          <input type="number" value={newCosto} onChange={e => setNewCosto(Number(e.target.value))} min={0} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  {/* Panel de Validaciones */}
+                  <div className="lg:col-span-4 bg-slate-50 dark:bg-slate-900/50 p-6 md:p-8">
+                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider mb-6 flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-indigo-500" />
+                      Auditoría en Tiempo Real
+                    </h3>
+
+                    <div className="space-y-4">
+                      {validations.map((v, i) => (
+                        <motion.div 
+                          key={i} 
+                          initial={{ opacity: 0, x: 20 }} 
+                          animate={{ opacity: 1, x: 0 }}
+                          className={`p-4 rounded-2xl border ${
+                            v.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50' :
+                            v.type === 'error' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50' :
+                            v.type === 'warning' ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50' :
+                            'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          <div className="flex gap-3">
+                            <div className="mt-0.5">
+                              {v.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />}
+                              {v.type === 'error' && <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />}
+                              {v.type === 'warning' && <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />}
+                              {v.type === 'info' && <Activity className="w-5 h-5 text-slate-400" />}
+                            </div>
+                            <div>
+                              <p className={`text-sm font-medium leading-relaxed ${
+                                v.type === 'success' ? 'text-emerald-800 dark:text-emerald-300' :
+                                v.type === 'error' ? 'text-red-800 dark:text-red-300' :
+                                v.type === 'warning' ? 'text-amber-800 dark:text-amber-300' :
+                                'text-slate-600 dark:text-slate-400'
+                              }`}>
+                                {v.text}
+                              </p>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+
+                    <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-800/60">
+                      <div className="bg-slate-100 dark:bg-slate-800 rounded-xl p-4 text-xs font-medium text-slate-600 dark:text-slate-400 leading-relaxed">
+                        Este panel cruza información con Gestión de Contratos (GDC) y Finanzas para validar la rentabilidad y asegurar el cumplimiento normativo antes de confirmar el servicio.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-white dark:bg-slate-900">
+                 <button 
+                   onClick={() => setIsModalOpen(false)}
+                   className="px-6 py-3 rounded-xl font-bold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                 >
+                   Cancelar
+                 </button>
+                 <button 
+                   disabled={validations.some(v => v.type === 'error')}
+                   onClick={() => setIsModalOpen(false)}
+                   className="px-8 py-3 rounded-xl font-black text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-indigo-600/20 transition-all flex items-center gap-2"
+                 >
+                   <CheckCircle2 className="w-5 h-5" />
+                   {editingServicio ? 'Guardar Cambios' : 'Confirmar Servicio'}
+                 </button>
+              </div>
+
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Detalle de Servicio Side Panel */}
+      <AnimatePresence>
+        {selectedServicio && !showHojaRuta && (
+          <div className="fixed inset-0 z-50 flex items-stretch justify-end">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => setSelectedServicio(null)}
+            />
+            
+            <motion.div 
+              initial={{ x: '100%', opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="relative w-full max-w-lg bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col"
+            >
+              <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center font-black text-xs">
+                    {selectedServicio.codigo.replace('SRV-', '')}
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">{selectedServicio.codigo}</h2>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-widest rounded-md border ${getStatusColor(selectedServicio.estado)}`}>
+                        {selectedServicio.estado}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedServicio(null)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 md:p-8">
+                <div className="space-y-8">
+                  
+                  {/* Datos Principales */}
+                  <div>
+                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Información del Servicio</h3>
+                    <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4">
+                      
+                      <div>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Contrato o Cliente</p>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{selectedServicio.contrato}</p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-1">
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tipo Operación</p>
+                          <div className="flex">
+                            <span className="inline-block px-2.5 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-bold text-xs rounded-md">
+                              {selectedServicio.tipo}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Subtipo</p>
+                          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                            {selectedServicio.subtipo}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-slate-200 dark:border-slate-800 grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Ingreso Estimado</p>
+                          <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">
+                            ${selectedServicio.ingreso?.toLocaleString('es-CL') || '0'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Costo Estimado</p>
+                          <p className="text-lg font-black text-red-600 dark:text-red-400">
+                            ${selectedServicio.costo?.toLocaleString('es-CL') || '0'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Ruta y Programación */}
+                  <div>
+                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Ruta y Programación</h3>
+                    <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
+                      <div className="flex flex-col gap-5">
+                        <div className="flex gap-4 items-start relative">
+                           <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center z-10">
+                             <MapPin className="w-4 h-4 text-slate-500" />
+                           </div>
+                           <div className="absolute top-8 left-4 bottom-[-20px] w-0.5 bg-slate-200 dark:bg-slate-800"></div>
+                           <div>
+                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Origen</p>
+                             <p className="text-sm font-semibold text-slate-900 dark:text-white">{selectedServicio.origen}</p>
+                           </div>
+                        </div>
+                        <div className="flex gap-4 items-start">
+                           <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center z-10">
+                             <MapPin className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                           </div>
+                           <div>
+                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Destino</p>
+                             <p className="text-sm font-semibold text-slate-900 dark:text-white">{selectedServicio.destino}</p>
+                           </div>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-5 pt-5 border-t border-slate-200 dark:border-slate-800 flex items-center gap-3">
+                         <CalendarIcon className="w-5 h-5 text-slate-400" />
+                         <div>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Fecha Programada</p>
+                            <p className="text-sm font-bold text-slate-900 dark:text-white">{new Date(selectedServicio.fecha).toLocaleString('es-CL')}</p>
+                         </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Asignaciones */}
+                  <div>
+                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Asignación de Recursos</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col items-center text-center">
+                        <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center mb-3">
+                          <User className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Conductor</p>
+                        <p className="text-sm font-bold text-slate-900 dark:text-white">{selectedServicio.conductor}</p>
+                      </div>
+                      <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col items-center text-center">
+                        <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center mb-3">
+                          <Truck className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Unidad</p>
+                        <p className="text-sm font-bold text-slate-900 dark:text-white">{selectedServicio.unidad}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Acciones de detalle */}
+              <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex flex-col gap-3">
+                 <button 
+                   onClick={handleEditService}
+                   className="w-full py-3.5 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-all focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                 >
+                   Editar Servicio
+                 </button>
+                 <button 
+                   onClick={() => setShowHojaRuta(true)}
+                   className="w-full py-3.5 rounded-xl font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all flex items-center justify-center gap-2"
+                 >
+                   Ver Hoja de Ruta <ChevronRight className="w-4 h-4" />
+                 </button>
+                 <button className="w-full py-3.5 rounded-xl font-bold bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-all">
+                   Anular Servicio
+                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Hoja de Ruta Full Screen */}
+      <AnimatePresence>
+        {showHojaRuta && selectedServicio && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 lg:p-8">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+              onClick={() => setShowHojaRuta(false)}
+            />
+            
+            <motion.div 
+              initial={{ y: 50, opacity: 0, scale: 0.95 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 50, opacity: 0, scale: 0.95 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="relative w-full max-w-5xl bg-slate-50 dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              {/* Header Hoja de Ruta */}
+              <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-950 sticky top-0 z-10">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-600/20">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Hoja de Ruta Digital</h2>
+                    <div className="flex items-center gap-3 mt-1">
+                      <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">{selectedServicio.codigo}</span>
+                      <div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700"></div>
+                      <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">{selectedServicio.contrato}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button className="hidden sm:flex px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-sm shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors items-center gap-2">
+                    <Download className="w-4 h-4" />
+                    Descargar PDF
+                  </button>
+                  <button 
+                    onClick={() => setShowHojaRuta(false)}
+                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition-colors bg-slate-100 dark:bg-slate-900"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Contenido Hoja de Ruta */}
+              <div className="flex-1 overflow-y-auto p-0">
+                <div className="grid grid-cols-1 lg:grid-cols-3 min-h-full">
+                  
+                  {/* Columna Izquierda: Linea de Tiempo */}
+                  <div className="lg:col-span-2 p-6 md:p-8 bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800">
+                    <div className="flex items-center justify-between mb-8">
+                       <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                         <Activity className="w-5 h-5 text-indigo-500" />
+                         Progreso del Viaje
+                       </h3>
+                       <span className={`px-3 py-1 text-xs font-black uppercase tracking-widest rounded-lg border ${getStatusColor(selectedServicio.estado)}`}>
+                         {selectedServicio.estado}
+                       </span>
+                    </div>
+
+                    <div className="relative pl-8 space-y-10 before:absolute before:inset-0 before:ml-[39px] before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-emerald-500 before:via-indigo-500 before:to-slate-200 dark:before:to-slate-800">
+                       
+                       {/* Origen */}
+                       <div className="relative flex items-start group">
+                         <div className="absolute left-[-32px] w-8 h-8 rounded-full bg-emerald-500 border-4 border-white dark:border-slate-950 flex items-center justify-center shadow-lg z-10">
+                           <CheckCircle2 className="w-4 h-4 text-white" />
+                         </div>
+                         <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 w-full ml-6">
+                           <div className="flex justify-between items-start mb-2">
+                             <h4 className="font-bold text-slate-900 dark:text-white text-base">Salida: {selectedServicio.origen}</h4>
+                             <span className="text-xs font-bold text-slate-500 bg-white dark:bg-slate-800 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 flex items-center gap-1">
+                               <Clock className="w-3 h-3" />
+                               {new Date(selectedServicio.fecha).toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'})}
+                             </span>
+                           </div>
+                           <p className="text-sm text-slate-600 dark:text-slate-400">Revisión pre-operacional completada (Checklist #4521). Carga asegurada, documentación a bordo.</p>
+                           <div className="mt-4 flex gap-2">
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-lg">
+                                <ShieldCheck className="w-3 h-3" /> Verificado
+                              </span>
+                           </div>
+                         </div>
+                       </div>
+
+                       {/* Punto intermedio (En Ruta) */}
+                       <div className="relative flex items-start group">
+                         <div className="absolute left-[-32px] w-8 h-8 rounded-full bg-indigo-500 border-4 border-white dark:border-slate-950 flex items-center justify-center shadow-lg z-10">
+                           <Truck className="w-4 h-4 text-white" />
+                         </div>
+                         <div className="bg-indigo-50/50 dark:bg-indigo-900/10 rounded-2xl p-5 border border-indigo-100 dark:border-indigo-500/20 w-full ml-6">
+                           <div className="flex justify-between items-start mb-2">
+                             <h4 className="font-bold text-indigo-900 dark:text-white text-base">Control Peaje General</h4>
+                             <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-800 px-2 py-1 rounded-md border border-indigo-100 dark:border-indigo-500/30 flex items-center gap-1">
+                               <Clock className="w-3 h-3" />
+                               +2h 30m
+                             </span>
+                           </div>
+                           <p className="text-sm text-indigo-700/80 dark:text-indigo-300">Punto de control intermedio. GPS reporta velocidad estable (85km/h).</p>
+                         </div>
+                       </div>
+
+                       {/* Destino */}
+                       <div className="relative flex items-start group">
+                         <div className="absolute left-[-32px] w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 border-4 border-white dark:border-slate-950 flex items-center justify-center shadow-sm z-10">
+                           <MapPin className="w-4 h-4 text-slate-500" />
+                         </div>
+                         <div className="bg-white dark:bg-slate-950 opacity-60 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 border-dashed w-full ml-6">
+                           <div className="flex justify-between items-start mb-2">
+                             <h4 className="font-bold text-slate-500 dark:text-slate-400 text-base">Llegada: {selectedServicio.destino}</h4>
+                             <span className="text-xs font-bold text-slate-400 bg-slate-50 dark:bg-slate-900 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-800">
+                               Estimado: {new Date(new Date(selectedServicio.fecha).getTime() + 5 * 60 * 60 * 1000).toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'})}
+                             </span>
+                           </div>
+                           <p className="text-sm text-slate-500 dark:text-slate-500">Pendiente de llegada y firma de recepción (Guía de Despacho).</p>
+                         </div>
+                       </div>
+
+                    </div>
+                  </div>
+
+                  {/* Columna Derecha: Detalles operativos */}
+                  <div className="lg:col-span-1 p-6 md:p-8 bg-slate-50 dark:bg-slate-900 flex flex-col gap-6">
+                     
+                     {/* QR de Validación */}
+                     <div className="bg-white dark:bg-slate-950 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center text-center shadow-sm">
+                       <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Código de Validación en Terreno</h4>
+                       <div className="w-32 h-32 bg-slate-100 dark:bg-slate-900 rounded-xl mb-3 flex items-center justify-center border-2 border-slate-200 dark:border-slate-800 border-dashed">
+                         {/* Placeholder para QR Real */}
+                         <Activity className="w-10 h-10 text-slate-300 dark:text-slate-700" />
+                       </div>
+                       <p className="text-xs text-slate-500 font-medium">Escanear para registrar llegada e iniciar protocolo de descarga.</p>
+                     </div>
+
+                     {/* Datos Conductor / Vehículo */}
+                     <div className="bg-white dark:bg-slate-950 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-5 shadow-sm">
+                        <div>
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center">
+                              <User className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                            </div>
+                            <h4 className="text-sm font-bold text-slate-900 dark:text-white">Tripulación</h4>
+                          </div>
+                          <div className="pl-11 space-y-1">
+                            <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">{selectedServicio.conductor}</p>
+                            <p className="text-xs text-slate-500 font-medium">Licencia A-5, A-2 Vigente</p>
+                          </div>
+                        </div>
+                        
+                        <div className="h-px w-full bg-slate-100 dark:bg-slate-800" />
+
+                        <div>
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center">
+                              <Truck className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                            </div>
+                            <h4 className="text-sm font-bold text-slate-900 dark:text-white">Unidad de Transporte</h4>
+                          </div>
+                          <div className="pl-11 space-y-1">
+                            <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">{selectedServicio.unidad}</p>
+                            <p className="text-xs text-slate-500 font-medium">Patente: AB-CD-12</p>
+                          </div>
+                        </div>
+                     </div>
+
+                     {/* Incidentes o Notas */}
+                     <div className="bg-amber-50 dark:bg-amber-900/20 p-5 rounded-2xl border border-amber-200 dark:border-amber-800/50 flex-1">
+                        <div className="flex items-center gap-3 mb-3">
+                          <FileWarning className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                          <h4 className="text-sm font-bold text-amber-900 dark:text-amber-400">Instrucciones Especiales</h4>
+                        </div>
+                        <p className="text-sm text-amber-800/80 dark:text-amber-300/80 leading-relaxed font-medium">
+                          {selectedServicio.tipo === 'Peligrosa / MATPEL' 
+                            ? 'Transporte de materiales peligrosos. Velocidad máxima reducida en ruta estructurante de minera. Se requiere escolta desde kilómetro 45.' 
+                            : 'El protocolo de ingreso a faena requiere presentar inducción de seguridad y certificado de somnolencia al día al momento de llegar a garita.'}
+                        </p>
+                     </div>
+
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }
