@@ -15,6 +15,7 @@ import KpiFlota from './pages/dashboard/KpiFlota';
 import KpiRRHH from './pages/dashboard/KpiRRHH';
 import AnalisisFallas from './pages/dashboard/AnalisisFallas';
 import PanelTco from './pages/dashboard/PanelTco';
+import ReporteMaestro from './pages/dashboard/ReporteMaestro';
 import { ThemeProvider } from './components/ThemeProvider';
 import { CompanyProvider } from './contexts/CompanyContext';
 
@@ -32,6 +33,7 @@ const router = createBrowserRouter([
       { path: "dashboard/kpi-rrhh", element: <KpiRRHH /> },
       { path: "dashboard/fallas", element: <AnalisisFallas /> },
       { path: "dashboard/tco", element: <PanelTco /> },
+      { path: "dashboard/reporte-maestro", element: <ReporteMaestro /> },
       { path: "*", element: <GenericPage /> },
     ]
   }
