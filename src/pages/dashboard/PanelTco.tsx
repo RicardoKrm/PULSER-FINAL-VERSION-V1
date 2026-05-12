@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { DollarSign, Filter, Calendar, FileText, FileSpreadsheet, TrendingDown, TrendingUp, Search, RefreshCw, X, ArrowRight, ChevronRight, BarChart2 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -6,18 +6,128 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value);
+};
+
+const formatCompactNumber = (number: number) => {
+  return Intl.NumberFormat('es-CL', {
+    notation: "compact",
+    maximumFractionDigits: 1
+  }).format(number);
+};
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-900 border border-slate-700 rounded-xl p-3 shadow-xl z-50">
+        <p className="text-white font-bold mb-2">{label}</p>
+        {payload.map((entry: any, index: number) => {
+           if (entry.value === 0) return null;
+           const entryKey = entry.dataKey || entry.name || `entry-${index}`;
+           return (
+            <div key={`tooltip-${index}-${entryKey}`} className="flex items-center justify-between gap-4 text-xs mt-1">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                <span className="text-slate-300 capitalize">{entry.name}</span>
+              </div>
+              <span className="font-bold" style={{ color: entry.color }}>
+                {entry.name.toLowerCase().includes('margen') 
+                  ? `${entry.value}%` 
+                  : entry.name.toLowerCase().includes('costo') && entry.value < 2000 
+                    ? `$${entry.value}` 
+                    : formatCurrency(entry.value)}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    );
+  }
+  return null;
+};
+
+const DesgloseChartInteractive = memo(({ data }: { data: any[] }) => {
+  const [disabledSeries, setDisabledSeries] = useState<Record<string, boolean>>({});
+  const handleLegendClick = (dataKey: string) => {
+    setDisabledSeries(prev => ({ ...prev, [dataKey]: !prev[dataKey] }));
+  };
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={data} margin={{ top: 10, right: 10, left: 20, bottom: 0 }} barSize={120}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#64748b" opacity={0.15} />
+        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 13, fontWeight: 'bold' }} dy={10} />
+        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11, fontWeight: 'medium' }} tickFormatter={formatCompactNumber} />
+        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent' }} />
+        <Legend 
+          wrapperStyle={{ fontSize: '11px', paddingTop: '20px', fontWeight: 'bold', cursor: 'pointer' }} 
+          iconType="circle" 
+          onClick={(e: any) => handleLegendClick(e.dataKey)} 
+        />
+        
+        <Bar dataKey="combustible" stackId="a" fill="#38bdf8" name="Combustible" hide={disabledSeries['combustible']} fillOpacity={disabledSeries['combustible'] ? 0.3 : 1} />
+        <Bar dataKey="peajes" stackId="a" fill="#c4b5fd" name="Peajes y Estacs." hide={disabledSeries['peajes']} />
+        <Bar dataKey="salarios" stackId="a" fill="#fcd34d" name="Fijo (Seguros, Salarios)" hide={disabledSeries['salarios']} />
+        <Bar dataKey="mantenimiento" stackId="a" fill="#fca5a5" name="Mantenimiento" hide={disabledSeries['mantenimiento']} />
+        
+        <Bar dataKey="ingresoContrato" stackId="b" fill="#a78bfa" name="Ingreso Fijo" hide={disabledSeries['ingresoContrato']} />
+        <Bar dataKey="ingresoVariable" stackId="b" fill="#818cf8" name="Ingreso Variable" hide={disabledSeries['ingresoVariable']} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+});
+
+const RentabilidadChartInteractive = memo(({ data }: { data: any[] }) => {
+  const [disabledSeries, setDisabledSeries] = useState<Record<string, boolean>>({});
+  const handleLegendClick = (dataKey: string) => {
+    setDisabledSeries(prev => ({ ...prev, [dataKey]: !prev[dataKey] }));
+  };
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }} barGap={0} barCategoryGap="20%">
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#64748b" opacity={0.15} />
+        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11, fontWeight: 'bold' }} dy={10} />
+        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11, fontWeight: 'medium' }} tickFormatter={formatCompactNumber} />
+        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,0,0,0.05)' }} />
+        <Legend 
+          wrapperStyle={{ fontSize: '11px', paddingTop: '10px', paddingBottom: '20px', fontWeight: 'bold', cursor: 'pointer' }} 
+          iconType="rect" 
+          verticalAlign="bottom"
+          onClick={(e: any) => handleLegendClick(e.dataKey)}
+          payload={[
+            { value: 'Ingreso por Contrato', type: 'rect', id: 'ingresoContrato', color: '#93c5fd' },
+            { value: 'Costo Fijo (Seguros, Salarios)', type: 'rect', id: 'costoFijo', color: '#a7f3d0' },
+            { value: 'Combustible', type: 'rect', id: 'combustible', color: '#fca5a5' },
+            { value: 'Neumáticos', type: 'rect', id: 'neumaticos', color: '#fdba74' },
+            { value: 'Peajes y Estacionamientos', type: 'rect', id: 'peajes', color: '#f9a8d4' },
+            { value: 'Lubricantes y Fluidos', type: 'rect', id: 'lubricantes', color: '#6ee7b7' },
+            { value: 'Costo Extraordinario (Multas)', type: 'rect', id: 'extraordinario', color: '#d6d3d1' },
+            { value: 'Mantenimiento Preventivo', type: 'rect', id: 'mttoPreventivo', color: '#bae6fd' },
+            { value: 'Mantenimiento Correctivo', type: 'rect', id: 'mttoCorrectivo', color: '#86efac' },
+            { value: 'Mantenimiento Evaluativo', type: 'rect', id: 'mttoEvaluativo', color: '#818cf8' }
+          ]}
+        />
+        <Bar dataKey="ingresoContrato" stackId="a" fill="#93c5fd" name="Ingreso por Contrato" hide={disabledSeries['ingresoContrato']} />
+        <Bar dataKey="costoFijo" stackId="a" fill="#a7f3d0" name="Costo Fijo (Seguros, Salarios)" hide={disabledSeries['costoFijo']} />
+        <Bar dataKey="combustible" stackId="a" fill="#fca5a5" name="Combustible" hide={disabledSeries['combustible']} />
+        <Bar dataKey="neumaticos" stackId="a" fill="#fdba74" name="Neumáticos" hide={disabledSeries['neumaticos']} />
+        <Bar dataKey="peajes" stackId="a" fill="#f9a8d4" name="Peajes y Estacionamientos" hide={disabledSeries['peajes']} />
+        <Bar dataKey="lubricantes" stackId="a" fill="#6ee7b7" name="Lubricantes y Fluidos" hide={disabledSeries['lubricantes']} />
+        <Bar dataKey="extraordinario" stackId="a" fill="#d6d3d1" name="Costo Extraordinario (Multas)" hide={disabledSeries['extraordinario']} />
+        <Bar dataKey="mttoPreventivo" stackId="a" fill="#bae6fd" name="Mantenimiento Preventivo" hide={disabledSeries['mttoPreventivo']} />
+        <Bar dataKey="mttoCorrectivo" stackId="a" fill="#86efac" name="Mantenimiento Correctivo" hide={disabledSeries['mttoCorrectivo']} />
+        <Bar dataKey="mttoEvaluativo" stackId="a" fill="#818cf8" name="Mantenimiento Evaluativo" hide={disabledSeries['mttoEvaluativo']} />
+        <Brush dataKey="name" height={30} stroke="#cbd5e1" fill="#f8fafc" travellerWidth={10} tickFormatter={() => ''} className="dark:fill-slate-800 dark:stroke-slate-700" />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+});
+
 export default function PanelTco() {
   const [showFilters, setShowFilters] = useState(true);
   const [isFiltering, setIsFiltering] = useState(false);
-
-  const [disabledSeries, setDisabledSeries] = useState<Record<string, boolean>>({});
-
-  const handleLegendClick = (dataKey: string) => {
-    setDisabledSeries(prev => ({
-      ...prev,
-      [dataKey]: !prev[dataKey]
-    }));
-  };
 
   // Mock Data
   const kpis = {
@@ -365,27 +475,7 @@ export default function PanelTco() {
             <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-3 py-1 rounded-full whitespace-nowrap">CLP Totales</span>
           </div>
           <div className="h-[380px] w-full relative z-10">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={desgloseData} margin={{ top: 10, right: 10, left: 20, bottom: 0 }} barSize={120}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#64748b" opacity={0.15} />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 13, fontWeight: 'bold' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11, fontWeight: 'medium' }} tickFormatter={formatCompactNumber} />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent' }} />
-                <Legend 
-                  wrapperStyle={{ fontSize: '11px', paddingTop: '20px', fontWeight: 'bold', cursor: 'pointer' }} 
-                  iconType="circle" 
-                  onClick={(e: any) => handleLegendClick(e.dataKey)} 
-                />
-                
-                <Bar dataKey="combustible" stackId="a" fill="#38bdf8" name="Combustible" hide={disabledSeries['combustible']} fillOpacity={disabledSeries['combustible'] ? 0.3 : 1} />
-                <Bar dataKey="peajes" stackId="a" fill="#c4b5fd" name="Peajes y Estacs." hide={disabledSeries['peajes']} />
-                <Bar dataKey="salarios" stackId="a" fill="#fcd34d" name="Fijo (Seguros, Salarios)" hide={disabledSeries['salarios']} />
-                <Bar dataKey="mantenimiento" stackId="a" fill="#fca5a5" name="Mantenimiento" hide={disabledSeries['mantenimiento']} />
-                
-                <Bar dataKey="ingresoContrato" stackId="b" fill="#a78bfa" name="Ingreso Fijo" hide={disabledSeries['ingresoContrato']} />
-                <Bar dataKey="ingresoVariable" stackId="b" fill="#818cf8" name="Ingreso Variable" hide={disabledSeries['ingresoVariable']} />
-              </BarChart>
-            </ResponsiveContainer>
+            <DesgloseChartInteractive data={desgloseData} />
           </div>
         </div>
 
@@ -395,43 +485,7 @@ export default function PanelTco() {
             <span className="text-[10px] font-bold bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full whitespace-nowrap">Por Kilómetro y Viaje</span>
           </div>
           <div className="h-[460px] w-full relative z-10 pb-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={rentabilidadVehiculo} margin={{ top: 10, right: 10, left: 10, bottom: 0 }} barGap={0} barCategoryGap="20%">
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#64748b" opacity={0.15} />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11, fontWeight: 'bold' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11, fontWeight: 'medium' }} tickFormatter={formatCompactNumber} />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,0,0,0.05)' }} />
-                <Legend 
-                  wrapperStyle={{ fontSize: '11px', paddingTop: '10px', paddingBottom: '20px', fontWeight: 'bold', cursor: 'pointer' }} 
-                  iconType="rect" 
-                  verticalAlign="bottom"
-                  onClick={(e: any) => handleLegendClick(e.dataKey)}
-                  payload={[
-                    { value: 'Ingreso por Contrato', type: 'rect', id: 'ingresoContrato', color: '#93c5fd' },
-                    { value: 'Costo Fijo (Seguros, Salarios)', type: 'rect', id: 'costoFijo', color: '#a7f3d0' },
-                    { value: 'Combustible', type: 'rect', id: 'combustible', color: '#fca5a5' },
-                    { value: 'Neumáticos', type: 'rect', id: 'neumaticos', color: '#fdba74' },
-                    { value: 'Peajes y Estacionamientos', type: 'rect', id: 'peajes', color: '#f9a8d4' },
-                    { value: 'Lubricantes y Fluidos', type: 'rect', id: 'lubricantes', color: '#6ee7b7' },
-                    { value: 'Costo Extraordinario (Multas)', type: 'rect', id: 'extraordinario', color: '#d6d3d1' },
-                    { value: 'Mantenimiento Preventivo', type: 'rect', id: 'mttoPreventivo', color: '#bae6fd' },
-                    { value: 'Mantenimiento Correctivo', type: 'rect', id: 'mttoCorrectivo', color: '#86efac' },
-                    { value: 'Mantenimiento Evaluativo', type: 'rect', id: 'mttoEvaluativo', color: '#818cf8' }
-                  ]}
-                />
-                <Bar dataKey="ingresoContrato" stackId="a" fill="#93c5fd" name="Ingreso por Contrato" hide={disabledSeries['ingresoContrato']} />
-                <Bar dataKey="costoFijo" stackId="a" fill="#a7f3d0" name="Costo Fijo (Seguros, Salarios)" hide={disabledSeries['costoFijo']} />
-                <Bar dataKey="combustible" stackId="a" fill="#fca5a5" name="Combustible" hide={disabledSeries['combustible']} />
-                <Bar dataKey="neumaticos" stackId="a" fill="#fdba74" name="Neumáticos" hide={disabledSeries['neumaticos']} />
-                <Bar dataKey="peajes" stackId="a" fill="#f9a8d4" name="Peajes y Estacionamientos" hide={disabledSeries['peajes']} />
-                <Bar dataKey="lubricantes" stackId="a" fill="#6ee7b7" name="Lubricantes y Fluidos" hide={disabledSeries['lubricantes']} />
-                <Bar dataKey="extraordinario" stackId="a" fill="#d6d3d1" name="Costo Extraordinario (Multas)" hide={disabledSeries['extraordinario']} />
-                <Bar dataKey="mttoPreventivo" stackId="a" fill="#bae6fd" name="Mantenimiento Preventivo" hide={disabledSeries['mttoPreventivo']} />
-                <Bar dataKey="mttoCorrectivo" stackId="a" fill="#86efac" name="Mantenimiento Correctivo" hide={disabledSeries['mttoCorrectivo']} />
-                <Bar dataKey="mttoEvaluativo" stackId="a" fill="#818cf8" name="Mantenimiento Evaluativo" hide={disabledSeries['mttoEvaluativo']} />
-                <Brush dataKey="name" height={30} stroke="#cbd5e1" fill="#f8fafc" travellerWidth={10} tickFormatter={() => ''} className="dark:fill-slate-800 dark:stroke-slate-700" />
-              </BarChart>
-            </ResponsiveContainer>
+            <RentabilidadChartInteractive data={rentabilidadVehiculo} />
           </div>
         </div>
 
