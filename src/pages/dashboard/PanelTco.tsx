@@ -10,6 +10,15 @@ export default function PanelTco() {
   const [showFilters, setShowFilters] = useState(true);
   const [isFiltering, setIsFiltering] = useState(false);
 
+  const [disabledSeries, setDisabledSeries] = useState<Record<string, boolean>>({});
+
+  const handleLegendClick = (dataKey: string) => {
+    setDisabledSeries(prev => ({
+      ...prev,
+      [dataKey]: !prev[dataKey]
+    }));
+  };
+
   // Mock Data
   const kpis = {
     ingresosTotales: 1547370000,
@@ -44,30 +53,47 @@ export default function PanelTco() {
   const rentabilidadVehiculo = Array.from({ length: 30 }, (_, i) => {
     const id = i + 1;
     let ingresoContrato = Math.floor(Math.random() * 4000000) + 1000000;
-    let ingresoVariable = Math.floor(Math.random() * 2000000) + 500000;
-    let otrosIngresos = Math.random() > 0.8 ? Math.floor(Math.random() * 500000) : 0;
+    
+    let costoFijo = Math.floor(Math.random() * 800000) + 200000;
+    let combustible = Math.floor(Math.random() * 1500000) + 500000;
+    let neumaticos = Math.floor(Math.random() * 200000) + 50000;
+    let peajes = Math.floor(Math.random() * 300000) + 50000;
+    let lubricantes = Math.floor(Math.random() * 100000) + 20000;
+    let extraordinario = Math.random() > 0.8 ? Math.floor(Math.random() * 200000) : 0;
+    
+    let mttoPreventivo = Math.floor(Math.random() * 400000) + 100000;
+    let mttoCorrectivo = Math.random() > 0.6 ? Math.floor(Math.random() * 600000) : 0;
+    let mttoEvaluativo = Math.random() > 0.7 ? Math.floor(Math.random() * 300000) : 0;
     
     // Simulate some huge outliers like the screenshot for realism
     if (id >= 27 && id <= 30) {
-      ingresoVariable = 16000000000; 
-      ingresoContrato = 0;
-      otrosIngresos = 0;
+      ingresoContrato = 16000000000; 
+      combustible = 6000000000;
+      mttoPreventivo = 2000000000;
     }
     if (id >= 12 && id <= 26) {
       ingresoContrato = 4000000000; 
-      ingresoVariable = 0;
-      otrosIngresos = 0;
+      combustible = 1500000000;
+      peajes = 500000000;
+      mttoCorrectivo = 0;
     }
     if (id >= 5 && id <= 8) {
       ingresoContrato = 2500000000;
-      ingresoVariable = 0;
+      mttoEvaluativo = 500000000;
     }
     
     return {
       name: `${id}`,
       ingresoContrato,
-      ingresoVariable,
-      otrosIngresos
+      costoFijo,
+      combustible,
+      neumaticos,
+      peajes,
+      lubricantes,
+      extraordinario,
+      mttoPreventivo,
+      mttoCorrectivo,
+      mttoEvaluativo
     };
   });
 
@@ -335,7 +361,7 @@ export default function PanelTco() {
             <BarChart2 className="w-32 h-32 text-slate-900 dark:text-white" />
           </div>
           <div className="flex justify-between items-center mb-8 relative z-10 w-full">
-            <h3 className="text-sm md:text-base font-black text-slate-900 dark:text-white uppercase tracking-tight">Desglose General</h3>
+            <h3 className="text-sm md:text-base font-black text-slate-900 dark:text-white uppercase tracking-tight">Desglose Ingresos y Costos</h3>
             <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-3 py-1 rounded-full whitespace-nowrap">CLP Totales</span>
           </div>
           <div className="h-[380px] w-full relative z-10">
@@ -345,15 +371,19 @@ export default function PanelTco() {
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 13, fontWeight: 'bold' }} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11, fontWeight: 'medium' }} tickFormatter={formatCompactNumber} />
                 <Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent' }} />
-                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '20px', fontWeight: 'bold' }} iconType="circle" />
+                <Legend 
+                  wrapperStyle={{ fontSize: '11px', paddingTop: '20px', fontWeight: 'bold', cursor: 'pointer' }} 
+                  iconType="circle" 
+                  onClick={(e: any) => handleLegendClick(e.dataKey)} 
+                />
                 
-                <Bar dataKey="combustible" stackId="a" fill="#fca5a5" name="Combustible" />
-                <Bar dataKey="peajes" stackId="a" fill="#93c5fd" name="Peajes y Estacs." />
-                <Bar dataKey="salarios" stackId="a" fill="#c4b5fd" name="Fijo (Seguros, Salarios)" />
-                <Bar dataKey="mantenimiento" stackId="a" fill="#fcd34d" name="Mantenimiento" />
+                <Bar dataKey="combustible" stackId="a" fill="#38bdf8" name="Combustible" hide={disabledSeries['combustible']} fillOpacity={disabledSeries['combustible'] ? 0.3 : 1} />
+                <Bar dataKey="peajes" stackId="a" fill="#c4b5fd" name="Peajes y Estacs." hide={disabledSeries['peajes']} />
+                <Bar dataKey="salarios" stackId="a" fill="#fcd34d" name="Fijo (Seguros, Salarios)" hide={disabledSeries['salarios']} />
+                <Bar dataKey="mantenimiento" stackId="a" fill="#fca5a5" name="Mantenimiento" hide={disabledSeries['mantenimiento']} />
                 
-                <Bar dataKey="ingresoContrato" stackId="b" fill="#a78bfa" name="Ingreso Fijo" />
-                <Bar dataKey="ingresoVariable" stackId="b" fill="#38bdf8" name="Ingreso Variable" />
+                <Bar dataKey="ingresoContrato" stackId="b" fill="#a78bfa" name="Ingreso Fijo" hide={disabledSeries['ingresoContrato']} />
+                <Bar dataKey="ingresoVariable" stackId="b" fill="#818cf8" name="Ingreso Variable" hide={disabledSeries['ingresoVariable']} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -372,18 +402,33 @@ export default function PanelTco() {
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11, fontWeight: 'medium' }} tickFormatter={formatCompactNumber} />
                 <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,0,0,0.05)' }} />
                 <Legend 
-                  wrapperStyle={{ fontSize: '11px', paddingTop: '10px', paddingBottom: '20px', fontWeight: 'bold' }} 
+                  wrapperStyle={{ fontSize: '11px', paddingTop: '10px', paddingBottom: '20px', fontWeight: 'bold', cursor: 'pointer' }} 
                   iconType="rect" 
                   verticalAlign="bottom"
+                  onClick={(e: any) => handleLegendClick(e.dataKey)}
                   payload={[
-                    { value: 'Ingreso por Contrato', type: 'rect', id: 'ingresoContrato', color: '#7dd3fc' },
-                    { value: 'Ingreso Variable (Viaje, KM)', type: 'rect', id: 'ingresoVariable', color: '#fdba74' },
-                    { value: 'Otros Ingresos', type: 'rect', id: 'otrosIngresos', color: '#f9a8d4' }
+                    { value: 'Ingreso por Contrato', type: 'rect', id: 'ingresoContrato', color: '#93c5fd' },
+                    { value: 'Costo Fijo (Seguros, Salarios)', type: 'rect', id: 'costoFijo', color: '#a7f3d0' },
+                    { value: 'Combustible', type: 'rect', id: 'combustible', color: '#fca5a5' },
+                    { value: 'Neumáticos', type: 'rect', id: 'neumaticos', color: '#fdba74' },
+                    { value: 'Peajes y Estacionamientos', type: 'rect', id: 'peajes', color: '#f9a8d4' },
+                    { value: 'Lubricantes y Fluidos', type: 'rect', id: 'lubricantes', color: '#6ee7b7' },
+                    { value: 'Costo Extraordinario (Multas)', type: 'rect', id: 'extraordinario', color: '#d6d3d1' },
+                    { value: 'Mantenimiento Preventivo', type: 'rect', id: 'mttoPreventivo', color: '#bae6fd' },
+                    { value: 'Mantenimiento Correctivo', type: 'rect', id: 'mttoCorrectivo', color: '#86efac' },
+                    { value: 'Mantenimiento Evaluativo', type: 'rect', id: 'mttoEvaluativo', color: '#818cf8' }
                   ]}
                 />
-                <Bar dataKey="ingresoContrato" stackId="a" fill="#7dd3fc" name="Ingreso por Contrato" />
-                <Bar dataKey="ingresoVariable" stackId="a" fill="#fdba74" name="Ingreso Variable (Viaje, KM)" />
-                <Bar dataKey="otrosIngresos" stackId="a" fill="#f9a8d4" name="Otros Ingresos" radius={[4,4,0,0]} />
+                <Bar dataKey="ingresoContrato" stackId="a" fill="#93c5fd" name="Ingreso por Contrato" hide={disabledSeries['ingresoContrato']} />
+                <Bar dataKey="costoFijo" stackId="a" fill="#a7f3d0" name="Costo Fijo (Seguros, Salarios)" hide={disabledSeries['costoFijo']} />
+                <Bar dataKey="combustible" stackId="a" fill="#fca5a5" name="Combustible" hide={disabledSeries['combustible']} />
+                <Bar dataKey="neumaticos" stackId="a" fill="#fdba74" name="Neumáticos" hide={disabledSeries['neumaticos']} />
+                <Bar dataKey="peajes" stackId="a" fill="#f9a8d4" name="Peajes y Estacionamientos" hide={disabledSeries['peajes']} />
+                <Bar dataKey="lubricantes" stackId="a" fill="#6ee7b7" name="Lubricantes y Fluidos" hide={disabledSeries['lubricantes']} />
+                <Bar dataKey="extraordinario" stackId="a" fill="#d6d3d1" name="Costo Extraordinario (Multas)" hide={disabledSeries['extraordinario']} />
+                <Bar dataKey="mttoPreventivo" stackId="a" fill="#bae6fd" name="Mantenimiento Preventivo" hide={disabledSeries['mttoPreventivo']} />
+                <Bar dataKey="mttoCorrectivo" stackId="a" fill="#86efac" name="Mantenimiento Correctivo" hide={disabledSeries['mttoCorrectivo']} />
+                <Bar dataKey="mttoEvaluativo" stackId="a" fill="#818cf8" name="Mantenimiento Evaluativo" hide={disabledSeries['mttoEvaluativo']} />
                 <Brush dataKey="name" height={30} stroke="#cbd5e1" fill="#f8fafc" travellerWidth={10} tickFormatter={() => ''} className="dark:fill-slate-800 dark:stroke-slate-700" />
               </BarChart>
             </ResponsiveContainer>

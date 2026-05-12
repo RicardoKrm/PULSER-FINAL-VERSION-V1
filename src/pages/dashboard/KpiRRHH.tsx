@@ -37,11 +37,11 @@ const cargaTrabajoTecnicosData = [
 ];
 
 const horasEvolucionData = [
-  { month: 'Ene 2026', reales: 1100, estandar: 950 },
-  { month: 'Feb 2026', reales: 1150, estandar: 1020 },
-  { month: 'Mar 2026', reales: 1200, estandar: 1100 },
-  { month: 'Abr 2026', reales: 1250, estandar: 1180 },
-  { month: 'May 2026', reales: 1240, estandar: 1146 },
+  { month: 'Ene 2026', reales: 1100, estandar: 950, disponibles: 1400 },
+  { month: 'Feb 2026', reales: 1150, estandar: 1020, disponibles: 1400 },
+  { month: 'Mar 2026', reales: 1200, estandar: 1100, disponibles: 1400 },
+  { month: 'Abr 2026', reales: 1250, estandar: 1180, disponibles: 1400 },
+  { month: 'May 2026', reales: 1240, estandar: 1146, disponibles: 1400 },
 ];
 
 export default function KpiRRHH() {
@@ -363,7 +363,7 @@ export default function KpiRRHH() {
         {/* Charts Row 1: Line Chart Evolucion */}
         <div className="grid grid-cols-1 gap-6">
           <div onClick={() => handleDetailClick('horas_evolucion')} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-xl shadow-sm cursor-pointer hover:border-blue-300 dark:hover:border-blue-700 transition-colors">
-            <h3 className="text-[14px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-tight mb-6 pb-1 border-b-2 border-dotted border-emerald-200 dark:border-emerald-900/50 text-center">Evolución Mensual: Horas Reales vs Estándar</h3>
+            <h3 className="text-[14px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-tight mb-6 pb-1 border-b-2 border-dotted border-emerald-200 dark:border-emerald-900/50 text-center">Evolución Mensual: Horas Reales vs Estándar vs Disponibles</h3>
             <div className="h-72 w-full pb-8">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={horasEvolucionData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
@@ -374,6 +374,7 @@ export default function KpiRRHH() {
                   <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 700, paddingTop: '10px' }} iconType="circle" />
                   <Bar dataKey="reales" name="Hrs Reales" fill="#38bdf8" radius={[4, 4, 0, 0]} maxBarSize={40} />
                   <Line type="monotone" dataKey="estandar" name="Hrs Estándar" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} />
+                  <Line type="stepAfter" dataKey="disponibles" name="Hrs Disponibles" stroke="#ef4444" strokeWidth={3} dot={{ r: 0 }} activeDot={{ r: 6 }} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
