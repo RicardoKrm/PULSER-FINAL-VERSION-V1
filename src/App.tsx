@@ -11,6 +11,9 @@ import SuperAdminEmpresas from './pages/super-admin/Empresas';
 import SuperAdminPerfiles from './pages/super-admin/Perfiles';
 import SuperAdminVisionEvolucion from './pages/super-admin/VisionEvolucion';
 import OperacionesAlertas from './pages/operaciones/Alertas';
+import Contratos from './pages/operaciones/Contratos';
+import CrearServicio from './pages/operaciones/CrearServicio';
+import Reservas from './pages/operaciones/Reservas';
 import KpiFlota from './pages/dashboard/KpiFlota';
 import KpiRRHH from './pages/dashboard/KpiRRHH';
 import AnalisisFallas from './pages/dashboard/AnalisisFallas';
@@ -26,6 +29,9 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/operaciones/alertas" replace /> },
       { path: "operaciones/alertas", element: <OperacionesAlertas /> },
+      { path: "operaciones/contratos", element: <Contratos /> },
+      { path: "operaciones/servicios", element: <CrearServicio /> },
+      { path: "operaciones/reservas", element: <Reservas /> },
       { path: "super-admin/empresas", element: <SuperAdminEmpresas /> },
       { path: "super-admin/perfiles", element: <SuperAdminPerfiles /> },
       { path: "super-admin/vision-evolucion", element: <SuperAdminVisionEvolucion /> },
