@@ -22,6 +22,7 @@ import KpiRRHH from './pages/dashboard/KpiRRHH';
 import AnalisisFallas from './pages/dashboard/AnalisisFallas';
 import PanelTco from './pages/dashboard/PanelTco';
 import ReporteMaestro from './pages/dashboard/ReporteMaestro';
+import PizarraMantenimiento from './pages/flota/Mantenimiento';
 import { ThemeProvider } from './components/ThemeProvider';
 import { CompanyProvider } from './contexts/CompanyContext';
 import { AppProvider } from './context/AppContext';
@@ -47,6 +48,7 @@ const router = createBrowserRouter([
       { path: "dashboard/fallas", element: <AnalisisFallas /> },
       { path: "dashboard/tco", element: <PanelTco /> },
       { path: "dashboard/reporte-maestro", element: <ReporteMaestro /> },
+      { path: "flota/mantenimiento", element: <PizarraMantenimiento /> },
       { path: "*", element: <GenericPage /> },
     ]
   }
