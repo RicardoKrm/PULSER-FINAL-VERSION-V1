@@ -61,3 +61,63 @@ export interface Vehiculo {
   id: string;
   patente: string;
 }
+
+export interface Tarea {
+  id: string;
+  descripcion: string;
+  costoBase: number;
+}
+
+export interface Insumo {
+  id: string;
+  nombre: string;
+  cantidad: number;
+  precioUnitario: number;
+}
+
+export interface HistorialEvento {
+  id: string;
+  descripcion: string;
+  fechaEvento: string;
+  usuario: string;
+}
+
+export interface OrdenDeTrabajo {
+  id: string;
+  folio: string;
+  vehiculoId: string;
+  tecnicoResponsable?: string;
+  tipo: 'PREVENTIVA' | 'CORRECTIVA' | 'EVALUATIVA';
+  estado: 'ABIERTA' | 'EN_PROCESO' | 'FINALIZADA' | 'CANCELADA' | 'PAUSADA' | 'POR_ASIGNAR' | 'CERRADA_MECANICO';
+  prioridad: 'BAJA' | 'MEDIA' | 'ALTA';
+  kilometrajeApertura: number;
+  kilometrajeCierre?: number;
+  fechaCreacion: string;
+  fechaProgramada?: string;
+  horaInicioProgramada?: string;
+  horaTerminoProgramada?: string;
+  tareasRealizadas: Tarea[];
+  insumos: Insumo[];
+  observacionInicial?: string;
+  diagnosticoEvaluacion?: string;
+  costoInsumos: number;
+  costoManoObraTareas: number;
+  costoManoObraHH: number;
+  tiempoTrabajadoSegundos: number;
+  historial: HistorialEvento[];
+}
+
+export interface PautaMantenimiento {
+  id: string;
+  nombre: string;
+  modeloVehiculo: string;
+  kmAplicacion: number;
+  archivoPdfUrl: string;
+}
+
+export interface TareaEstandar {
+  id: string;
+  descripcion: string;
+  tiempoEstandarMinutos: number;
+  costoManoObra: number;
+}

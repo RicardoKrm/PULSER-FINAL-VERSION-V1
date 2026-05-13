@@ -1,17 +1,22 @@
 import React, { createContext, useContext, useState } from 'react';
-import { ReservaTurismo, Conductor, Vehiculo } from '../types';
+import { ReservaTurismo, Conductor, Vehiculo, OrdenDeTrabajo, PautaMantenimiento, TareaEstandar } from '../types';
 
 interface AppContextType {
   reservasTurismo: ReservaTurismo[];
+  ordenesTrabajo: OrdenDeTrabajo[];
   conductores: Conductor[];
   vehiculos: Vehiculo[];
+  pautas: PautaMantenimiento[];
+  tareasEstandar: TareaEstandar[];
   crearReservaTurismo: (reserva: ReservaTurismo) => void;
+  crearOrdenTrabajo: (ot: OrdenDeTrabajo) => void;
+  eliminarOrdenTrabajo: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [reservasTurismo, setReservasTurismo] = useState<ReservaTurismo[]>([
+  const [reservasTurismo] = useState<ReservaTurismo[]>([
     {
       id: '1',
       op: 'OP-1001',
@@ -93,6 +98,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       auditLogs: [{ quien: 'Operaciones', accion: 'Creación', cuando: '2026-03-13T11:00:00Z' }]
     }
   ]);
+  const [ordenesTrabajo, setOrdenesTrabajo] = useState<OrdenDeTrabajo[]>([
+    {
+      id: 'ot1',
+      folio: 'OT-001',
+      vehiculoId: 'v1',
+      tipo: 'PREVENTIVA',
+      estado: 'EN_PROCESO',
+      prioridad: 'ALTA',
+      kilometrajeApertura: 125000,
+      fechaCreacion: '2026-05-10T10:00:00Z',
+      tareasRealizadas: [
+        { id: 't1', descripcion: 'Cambio de aceite', costoBase: 50000 },
+        { id: 't2', descripcion: 'Revisión de frenos', costoBase: 30000 }
+      ],
+      insumos: [
+        { id: 'i1', nombre: 'Filtro de Aceite', cantidad: 1, precioUnitario: 15000 }
+      ],
+      observacionInicial: 'Mantenimiento preventivo programado.',
+      historial: [
+        { id: 'h1', descripcion: 'OT Creada', fechaEvento: '2026-05-10T10:00:00Z', usuario: 'Admin' }
+      ],
+      costoInsumos: 15000,
+      costoManoObraTareas: 80000,
+      costoManoObraHH: 0,
+      tiempoTrabajadoSegundos: 0,
+    },
+    { id: 'ot2', folio: 'OT-002', vehiculoId: 'v1', tipo: 'PREVENTIVA', estado: 'FINALIZADA', prioridad: 'MEDIA', kilometrajeApertura: 126000, fechaCreacion: '2026-05-11T09:00:00Z', tareasRealizadas: [], insumos: [], observacionInicial: 'Cambio de neumáticos.', historial: [], costoInsumos: 0, costoManoObraTareas: 20000, costoManoObraHH: 0, tiempoTrabajadoSegundos: 0 },
+    { id: 'ot3', folio: 'OT-003', vehiculoId: 'v2', tipo: 'CORRECTIVA', estado: 'ABIERTA', prioridad: 'ALTA', kilometrajeApertura: 200000, fechaCreacion: '2026-05-12T08:00:00Z', tareasRealizadas: [], insumos: [], observacionInicial: 'Falla en sistema eléctrico.', historial: [], costoInsumos: 0, costoManoObraTareas: 50000, costoManoObraHH: 0, tiempoTrabajadoSegundos: 0 },
+    { id: 'ot4', folio: 'OT-004', vehiculoId: 'v2', tipo: 'PREVENTIVA', estado: 'PAUSADA', prioridad: 'BAJA', kilometrajeApertura: 201000, fechaCreacion: '2026-05-13T10:00:00Z', tareasRealizadas: [], insumos: [], observacionInicial: 'Revisión técnica.', historial: [], costoInsumos: 0, costoManoObraTareas: 0, costoManoObraHH: 0, tiempoTrabajadoSegundos: 0 },
+    { id: 'ot5', folio: 'OT-005', vehiculoId: 'v1', tipo: 'PREVENTIVA', estado: 'CERRADA_POR_MECANICO', prioridad: 'MEDIA', kilometrajeApertura: 127000, fechaCreacion: '2026-05-13T11:00:00Z', tareasRealizadas: [], insumos: [], observacionInicial: 'Cambio de aceite transmisión.', historial: [], costoInsumos: 0, costoManoObraTareas: 15000, costoManoObraHH: 0, tiempoTrabajadoSegundos: 0 },
+    { id: 'ot6', folio: 'OT-006', vehiculoId: 'v2', tipo: 'CORRECTIVA', estado: 'PROGRAMADA', prioridad: 'ALTA', kilometrajeApertura: 205000, fechaCreacion: '2026-05-13T12:00:00Z', tareasRealizadas: [], insumos: [], observacionInicial: 'Reparación de aire acondicionado.', historial: [], costoInsumos: 0, costoManoObraTareas: 40000, costoManoObraHH: 0, tiempoTrabajadoSegundos: 0 }
+  ]);
   const [conductores] = useState<Conductor[]>([
     { id: '1', nombre: 'Rosemary Sullivan', estado: 'activo' },
     { id: '2', nombre: 'Juan Pérez', estado: 'activo' }
@@ -101,20 +138,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     { id: 'v1', patente: 'AB-CD-12' },
     { id: 'v2', patente: 'EF-GH-34' }
   ]);
+  const [pautas] = useState<PautaMantenimiento[]>([
+    { id: 'p1', nombre: 'M A-MINERAL', modeloVehiculo: 'ACTYON SPORT D22', kmAplicacion: 8000, archivoPdfUrl: '#' },
+    { id: 'p2', nombre: 'SM3-MINERAL', modeloVehiculo: 'MERCEDES BENZ O 500 RS E III', kmAplicacion: 120000, archivoPdfUrl: '#' }
+  ]);
+  const [tareasEstandar] = useState<TareaEstandar[]>([
+    { id: 't1', descripcion: 'ARMAR Y REPARAR MOTOR OM 457 LA', tiempoEstandarMinutos: 900, costoManoObra: 127280 },
+    { id: 't2', descripcion: 'CAMBIAR CORREA DE ACC. VENTILADOR', tiempoEstandarMinutos: 60, costoManoObra: 7955 }
+  ]);
 
-  const crearReservaTurismo = (reserva: Omit<ReservaTurismo, 'id'>) => {
-    const newId = Math.random().toString(36).substr(2, 9);
-    const op = `OP-${1000 + reservasTurismo.length}`;
-    setReservasTurismo([...reservasTurismo, { 
-      ...reserva, 
-      id: newId, 
-      op: reserva.op || op,
-      auditLogs: [{ quien: 'Sistema', accion: 'Creación de reserva', cuando: new Date().toISOString() }]
-    } as ReservaTurismo]);
+  const crearReservaTurismo = (reserva: ReservaTurismo) => {
+    // Logic for adding a reservation
+  };
+  
+  const crearOrdenTrabajo = (ot: OrdenDeTrabajo) => {
+    setOrdenesTrabajo([...ordenesTrabajo, ot]);
+  };
+
+  const eliminarOrdenTrabajo = (id: string) => {
+    setOrdenesTrabajo(ordenesTrabajo.filter(ot => ot.id !== id));
   };
 
   return (
-    <AppContext.Provider value={{ reservasTurismo, conductores, vehiculos, crearReservaTurismo }}>
+    <AppContext.Provider value={{ reservasTurismo, ordenesTrabajo, conductores, vehiculos, pautas, tareasEstandar, crearReservaTurismo, crearOrdenTrabajo, eliminarOrdenTrabajo }}>
       {children}
     </AppContext.Provider>
   );

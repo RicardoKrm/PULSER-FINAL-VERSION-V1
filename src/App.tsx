@@ -23,6 +23,10 @@ import AnalisisFallas from './pages/dashboard/AnalisisFallas';
 import PanelTco from './pages/dashboard/PanelTco';
 import ReporteMaestro from './pages/dashboard/ReporteMaestro';
 import PizarraMantenimiento from './pages/flota/Mantenimiento';
+import GestionOrdenesTrabajo from './pages/flota/OrdenesTrabajo';
+import OrdenesTrabajoDetail from './pages/flota/OrdenesTrabajoDetail';
+import GestionPautas from './pages/flota/GestionPautas';
+import GestionTareas from './pages/flota/GestionTareas';
 import { ThemeProvider } from './components/ThemeProvider';
 import { CompanyProvider } from './contexts/CompanyContext';
 import { AppProvider } from './context/AppContext';
@@ -49,6 +53,10 @@ const router = createBrowserRouter([
       { path: "dashboard/tco", element: <PanelTco /> },
       { path: "dashboard/reporte-maestro", element: <ReporteMaestro /> },
       { path: "flota/mantenimiento", element: <PizarraMantenimiento /> },
+      { path: "flota/ordenes-trabajo", element: <GestionOrdenesTrabajo /> },
+      { path: "flota/ordenes-trabajo/:id", element: <OrdenesTrabajoDetail /> },
+      { path: "configuracion/pautas", element: <GestionPautas /> },
+      { path: "configuracion/tareas", element: <GestionTareas /> },
       { path: "*", element: <GenericPage /> },
     ]
   }
