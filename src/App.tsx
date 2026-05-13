@@ -14,6 +14,7 @@ import OperacionesAlertas from './pages/operaciones/Alertas';
 import Contratos from './pages/operaciones/Contratos';
 import CrearServicio from './pages/operaciones/CrearServicio';
 import Programacion from './pages/operaciones/Programacion';
+import Reservas from './pages/operaciones/Reservas';
 import GPS from './pages/operaciones/GPS';
 import ControlDocumental from './pages/operaciones/ControlDocumental';
 import KpiFlota from './pages/dashboard/KpiFlota';
@@ -23,6 +24,7 @@ import PanelTco from './pages/dashboard/PanelTco';
 import ReporteMaestro from './pages/dashboard/ReporteMaestro';
 import { ThemeProvider } from './components/ThemeProvider';
 import { CompanyProvider } from './contexts/CompanyContext';
+import { AppProvider } from './context/AppContext';
 
 const router = createBrowserRouter([
   {
@@ -33,8 +35,8 @@ const router = createBrowserRouter([
       { path: "operaciones/alertas", element: <OperacionesAlertas /> },
       { path: "operaciones/contratos", element: <Contratos /> },
       { path: "operaciones/servicios", element: <CrearServicio /> },
+      { path: "operaciones/reservas", element: <Reservas /> },
       { path: "operaciones/programacion", element: <Programacion /> },
-      { path: "operaciones/reservas", element: <Programacion /> },
       { path: "operaciones/gps", element: <GPS /> },
       { path: "operaciones/control-documental", element: <ControlDocumental /> },
       { path: "super-admin/empresas", element: <SuperAdminEmpresas /> },
@@ -54,8 +56,11 @@ export default function App() {
   return (
     <ThemeProvider>
       <CompanyProvider>
-        <RouterProvider router={router} />
+        <AppProvider>
+          <RouterProvider router={router} />
+        </AppProvider>
       </CompanyProvider>
     </ThemeProvider>
   );
 }
+

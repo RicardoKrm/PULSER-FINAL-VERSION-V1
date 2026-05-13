@@ -28,6 +28,7 @@ import {
   FileSpreadsheet,
   ScanBarcode,
   CheckSquare,
+  Calendar,
   Zap,
   Clock
 } from 'lucide-react';
@@ -62,6 +63,7 @@ export const navigation = [
     submodules: [
       { title: 'Contratos', icon: Briefcase, href: '/operaciones/contratos' },
       { title: 'Crear Servicio', icon: ClipboardList, href: '/operaciones/servicios' },
+      { title: 'Reservas', icon: Calendar, href: '/operaciones/reservas' },
       { title: 'Programación', icon: CalendarClock, href: '/operaciones/programacion' },
       { title: 'Control Documental', icon: FileCheck, href: '/operaciones/control-documental' },
       { title: 'Operaciones', icon: Activity, href: '/operaciones/monitor' },
