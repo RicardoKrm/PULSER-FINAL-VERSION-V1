@@ -215,7 +215,12 @@ export const CrearVehiculoModal: React.FC<CrearVehiculoModalProps> = ({ isOpen, 
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Aplicación</label>
-                  <input type="text" name="aplicacion" value={formData.aplicacion} onChange={handleChange} className="w-full px-3 py-2 border rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 bg-slate-50 border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Opcional (Ej: Urbano, Carretera)" />
+                  <select name="aplicacion" value={formData.aplicacion} onChange={handleChange} required className="w-full px-3 py-2 border rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 bg-slate-50 border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Seleccione una aplicación...</option>
+                    <option value="Urbano">Urbano</option>
+                    <option value="Carretera">Carretera</option>
+                    <option value="Mina">Mina</option>
+                  </select>
                 </div>
               </div>
             </div>
