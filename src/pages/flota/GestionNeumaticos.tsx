@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Plus, Search, Activity, CircleDashed, BarChart3, Truck, Trash, ChevronDown, AlertCircle, ChevronUp, DollarSign } from 'lucide-react';
+import { Plus, Search, Activity, CircleDashed, BarChart3, Truck, Trash, ChevronDown, AlertCircle, ChevronUp, DollarSign, X, Info, TrendingUp, AlertTriangle } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import Modal from '../../components/ui/Modal';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
@@ -62,11 +62,16 @@ export default function GestionNeumaticos() {
 }
 
 function DashboardNeumaticos() {
+  const [selectedKpi, setSelectedKpi] = useState<'cpk' | 'activos' | 'alertas' | 'ahorro' | null>(null);
+
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-none shadow-md">
+        <Card 
+          className={cn("bg-gradient-to-br from-blue-500 to-blue-600 text-white border-none shadow-md cursor-pointer transition-transform hover:scale-[1.02]", selectedKpi === 'cpk' && "ring-2 ring-blue-300")}
+          onClick={() => setSelectedKpi('cpk')}
+        >
           <CardContent className="p-6">
             <div className="flex justify-between items-start">
               <div className="space-y-2">
@@ -78,7 +83,10 @@ function DashboardNeumaticos() {
           </CardContent>
         </Card>
         
-        <Card className="bg-white dark:bg-slate-900 shadow-md">
+        <Card 
+          className={cn("bg-white dark:bg-slate-900 shadow-md cursor-pointer transition-transform hover:scale-[1.02]", selectedKpi === 'activos' && "ring-2 ring-blue-500")}
+          onClick={() => setSelectedKpi('activos')}
+        >
           <CardContent className="p-6">
             <div className="flex justify-between items-start">
               <div className="space-y-2">
@@ -91,7 +99,10 @@ function DashboardNeumaticos() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white dark:bg-slate-900 shadow-md">
+        <Card 
+          className={cn("bg-white dark:bg-slate-900 shadow-md cursor-pointer transition-transform hover:scale-[1.02]", selectedKpi === 'alertas' && "ring-2 ring-red-500")}
+          onClick={() => setSelectedKpi('alertas')}
+        >
           <CardContent className="p-6">
             <div className="flex justify-between items-start">
               <div className="space-y-2">
@@ -104,7 +115,10 @@ function DashboardNeumaticos() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white dark:bg-slate-900 shadow-md">
+        <Card 
+          className={cn("bg-white dark:bg-slate-900 shadow-md cursor-pointer transition-transform hover:scale-[1.02]", selectedKpi === 'ahorro' && "ring-2 ring-emerald-500")}
+          onClick={() => setSelectedKpi('ahorro')}
+        >
           <CardContent className="p-6">
             <div className="flex justify-between items-start">
               <div className="space-y-2">
@@ -216,6 +230,127 @@ function DashboardNeumaticos() {
           </Card>
         </div>
       </div>
+
+      {/* Sidebar KPI Details Layer */}
+      {selectedKpi && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/20 dark:bg-black/40 z-40 backdrop-blur-sm transition-opacity" 
+            onClick={() => setSelectedKpi(null)}
+          />
+          <div className="fixed inset-y-0 right-0 w-full md:w-[450px] bg-white dark:bg-slate-900 shadow-2xl border-l dark:border-slate-800 z-50 flex flex-col overflow-y-auto animate-in slide-in-from-right">
+            <div className="flex justify-between items-center p-6 border-b dark:border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 sticky top-0 z-10 backdrop-blur-md">
+              <div>
+                <h3 className="font-bold text-xl text-slate-900 dark:text-white">Detalle de Gestión</h3>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mt-1">
+                  Métricas de Neumáticos
+                </p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setSelectedKpi(null)} className="h-8 w-8 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            <div className="p-6 flex-1 space-y-6">
+              {/* Info box */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 p-4 rounded-xl border border-blue-100 dark:border-blue-900/50 flex gap-3 text-sm">
+                 <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                 <div>
+                   <strong className="block mb-1">FÓRMULA / DEFINICIÓN:</strong>
+                   {selectedKpi === 'cpk' && "CPK ($/km) = (Costo de Adquisición + Costo Reparaciones) / Kilómetros Recorridos."}
+                   {selectedKpi === 'activos' && "Neumáticos Activos = Total de unidades actualmente montadas o en inventario como stock disponible."}
+                   {selectedKpi === 'alertas' && "Alertas Críticas = Neumáticos con surco menor a 3mm, daños severos, o desgaste irregular detectado en inspección."}
+                   {selectedKpi === 'ahorro' && "Ahorro Proyectado = Reducción estimada de compras anualizadas si se maximiza la vida útil al estándar esperado (+10%)."}
+                 </div>
+              </div>
+
+              {/* Data content layer */}
+              <div className="space-y-4 pt-4">
+                <h4 className="font-bold text-sm uppercase text-slate-500 tracking-wider">Desglose de Datos</h4>
+                
+                {selectedKpi === 'cpk' && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <span className="text-slate-600 dark:text-slate-400">Total Inversión Activa</span>
+                      <span className="font-bold text-slate-900 dark:text-white">$75,500,000</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <span className="text-slate-600 dark:text-slate-400">Total Kilómetros Producidos</span>
+                      <span className="font-bold text-slate-900 dark:text-white">23,230,769 km</span>
+                    </div>
+                    <div className="flex justify-between items-center p-4 bg-blue-600 text-white rounded-lg shadow-inner">
+                      <span className="font-medium">CPK Promedio Ponderado</span>
+                      <span className="font-black text-xl">$3.25/km</span>
+                    </div>
+                  </div>
+                )}
+                {selectedKpi === 'activos' && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <span className="text-slate-600 dark:text-slate-400">Montados en Vehículos</span>
+                      <span className="font-bold text-slate-900 dark:text-white">135 Unidades</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <span className="text-slate-600 dark:text-slate-400">Stock Bodega (Repuestos)</span>
+                      <span className="font-bold text-slate-900 dark:text-white">7 Unidades</span>
+                    </div>
+                    <div className="flex justify-between items-center p-4 bg-slate-800 dark:bg-slate-950 text-white rounded-lg shadow-inner">
+                      <span className="font-medium">Total Unidades Activas</span>
+                      <span className="font-black text-xl">142</span>
+                    </div>
+                  </div>
+                )}
+                {selectedKpi === 'alertas' && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <span className="text-slate-600 dark:text-slate-400">Surco Crítico (&lt; 3mm)</span>
+                      <span className="font-bold text-slate-900 dark:text-white">2 Unidades</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <span className="text-slate-600 dark:text-slate-400 text-red-600">Presión Baja Peligrosa</span>
+                      <span className="font-bold text-slate-900 dark:text-white">2 Unidades</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <span className="text-slate-600 dark:text-slate-400">Desgaste Irregular Grave</span>
+                      <span className="font-bold text-slate-900 dark:text-white">1 Unidad</span>
+                    </div>
+                    <div className="space-y-2 mt-4 border-t dark:border-slate-800 pt-4">
+                      <p className="text-sm font-semibold text-red-600 flex items-center"><AlertTriangle className="w-4 h-4 mr-2" /> Necesidad de Retiro</p>
+                      {[
+                        { pos: 'LDPJ-99 - Pos 8', desc: 'Surco crítico (3mm)' },
+                        { pos: 'LDPJ-99 - Pos 9', desc: 'Surco crítico (3mm)' },
+                        { pos: 'FRTY-12 - Pos 2', desc: 'Desgaste irregular' },
+                      ].map((v, idx) => (
+                         <div key={idx} className="flex justify-between text-sm p-2 border-l-4 border-red-500 bg-red-50 dark:bg-red-900/10 rounded-r">
+                           <span className="font-medium">{v.pos}</span>
+                           <span className="text-red-600">{v.desc}</span>
+                         </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {selectedKpi === 'ahorro' && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <span className="text-slate-600 dark:text-slate-400">Ahorro en Renuevos Esperado</span>
+                      <span className="font-bold text-slate-900 dark:text-white">$800,000</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <span className="text-slate-600 dark:text-slate-400">Menor Combustible por Presión</span>
+                      <span className="font-bold text-slate-900 dark:text-white">$400,000</span>
+                    </div>
+                    <div className="flex justify-between items-center p-4 bg-emerald-600 text-white rounded-lg shadow-inner">
+                      <span className="font-medium">Total Potencial Anual</span>
+                      <span className="font-black text-xl">$1.2M</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
     </div>
   );
 }
