@@ -20,6 +20,7 @@ export default function PizarraMantenimiento() {
   const [vehiculoSeleccionadoOT, setVehiculoSeleccionadoOT] = useState<string | undefined>();
   const [selectedVehicleRow, setSelectedVehicleRow] = useState<number | null>(null);
   const [vistaTabla, setVistaTabla] = useState(false);
+  const [fichaTecnicaVehiculo, setFichaTecnicaVehiculo] = useState<any | null>(null);
   
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -56,6 +57,15 @@ export default function PizarraMantenimiento() {
       patente: 'AB-CD-12',
       marca: 'Mercedes-Benz',
       modelo: 'Sprinter 315',
+      ano: 2022,
+      chasis: 'W1V420123456789',
+      motor: 'OM651 2.1L',
+      norma: 'EURO VI',
+      aplicacion: 'Urbano',
+      tipoAceite: 'Sintético 5W30',
+      intervaloMantenimiento: 15000,
+      tipoIntervalo: 'KM',
+      factorConversionHoras: 45, // Km/h promedio para estimar horas
       kmActual: 125430,
       ultimoMant: {
         km: 115000,
@@ -76,6 +86,15 @@ export default function PizarraMantenimiento() {
       patente: 'WX-YZ-99',
       marca: 'Ford',
       modelo: 'Transit Custom',
+      ano: 2021,
+      chasis: 'WF0YXXTTGY123456',
+      motor: 'EcoBlue 2.0',
+      norma: 'EURO VI',
+      aplicacion: 'Carretera',
+      tipoAceite: 'Sintético 5W30',
+      intervaloMantenimiento: 10000,
+      tipoIntervalo: 'KM',
+      factorConversionHoras: 60,
       kmActual: 89000,
       ultimoMant: {
         km: 70000,
@@ -98,6 +117,15 @@ export default function PizarraMantenimiento() {
       patente: 'KL-MN-34',
       marca: 'Toyota',
       modelo: 'Rav4',
+      ano: 2023,
+      chasis: 'JTMZREBV12345678',
+      motor: 'Dynamic Force 2.5',
+      norma: 'EURO V',
+      aplicacion: 'Mina',
+      tipoAceite: 'Sintético 0W20',
+      intervaloMantenimiento: 500,
+      tipoIntervalo: 'Horas',
+      factorConversionHoras: 25, // En faena/mina se avanza más lento, ej 25 km/h
       kmActual: 44500,
       ultimoMant: {
         km: 35000,
@@ -206,7 +234,11 @@ export default function PizarraMantenimiento() {
               if (vehiculo.estado === 'NORMAL') { cumplimientoText = 'Normal'; cumplimientoColor = 'text-slate-700 dark:text-slate-300 font-bold'; }
 
               return (
-                <tr key={`dense-${vehiculo.id}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                <tr 
+                  key={`dense-${vehiculo.id}`} 
+                  onClick={() => setSelectedVehicleRow(vehiculo.id)}
+                  className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer ${selectedVehicleRow === vehiculo.id ? 'bg-blue-50 dark:bg-slate-800/50' : ''}`}
+                >
                   <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800 font-bold text-blue-900 dark:text-blue-100 whitespace-nowrap">{vehiculo.numeroInterno}</td>
                   <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800 text-slate-500 whitespace-nowrap">{vehiculo.patente}</td>
                   <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800">{vehiculo.ultimoMant.km.toLocaleString('es-CL')}</td>
@@ -220,9 +252,23 @@ export default function PizarraMantenimiento() {
                   </td>
                   <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800 text-slate-500">{vehiculo.proxMant.kmVencido ? vehiculo.proxMant.kmVencido.toLocaleString('es-CL') : '--'}</td>
                   <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800 text-slate-500 whitespace-nowrap">{vehiculo.proxMant.vencidosStr || '--'}</td>
-                  <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800">{vehiculo.kmActual.toLocaleString('es-CL')}</td>
+                  <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800">
+                    <div>{vehiculo.kmActual.toLocaleString('es-CL')}</div>
+                    {vehiculo.tipoIntervalo === 'Horas' && vehiculo.factorConversionHoras && (
+                      <div className="text-[10px] text-slate-500 mt-0.5" title="Horas Trabajadas Estimadas">
+                        {Math.round(vehiculo.kmActual / vehiculo.factorConversionHoras).toLocaleString('es-CL')} Hrs
+                      </div>
+                    )}
+                  </td>
                   <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800 text-slate-500 whitespace-nowrap">{fKmActual}</td>
-                  <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800">{vehiculo.proxMant.kmTarget.toLocaleString('es-CL')}</td>
+                  <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800">
+                    <div>{vehiculo.proxMant.kmTarget.toLocaleString('es-CL')}</div>
+                    {vehiculo.tipoIntervalo === 'Horas' && vehiculo.factorConversionHoras && (
+                      <div className="text-[10px] text-slate-500 mt-0.5">
+                        {Math.round(vehiculo.proxMant.kmTarget / vehiculo.factorConversionHoras).toLocaleString('es-CL')} Hrs
+                      </div>
+                    )}
+                  </td>
                   <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800 font-medium whitespace-nowrap">{vehiculo.proxMant.tipo}</td>
                   <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800">
                     <div className="flex justify-center">
@@ -251,6 +297,15 @@ export default function PizarraMantenimiento() {
                             <Plus className="w-4 h-4 mr-2" /> Crear OT
                           </button>
                           <div className="border-t border-slate-100 dark:border-slate-800 my-1"></div>
+                          <button 
+                            className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center font-medium"
+                            onClick={() => {
+                              setFichaTecnicaVehiculo(vehiculo);
+                              setActionMenuOpen(null);
+                            }}
+                          >
+                            <FileSpreadsheet className="w-4 h-4 mr-2 text-slate-500" /> Ficha Técnica
+                          </button>
                           <button className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center">
                             <Edit3 className="w-4 h-4 mr-2" /> Actualizar KM
                           </button>
@@ -517,7 +572,11 @@ export default function PizarraMantenimiento() {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
               {vehiculosFiltrados.map((vehiculo) => (
-                <tr key={vehiculo.id} className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group ${selectedVehicleRow === vehiculo.id ? 'bg-blue-50/50 dark:bg-slate-800/50' : 'dark:bg-slate-900/50'}`}>
+                <tr 
+                  key={vehiculo.id} 
+                  onClick={() => setSelectedVehicleRow(vehiculo.id)}
+                  className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer ${selectedVehicleRow === vehiculo.id ? 'bg-blue-50 dark:bg-slate-800/50' : 'dark:bg-slate-900/50'}`}
+                >
                   <td className="px-5 py-4 text-center">
                     <input 
                       type="radio" 
@@ -536,12 +595,20 @@ export default function PizarraMantenimiento() {
                     <div className="flex flex-col">
                       <span className="font-bold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 transition-colors">{vehiculo.numeroInterno}</span>
                       <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{vehiculo.patente}</span>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 dark:text-slate-400">{vehiculo.marca} {vehiculo.modelo}</span>
+                      <span className="text-xs text-slate-400 dark:text-slate-500 transition-colors uppercase mt-0.5">{vehiculo.marca} {vehiculo.modelo}</span>
                     </div>
                   </td>
                   <td className="px-5 py-4">
-                    <div className="font-mono text-slate-900 dark:text-slate-100 font-semibold bg-slate-100 dark:bg-slate-900 px-2 py-1 rounded inline-block">
-                      {vehiculo.kmActual.toLocaleString('es-CL')} km
+                    <div className="flex flex-col gap-1">
+                      <div className="font-mono text-slate-900 dark:text-slate-100 font-semibold bg-slate-100 dark:bg-slate-900 px-2 py-1 rounded inline-block w-fit">
+                        {vehiculo.kmActual.toLocaleString('es-CL')} km
+                      </div>
+                      {vehiculo.tipoIntervalo === 'Horas' && vehiculo.factorConversionHoras && (
+                        <div className="text-[10px] uppercase font-bold text-slate-500 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {Math.round(vehiculo.kmActual / vehiculo.factorConversionHoras).toLocaleString('es-CL')} Hrs.
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td className="px-5 py-4">
@@ -612,6 +679,15 @@ export default function PizarraMantenimiento() {
                             <Plus className="w-4 h-4 mr-2" /> Crear OT
                           </button>
                           <div className="border-t border-slate-100 dark:border-slate-800 my-1"></div>
+                          <button 
+                            className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center font-medium"
+                            onClick={() => {
+                              setFichaTecnicaVehiculo(vehiculo);
+                              setActionMenuOpen(null);
+                            }}
+                          >
+                            <FileSpreadsheet className="w-4 h-4 mr-2 text-slate-500" /> Ficha Técnica
+                          </button>
                           <button className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center">
                             <Edit3 className="w-4 h-4 mr-2" /> Actualizar KM
                           </button>
@@ -721,6 +797,86 @@ export default function PizarraMantenimiento() {
           </div>
         </div>
       </Modal>
+
+      {fichaTecnicaVehiculo && (
+        <Modal 
+          isOpen={!!fichaTecnicaVehiculo} 
+          onClose={() => setFichaTecnicaVehiculo(null)} 
+          title={`Ficha Técnica - ${fichaTecnicaVehiculo.numeroInterno} (${fichaTecnicaVehiculo.patente})`}
+        >
+          <div className="space-y-6 text-sm">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Marca / Modelo</span>
+                <span className="font-bold">{fichaTecnicaVehiculo.marca} {fichaTecnicaVehiculo.modelo}</span>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Año de Fabricación</span>
+                <span className="font-bold">{fichaTecnicaVehiculo.ano || '--'}</span>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Patente (PPU)</span>
+                <span className="font-bold">{fichaTecnicaVehiculo.patente}</span>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">N° de Chasis (VIN)</span>
+                <span className="font-bold font-mono">{fichaTecnicaVehiculo.chasis || '--'}</span>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Motorización</span>
+                <span className="font-bold">{fichaTecnicaVehiculo.motor || '--'}</span>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Norma de Emisión</span>
+                <span className="font-bold">{fichaTecnicaVehiculo.norma || '--'}</span>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Aplicación Operativa</span>
+                <span className="font-bold">{fichaTecnicaVehiculo.aplicacion || '--'}</span>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Tipo de Aceite</span>
+                <span className="font-bold">{fichaTecnicaVehiculo.tipoAceite || '--'}</span>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/50 p-4 rounded-lg">
+              <h3 className="font-bold text-blue-900 dark:text-blue-100 mb-3 flex items-center gap-2">
+                <Wrench className="w-4 h-4" />
+                Plan de Mantenimiento Preventivo
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="block text-xs font-semibold text-slate-500 uppercase">Intervalo Base</span>
+                  <span className="font-bold text-lg">
+                    {fichaTecnicaVehiculo.intervaloMantenimiento?.toLocaleString('es-CL') || '--'} {fichaTecnicaVehiculo.tipoIntervalo}
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-xs font-semibold text-slate-500 uppercase">Avanzado Actual</span>
+                  <span className="font-bold text-lg">
+                    {fichaTecnicaVehiculo.kmActual.toLocaleString('es-CL')} KM
+                  </span>
+                </div>
+                {fichaTecnicaVehiculo.tipoIntervalo === 'Horas' && fichaTecnicaVehiculo.factorConversionHoras && (
+                  <div className="col-span-2 mt-2 pt-2 border-t border-blue-200 dark:border-blue-800/50">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="font-semibold text-slate-600 dark:text-slate-400">Factor de Conversión:</span>
+                      <span className="font-bold">{fichaTecnicaVehiculo.factorConversionHoras} Km/h (Estimado)</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm mt-1">
+                      <span className="font-semibold text-slate-600 dark:text-slate-400">Total Horas Trabajadas:</span>
+                      <span className="font-bold text-orange-600 dark:text-orange-400">
+                        {Math.round(fichaTecnicaVehiculo.kmActual / fichaTecnicaVehiculo.factorConversionHoras).toLocaleString('es-CL')} Hrs.
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
