@@ -20,6 +20,9 @@ interface OtMock {
   estado?: 'EN_PROCESO' | 'PAUSADA' | 'PAUSADA_MECANICO' | 'TERMINADA' | 'PROGRAMADA';
   tiempoAplicacion?: string;
   tiempoAtraso?: string;
+  progress?: number;
+  startedLate?: boolean;
+  finishedLate?: boolean;
 }
 
 interface MecanicoMock {
@@ -65,19 +68,19 @@ export default function PizarraProgramacion() {
     {
       id: 'm1', nombre: 'Carlos Ruiz', especialidad: 'Mecánico General', selected: true,
       ots: [
-        { id: 'ot1', folio: 'OT-001', tipo: 'Preventiva', patente: 'AB-CD-12', actividad: 'Mantenimiento preventivo.', startHour: 8, duration: 2, dayOffset: 0, estado: 'EN_PROCESO', tiempoAplicacion: '01:30:00', tiempoAtraso: '+ 30 min', isOverdue: true },
+        { id: 'ot1', folio: 'OT-001', tipo: 'Preventiva', patente: 'AB-CD-12', actividad: 'Mantenimiento preventivo.', startHour: 8, duration: 2, dayOffset: 0, estado: 'EN_PROCESO', tiempoAplicacion: '01:30:00', tiempoAtraso: '+ 30 min', isOverdue: true, progress: 100, startedLate: true },
         { id: 'ot8', folio: 'OT-008', tipo: 'Correctiva', patente: 'EF-GH-34', actividad: 'Cambio pastillas freno.', startHour: 10.5, duration: 1.5, dayOffset: 0, estado: 'PROGRAMADA' },
-        { id: 'ot9', folio: 'OT-009', tipo: 'Preventiva', patente: 'XX-YY-01', actividad: 'Pauta Mantenimiento 10K', startHour: 14, duration: 2, dayOffset: -1, estado: 'TERMINADA', tiempoAplicacion: '01:50:00' },
-        { id: 'ot10', folio: 'OT-010', tipo: 'Correctiva', patente: 'ZZ-WW-02', actividad: 'Reparación motor', startHour: 8, duration: 4, dayOffset: 1, estado: 'PAUSADA_MECANICO', tiempoAplicacion: '02:00:00', tiempoAtraso: '+ 1 hr' },
+        { id: 'ot9', folio: 'OT-009', tipo: 'Preventiva', patente: 'XX-YY-01', actividad: 'Pauta Mantenimiento 10K', startHour: 14, duration: 2, dayOffset: -1, estado: 'TERMINADA', tiempoAplicacion: '01:50:00', progress: 100, finishedLate: false, startedLate: false },
+        { id: 'ot10', folio: 'OT-010', tipo: 'Correctiva', patente: 'ZZ-WW-02', actividad: 'Reparación motor', startHour: 8, duration: 4, dayOffset: 1, estado: 'PAUSADA_MECANICO', tiempoAplicacion: '02:00:00', tiempoAtraso: '+ 1 hr', progress: 50 },
         { id: 'ot11', folio: 'OT-011', tipo: 'Preventiva', patente: 'ZZ-WW-02', actividad: 'Revisión fluidos', startHour: 14, duration: 1, dayOffset: 1, estado: 'PROGRAMADA' }
       ]
     },
     {
       id: 'm2', nombre: 'Pedro Gómez', especialidad: 'Electricista', selected: true,
       ots: [
-        { id: 'ot2', folio: 'OT-002', tipo: 'Preventiva', patente: 'AB-CD-12', actividad: 'Revisión sist. eléctrico.', startHour: 9, duration: 2, dayOffset: 0, estado: 'EN_PROCESO', tiempoAplicacion: '00:45:00' },
-        { id: 'ot12', folio: 'OT-012', tipo: 'Correctiva', patente: 'XY-AA-10', actividad: 'Cambio de alternador', startHour: 12, duration: 2.5, dayOffset: 0, estado: 'PAUSADA', tiempoAplicacion: '01:10:00', isOverdue: true },
-        { id: 'ot13', folio: 'OT-013', tipo: 'Preventiva', patente: 'AB-CD-12', actividad: 'Chequeo baterías', startHour: 15, duration: 1, dayOffset: -1, estado: 'TERMINADA', tiempoAplicacion: '00:55:00' },
+        { id: 'ot2', folio: 'OT-002', tipo: 'Preventiva', patente: 'AB-CD-12', actividad: 'Revisión sist. eléctrico.', startHour: 9, duration: 2, dayOffset: 0, estado: 'EN_PROCESO', tiempoAplicacion: '00:45:00', progress: 37, startedLate: false },
+        { id: 'ot12', folio: 'OT-012', tipo: 'Correctiva', patente: 'XY-AA-10', actividad: 'Cambio de alternador', startHour: 12, duration: 2.5, dayOffset: 0, estado: 'PAUSADA', tiempoAplicacion: '01:10:00', isOverdue: true, progress: 46, startedLate: true },
+        { id: 'ot13', folio: 'OT-013', tipo: 'Preventiva', patente: 'AB-CD-12', actividad: 'Chequeo baterías', startHour: 15, duration: 1, dayOffset: -1, estado: 'TERMINADA', tiempoAplicacion: '00:55:00', progress: 100, finishedLate: false },
         { id: 'ot14', folio: 'OT-014', tipo: 'Preventiva', patente: 'ZZ-KK-88', actividad: 'Revisión luces', startHour: 10, duration: 1, dayOffset: 1, estado: 'PROGRAMADA' },
         { id: 'ot15', folio: 'OT-015', tipo: 'Correctiva', patente: 'XY-AA-11', actividad: 'Diagnóstico escáner', startHour: 12, duration: 1.5, dayOffset: 1, estado: 'PROGRAMADA' }
       ]
@@ -85,17 +88,17 @@ export default function PizarraProgramacion() {
     {
       id: 'm3', nombre: 'Luis Silva', especialidad: 'Lubricador', selected: true,
       ots: [
-        { id: 'ot3', folio: 'OT-003', tipo: 'Correctiva', patente: 'EF-GH-34', actividad: 'Cambio aceite motor', startHour: 8, duration: 1.5, dayOffset: -1, estado: 'TERMINADA', tiempoAplicacion: '01:20:00' },
-        { id: 'ot16', folio: 'OT-016', tipo: 'Preventiva', patente: 'AB-CD-12', actividad: 'Engrase general', startHour: 8, duration: 2, dayOffset: 0, estado: 'EN_PROCESO', tiempoAplicacion: '00:30:00' },
+        { id: 'ot3', folio: 'OT-003', tipo: 'Correctiva', patente: 'EF-GH-34', actividad: 'Cambio aceite motor', startHour: 8, duration: 1.5, dayOffset: -1, estado: 'TERMINADA', tiempoAplicacion: '01:20:00', progress: 100, finishedLate: false, startedLate: false },
+        { id: 'ot16', folio: 'OT-016', tipo: 'Preventiva', patente: 'AB-CD-12', actividad: 'Engrase general', startHour: 8, duration: 2, dayOffset: 0, estado: 'EN_PROCESO', tiempoAplicacion: '00:30:00', progress: 25, startedLate: false },
         { id: 'ot17', folio: 'OT-017', tipo: 'Preventiva', patente: 'EF-GH-34', actividad: 'Revisión niveles', startHour: 11, duration: 1, dayOffset: 0, estado: 'PROGRAMADA' },
-        { id: 'ot18', folio: 'OT-018', tipo: 'Correctiva', patente: 'KL-NM-11', actividad: 'Cambio filtro aire', startHour: 14, duration: 1.5, dayOffset: 0, estado: 'PAUSADA', tiempoAplicacion: '00:20:00' },
+        { id: 'ot18', folio: 'OT-018', tipo: 'Correctiva', patente: 'KL-NM-11', actividad: 'Cambio filtro aire', startHour: 14, duration: 1.5, dayOffset: 0, estado: 'PAUSADA', tiempoAplicacion: '00:20:00', progress: 22 },
       ]
     },
     {
       id: 'm4', nombre: 'M. Santibáñez', especialidad: 'Esp. Diésel', selected: true,
       ots: [
-        { id: 'ot19', folio: 'OT-019', tipo: 'Correctiva', patente: 'TR-CK-55', actividad: 'Reparación inyectores', startHour: 9, duration: 3, dayOffset: 0, estado: 'EN_PROCESO', tiempoAplicacion: '02:15:00', isOverdue: true, tiempoAtraso: '+ 45 min' },
-        { id: 'ot20', folio: 'OT-020', tipo: 'Preventiva', patente: 'TR-CK-99', actividad: 'Afinamiento diésel', startHour: 14, duration: 2.5, dayOffset: -1, estado: 'TERMINADA', tiempoAplicacion: '02:30:00' },
+        { id: 'ot19', folio: 'OT-019', tipo: 'Correctiva', patente: 'TR-CK-55', actividad: 'Reparación inyectores', startHour: 9, duration: 3, dayOffset: 0, estado: 'EN_PROCESO', tiempoAplicacion: '02:15:00', isOverdue: true, tiempoAtraso: '+ 45 min', progress: 100, startedLate: true },
+        { id: 'ot20', folio: 'OT-020', tipo: 'Preventiva', patente: 'TR-CK-99', actividad: 'Afinamiento diésel', startHour: 14, duration: 2.5, dayOffset: -1, estado: 'TERMINADA', tiempoAplicacion: '03:30:00', progress: 100, finishedLate: true, startedLate: false },
         { id: 'ot21', folio: 'OT-021', tipo: 'Correctiva', patente: 'TR-CK-55', actividad: 'Cambio turbo', startHour: 10, duration: 4, dayOffset: 1, estado: 'PROGRAMADA' }
       ]
     }
@@ -403,12 +406,23 @@ export default function PizarraProgramacion() {
                                  )}>{ot.estado.replace('_', ' ')}</span>}
                               </div>
                               <div className="text-[9px] leading-tight truncate mt-0.5 font-medium">{m.nombre}</div>
-                              <div className="mt-auto text-[9px] truncate opacity-90 flex justify-between items-center gap-1">
-                                 <span>{ot.patente}</span>
-                                 <div className="flex items-center gap-1">
-                                   {ot.tiempoAplicacion && <span>{ot.tiempoAplicacion}</span>}
-                                   {ot.tiempoAtraso && <span className="text-red-200">{ot.tiempoAtraso}</span>}
+                              <div className="mt-auto flex flex-col gap-0.5">
+                                 <div className="text-[9px] truncate opacity-90 flex justify-between items-center gap-1 w-full">
+                                    <span className={'flex gap-0.5 items-center'}>
+                                      {ot.startedLate && <span className="bg-red-500 text-white px-0.5 text-[7px] rounded" title="Inició atrasada">I</span>}
+                                      {ot.finishedLate && <span className="bg-red-500 text-white px-0.5 text-[7px] rounded" title="Terminó atrasada">T</span>}
+                                      <span>{ot.patente}</span>
+                                    </span>
+                                    <div className="flex items-center gap-0.5 shrink-0 text-[8px]">
+                                      {ot.tiempoAplicacion && <span>{ot.tiempoAplicacion}</span>}
+                                      {ot.tiempoAtraso && <span className="text-red-200">{ot.tiempoAtraso}</span>}
+                                    </div>
                                  </div>
+                                 {ot.progress !== undefined && (
+                                   <div className="w-full h-1 bg-white/20 rounded-full overflow-hidden flex">
+                                      <div className={cn("h-full transition-all", ot.tiempoAtraso ? "bg-red-400" : "bg-white")} style={{width: `${Math.min(ot.progress, 100)}%`}}></div>
+                                   </div>
+                                 )}
                               </div>
                            </div>
                          )
@@ -491,8 +505,17 @@ export default function PizarraProgramacion() {
                                   <Clock className="w-3 h-3 shrink-0" />
                                   <span>{ot.startHour}:00 - {ot.startHour! + ot.duration!}:00</span>
                                 </div>
-                                <span className="font-bold">{ot.patente}</span>
+                                <span className={'flex gap-1 items-center'}>
+                                  {ot.startedLate && <span className="bg-red-500 text-white px-1 text-[8px] rounded uppercase" title="Inició atrasada">IA</span>}
+                                  {ot.finishedLate && <span className="bg-red-500 text-white px-1 text-[8px] rounded uppercase" title="Terminó atrasada">TA</span>}
+                                  <span className="font-bold">{ot.patente}</span>
+                                </span>
                               </div>
+                              {ot.progress !== undefined && (
+                                <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden flex mt-0.5">
+                                   <div className={cn("h-full transition-all", ot.tiempoAtraso ? "bg-red-400" : "bg-white")} style={{width: `${Math.min(ot.progress, 100)}%`}}></div>
+                                </div>
+                              )}
                            </div>
                         </div>
                       )
