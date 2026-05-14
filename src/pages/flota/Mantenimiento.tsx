@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -6,7 +7,7 @@ import {
   Search, Filter, Plus, FileSpreadsheet, AlertTriangle, 
   CheckCircle, Clock, Truck, ChevronRight, Activity, Wrench,
   MoreVertical, Edit3, History, TrendingUp, Archive, Trash2,
-  Table as TableIcon, List
+  Table as TableIcon, List, Eye, ArrowLeft
 } from 'lucide-react';
 import { CrearOTModal } from '../../components/flota/CrearOTModal';
 import { CrearVehiculoModal } from '../../components/flota/CrearVehiculoModal';
@@ -21,6 +22,8 @@ export default function PizarraMantenimiento() {
   const [selectedVehicleRow, setSelectedVehicleRow] = useState<number | null>(null);
   const [vistaTabla, setVistaTabla] = useState(false);
   const [fichaTecnicaVehiculo, setFichaTecnicaVehiculo] = useState<any | null>(null);
+  const [historialVehiculo, setHistorialVehiculo] = useState<any | null>(null);
+  const navigate = useNavigate();
   
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -242,7 +245,13 @@ export default function PizarraMantenimiento() {
                           <button className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center">
                             <Edit3 className="w-4 h-4 mr-2" /> Actualizar KM
                           </button>
-                          <button className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center">
+                          <button 
+                            className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center"
+                            onClick={() => {
+                              setHistorialVehiculo(vehiculo);
+                              setActionMenuOpen(null);
+                            }}
+                          >
                             <History className="w-4 h-4 mr-2" /> Ver Historial
                           </button>
                           <button className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center">
@@ -274,6 +283,87 @@ export default function PizarraMantenimiento() {
       </div>
     </Card>
   );
+
+  const mockOTs = (vehiculo: any) => [
+      { id: 'ot1', folio: 'OT-0245', tipo: 'Preventiva', prioridad: 'Media', estado: 'Finalizada', fechaCreacion: '30/04/2026', fechaCierre: '06/05/2026', costo: 401503.37 },
+      { id: 'ot2', folio: 'OT-0232', tipo: 'Correctiva', prioridad: 'Media', estado: 'Finalizada', fechaCreacion: '06/04/2026', fechaCierre: '13/04/2026', costo: 751253.0 },
+      { id: 'ot3', folio: 'OT-0205', tipo: 'Preventiva', prioridad: 'Media', estado: 'Finalizada', fechaCreacion: '23/02/2026', fechaCierre: '--', costo: 586121.52 },
+      { id: 'ot4', folio: 'OT-0186', tipo: 'Correctiva', prioridad: 'Media', estado: 'Finalizada', fechaCreacion: '16/01/2026', fechaCierre: '--', costo: 241000.0 },
+      { id: 'ot5', folio: 'OT-0183', tipo: 'Correctiva', prioridad: 'Alta', estado: 'Finalizada', fechaCreacion: '13/01/2026', fechaCierre: '--', costo: 332771.0 },
+      { id: 'ot6', folio: 'OT-0165', tipo: 'Preventiva', prioridad: 'Media', estado: 'Finalizada', fechaCreacion: '24/12/2025', fechaCierre: '--', costo: 717895.32 },
+      { id: 'ot8', folio: 'OT-0158', tipo: 'Preventiva', prioridad: 'Media', estado: 'Finalizada', fechaCreacion: '20/10/2025', fechaCierre: '--', costo: 220000.0 },
+      { id: 'ot9', folio: 'OT-0156', tipo: 'Evaluativa', prioridad: 'Media', estado: 'Finalizada', fechaCreacion: '03/09/2025', fechaCierre: '--', costo: 220000.0 },
+      { id: 'ot10', folio: 'OT-0155', tipo: 'Correctiva', prioridad: 'Media', estado: 'Finalizada', fechaCreacion: '22/07/2025', fechaCierre: '--', costo: 154000.0 },
+  ];
+
+  if (historialVehiculo) {
+    return (
+      <div className="space-y-6">
+         <div className="flex justify-between items-start pt-2">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-800 dark:text-slate-100 mb-1">Historial de Mantenimiento</h1>
+              <p className="text-base text-slate-600 dark:text-slate-400">Vehículo: {historialVehiculo.numeroInterno} ({historialVehiculo.patente})</p>
+            </div>
+            <button onClick={() => setHistorialVehiculo(null)} className="inline-flex items-center justify-center rounded-md border border-transparent bg-slate-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-600 focus:outline-none dark:bg-slate-700 dark:hover:bg-slate-600">
+              <ArrowLeft className="w-4 h-4 mr-2" /> Volver
+            </button>
+         </div>
+         <Card className="border-none shadow-sm overflow-hidden bg-white dark:bg-slate-900 rounded-xl">
+           <CardContent className="p-0">
+             <div className="overflow-x-auto">
+               <table className="w-full text-sm text-center">
+                  <thead className="bg-white dark:bg-slate-900 border-b border-b-slate-100 dark:border-b-slate-800 text-slate-700 dark:text-slate-400 font-extrabold uppercase text-[10px] tracking-widest leading-loose">
+                    <tr>
+                      <th className="px-6 py-6 whitespace-nowrap">Folio</th>
+                      <th className="px-6 py-6 whitespace-nowrap">Tipo</th>
+                      <th className="px-6 py-6 whitespace-nowrap">Prioridad</th>
+                      <th className="px-6 py-6 whitespace-nowrap">Estado</th>
+                      <th className="px-6 py-6 whitespace-nowrap">Fecha Creación</th>
+                      <th className="px-6 py-6 whitespace-nowrap">Fecha Cierre</th>
+                      <th className="px-6 py-6 whitespace-nowrap">Costo Total</th>
+                      <th className="px-6 py-6 whitespace-nowrap">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {mockOTs(historialVehiculo).map(ot => (
+                      <tr key={ot.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors h-16">
+                        <td className="px-6 whitespace-nowrap font-medium text-slate-800 dark:text-slate-300">{ot.folio}</td>
+                        <td className="px-6 whitespace-nowrap text-slate-600 dark:text-slate-400">{ot.tipo}</td>
+                        <td className="px-6 whitespace-nowrap text-slate-600 dark:text-slate-400">{ot.prioridad}</td>
+                        <td className="px-6 whitespace-nowrap justify-center p-0 align-middle">
+                          <div className="flex justify-center items-center h-full w-full">
+                            <span className="inline-flex items-center px-4 py-1 rounded-full text-[11px] font-bold bg-[#10b981] text-white shadow-sm">
+                              {ot.estado}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 whitespace-nowrap text-slate-600 dark:text-slate-400">{ot.fechaCreacion}</td>
+                        <td className="px-6 whitespace-nowrap text-slate-600 dark:text-slate-400">{ot.fechaCierre}</td>
+                        <td className="px-6 whitespace-nowrap text-slate-600 dark:text-slate-400">
+                          ${ot.costo.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-6 whitespace-nowrap text-center">
+                          <div className="flex justify-center">
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="w-[42px] h-[26px] p-0 bg-[#38bdf8] hover:bg-[#0ea5e9] text-white shadow-sm border-none rounded justify-center items-center flex"
+                              onClick={() => navigate(`/flota/ordenes-trabajo/${ot.id}`)}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+               </table>
+             </div>
+           </CardContent>
+         </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -624,7 +714,14 @@ export default function PizarraMantenimiento() {
                           <button className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center">
                             <Edit3 className="w-4 h-4 mr-2" /> Actualizar KM
                           </button>
-                          <button className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center">
+                          <button 
+                            className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setHistorialVehiculo(vehiculo);
+                              setActionMenuOpen(null);
+                            }}
+                          >
                             <History className="w-4 h-4 mr-2" /> Ver Historial
                           </button>
                           <button className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center">
