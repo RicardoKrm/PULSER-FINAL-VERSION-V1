@@ -7,14 +7,16 @@ import { OrdenDeTrabajo } from '../../types';
 interface CrearOTModalProps {
   isOpen: boolean;
   onClose: () => void;
+  vehiculoPreseleccionadoId?: string;
 }
 
-export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose }) => {
+export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, vehiculoPreseleccionadoId }) => {
   const { crearOrdenTrabajo, vehiculos, tiposFalla, pautas, kitsRepuesto, usuarios } = useAppContext();
   const mecanicos = usuarios.filter(u => u.cargo === 'Mecánico');
   
   // State for all fields
   const [formData, setFormData] = useState<Partial<OrdenDeTrabajo>>({
+    vehiculoId: vehiculoPreseleccionadoId || '',
     tipo: 'PREVENTIVA',
     prioridad: 'MEDIA',
     kilometrajeApertura: 0,
@@ -78,7 +80,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose }) =
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium">Vehículo</label>
-              <select name="vehiculoId" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} required>
+              <select name="vehiculoId" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={formData.vehiculoId} onChange={handleChange} required>
                 <option value="">---------</option>
                 {vehiculos.map(v => <option key={v.id} value={v.id}>{v.patente}</option>)}
               </select>

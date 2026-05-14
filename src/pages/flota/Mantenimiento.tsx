@@ -7,11 +7,17 @@ import {
   CheckCircle, Clock, Truck, ChevronRight, Activity, Wrench,
   MoreVertical, Edit3, History, TrendingUp, Archive, Trash2
 } from 'lucide-react';
+import { CrearOTModal } from '../../components/flota/CrearOTModal';
+import { CrearVehiculoModal } from '../../components/flota/CrearVehiculoModal';
+import { Modal } from '../../components/ui/Modal';
 
 export default function PizarraMantenimiento() {
   const [busqueda, setBusqueda] = useState('');
-  const [mostrarFiltros, setMostrarFiltros] = useState(false);
+  const [mostrarFiltros, setMostrarFiltros] = useState(true);
   const [actionMenuOpen, setActionMenuOpen] = useState<number | null>(null);
+  const [modalOTOpen, setModalOTOpen] = useState(false);
+  const [vehiculoSeleccionadoOT, setVehiculoSeleccionadoOT] = useState<string | undefined>();
+  const [selectedVehicleRow, setSelectedVehicleRow] = useState<number | null>(null);
   
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -31,13 +37,15 @@ export default function PizarraMantenimiento() {
   const modelos = ['Sprinter 315', 'Transit Custom', 'Rav4'];
   const tiposMantenimiento = ['Todos los tipos', 'Inicial', 'PM-1', 'PM-2', 'PM-3', 'PM-4'];
 
-  const kpis = {
-    vehiculosFiltrados: 24,
-    porcentajeFlota: 100,
-    nivelCumplimiento: 85.5,
-    costoTotal: 12500000,
-    costoKm: 14.5
-  };
+  const [filtroModelo, setFiltroModelo] = useState('');
+  const [filtroTipoMant, setFiltroTipoMant] = useState('');
+  const [soloProximosOVencidos, setSoloProximosOVencidos] = useState(false);
+  const [modalVehiculoOpen, setModalVehiculoOpen] = useState(false);
+
+  const [filtroProxMantDesde, setFiltroProxMantDesde] = useState('');
+  const [filtroProxMantHasta, setFiltroProxMantHasta] = useState('');
+  const [filtroUltMantDesde, setFiltroUltMantDesde] = useState('');
+  const [filtroUltMantHasta, setFiltroUltMantHasta] = useState('');
 
   const [dataFlota, setDataFlota] = useState([
     {
@@ -54,6 +62,7 @@ export default function PizarraMantenimiento() {
       },
       proxMant: {
         kmFaltante: 4570,
+        kmTarget: 130000,
         fechaProg: '2026-04-20',
         tipo: 'PM-3（Mantenimiento C）'
       },
@@ -73,6 +82,7 @@ export default function PizarraMantenimiento() {
       },
       proxMant: {
         kmFaltante: -1000,
+        kmTarget: 88000,
         kmVencido: 1000,
         fechaProg: '2026-03-01',
         tipo: 'PM-2',
@@ -94,12 +104,40 @@ export default function PizarraMantenimiento() {
       },
       proxMant: {
         kmFaltante: 500,
+        kmTarget: 45000,
         fechaProg: '2026-03-18',
         tipo: 'PM-1'
       },
       estado: 'PROXIMO',
     }
   ]);
+
+  const [kpiModal, setKpiModal] = useState<string | null>(null);
+
+  const vehiculosFiltrados = dataFlota.filter(v => {
+    if (busqueda && !v.patente.toLowerCase().includes(busqueda.toLowerCase()) && !v.numeroInterno.toLowerCase().includes(busqueda.toLowerCase()) && !v.modelo.toLowerCase().includes(busqueda.toLowerCase())) {
+      return false;
+    }
+    if (filtroModelo && v.modelo !== filtroModelo) return false;
+    if (filtroTipoMant && filtroTipoMant !== 'Todos los tipos' && !v.proxMant.tipo.includes(filtroTipoMant)) return false;
+    if (soloProximosOVencidos && v.estado === 'NORMAL') return false;
+    
+    if (filtroProxMantDesde && v.proxMant.fechaProg < filtroProxMantDesde) return false;
+    if (filtroProxMantHasta && v.proxMant.fechaProg > filtroProxMantHasta) return false;
+    
+    if (filtroUltMantDesde && v.ultimoMant.fecha < filtroUltMantDesde) return false;
+    if (filtroUltMantHasta && v.ultimoMant.fecha > filtroUltMantHasta) return false;
+
+    return true;
+  });
+
+  const kpis = {
+    vehiculosFiltrados: vehiculosFiltrados.length,
+    porcentajeFlota: Math.round((vehiculosFiltrados.length / (dataFlota.length || 1)) * 100),
+    nivelCumplimiento: 85.5,
+    costoTotal: 12500000,
+    costoKm: 14.5
+  };
 
   const handleArchive = (id: number) => {
     setDataFlota(dataFlota.filter(v => v.id !== id));
@@ -111,9 +149,9 @@ export default function PizarraMantenimiento() {
       case 'NORMAL':
         return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 shadow-sm"><CheckCircle className="w-3 h-3 mr-1" /> NORMALIDAD</Badge>;
       case 'PROXIMO':
-        return <Badge className="bg-orange-100 text-orange-800 border-orange-200 shadow-sm"><Clock className="w-3 h-3 mr-1" /> MANT. PRÓX</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 shadow-sm hover:bg-yellow-200"><Clock className="w-3 h-3 mr-1" /> MANT. PRÓX</Badge>;
       case 'VENCIDO':
-        return <Badge className="bg-red-100 text-red-800 border-red-200 shadow-sm"><AlertTriangle className="w-3 h-3 mr-1" /> VENCIDO</Badge>;
+        return <Badge className="bg-red-100 text-red-800 border-red-200 shadow-sm hover:bg-red-200"><AlertTriangle className="w-3 h-3 mr-1" /> VENCIDO</Badge>;
       default:
         return <Badge variant="default">{estado}</Badge>;
     }
@@ -121,9 +159,9 @@ export default function PizarraMantenimiento() {
 
   const getStatusIcon = (estado: string) => {
     switch (estado) {
-      case 'NORMAL': return <div className="h-2 w-2 rounded-full bg-emerald-50 dark:bg-emerald-900/300 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />;
-      case 'PROXIMO': return <div className="h-2 w-2 rounded-full bg-orange-50 dark:bg-orange-900/300 shadow-[0_0_8px_rgba(249,115,22,0.5)] animate-pulse" />;
-      case 'VENCIDO': return <div className="h-2 w-2 rounded-full bg-red-50 dark:bg-red-900/300 shadow-[0_0_8px_rgba(239,68,68,0.5)] animate-pulse" />;
+      case 'NORMAL': return <div className="h-3 w-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />;
+      case 'PROXIMO': return <div className="h-3 w-3 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.8)] animate-pulse" />;
+      case 'VENCIDO': return <div className="h-3 w-3 rounded-full bg-red-600 shadow-[0_0_8px_rgba(220,38,38,0.8)] animate-pulse" />;
       default: return null;
     }
   };
@@ -151,9 +189,14 @@ export default function PizarraMantenimiento() {
             <FileSpreadsheet className="w-4 h-4 mr-2 text-green-600" />
             Exportar XLSX
           </Button>
-          <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
+          <Button 
+            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+            onClick={() => {
+              setModalVehiculoOpen(true);
+            }}
+          >
             <Plus className="w-4 h-4 mr-2" />
-            Nueva OT
+            Nuevo Vehículo
           </Button>
         </div>
       </div>
@@ -175,37 +218,46 @@ export default function PizarraMantenimiento() {
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md transition-all">
-          <CardContent className="p-4 flex items-center justify-between">
+        <Card 
+          className="border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+          onClick={() => setKpiModal('cumplimiento')}
+        >
+          <CardContent className="p-4 flex items-center justify-between relative">
             <div>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Cumplimiento Normal</p>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Cumplimiento del Cronograma</p>
               <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">{kpis.nivelCumplimiento}%</h3>
             </div>
-            <div className="p-3 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg text-emerald-600">
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg text-emerald-600 group-hover:scale-110 transition-transform">
               <CheckCircle className="w-5 h-5" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-orange-500 shadow-sm hover:shadow-md transition-all">
-          <CardContent className="p-4 flex items-center justify-between">
+        <Card 
+          className="border-l-4 border-l-orange-500 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+          onClick={() => setKpiModal('costo_total')}
+        >
+          <CardContent className="p-4 flex items-center justify-between relative">
             <div>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Costo Total Mant.</p>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Costo Total Mant. <span className="text-[10px]">(PREV. + CORR)</span></p>
               <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">${kpis.costoTotal.toLocaleString('es-CL')}</h3>
             </div>
-            <div className="p-3 bg-orange-50 dark:bg-orange-900/30 rounded-lg text-orange-600">
+            <div className="p-3 bg-orange-50 dark:bg-orange-900/30 rounded-lg text-orange-600 group-hover:scale-110 transition-transform">
               <Activity className="w-5 h-5" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-purple-500 shadow-sm hover:shadow-md transition-all">
-          <CardContent className="p-4 flex items-center justify-between">
+        <Card 
+          className="border-l-4 border-l-purple-500 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+          onClick={() => setKpiModal('costo_promedio')}
+        >
+          <CardContent className="p-4 flex items-center justify-between relative">
             <div>
               <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Costo Promedio / KM</p>
               <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">${kpis.costoKm}</h3>
             </div>
-            <div className="p-3 bg-purple-50 dark:bg-purple-900/30 rounded-lg text-purple-600">
+            <div className="p-3 bg-purple-50 dark:bg-purple-900/30 rounded-lg text-purple-600 group-hover:scale-110 transition-transform">
               <Wrench className="w-5 h-5" />
             </div>
           </CardContent>
@@ -242,7 +294,11 @@ export default function PizarraMantenimiento() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-slate-100 animate-in fade-in slide-in-from-top-2">
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">Modelo</label>
-                <select className="w-full bg-white dark:bg-slate-700 dark:text-slate-100 dark:border-slate-700 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-b dark:border-slate-800lue-500">
+                <select 
+                  className="w-full bg-white dark:bg-slate-700 dark:text-slate-100 dark:border-slate-700 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-b dark:border-slate-800lue-500"
+                  value={filtroModelo}
+                  onChange={(e) => setFiltroModelo(e.target.value)}
+                >
                   <option value="">Todos los modelos</option>
                   {modelos.map((m) => (
                     <option key={m} value={m}>{m}</option>
@@ -251,7 +307,11 @@ export default function PizarraMantenimiento() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">Tipo de Mantenimiento</label>
-                <select className="w-full bg-white dark:bg-slate-700 dark:text-slate-100 dark:border-slate-700 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-b dark:border-slate-800lue-500">
+                <select 
+                  className="w-full bg-white dark:bg-slate-700 dark:text-slate-100 dark:border-slate-700 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-b dark:border-slate-800lue-500"
+                  value={filtroTipoMant}
+                  onChange={(e) => setFiltroTipoMant(e.target.value)}
+                >
                   {tiposMantenimiento.map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
@@ -259,24 +319,50 @@ export default function PizarraMantenimiento() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">Próx. Mantenimiento Desde</label>
-                <input type="date" className="w-full bg-white dark:bg-slate-700 dark:text-slate-100 dark:border-slate-700 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-b dark:border-slate-800lue-500" />
+                <input 
+                  type="date" 
+                  className="w-full bg-white dark:bg-slate-700 dark:text-slate-100 dark:border-slate-700 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-b dark:border-slate-800lue-500" 
+                  value={filtroProxMantDesde}
+                  onChange={(e) => setFiltroProxMantDesde(e.target.value)}
+                />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">Próx. Mantenimiento Hasta</label>
-                <input type="date" className="w-full bg-white dark:bg-slate-700 dark:text-slate-100 dark:border-slate-700 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-b dark:border-slate-800lue-500" />
+                <input 
+                  type="date" 
+                  className="w-full bg-white dark:bg-slate-700 dark:text-slate-100 dark:border-slate-700 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-b dark:border-slate-800lue-500" 
+                  value={filtroProxMantHasta}
+                  onChange={(e) => setFiltroProxMantHasta(e.target.value)}
+                />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">Último Mantenimiento Desde</label>
-                <input type="date" className="w-full bg-white dark:bg-slate-700 dark:text-slate-100 dark:border-slate-700 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-b dark:border-slate-800lue-500" />
+                <input 
+                  type="date" 
+                  className="w-full bg-white dark:bg-slate-700 dark:text-slate-100 dark:border-slate-700 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-b dark:border-slate-800lue-500" 
+                  value={filtroUltMantDesde}
+                  onChange={(e) => setFiltroUltMantDesde(e.target.value)}
+                />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">Último Mantenimiento Hasta</label>
-                <input type="date" className="w-full bg-white dark:bg-slate-700 dark:text-slate-100 dark:border-slate-700 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-b dark:border-slate-800lue-500" />
+                <input 
+                  type="date" 
+                  className="w-full bg-white dark:bg-slate-700 dark:text-slate-100 dark:border-slate-700 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-b dark:border-slate-800lue-500" 
+                  value={filtroUltMantHasta}
+                  onChange={(e) => setFiltroUltMantHasta(e.target.value)}
+                />
               </div>
               <div className="space-y-1 md:col-span-2 flex items-end">
                 <div className="flex items-center gap-2 p-2 bg-orange-50 dark:bg-orange-900/30 border dark:border-slate-800 border-orange-200 rounded-lg w-full">
-                  <input type="checkbox" id="proximos_alerta" className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-slate-300 dark:border-slate-700 dark:text-slate-100" />
-                  <label htmlFor="proximos_alerta" className="text-sm font-medium text-orange-800">
+                  <input 
+                    type="checkbox" 
+                    id="proximos_alerta" 
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-slate-300 dark:border-slate-700 dark:text-slate-100" 
+                    checked={soloProximosOVencidos}
+                    onChange={(e) => setSoloProximosOVencidos(e.target.checked)}
+                  />
+                  <label htmlFor="proximos_alerta" className="text-sm font-medium text-orange-800 cursor-pointer w-full h-full block">
                     Mostrar solo vehículos con mantenimientos PRÓXIMOS o VENCIDOS
                   </label>
                 </div>
@@ -292,6 +378,7 @@ export default function PizarraMantenimiento() {
           <table className="w-full text-sm text-left">
             <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-xs uppercase font-semibold">
               <tr>
+                <th className="px-5 py-4 w-12 text-center"></th>
                 <th className="px-5 py-4 w-12 text-center">STS</th>
                 <th className="px-5 py-4">Vehículo</th>
                 <th className="px-5 py-4">KM Actual</th>
@@ -302,8 +389,17 @@ export default function PizarraMantenimiento() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
-              {dataFlota.map((vehiculo) => (
-                <tr key={vehiculo.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:bg-slate-900/50 transition-colors group">
+              {vehiculosFiltrados.map((vehiculo) => (
+                <tr key={vehiculo.id} className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group ${selectedVehicleRow === vehiculo.id ? 'bg-blue-50/50 dark:bg-slate-800/50' : 'dark:bg-slate-900/50'}`}>
+                  <td className="px-5 py-4 text-center">
+                    <input 
+                      type="radio" 
+                      name="selectedVehicle"
+                      className="w-4 h-4 text-blue-600 rounded-full focus:ring-blue-500 border-slate-300 dark:border-slate-700 cursor-pointer"
+                      checked={selectedVehicleRow === vehiculo.id}
+                      onChange={() => setSelectedVehicleRow(vehiculo.id)}
+                    />
+                  </td>
                   <td className="px-5 py-4">
                     <div className="flex justify-center">
                       {getStatusIcon(vehiculo.estado)}
@@ -340,14 +436,17 @@ export default function PizarraMantenimiento() {
                     <div className="flex flex-col space-y-1">
                       <div className="flex items-center gap-1.5 text-blue-600 font-bold">
                         <Activity className="w-3.5 h-3.5" />
-                        Faltan: {vehiculo.proxMant.kmFaltante.toLocaleString('es-CL')} km
+                        Próx. Mant.: {vehiculo.proxMant.kmTarget.toLocaleString('es-CL')} km
+                      </div>
+                      <div className="text-xs font-medium text-slate-500">
+                        (Faltan: {vehiculo.proxMant.kmFaltante.toLocaleString('es-CL')} km)
                       </div>
                       <div className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                        Proyectado: {vehiculo.proxMant.fechaProg}
+                        Fecha Próx.: {vehiculo.proxMant.fechaProg}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 mt-1">
                         <span className="text-[10px] font-bold text-blue-700 bg-blue-50 dark:bg-blue-900/30 border dark:border-slate-800 border-b dark:border-slate-800lue-200 px-1.5 py-0.5 rounded w-fit uppercase">
-                          {vehiculo.proxMant.tipo}
+                          Tipo: {vehiculo.proxMant.tipo}
                         </span>
                         {vehiculo.proxMant.vencidosStr && (
                           <span className="text-[9px] font-bold text-red-600 bg-red-50 dark:bg-red-900/30 border dark:border-slate-800 border-red-200 px-1 rounded uppercase animate-pulse">
@@ -375,6 +474,17 @@ export default function PizarraMantenimiento() {
                         className="absolute right-8 top-10 w-56 bg-white dark:bg-slate-900 rounded-md shadow-lg border border-slate-200 dark:border-slate-800 z-50 overflow-hidden"
                       >
                         <div className="py-1">
+                          <button 
+                            className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center font-bold"
+                            onClick={() => {
+                              setVehiculoSeleccionadoOT(vehiculo.id.toString());
+                              setModalOTOpen(true);
+                              setActionMenuOpen(null);
+                            }}
+                          >
+                            <Plus className="w-4 h-4 mr-2" /> Crear OT
+                          </button>
+                          <div className="border-t border-slate-100 dark:border-slate-800 my-1"></div>
                           <button className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center">
                             <Edit3 className="w-4 h-4 mr-2" /> Actualizar KM
                           </button>
@@ -400,9 +510,9 @@ export default function PizarraMantenimiento() {
                   </td>
                 </tr>
               ))}
-              {dataFlota.length === 0 && (
+              {vehiculosFiltrados.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-8 text-center text-slate-500 dark:text-slate-400">
+                  <td colSpan={8} className="px-5 py-8 text-center text-slate-500 dark:text-slate-400">
                     No se encontraron vehículos.
                   </td>
                 </tr>
@@ -411,6 +521,78 @@ export default function PizarraMantenimiento() {
           </table>
         </div>
       </Card>
+      {modalOTOpen && (
+        <CrearOTModal 
+          isOpen={modalOTOpen} 
+          onClose={() => setModalOTOpen(false)} 
+          vehiculoPreseleccionadoId={vehiculoSeleccionadoOT}
+        />
+      )}
+      {modalVehiculoOpen && (
+        <CrearVehiculoModal 
+          isOpen={modalVehiculoOpen} 
+          onClose={() => setModalVehiculoOpen(false)} 
+        />
+      )}
+      <Modal isOpen={kpiModal === 'cumplimiento'} onClose={() => setKpiModal(null)} title="Detalle KPI: Cumplimiento del Cronograma">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">Este KPI mide la proporción de vehículos que se encuentran al día con sus pautas de mantenimiento respecto al total de la flota activa.</p>
+          <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-medium">Vehículos al día (NORMAL)</span>
+              <span className="font-bold text-emerald-600">{dataFlota.filter(v => v.estado === 'NORMAL').length}</span>
+            </div>
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-medium">Vehículos con mantenimiento próximo o vencido</span>
+              <span className="font-bold text-red-600">{dataFlota.filter(v => v.estado !== 'NORMAL').length}</span>
+            </div>
+            <div className="border-t border-slate-200 dark:border-slate-700 my-2 pt-2 flex justify-between items-center">
+              <span className="font-bold">Total Flota Visualizada</span>
+              <span className="font-bold">{vehiculosFiltrados.length}</span>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={kpiModal === 'costo_total'} onClose={() => setKpiModal(null)} title="Detalle KPI: Costo Total Mantenimiento">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">Desglose acumulado de los gastos en órdenes de trabajo que han sido completadas.</p>
+          <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-medium">Mantenimiento Preventivo</span>
+              <span className="font-bold text-slate-700 dark:text-slate-300">$8.500.000</span>
+            </div>
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-medium">Mantenimiento Correctivo</span>
+              <span className="font-bold text-slate-700 dark:text-slate-300">$4.000.000</span>
+            </div>
+            <div className="border-t border-slate-200 dark:border-slate-700 my-2 pt-2 flex justify-between items-center">
+              <span className="font-bold">Total Acumulado</span>
+              <span className="font-bold text-orange-600">$12.500.000</span>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={kpiModal === 'costo_promedio'} onClose={() => setKpiModal(null)} title="Detalle KPI: Costo Promedio por KM">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">Este valor se calcula al dividir el costo total de los mantenimientos sobre los kilómetros totaes acumulados, indicando qué tan caro es mantener la flota por kilómetro recorrido.</p>
+          <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-medium">Costo Total Mant.</span>
+              <span className="font-bold text-slate-700 dark:text-slate-300">$12.500.000</span>
+            </div>
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-medium">KM Acumulados</span>
+              <span className="font-bold text-slate-700 dark:text-slate-300">862.068 km</span>
+            </div>
+            <div className="border-t border-slate-200 dark:border-slate-700 my-2 pt-2 flex justify-between items-center">
+              <span className="font-bold">Costo Promedio</span>
+              <span className="font-bold text-purple-600">$14.5 / km</span>
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
