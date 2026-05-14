@@ -106,6 +106,7 @@ export interface OrdenDeTrabajo {
   tipoFalla?: string;
   sintomas?: string;
   inspeccionTrenMotriz?: string; // Configuración Ejes...
+  eje?: string;
   presionNeumatico?: number;
   // Gestón Administrativa
   personalOperativo?: string;

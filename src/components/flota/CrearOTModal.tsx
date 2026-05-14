@@ -45,6 +45,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose }) =
       tipoFalla: formData.tipoFalla,
       sintomas: formData.sintomas,
       inspeccionTrenMotriz: formData.inspeccionTrenMotriz,
+      eje: formData.eje,
       presionNeumatico: formData.presionNeumatico ? Number(formData.presionNeumatico) : undefined,
       personalOperativo: formData.personalOperativo,
       proveedor: formData.proveedor,
@@ -129,7 +130,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose }) =
                   </div>
               </>
             )}
-            {(formData.tipo.includes('CORRECTIVA') || formData.tipo.includes('EVALUATIVA')) && (
+            {(formData.tipo.includes('CORRECTIVA') || formData.tipo.includes('EVALUATIVA')) && formData.tipo !== 'EVALUATIVA_NEUMATICOS' && (
                <>
                 <div>
                   <label className="block text-sm font-medium">Tipo de Falla</label>
@@ -145,16 +146,22 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose }) =
                </>
             )}
             {formData.tipo === 'EVALUATIVA_NEUMATICOS' && (
-              <div>
-                <label className="block text-sm font-medium">Inspección Tren Motriz</label>
-                <select name="inspeccionTrenMotriz" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange}>
-                   <option value="">Configuración Ejes...</option>
-                   <option value="4x2">4x2 (6 Ruedas)</option>
-                   <option value="6x2">6x2 (8 Ruedas)</option>
-                   <option value="6x4">6x4 (10 Ruedas)</option>
-                   <option value="8x4">8x4 (12 Ruedas)</option>
-                </select>
-              </div>
+              <>
+                <div>
+                  <label className="block text-sm font-medium">Inspección Tren Motriz</label>
+                  <select name="inspeccionTrenMotriz" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange}>
+                     <option value="">Configuración Ejes...</option>
+                     <option value="4x2">4x2 (6 Ruedas)</option>
+                     <option value="6x2">6x2 (8 Ruedas)</option>
+                     <option value="6x4">6x4 (10 Ruedas)</option>
+                     <option value="8x4">8x4 (12 Ruedas)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium">Eje</label>
+                  <input type="text" name="eje" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
+                </div>
+              </>
             )}
             {(formData.tipo.includes('NEUMATICOS')) && (
                 <div>
