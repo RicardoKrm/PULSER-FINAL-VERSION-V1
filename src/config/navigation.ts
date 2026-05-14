@@ -116,6 +116,8 @@ export const navigation = [
       { title: 'Usuarios y Cargos', icon: Users, href: '/configuracion/usuarios' },
       { title: 'Gestión de Pautas', icon: FileText, href: '/configuracion/pautas' },
       { title: 'Gestión de Tareas', icon: ClipboardList, href: '/configuracion/tareas' },
+      { title: 'Tipos de Falla', icon: AlertCircle, href: '/configuracion/fallas' },
+      { title: 'Kit de Repuestos', icon: Package, href: '/herramientas/kits' },
       { title: 'Tipos de Pausa', icon: Clock, href: '/configuracion/pausas' },
       { title: 'Pulser AI', icon: Cpu, href: '/configuracion/ai' },
       { title: 'Carga Masiva', icon: Zap, href: '/configuracion/carga-masiva' },

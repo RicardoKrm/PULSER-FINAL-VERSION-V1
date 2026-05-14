@@ -2,12 +2,18 @@ import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Plus } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
 
 export default function GestionPautas() {
   const { pautas } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [filtroBusqueda, setFiltroBusqueda] = useState('');
+
+  const pautasFiltradas = pautas.filter(p => 
+    p.nombre.toLowerCase().includes(filtroBusqueda.toLowerCase()) ||
+    p.modeloVehiculo.toLowerCase().includes(filtroBusqueda.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
@@ -34,6 +40,11 @@ export default function GestionPautas() {
         </div>
       </Modal>
 
+      <div className="bg-white p-4 rounded-lg border flex items-center gap-2">
+          <Search className="text-gray-400 w-5 h-5"/>
+          <input type="text" placeholder="Buscar por nombre o modelo..." className="flex-1 outline-none" value={filtroBusqueda} onChange={(e) => setFiltroBusqueda(e.target.value)} />
+      </div>
+
       <Card className="overflow-hidden">
         <div className="overflow-auto">
           <table className="w-full text-sm text-left">
@@ -47,7 +58,7 @@ export default function GestionPautas() {
                   </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                  {pautas.map((p) => (
+                  {pautasFiltradas.map((p) => (
                       <tr key={p.id} className="hover:bg-slate-50">
                           <td className="px-6 py-4 font-semibold text-slate-900">{p.nombre}</td>
                           <td className="px-6 py-4 text-slate-600">{p.modeloVehiculo}</td>

@@ -5,10 +5,12 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Plus, Search, Filter, DollarSign, FileDown, Trash } from 'lucide-react';
+import { CrearOTModal } from '../../components/flota/CrearOTModal';
 
 export default function GestionOrdenesTrabajo() {
   const { ordenesTrabajo, vehiculos, eliminarOrdenTrabajo } = useAppContext();
   const navigate = useNavigate();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [filtroVehiculo, setFiltroVehiculo] = useState('Todos');
   const [filtroTipo, setFiltroTipo] = useState('Todos');
@@ -61,9 +63,11 @@ export default function GestionOrdenesTrabajo() {
         <h1 className="text-3xl font-bold">Órdenes de Trabajo</h1>
         <div className="flex items-center gap-4">
             <Button variant="outline" className="border-green-600 text-green-600 hover:bg-green-50"><FileDown className="w-4 h-4 mr-2" /> Exportar</Button>
-            <Button className="bg-cyan-600"><Plus className="w-4 h-4 mr-2" /> Crear Nueva OT</Button>
+            <Button className="bg-cyan-600" onClick={() => setIsModalOpen(true)}><Plus className="w-4 h-4 mr-2" /> Crear Nueva OT</Button>
         </div>
       </div>
+      
+      <CrearOTModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
       
       <Card className="p-6">
         <h2 className="text-xl font-semibold mb-6 flex items-center gap-2"><Filter className="text-cyan-600 w-5 h-5"/> Filtros</h2>

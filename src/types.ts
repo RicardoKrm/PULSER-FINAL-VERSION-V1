@@ -87,8 +87,8 @@ export interface OrdenDeTrabajo {
   folio: string;
   vehiculoId: string;
   tecnicoResponsable?: string;
-  tipo: 'PREVENTIVA' | 'CORRECTIVA' | 'EVALUATIVA';
-  estado: 'ABIERTA' | 'EN_PROCESO' | 'FINALIZADA' | 'CANCELADA' | 'PAUSADA' | 'POR_ASIGNAR' | 'CERRADA_MECANICO';
+  tipo: 'PREVENTIVA' | 'CORRECTIVA' | 'EVALUATIVA' | 'PREVENTIVA_NEUMATICOS' | 'CORRECTIVA_NEUMATICOS' | 'EVALUATIVA_NEUMATICOS';
+  estado: 'ABIERTA' | 'EN_PROCESO' | 'FINALIZADA' | 'CANCELADA' | 'PAUSADA' | 'POR_ASIGNAR' | 'CERRADA_MECANICO' | 'PROGRAMADA' | 'CERRADA_POR_MECANICO';
   prioridad: 'BAJA' | 'MEDIA' | 'ALTA';
   kilometrajeApertura: number;
   kilometrajeCierre?: number;
@@ -100,6 +100,22 @@ export interface OrdenDeTrabajo {
   insumos: Insumo[];
   observacionInicial?: string;
   diagnosticoEvaluacion?: string;
+  // Detalle Técnico
+  pauta?: string;
+  kitRepuestos?: string;
+  tipoFalla?: string;
+  sintomas?: string;
+  inspeccionTrenMotriz?: string; // Configuración Ejes...
+  presionNeumatico?: number;
+  // Gestón Administrativa
+  personalOperativo?: string;
+  proveedor?: string;
+  empresaExterna?: string;
+  rutEmpresa?: string;
+  valorHH?: number;
+  presupuestoAprobado?: number;
+  observaciones?: string;
+
   costoInsumos: number;
   costoManoObraTareas: number;
   costoManoObraHH: number;
@@ -120,4 +136,20 @@ export interface TareaEstandar {
   descripcion: string;
   tiempoEstandarMinutos: number;
   costoManoObra: number;
+}
+
+export interface TipoFalla {
+  id: string;
+  nombre: string;
+}
+
+export interface KitRepuesto {
+  id: string;
+  nombre: string;
+}
+
+export interface Usuario {
+  id: string;
+  nombre: string;
+  cargo: string; // Including 'Mecánico'
 }

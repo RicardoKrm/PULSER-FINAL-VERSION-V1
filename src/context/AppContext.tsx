@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
-import { ReservaTurismo, Conductor, Vehiculo, OrdenDeTrabajo, PautaMantenimiento, TareaEstandar } from '../types';
+import { ReservaTurismo, Conductor, Vehiculo, OrdenDeTrabajo, PautaMantenimiento, TareaEstandar, TipoFalla, KitRepuesto, Usuario } from '../types';
 
 interface AppContextType {
   reservasTurismo: ReservaTurismo[];
@@ -8,9 +8,16 @@ interface AppContextType {
   vehiculos: Vehiculo[];
   pautas: PautaMantenimiento[];
   tareasEstandar: TareaEstandar[];
+  tiposFalla: TipoFalla[];
+  kitsRepuesto: KitRepuesto[];
+  usuarios: Usuario[];
   crearReservaTurismo: (reserva: ReservaTurismo) => void;
   crearOrdenTrabajo: (ot: OrdenDeTrabajo) => void;
   eliminarOrdenTrabajo: (id: string) => void;
+  crearTipoFalla: (tipoFalla: TipoFalla) => void;
+  eliminarTipoFalla: (id: string) => void;
+  crearKitRepuesto: (kit: KitRepuesto) => void;
+  eliminarKitRepuesto: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -146,6 +153,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     { id: 't1', descripcion: 'ARMAR Y REPARAR MOTOR OM 457 LA', tiempoEstandarMinutos: 900, costoManoObra: 127280 },
     { id: 't2', descripcion: 'CAMBIAR CORREA DE ACC. VENTILADOR', tiempoEstandarMinutos: 60, costoManoObra: 7955 }
   ]);
+  const [tiposFalla, setTiposFalla] = useState<TipoFalla[]>([
+    { id: 'tf1', nombre: 'MOTOR AGRIPADO' },
+    { id: 'tf2', nombre: 'FUGA DE REFRIG. MOTOR' },
+    { id: 'tf3', nombre: 'FUGA ACEITE MOTOR' },
+    { id: 'tf4', nombre: 'MOTOR NO ARRANCA' }
+  ]);
+  const [kitsRepuesto, setKitsRepuesto] = useState<KitRepuesto[]>([
+    { id: 'kr1', nombre: 'KIT SERVICIO 10K' },
+    { id: 'kr2', nombre: 'KIT FRENOS' }
+  ]);
+  const [usuarios, setUsuarios] = useState<Usuario[]>([
+    { id: 'u1', nombre: 'Mecánico Juan', cargo: 'Mecánico' },
+    { id: 'u2', nombre: 'Mecánico Pedro', cargo: 'Mecánico' },
+    { id: 'u3', nombre: 'Administradora María', cargo: 'Admin' }
+  ]);
 
   const crearReservaTurismo = (reserva: ReservaTurismo) => {
     // Logic for adding a reservation
@@ -159,8 +181,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setOrdenesTrabajo(ordenesTrabajo.filter(ot => ot.id !== id));
   };
 
+  const crearTipoFalla = (tipoFalla: TipoFalla) => {
+    setTiposFalla([...tiposFalla, tipoFalla]);
+  };
+
+  const eliminarTipoFalla = (id: string) => {
+    setTiposFalla(tiposFalla.filter(tf => tf.id !== id));
+  };
+
+  const crearKitRepuesto = (kit: KitRepuesto) => {
+    setKitsRepuesto([...kitsRepuesto, kit]);
+  };
+
+  const eliminarKitRepuesto = (id: string) => {
+    setKitsRepuesto(kitsRepuesto.filter(kr => kr.id !== id));
+  };
+
   return (
-    <AppContext.Provider value={{ reservasTurismo, ordenesTrabajo, conductores, vehiculos, pautas, tareasEstandar, crearReservaTurismo, crearOrdenTrabajo, eliminarOrdenTrabajo }}>
+    <AppContext.Provider value={{ reservasTurismo, ordenesTrabajo, conductores, vehiculos, pautas, tareasEstandar, tiposFalla, kitsRepuesto, usuarios, crearReservaTurismo, crearOrdenTrabajo, eliminarOrdenTrabajo, crearTipoFalla, eliminarTipoFalla, crearKitRepuesto, eliminarKitRepuesto }}>
       {children}
     </AppContext.Provider>
   );
