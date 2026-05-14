@@ -17,6 +17,9 @@ interface OtMock {
   duration?: number;
   dayOffset?: number; // 0 = today, 1 = tomorrow, etc.
   isOverdue?: boolean;
+  estado?: 'EN_PROCESO' | 'PAUSADA' | 'PAUSADA_MECANICO' | 'TERMINADA' | 'PROGRAMADA';
+  tiempoAplicacion?: string;
+  tiempoAtraso?: string;
 }
 
 interface MecanicoMock {
@@ -52,34 +55,48 @@ export default function PizarraProgramacion() {
   const hours = Array.from({length: 11}, (_, i) => i + 8); // 8 to 18
 
   const [pendingOts, setPendingOts] = useState<OtMock[]>([
-    { id: 'p1', folio: 'OT-1045', tipo: 'Preventiva', patente: 'LDPJ-99', actividad: 'Mantenimiento A' },
-    { id: 'p2', folio: 'OT-1046', tipo: 'Correctiva', patente: 'KHYT-22', actividad: 'Cambio de Alternador' },
-    { id: 'p3', folio: 'OT-1047', tipo: 'Correctiva', patente: 'MNQP-15', actividad: 'Revisión Frenos' },
+    { id: 'ot4', folio: 'OT-004', tipo: 'Preventiva', patente: 'EF-GH-34', actividad: 'Revisión técnica', estado: 'PROGRAMADA' },
+    { id: 'ot5', folio: 'OT-005', tipo: 'Correctiva', patente: 'AB-CD-12', actividad: 'Cambio de aceite transmisión', estado: 'PROGRAMADA' },
+    { id: 'ot6', folio: 'OT-006', tipo: 'Correctiva', patente: 'XY-ZW-99', actividad: 'Reparación de aire acondicionado', estado: 'PROGRAMADA' },
+    { id: 'ot7', folio: 'OT-007', tipo: 'Preventiva', patente: 'KL-NM-11', actividad: 'Alineación y balanceo', estado: 'PROGRAMADA' },
   ]);
 
   const [mecanicos, setMecanicos] = useState<MecanicoMock[]>([
     {
       id: 'm1', nombre: 'Carlos Ruiz', especialidad: 'Mecánico General', selected: true,
       ots: [
-        { id: 'e1', folio: 'OT-1040', tipo: 'Preventiva', patente: 'HGTY-88', actividad: 'Mantenimiento B', startHour: 10, duration: 2, dayOffset: 0 }
+        { id: 'ot1', folio: 'OT-001', tipo: 'Preventiva', patente: 'AB-CD-12', actividad: 'Mantenimiento preventivo.', startHour: 8, duration: 2, dayOffset: 0, estado: 'EN_PROCESO', tiempoAplicacion: '01:30:00', tiempoAtraso: '+ 30 min', isOverdue: true },
+        { id: 'ot8', folio: 'OT-008', tipo: 'Correctiva', patente: 'EF-GH-34', actividad: 'Cambio pastillas freno.', startHour: 10.5, duration: 1.5, dayOffset: 0, estado: 'PROGRAMADA' },
+        { id: 'ot9', folio: 'OT-009', tipo: 'Preventiva', patente: 'XX-YY-01', actividad: 'Pauta Mantenimiento 10K', startHour: 14, duration: 2, dayOffset: -1, estado: 'TERMINADA', tiempoAplicacion: '01:50:00' },
+        { id: 'ot10', folio: 'OT-010', tipo: 'Correctiva', patente: 'ZZ-WW-02', actividad: 'Reparación motor', startHour: 8, duration: 4, dayOffset: 1, estado: 'PAUSADA_MECANICO', tiempoAplicacion: '02:00:00', tiempoAtraso: '+ 1 hr' },
+        { id: 'ot11', folio: 'OT-011', tipo: 'Preventiva', patente: 'ZZ-WW-02', actividad: 'Revisión fluidos', startHour: 14, duration: 1, dayOffset: 1, estado: 'PROGRAMADA' }
       ]
     },
     {
       id: 'm2', nombre: 'Pedro Gómez', especialidad: 'Electricista', selected: true,
       ots: [
-        { id: 'e2', folio: 'OT-1042', tipo: 'Correctiva', patente: 'PLKX-10', actividad: 'Falla Sist. Eléctrico', startHour: 11, duration: 3, dayOffset: 1, isOverdue: true }
+        { id: 'ot2', folio: 'OT-002', tipo: 'Preventiva', patente: 'AB-CD-12', actividad: 'Revisión sist. eléctrico.', startHour: 9, duration: 2, dayOffset: 0, estado: 'EN_PROCESO', tiempoAplicacion: '00:45:00' },
+        { id: 'ot12', folio: 'OT-012', tipo: 'Correctiva', patente: 'XY-AA-10', actividad: 'Cambio de alternador', startHour: 12, duration: 2.5, dayOffset: 0, estado: 'PAUSADA', tiempoAplicacion: '01:10:00', isOverdue: true },
+        { id: 'ot13', folio: 'OT-013', tipo: 'Preventiva', patente: 'AB-CD-12', actividad: 'Chequeo baterías', startHour: 15, duration: 1, dayOffset: -1, estado: 'TERMINADA', tiempoAplicacion: '00:55:00' },
+        { id: 'ot14', folio: 'OT-014', tipo: 'Preventiva', patente: 'ZZ-KK-88', actividad: 'Revisión luces', startHour: 10, duration: 1, dayOffset: 1, estado: 'PROGRAMADA' },
+        { id: 'ot15', folio: 'OT-015', tipo: 'Correctiva', patente: 'XY-AA-11', actividad: 'Diagnóstico escáner', startHour: 12, duration: 1.5, dayOffset: 1, estado: 'PROGRAMADA' }
       ]
     },
     {
       id: 'm3', nombre: 'Luis Silva', especialidad: 'Lubricador', selected: true,
       ots: [
-        { id: 'e3', folio: 'OT-1043', tipo: 'Preventiva', patente: 'VBNM-55', actividad: 'Cambio Aceite', startHour: 14, duration: 1.5, dayOffset: -1 }
+        { id: 'ot3', folio: 'OT-003', tipo: 'Correctiva', patente: 'EF-GH-34', actividad: 'Cambio aceite motor', startHour: 8, duration: 1.5, dayOffset: -1, estado: 'TERMINADA', tiempoAplicacion: '01:20:00' },
+        { id: 'ot16', folio: 'OT-016', tipo: 'Preventiva', patente: 'AB-CD-12', actividad: 'Engrase general', startHour: 8, duration: 2, dayOffset: 0, estado: 'EN_PROCESO', tiempoAplicacion: '00:30:00' },
+        { id: 'ot17', folio: 'OT-017', tipo: 'Preventiva', patente: 'EF-GH-34', actividad: 'Revisión niveles', startHour: 11, duration: 1, dayOffset: 0, estado: 'PROGRAMADA' },
+        { id: 'ot18', folio: 'OT-018', tipo: 'Correctiva', patente: 'KL-NM-11', actividad: 'Cambio filtro aire', startHour: 14, duration: 1.5, dayOffset: 0, estado: 'PAUSADA', tiempoAplicacion: '00:20:00' },
       ]
     },
     {
       id: 'm4', nombre: 'M. Santibáñez', especialidad: 'Esp. Diésel', selected: true,
       ots: [
-        { id: 'e4', folio: 'OT-1044', tipo: 'Correctiva Neumático', patente: 'DFGH-21', actividad: 'Reemplazo Neumáticos', startHour: 9, duration: 2, dayOffset: 0, isOverdue: true }
+        { id: 'ot19', folio: 'OT-019', tipo: 'Correctiva', patente: 'TR-CK-55', actividad: 'Reparación inyectores', startHour: 9, duration: 3, dayOffset: 0, estado: 'EN_PROCESO', tiempoAplicacion: '02:15:00', isOverdue: true, tiempoAtraso: '+ 45 min' },
+        { id: 'ot20', folio: 'OT-020', tipo: 'Preventiva', patente: 'TR-CK-99', actividad: 'Afinamiento diésel', startHour: 14, duration: 2.5, dayOffset: -1, estado: 'TERMINADA', tiempoAplicacion: '02:30:00' },
+        { id: 'ot21', folio: 'OT-021', tipo: 'Correctiva', patente: 'TR-CK-55', actividad: 'Cambio turbo', startHour: 10, duration: 4, dayOffset: 1, estado: 'PROGRAMADA' }
       ]
     }
   ]);
@@ -286,7 +303,7 @@ export default function PizarraProgramacion() {
                  {d.events.slice(0, 2).map((ev, i) => (
                     <div 
                       key={i} 
-                      onClick={(e) => { e.stopPropagation(); navigate(`/flota/ordenes-trabajo/${ev.otId.replace('e', '')}`); }}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/flota/ordenes-trabajo/${ev.otId}`); }}
                       draggable
                       onDragStart={(e) => handleDragStart(e, ev.otId)}
                       className={cn("text-[10px] px-1.5 py-1 rounded truncate cursor-pointer hover:opacity-90 flex items-center gap-1.5 font-medium shadow-sm transition-opacity",
@@ -370,17 +387,29 @@ export default function PizarraProgramacion() {
                          const top = (ot.startHour! - 8) * 80;
                          const height = ot.duration! * 80;
                          return (
-                           <div key={ot.id} onClick={() => navigate(`/flota/ordenes-trabajo/${ot.id.replace('e', '')}`)}
+                           <div key={ot.id} onClick={() => navigate(`/flota/ordenes-trabajo/${ot.id}`)}
                                 className={cn("absolute left-1 right-1 flex flex-col rounded p-1.5 text-white shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-all hover:z-50", 
                                   getTipoColor(ot.tipo),
                                   ot.isOverdue && "ring-2 ring-red-500 animate-pulse border-2 border-red-500"
                                 )}
                                 style={{ top: `${top + 1}px`, height: `${height - 2}px` }}>
-                              <div className="text-[9px] font-bold opacity-90 truncate flex justify-between">
+                              <div className="text-[9px] font-bold opacity-90 truncate flex justify-between gap-1 items-center">
                                  <span>{ot.folio}</span>
+                                 {ot.estado && <span className={cn("px-1 rounded-sm text-[7px] uppercase tracking-wider font-bold truncate shrink-0 max-w-[60px]", 
+                                   ot.estado === 'EN_PROCESO' ? "bg-white/20 text-white" :
+                                   ot.estado === 'PAUSADA' ? "bg-amber-400/20 text-white" :
+                                   ot.estado === 'PAUSADA_MECANICO' ? "bg-orange-500/80 text-white" :
+                                   ot.estado === 'TERMINADA' ? "bg-emerald-500/80 text-white" : "bg-white/10 text-white"
+                                 )}>{ot.estado.replace('_', ' ')}</span>}
                               </div>
                               <div className="text-[9px] leading-tight truncate mt-0.5 font-medium">{m.nombre}</div>
-                              <div className="mt-auto text-[9px] truncate opacity-90">{ot.patente}</div>
+                              <div className="mt-auto text-[9px] truncate opacity-90 flex justify-between items-center gap-1">
+                                 <span>{ot.patente}</span>
+                                 <div className="flex items-center gap-1">
+                                   {ot.tiempoAplicacion && <span>{ot.tiempoAplicacion}</span>}
+                                   {ot.tiempoAtraso && <span className="text-red-200">{ot.tiempoAtraso}</span>}
+                                 </div>
+                              </div>
                            </div>
                          )
                       })
@@ -431,7 +460,7 @@ export default function PizarraProgramacion() {
                       const top = (ot.startHour! - 8) * 80;
                       const height = ot.duration! * 80;
                       return (
-                        <div key={ot.id} onClick={() => navigate(`/flota/ordenes-trabajo/${ot.id.replace('e', '')}`)}
+                        <div key={ot.id} onClick={() => navigate(`/flota/ordenes-trabajo/${ot.id}`)}
                              draggable
                              onDragStart={(e) => handleDragStart(e, ot.id)}
                              className={cn("absolute left-1 right-1 rounded-lg p-2 text-white shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-all flex flex-col", 
@@ -446,10 +475,24 @@ export default function PizarraProgramacion() {
                            <div className="font-semibold text-xs leading-tight mt-0.5">{ot.tipo}</div>
                            <div className="text-[10px] leading-tight mt-0.5">{ot.actividad}</div>
                            
-                           <div className="mt-auto pt-1 text-[10px] font-medium opacity-90 flex items-center gap-1 truncate w-full">
-                              <Clock className="w-3 h-3 shrink-0" />
-                              <span>{ot.startHour}:00 - {ot.startHour! + ot.duration!}:00 ({ot.duration} hrs)</span>
-                              <span className="ml-auto font-bold">{ot.patente}</span>
+                           <div className="mt-auto pt-1 text-[10px] font-medium opacity-90 flex flex-col gap-1 w-full">
+                              <div className="flex items-center gap-1 truncate text-[9px] uppercase tracking-wider">
+                                {ot.estado && <span className={cn("px-1 rounded-sm font-bold truncate", 
+                                   ot.estado === 'EN_PROCESO' ? "bg-white/20 text-white" :
+                                   ot.estado === 'PAUSADA' ? "bg-amber-400/20 text-white" :
+                                   ot.estado === 'PAUSADA_MECANICO' ? "bg-orange-500/80 text-white" :
+                                   ot.estado === 'TERMINADA' ? "bg-emerald-500/80 text-white" : "bg-white/10 text-white"
+                                )}>{ot.estado.replace('_', ' ')}</span>}
+                                {ot.tiempoAplicacion && <span>| {ot.tiempoAplicacion}</span>}
+                                {ot.tiempoAtraso && <span className="text-red-200 font-bold">| {ot.tiempoAtraso}</span>}
+                              </div>
+                              <div className="flex items-center gap-1 truncate justify-between w-full">
+                                <div className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3 shrink-0" />
+                                  <span>{ot.startHour}:00 - {ot.startHour! + ot.duration!}:00</span>
+                                </div>
+                                <span className="font-bold">{ot.patente}</span>
+                              </div>
                            </div>
                         </div>
                       )
@@ -526,8 +569,9 @@ export default function PizarraProgramacion() {
                  {pendingOts.map(ot => (
                     <div key={ot.id} draggable onDragStart={(e) => handleDragStart(e, ot.id)}
                          className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs shadow-sm cursor-grab active:cursor-grabbing hover:border-blue-400 transition-colors group">
-                       <div className="font-bold text-slate-800 dark:text-slate-200 flex justify-between items-start mb-1 text-[11px]">
+                       <div className="font-bold text-slate-800 dark:text-slate-200 flex justify-between items-center mb-1 text-[11px]">
                          <span className="bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">{ot.folio}</span>
+                         {ot.estado && <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider">{ot.estado}</span>}
                          <GripVertical className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
                        </div>
                        <div className="font-semibold text-slate-700 dark:text-slate-300">{ot.tipo}</div>
@@ -662,7 +706,7 @@ export default function PizarraProgramacion() {
                <div 
                  key={i} 
                  onClick={() => {
-                   navigate(`/flota/ordenes-trabajo/${ev.otId.replace('e', '')}`);
+                   navigate(`/flota/ordenes-trabajo/${ev.otId}`);
                    setDayEventsModal({ isOpen: false, date: null, events: [] });
                  }}
                  className={cn("px-3 py-2 rounded-md cursor-pointer hover:opacity-90 flex flex-col gap-1 shadow-sm transition-opacity",
