@@ -100,7 +100,7 @@ export default function PizarraMantenimiento() {
   const kpis = {
     vehiculosFiltrados: vehiculosFiltrados.length,
     porcentajeFlota: Math.round((vehiculosFiltrados.length / (dataFlota.length || 1)) * 100),
-    nivelCumplimiento: 85.5,
+    nivelCumplimiento: Math.round(100 - (dataFlota.filter(v => v.estado === 'VENCIDO').length / (dataFlota.length || 1)) * 100),
     costoTotal: 12500000,
     costoKm: 14.5
   };
@@ -770,19 +770,19 @@ export default function PizarraMantenimiento() {
       )}
       <Modal isOpen={kpiModal === 'cumplimiento'} onClose={() => setKpiModal(null)} title="Detalle KPI: Cumplimiento del Cronograma">
         <div className="space-y-4">
-          <p className="text-sm text-slate-600 dark:text-slate-400">Este KPI mide la proporción de vehículos que se encuentran al día con sus pautas de mantenimiento respecto al total de la flota activa.</p>
-          <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
-            <div className="flex justify-between items-center mb-2">
-              <span className="font-medium">Vehículos al día (NORMAL)</span>
-              <span className="font-bold text-emerald-600">{dataFlota.filter(v => v.estado === 'NORMAL').length}</span>
+          <p className="text-sm text-slate-600 dark:text-slate-400">Este KPI mide la proporción de vehículos que se encuentran al día o anticipados con sus pautas de mantenimiento respecto al total de la flota activa, castigando solo los mantenimientos vencidos.</p>
+          <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg space-y-3 text-sm">
+            <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-3 rounded-md shadow-sm border border-slate-100 dark:border-slate-700/50">
+              <span className="font-medium text-slate-700 dark:text-slate-300">Total Flota Activa</span>
+              <span className="font-bold text-slate-900 dark:text-slate-100">{dataFlota.length}</span>
             </div>
-            <div className="flex justify-between items-center mb-2">
-              <span className="font-medium">Vehículos con mantenimiento próximo o vencido</span>
-              <span className="font-bold text-red-600">{dataFlota.filter(v => v.estado !== 'NORMAL').length}</span>
+            <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-3 rounded-md shadow-sm border border-slate-100 dark:border-slate-700/50">
+              <span className="font-medium text-slate-700 dark:text-slate-300">Vehículos Vencidos (Incumplimientos)</span>
+              <span className="font-bold text-red-600">{dataFlota.filter(v => v.estado === 'VENCIDO').length}</span>
             </div>
-            <div className="border-t border-slate-200 dark:border-slate-700 my-2 pt-2 flex justify-between items-center">
-              <span className="font-bold">Total Flota Visualizada</span>
-              <span className="font-bold">{vehiculosFiltrados.length}</span>
+            <div className="flex justify-between items-center bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-md shadow-sm border border-emerald-100 dark:border-emerald-800/30">
+              <span className="font-bold text-emerald-800 dark:text-emerald-300">Nivel de Cumplimiento</span>
+              <span className="font-extrabold text-2xl text-emerald-600 dark:text-emerald-400">{kpis.nivelCumplimiento}%</span>
             </div>
           </div>
         </div>
