@@ -51,95 +51,28 @@ export default function PizarraMantenimiento() {
   const [filtroUltMantHasta, setFiltroUltMantHasta] = useState('');
 
   const [dataFlota, setDataFlota] = useState([
-    {
-      id: 1,
-      numeroInterno: 'V-101',
-      patente: 'AB-CD-12',
-      marca: 'Mercedes-Benz',
-      modelo: 'Sprinter 315',
-      ano: 2022,
-      chasis: 'W1V420123456789',
-      motor: 'OM651 2.1L',
-      norma: 'EURO VI',
-      aplicacion: 'Urbano',
-      tipoAceite: 'Sintético 5W30',
-      intervaloMantenimiento: 15000,
-      tipoIntervalo: 'KM',
-      factorConversionHoras: 45, // Km/h promedio para estimar horas
-      kmActual: 125430,
-      ultimoMant: {
-        km: 115000,
-        fecha: '2026-01-15',
-        tipo: 'PM-2（Mantenimiento B）'
-      },
-      proxMant: {
-        kmFaltante: 4570,
-        kmTarget: 130000,
-        fechaProg: '2026-04-20',
-        tipo: 'PM-3（Mantenimiento C）'
-      },
-      estado: 'NORMAL',
-    },
-    {
-      id: 2,
-      numeroInterno: 'V-102',
-      patente: 'WX-YZ-99',
-      marca: 'Ford',
-      modelo: 'Transit Custom',
-      ano: 2021,
-      chasis: 'WF0YXXTTGY123456',
-      motor: 'EcoBlue 2.0',
-      norma: 'EURO VI',
-      aplicacion: 'Carretera',
-      tipoAceite: 'Sintético 5W30',
-      intervaloMantenimiento: 10000,
-      tipoIntervalo: 'KM',
-      factorConversionHoras: 60,
-      kmActual: 89000,
-      ultimoMant: {
-        km: 70000,
-        fecha: '2025-11-10',
-        tipo: 'PM-1'
-      },
-      proxMant: {
-        kmFaltante: -1000,
-        kmTarget: 88000,
-        kmVencido: 1000,
-        fechaProg: '2026-03-01',
-        tipo: 'PM-2',
-        vencidosStr: 'PM-2'
-      },
-      estado: 'VENCIDO',
-    },
-    {
-      id: 3,
-      numeroInterno: 'SUV-01',
-      patente: 'KL-MN-34',
-      marca: 'Toyota',
-      modelo: 'Rav4',
-      ano: 2023,
-      chasis: 'JTMZREBV12345678',
-      motor: 'Dynamic Force 2.5',
-      norma: 'EURO V',
-      aplicacion: 'Mina',
-      tipoAceite: 'Sintético 0W20',
-      intervaloMantenimiento: 500,
-      tipoIntervalo: 'Horas',
-      factorConversionHoras: 25, // En faena/mina se avanza más lento, ej 25 km/h
-      kmActual: 44500,
-      ultimoMant: {
-        km: 35000,
-        fecha: '2025-12-05',
-        tipo: 'Inicial'
-      },
-      proxMant: {
-        kmFaltante: 500,
-        kmTarget: 45000,
-        fechaProg: '2026-03-18',
-        tipo: 'PM-1'
-      },
-      estado: 'PROXIMO',
-    }
+    { id: 1, numeroInterno: '1', patente: 'SXDR14', marca: 'Genérica', modelo: 'Modelo 1', ano: 2021, chasis: '1A2B3C', motor: '1.0', norma: 'EURO V', aplicacion: 'Mina', tipoAceite: '15W40', intervaloMantenimiento: 14676, tipoIntervalo: 'Horas', factorConversionHoras: 25, kmActual: 197700, ultimoMant: { km: 195324, fecha: '06/05/26', tipo: 'SM1' }, proxMant: { kmFaltante: 12300, kmTarget: 210000, fechaProg: '24/06/26', tipo: 'SM1' }, estado: 'NORMAL' },
+    { id: 2, numeroInterno: '2', patente: 'JPHK19', marca: 'Genérica', modelo: 'Modelo 2', ano: 2022, chasis: '2B3C4D', motor: '2.0', norma: 'EURO VI', aplicacion: 'Mina', tipoAceite: '5W30', intervaloMantenimiento: 11974, tipoIntervalo: 'Horas', factorConversionHoras: 30, kmActual: 222979, ultimoMant: { km: 218026, fecha: '02/02/26', tipo: 'MH1' }, proxMant: { kmFaltante: 7021, kmTarget: 230000, fechaProg: '04/10/26', tipo: 'MH1' }, estado: 'NORMAL' },
+    { id: 3, numeroInterno: '3', patente: 'RCKY25', marca: 'Genérica', modelo: 'Modelo 3', ano: 2023, chasis: '3C4D5E', motor: '3.0', norma: 'EURO V', aplicacion: 'Mina', tipoAceite: '15W40', intervaloMantenimiento: 9215, tipoIntervalo: 'Horas', factorConversionHoras: 35, kmActual: 176312, ultimoMant: { km: 170785, fecha: '14/04/26', tipo: 'SM1' }, proxMant: { kmFaltante: 3688, kmTarget: 180000, fechaProg: '03/06/26', tipo: 'SM3' }, estado: 'NORMAL' },
+    { id: 4, numeroInterno: '4', patente: 'SVJC32', marca: 'Genérica', modelo: 'Modelo 4', ano: 2024, chasis: '4D5E6F', motor: '4.0', norma: 'EURO VI', aplicacion: 'Mina', tipoAceite: '5W30', intervaloMantenimiento: 9975, tipoIntervalo: 'Horas', factorConversionHoras: 40, kmActual: 155078, ultimoMant: { km: 150025, fecha: '02/04/26', tipo: 'SM4' }, proxMant: { kmFaltante: 4922, kmTarget: 160000, fechaProg: '03/06/26', tipo: 'SM1' }, estado: 'NORMAL' },
+    { id: 5, numeroInterno: '5', patente: 'KHLW39', marca: 'Genérica', modelo: 'Modelo 5', ano: 2020, chasis: '5E6F7G', motor: '5.0', norma: 'EURO V', aplicacion: 'Mina', tipoAceite: '15W40', intervaloMantenimiento: 14799, tipoIntervalo: 'Horas', factorConversionHoras: 25, kmActual: 473771, ultimoMant: { km: 465201, fecha: '01/04/26', tipo: 'SM2' }, proxMant: { kmFaltante: 6229, kmTarget: 480000, fechaProg: '14/06/26', tipo: 'SM2' }, estado: 'NORMAL' },
+    { id: 6, numeroInterno: '6', patente: 'TDJD43', marca: 'Genérica', modelo: 'Modelo 6', ano: 2021, chasis: '6F7G8H', motor: '6.0', norma: 'EURO VI', aplicacion: 'Mina', tipoAceite: '5W30', intervaloMantenimiento: 14151, tipoIntervalo: 'Horas', factorConversionHoras: 30, kmActual: 219563, ultimoMant: { km: 210849, fecha: '17/04/26', tipo: 'SM1' }, proxMant: { kmFaltante: 5437, kmTarget: 225000, fechaProg: '31/05/26', tipo: 'SM4' }, estado: 'NORMAL' },
+    { id: 7, numeroInterno: '7', patente: 'SBWF44', marca: 'Genérica', modelo: 'Modelo 7', ano: 2022, chasis: '7G8H9I', motor: '7.0', norma: 'EURO V', aplicacion: 'Mina', tipoAceite: '15W40', intervaloMantenimiento: 13730, tipoIntervalo: 'Horas', factorConversionHoras: 35, kmActual: 297740, ultimoMant: { km: 286270, fecha: '24/02/26', tipo: 'SM1' }, proxMant: { kmFaltante: 2260, kmTarget: 300000, fechaProg: '18/05/26', tipo: 'SM1' }, estado: 'PROXIMO' },
+    { id: 8, numeroInterno: '8', patente: 'TCLR44', marca: 'Genérica', modelo: 'Modelo 8', ano: 2023, chasis: '8H9I0J', motor: '8.0', norma: 'EURO VI', aplicacion: 'Mina', tipoAceite: '5W30', intervaloMantenimiento: 14968, tipoIntervalo: 'Horas', factorConversionHoras: 40, kmActual: 180620, ultimoMant: { km: 180032, fecha: '12/05/26', tipo: 'SM3' }, proxMant: { kmFaltante: 14380, kmTarget: 195000, fechaProg: '02/07/26', tipo: 'SM1' }, estado: 'NORMAL' },
+    { id: 9, numeroInterno: '9', patente: 'PRYL49', marca: 'Genérica', modelo: 'Modelo 9', ano: 2024, chasis: '9I0J1K', motor: '9.0', norma: 'EURO V', aplicacion: 'Mina', tipoAceite: '15W40', intervaloMantenimiento: 10531, tipoIntervalo: 'Horas', factorConversionHoras: 25, kmActual: 189307, ultimoMant: { km: 179469, fecha: '25/03/26', tipo: 'MNH1' }, proxMant: { kmFaltante: 693, kmTarget: 190000, fechaProg: '17/05/26', tipo: 'MH1' }, estado: 'PROXIMO' },
+    { id: 10, numeroInterno: '10', patente: 'CKHB56', marca: 'Genérica', modelo: 'Modelo 10', ano: 2020, chasis: '0J1K2L', motor: '10.0', norma: 'EURO VI', aplicacion: 'Mina', tipoAceite: '5W30', intervaloMantenimiento: 5350, tipoIntervalo: 'Horas', factorConversionHoras: 30, kmActual: 457836, ultimoMant: { km: 454650, fecha: '08/09/25', tipo: 'MH1' }, proxMant: { kmFaltante: 2164, kmTarget: 460000, fechaProg: '29/10/26', tipo: 'MH1' }, estado: 'NORMAL' },
+    { id: 11, numeroInterno: '11', patente: 'LYRK58', marca: 'Genérica', modelo: 'Modelo 11', ano: 2021, chasis: '1K2L3M', motor: '11.0', norma: 'EURO V', aplicacion: 'Mina', tipoAceite: '15W40', intervaloMantenimiento: 14968, tipoIntervalo: 'Horas', factorConversionHoras: 35, kmActual: 450626, ultimoMant: { km: 450032, fecha: '11/05/26', tipo: 'SM3' }, proxMant: { kmFaltante: 14374, kmTarget: 465000, fechaProg: '11/09/26', tipo: 'SM1' }, estado: 'NORMAL' },
+    { id: 12, numeroInterno: '12', patente: 'TLRV62', marca: 'Genérica', modelo: 'Modelo 12', ano: 2022, chasis: '2L3M4N', motor: '12.0', norma: 'EURO VI', aplicacion: 'Mina', tipoAceite: '5W30', intervaloMantenimiento: 4611, tipoIntervalo: 'Horas', factorConversionHoras: 40, kmActual: 45389, ultimoMant: { km: 45389, fecha: '27/02/26', tipo: 'MTH' }, proxMant: { kmFaltante: 4611, kmTarget: 50000, fechaProg: '22/05/26', tipo: 'MTH' }, estado: 'NORMAL' },
+    { id: 13, numeroInterno: '13', patente: 'JHRF63', marca: 'Genérica', modelo: 'Modelo 13', ano: 2023, chasis: '3M4N5O', motor: '13.0', norma: 'EURO V', aplicacion: 'Mina', tipoAceite: '15W40', intervaloMantenimiento: 15625, tipoIntervalo: 'Horas', factorConversionHoras: 25, kmActual: 533582, ultimoMant: { km: 524375, fecha: '24/03/26', tipo: 'SM3' }, proxMant: { kmFaltante: 6418, kmTarget: 540000, fechaProg: '19/06/26', tipo: 'SM3' }, estado: 'NORMAL' },
+    { id: 14, numeroInterno: '14', patente: 'TTJJ65', marca: 'Genérica', modelo: 'Modelo 14', ano: 2024, chasis: '4N5O6P', motor: '14.0', norma: 'EURO VI', aplicacion: 'Mina', tipoAceite: '5W30', intervaloMantenimiento: 10000, tipoIntervalo: 'Horas', factorConversionHoras: 30, kmActual: 135536, ultimoMant: { km: 130000, fecha: '13/04/26', tipo: 'SM1' }, proxMant: { kmFaltante: 4464, kmTarget: 140000, fechaProg: '08/06/26', tipo: 'SM1' }, estado: 'NORMAL' },
+    { id: 15, numeroInterno: '15', patente: 'RWVS65', marca: 'Genérica', modelo: 'Modelo 15', ano: 2020, chasis: '5O6P7Q', motor: '15.0', norma: 'EURO V', aplicacion: 'Mina', tipoAceite: '15W40', intervaloMantenimiento: 14891, tipoIntervalo: 'Horas', factorConversionHoras: 35, kmActual: 82848, ultimoMant: { km: 75109, fecha: '08/10/25', tipo: 'N/A' }, proxMant: { kmFaltante: 7152, kmTarget: 90000, fechaProg: '16/05/26', tipo: 'SM5' }, estado: 'NORMAL' },
+    { id: 16, numeroInterno: '16', patente: 'VBWH79', marca: 'Genérica', modelo: 'Modelo 16', ano: 2021, chasis: '6P7Q8R', motor: '16.0', norma: 'EURO VI', aplicacion: 'Mina', tipoAceite: '5W30', intervaloMantenimiento: 9864, tipoIntervalo: 'Horas', factorConversionHoras: 40, kmActual: 13034, ultimoMant: { km: 10136, fecha: '17/02/26', tipo: 'MDR' }, proxMant: { kmFaltante: 6966, kmTarget: 20000, fechaProg: '03/07/26', tipo: 'MDR' }, estado: 'NORMAL' },
+    { id: 17, numeroInterno: '17', patente: 'JBHF86', marca: 'Genérica', modelo: 'Modelo 17', ano: 2022, chasis: '7Q8R9S', motor: '17.0', norma: 'EURO V', aplicacion: 'Mina', tipoAceite: '15W40', intervaloMantenimiento: 13227, tipoIntervalo: 'Horas', factorConversionHoras: 25, kmActual: 306534, ultimoMant: { km: 296773, fecha: '09/09/25', tipo: 'MH1' }, proxMant: { kmFaltante: 3466, kmTarget: 310000, fechaProg: '10/08/26', tipo: 'MH1' }, estado: 'NORMAL' },
+    { id: 18, numeroInterno: '18', patente: 'KRTC90', marca: 'Genérica', modelo: 'Modelo 18', ano: 2023, chasis: '8R9S0T', motor: '18.0', norma: 'EURO VI', aplicacion: 'Mina', tipoAceite: '5W30', intervaloMantenimiento: 14220, tipoIntervalo: 'Horas', factorConversionHoras: 30, kmActual: 456542, ultimoMant: { km: 450780, fecha: '17/04/26', tipo: 'MH350' }, proxMant: { kmFaltante: 8458, kmTarget: 465000, fechaProg: '23/06/26', tipo: 'MH350' }, estado: 'NORMAL' },
+    { id: 19, numeroInterno: '19', patente: 'SZLB99', marca: 'Genérica', modelo: 'Modelo 19', ano: 2024, chasis: '9S0T1U', motor: '19.0', norma: 'EURO V', aplicacion: 'Mina', tipoAceite: '15W40', intervaloMantenimiento: 4892, tipoIntervalo: 'Horas', factorConversionHoras: 35, kmActual: 65444, ultimoMant: { km: 65108, fecha: '13/04/26', tipo: 'MH1' }, proxMant: { kmFaltante: 4556, kmTarget: 70000, fechaProg: '08/07/27', tipo: 'MH1' }, estado: 'NORMAL' },
+    { id: 20, numeroInterno: '20', patente: 'VPWC18', marca: 'Genérica', modelo: 'Modelo 20', ano: 2020, chasis: '0T1U2V', motor: '20.0', norma: 'EURO VI', aplicacion: 'Mina', tipoAceite: '5W30', intervaloMantenimiento: 14761, tipoIntervalo: 'Horas', factorConversionHoras: 40, kmActual: 25177, ultimoMant: { km: 15239, fecha: '02/03/26', tipo: 'SM1' }, proxMant: { kmFaltante: 4823, kmTarget: 300000, fechaProg: '18/06/26', tipo: 'SM1' }, estado: 'NORMAL' },
+    { id: 21, numeroInterno: '21', patente: 'VSBL78', marca: 'Genérica', modelo: 'Modelo 21', ano: 2021, chasis: '1U2V3W', motor: '21.0', norma: 'EURO V', aplicacion: 'Mina', tipoAceite: '15W40', intervaloMantenimiento: 18894, tipoIntervalo: 'Horas', factorConversionHoras: 25, kmActual: 32871, ultimoMant: { km: 21106, fecha: '14/04/26', tipo: 'SM1' }, proxMant: { kmFaltante: 7129, kmTarget: 40000, fechaProg: '01/06/26', tipo: 'SM1' }, estado: 'NORMAL' },
+    { id: 22, numeroInterno: '22', patente: 'VVGT88', marca: 'Genérica', modelo: 'Modelo 22', ano: 2022, chasis: '2V3W4X', motor: '22.0', norma: 'EURO VI', aplicacion: 'Mina', tipoAceite: '5W30', intervaloMantenimiento: 10000, tipoIntervalo: 'Horas', factorConversionHoras: 30, kmActual: 11033, ultimoMant: { km: 11000, fecha: '07/05/26', tipo: 'MTH' }, proxMant: { kmFaltante: 8967, kmTarget: 10000, fechaProg: '14/07/26', tipo: 'MTH' }, estado: 'NORMAL' }
   ]);
 
   const [kpiModal, setKpiModal] = useState<string | null>(null);
