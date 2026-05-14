@@ -26,7 +26,6 @@ import PizarraMantenimiento from './pages/flota/Mantenimiento';
 import PizarraProgramacion from './pages/flota/PizarraProgramacion';
 import GestionOrdenesTrabajo from './pages/flota/OrdenesTrabajo';
 import OrdenesTrabajoDetail from './pages/flota/OrdenesTrabajoDetail';
-import ConfiguracionEmpresa from './pages/configuracion/Empresa';
 import GestionPautas from './pages/flota/GestionPautas';
 import GestionTareas from './pages/flota/GestionTareas';
 import VehiculosArchivados from './pages/configuracion/VehiculosArchivados';

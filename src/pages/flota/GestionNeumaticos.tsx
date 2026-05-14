@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Ca
 import { Button } from '../../components/ui/Button';
 import { Plus, Search, Activity, CircleDashed, BarChart3, Truck, Trash, ChevronDown, AlertCircle, ChevronUp, DollarSign, X, Info, TrendingUp, AlertTriangle } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import Modal from '../../components/ui/Modal';
+import { Modal } from '../../components/ui/Modal';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 
 export default function GestionNeumaticos() {

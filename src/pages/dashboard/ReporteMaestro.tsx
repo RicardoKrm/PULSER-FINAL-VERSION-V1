@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   FileSpreadsheet, FileText, Settings2, Download, Table2, Filter, 
-  Calendar, Check, Circle, BarChart2, CheckSquare, Search, Copy, Printer, CheckCircle2, ChevronDown, Include, ChevronRight, Info, Package, Fuel, DollarSign, Users, Truck, Wrench, CircleDot
+  Calendar, Check, Circle, BarChart2, CheckSquare, Search, Copy, Printer, CheckCircle2, ChevronDown, ChevronRight, Info, Package, Fuel, DollarSign, Users, Truck, Wrench, CircleDot
 } from 'lucide-react';
 
 // Formatters

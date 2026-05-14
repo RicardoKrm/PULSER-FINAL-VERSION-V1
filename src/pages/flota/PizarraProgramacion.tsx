@@ -1,17 +1,21 @@
 import React, { useState } from 'react';
 import { Button } from '../../components/ui/Button';
-import { ChevronLeft, ChevronRight, Clock, GripVertical, Download, Search, AlertCircle, Info } from 'lucide-react';
+import { Modal } from '../../components/ui/Modal';
+import { ChevronLeft, ChevronRight, Clock, GripVertical, Search, AlertCircle, Plus, Calendar as CalendarIcon, Check, MoreHorizontal } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useNavigate } from 'react-router-dom';
+
+type OTTipo = 'Preventiva' | 'Correctiva' | 'Evaluativa' | 'Preventiva Neumático' | 'Correctiva Neumático' | 'Evaluativa Neumático' | 'Inspección';
 
 interface OtMock {
   id: string;
   folio: string;
   patente: string;
-  tipo: 'Preventiva' | 'Correctiva' | 'Inspección';
+  tipo: OTTipo;
   actividad: string;
   startHour?: number;
   duration?: number;
+  dayOffset?: number; // 0 = today, 1 = tomorrow, etc.
   isOverdue?: boolean;
 }
 
@@ -19,61 +23,79 @@ interface MecanicoMock {
   id: string;
   nombre: string;
   especialidad: string;
+  selected: boolean;
   ots: OtMock[];
 }
 
+const getTipoColor = (tipo: string) => {
+  switch (tipo) {
+    case 'Preventiva': return 'bg-blue-500 hover:bg-blue-600';
+    case 'Correctiva': return 'bg-red-500 hover:bg-red-600';
+    case 'Evaluativa': return 'bg-emerald-500 hover:bg-emerald-600';
+    case 'Preventiva Neumático': return 'bg-amber-400 hover:bg-amber-500';
+    case 'Correctiva Neumático': return 'bg-orange-500 hover:bg-orange-600';
+    case 'Evaluativa Neumático': return 'bg-indigo-500 hover:bg-indigo-600';
+    case 'Inspección': return 'bg-purple-500 hover:bg-purple-600';
+    default: return 'bg-slate-500 hover:bg-slate-600';
+  }
+};
+
 export default function PizarraProgramacion() {
   const navigate = useNavigate();
-  const [viewMode, setViewMode] = useState<'Día' | 'Semana' | 'Mes'>('Día');
-  const [currentDate, setCurrentDate] = useState(new Date('2026-05-14'));
+  const [viewMode, setViewMode] = useState<'Día' | 'Semana' | 'Mes'>('Mes');
+  const [currentDate, setCurrentDate] = useState(new Date('2026-05-14T12:00:00'));
   const [draggedOt, setDraggedOt] = useState<string | null>(null);
   
-  const hours = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+  const [isNewOtModalOpen, setIsNewOtModalOpen] = useState(false);
+  const [dayEventsModal, setDayEventsModal] = useState<{ isOpen: boolean, date: number | null, events: any[] }>({ isOpen: false, date: null, events: [] });
+  
+  const hours = Array.from({length: 11}, (_, i) => i + 8); // 8 to 18
 
   const [pendingOts, setPendingOts] = useState<OtMock[]>([
     { id: 'p1', folio: 'OT-1045', tipo: 'Preventiva', patente: 'LDPJ-99', actividad: 'Mantenimiento A' },
     { id: 'p2', folio: 'OT-1046', tipo: 'Correctiva', patente: 'KHYT-22', actividad: 'Cambio de Alternador' },
     { id: 'p3', folio: 'OT-1047', tipo: 'Correctiva', patente: 'MNQP-15', actividad: 'Revisión Frenos' },
-    { id: 'p4', folio: 'OT-1048', tipo: 'Preventiva', patente: 'FRTY-12', actividad: 'Lubricación General' },
-    { id: 'p5', folio: 'OT-1049', tipo: 'Inspección', patente: 'BVCX-33', actividad: 'Diagnóstico Emisiones' },
   ]);
 
   const [mecanicos, setMecanicos] = useState<MecanicoMock[]>([
     {
-      id: 'm1',
-      nombre: 'Carlos Ruiz',
-      especialidad: 'Mecánico General',
+      id: 'm1', nombre: 'Carlos Ruiz', especialidad: 'Mecánico General', selected: true,
       ots: [
-        { id: 'e1', folio: 'OT-1040', tipo: 'Preventiva', patente: 'HGTY-88', actividad: 'Mantenimiento B', startHour: 10, duration: 2.5 }
+        { id: 'e1', folio: 'OT-1040', tipo: 'Preventiva', patente: 'HGTY-88', actividad: 'Mantenimiento B', startHour: 10, duration: 2, dayOffset: 0 }
       ]
     },
     {
-      id: 'm2',
-      nombre: 'Pedro Gómez',
-      especialidad: 'Electricista',
+      id: 'm2', nombre: 'Pedro Gómez', especialidad: 'Electricista', selected: true,
       ots: [
-        { id: 'e2', folio: 'OT-1042', tipo: 'Correctiva', patente: 'PLKX-10', actividad: 'Falla Sist. Eléctrico', startHour: 11, duration: 3, isOverdue: true }
+        { id: 'e2', folio: 'OT-1042', tipo: 'Correctiva', patente: 'PLKX-10', actividad: 'Falla Sist. Eléctrico', startHour: 11, duration: 3, dayOffset: 1, isOverdue: true }
       ]
     },
     {
-      id: 'm3',
-      nombre: 'Luis Silva',
-      especialidad: 'Lubricador',
+      id: 'm3', nombre: 'Luis Silva', especialidad: 'Lubricador', selected: true,
       ots: [
-        { id: 'e3', folio: 'OT-1043', tipo: 'Preventiva', patente: 'VBNM-55', actividad: 'Cambio Aceite', startHour: 14, duration: 2.5 }
+        { id: 'e3', folio: 'OT-1043', tipo: 'Preventiva', patente: 'VBNM-55', actividad: 'Cambio Aceite', startHour: 14, duration: 1.5, dayOffset: -1 }
       ]
     },
     {
-      id: 'm4',
-      nombre: 'M. Santibáñez',
-      especialidad: 'Esp. Diésel',
+      id: 'm4', nombre: 'M. Santibáñez', especialidad: 'Esp. Diésel', selected: true,
       ots: [
-        { id: 'e4', folio: 'OT-1044', tipo: 'Preventiva', patente: 'DFGH-21', actividad: 'Inyectores', startHour: 9, duration: 2 }
+        { id: 'e4', folio: 'OT-1044', tipo: 'Correctiva Neumático', patente: 'DFGH-21', actividad: 'Reemplazo Neumáticos', startHour: 9, duration: 2, dayOffset: 0, isOverdue: true }
       ]
     }
   ]);
 
+  const toggleMechanic = (id: string) => {
+    setMecanicos(mecanicos.map(m => m.id === id ? { ...m, selected: !m.selected } : m));
+  };
+
+  const navigateDays = (days: number) => {
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() + days);
+    setCurrentDate(d);
+  };
+
   const handleDragStart = (e: React.DragEvent, id: string) => {
+    e.stopPropagation();
     setDraggedOt(id);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', id);
@@ -84,287 +106,580 @@ export default function PizarraProgramacion() {
     e.dataTransfer.dropEffect = 'move';
   };
 
-  const handleDrop = (e: React.DragEvent, mechanicId: string, hour: number) => {
+  const handleDrop = (e: React.DragEvent, mechanicId: string, hour: number, dayOffset: number = 0) => {
     e.preventDefault();
     const otId = e.dataTransfer.getData('text/plain');
     
+    // Simplification for the mockup
     const pendingOt = pendingOts.find(ot => ot.id === otId);
     if (pendingOt) {
       setPendingOts(pendingOts.filter(ot => ot.id !== otId));
-      setMecanicos(mecanicos.map(m => {
-        if (m.id === mechanicId) {
-          return {
-            ...m,
-            ots: [...m.ots, { ...pendingOt, startHour: hour, duration: 2 }]
-          };
-        }
-        return m;
-      }));
+      setMecanicos(mecanicos.map(m => m.id === mechanicId ? {
+        ...m, ots: [...m.ots, { ...pendingOt, startHour: hour, duration: 2, dayOffset }]
+      } : m));
     } else {
-      // Re-scheduling already placed OTs
-      setMecanicos(mecanicos.map(m => {
-        const found = m.ots.find(ot => ot.id === otId);
-        if (found && m.id === mechanicId) {
-           return { ...m, ots: m.ots.map(ot => ot.id === otId ? {...ot, startHour: hour} : ot) };
-        } else if (found) {
-           return { ...m, ots: m.ots.filter(ot => ot.id !== otId) };
-        }
-        return m;
-      }).map(m => {
-        // If moved to a different mechanic
-        const isTarget = m.id === mechanicId;
-        const previousMechanic = mecanicos.find(pm => pm.ots.some(ot => ot.id === otId));
-        if (isTarget && previousMechanic && previousMechanic.id !== mechanicId) {
-             const otToMove = previousMechanic.ots.find(ot => ot.id === otId)!;
-             return { ...m, ots: [...m.ots, { ...otToMove, startHour: hour }] };
-        }
-        return m;
-      }));
+       // Moving an assigned OT to another mechanic or hour
+       let movedOt: OtMock | undefined;
+       const newMecanicos = mecanicos.map(m => {
+          const found = m.ots.find(ot => ot.id === otId);
+          if (found) {
+             movedOt = found;
+             return { ...m, ots: m.ots.filter(ot => ot.id !== otId) };
+          }
+          return m;
+       });
+
+       if (movedOt) {
+          setMecanicos(newMecanicos.map(m => m.id === mechanicId ? {
+            ...m, ots: [...m.ots, { ...movedOt, startHour: hour, dayOffset }]
+          } : m));
+       }
     }
     setDraggedOt(null);
   };
 
-  const navigateDays = (days: number) => {
-    const d = new Date(currentDate);
-    d.setDate(d.getDate() + days);
-    setCurrentDate(d);
-  };
+  const handleDropToPending = (e: React.DragEvent) => {
+    e.preventDefault();
+    const otId = e.dataTransfer.getData('text/plain');
+    
+    if (pendingOts.find(ot => ot.id === otId)) return;
 
-  const formatTime = (hour: number) => {
-    const h = Math.floor(hour);
-    const m = Math.round((hour - h) * 60);
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-  };
+    let movedOt: OtMock | undefined;
+    const newMecanicos = mecanicos.map(m => {
+       const found = m.ots.find(ot => ot.id === otId);
+       if (found) {
+          movedOt = found;
+          return { ...m, ots: m.ots.filter(ot => ot.id !== otId) };
+       }
+       return m;
+    });
 
-  const getEventStyles = (type: string) => {
-    switch (type) {
-      case 'Preventiva': return 'bg-[#FEF5D9] border-[#FDE08B] text-[#936B00]';
-      case 'Correctiva': return 'bg-[#E3EFFF] border-[#A8CFFF] text-[#004A99]';
-      case 'Inspección': return 'bg-[#F1F5F9] border-[#CBD5E1] text-[#334155]';
-      default: return 'bg-slate-100 border-slate-200 text-slate-800';
+    if (movedOt) {
+       setMecanicos(newMecanicos);
+       setPendingOts([{ ...movedOt, startHour: undefined, duration: undefined, dayOffset: undefined }, ...pendingOts]);
     }
+    setDraggedOt(null);
+  };
+
+  const handleDropOnDay = (e: React.DragEvent, dayIndex: number) => {
+    e.preventDefault();
+    const otId = e.dataTransfer.getData('text/plain');
+    const dayOffset = dayIndex - 14; // specific to this mock
+
+    const pendingOt = pendingOts.find(ot => ot.id === otId);
+    if (pendingOt) {
+      setPendingOts(pendingOts.filter(ot => ot.id !== otId));
+      // Assign to the first selected mechanic as default 
+      const firstMec = mecanicos.find(m => m.selected) || mecanicos[0];
+      setMecanicos(mecanicos.map(m => m.id === firstMec.id ? {
+        ...m, ots: [...m.ots, { ...pendingOt, startHour: 8, duration: 2, dayOffset }]
+      } : m));
+    } else {
+       // Re-scheduling already placed OT to a different day
+       setMecanicos(mecanicos.map(m => {
+          const found = m.ots.find(ot => ot.id === otId);
+          if (found) {
+             return { ...m, ots: m.ots.map(ot => ot.id === otId ? {...ot, dayOffset} : ot) };
+          }
+          return m;
+       }));
+    }
+    setDraggedOt(null);
+  };
+
+  const getFormatDate = (date: Date) => {
+    if (viewMode === 'Día') {
+      const fullDateStr = date.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      return fullDateStr.charAt(0).toUpperCase() + fullDateStr.slice(1);
+    }
+    if (viewMode === 'Semana') {
+       const d = new Date(date);
+       const day = d.getDay(); 
+       const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+       const monday = new Date(d.setDate(diff));
+       const sunday = new Date(monday);
+       sunday.setDate(monday.getDate() + 6);
+       
+       const startStr = monday.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
+       const endStr = sunday.toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' });
+       return `${startStr} al ${endStr}`;
+    }
+    return date.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
+  };
+
+  // Generate Month Days (mock logic for May 2026)
+  const renderMonthGrid = () => {
+    const startDayOfWeek = 4; // May 1, 2026 is Friday (0=Mon, 1=Tue... 4=Fri)
+    const daysInMonth = 31;
+    const days = [];
+    
+    // Previous month padding
+    for(let i=0; i<startDayOfWeek; i++) {
+       days.push({ day: 27 + i, isCurrentMonth: false, events: [] });
+    }
+    
+    // Current month
+    for(let i=1; i<=daysInMonth; i++) {
+       const dayOffset = i - 14;
+       let dailyEvents: {title: string, color: string, isOverdue?: boolean, otId: string}[] = [];
+       mecanicos.filter(m => m.selected).forEach(m => {
+          m.ots.filter(ot => ot.dayOffset === dayOffset).forEach(ot => {
+             dailyEvents.push({
+               title: `${ot.startHour}:00 ${ot.tipo} ${ot.patente}`,
+               color: getTipoColor(ot.tipo),
+               isOverdue: ot.isOverdue,
+               otId: ot.id
+             });
+          });
+       });
+       // Sort by time
+       dailyEvents.sort((a,b) => a.title.localeCompare(b.title));
+       
+       days.push({ day: i, isCurrentMonth: true, isToday: i === 14, events: dailyEvents });
+    }
+
+    // Next month padding
+    const remaining = 42 - days.length; // 6 rows of 7
+    for(let i=1; i<=remaining; i++) {
+        days.push({ day: i, isCurrentMonth: false, events: [] });
+    }
+
+    const weekDaysInfo = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'];
+
+    return (
+      <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-slate-900 overflow-hidden">
+        <div className="grid grid-cols-7 border-b border-slate-200 dark:border-slate-800">
+           {weekDaysInfo.map(d => (
+             <div key={d} className="py-2 text-center text-[10px] font-bold text-slate-500 dark:text-slate-400 border-r border-slate-200 dark:border-slate-800 last:border-r-0 uppercase">
+               {d}
+             </div>
+           ))}
+        </div>
+        <div className="flex-1 grid grid-cols-7 grid-rows-6 auto-rows-[1fr] overflow-hidden">
+           {days.map((d, idx) => (
+             <div key={idx} 
+               onClick={d.isCurrentMonth ? () => {
+                 const newDate = new Date(currentDate);
+                 newDate.setDate(d.day);
+                 setCurrentDate(newDate);
+                 setViewMode('Día');
+               } : undefined}
+               className={cn(
+                 "border-r border-b border-slate-200 dark:border-slate-800 p-1 flex flex-col transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50",
+                 !d.isCurrentMonth && "bg-slate-50/50 dark:bg-slate-900/30",
+                 d.isCurrentMonth && "cursor-pointer"
+               )}
+               onDragOver={handleDragOver}
+               onDrop={d.isCurrentMonth ? (e) => handleDropOnDay(e, d.day) : undefined}
+             >
+               <div className="flex justify-center mb-1">
+                 <span 
+                   className={cn(
+                     "text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full mt-1 transition-all",
+                     d.isToday ? "bg-blue-600 text-white" : (d.isCurrentMonth ? "text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700" : "text-slate-400 dark:text-slate-600")
+                   )}
+                 >
+                   {d.day}
+                 </span>
+               </div>
+               <div className="flex-1 overflow-y-auto space-y-1.5 px-1 scrollbar-none pb-1">
+                 {d.events.slice(0, 2).map((ev, i) => (
+                    <div 
+                      key={i} 
+                      onClick={(e) => { e.stopPropagation(); navigate(`/flota/ordenes-trabajo/${ev.otId.replace('e', '')}`); }}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, ev.otId)}
+                      className={cn("text-[10px] px-1.5 py-1 rounded truncate cursor-pointer hover:opacity-90 flex items-center gap-1.5 font-medium shadow-sm transition-opacity",
+                         ev.color,
+                         ev.isOverdue ? "ring-2 ring-red-500" : "",
+                         "text-white"
+                      )}
+                    >
+                      <div className="w-1.5 h-1.5 rounded-full bg-white opacity-80 shrink-0"></div>
+                      <span className="truncate">{ev.title}</span>
+                    </div>
+                 ))}
+                 {d.events.length > 2 && (
+                    <div 
+                      onClick={(e) => { e.stopPropagation(); setDayEventsModal({ isOpen: true, date: d.day, events: d.events }); }}
+                      className="text-[10px] font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 cursor-pointer pl-1 mt-1"
+                    >
+                      +{d.events.length - 2} más
+                    </div>
+                 )}
+               </div>
+             </div>
+           ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderWeekGrid = () => {
+     const d = new Date(currentDate);
+     const day = d.getDay(); 
+     const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+     const monday = new Date(d.setDate(diff));
+     
+     const weekDaysInfo = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'];
+     const weekDates = Array.from({length: 7}, (_, i) => {
+        const nd = new Date(monday);
+        nd.setDate(monday.getDate() + i);
+        return {
+           date: nd,
+           label: weekDaysInfo[i],
+           dayNum: nd.getDate()
+        };
+     });
+
+     const activeMecanicos = mecanicos.filter(m => m.selected);
+
+     return (
+        <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-slate-900 overflow-hidden">
+           <div className="flex border-b border-slate-200 dark:border-slate-800">
+             <div className="w-16 shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 z-20"></div>
+             {weekDates.map(wd => (
+               <div key={wd.label} className="flex-1 min-w-[120px] py-2 text-center border-r border-slate-200 dark:border-slate-800 last:border-r-0">
+                 <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">{wd.label}</div>
+                 <div className={cn("text-lg font-normal mb-1", wd.date.getDate() === new Date('2026-05-14T12:00:00').getDate() ? "text-blue-600 font-bold" : "text-slate-800 dark:text-slate-200")}>
+                    {wd.dayNum}
+                 </div>
+               </div>
+             ))}
+           </div>
+           
+           <div className="flex-1 overflow-y-auto overflow-x-auto relative flex">
+              <div className="w-16 shrink-0 border-r border-slate-200 dark:border-slate-800 sticky left-0 bg-white dark:bg-slate-900 z-20">
+                 {hours.map(h => (
+                   <div key={h} className="h-20 border-b border-slate-100 dark:border-slate-800 relative bg-white dark:bg-slate-900">
+                     <span className="absolute -top-2.5 right-2 text-[10px] text-slate-500 font-medium">{h}:00</span>
+                   </div>
+                 ))}
+              </div>
+              {weekDates.map(wd => {
+                 const dayOffset = wd.date.getDate() - 14; 
+                 return (
+                 <div key={wd.label} className="flex-1 min-w-[120px] border-r border-slate-100 dark:border-slate-800 relative z-10">
+                   {hours.map(h => (
+                     <div key={h} className="h-20 border-b border-slate-100 dark:border-slate-800 border-dashed hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                     </div>
+                   ))}
+
+                   {activeMecanicos.map(m => 
+                      m.ots.filter(ot => ot.dayOffset === dayOffset).map(ot => {
+                         const top = (ot.startHour! - 8) * 80;
+                         const height = ot.duration! * 80;
+                         return (
+                           <div key={ot.id} onClick={() => navigate(`/flota/ordenes-trabajo/${ot.id.replace('e', '')}`)}
+                                className={cn("absolute left-1 right-1 flex flex-col rounded p-1.5 text-white shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-all hover:z-50", 
+                                  getTipoColor(ot.tipo),
+                                  ot.isOverdue && "ring-2 ring-red-500 animate-pulse border-2 border-red-500"
+                                )}
+                                style={{ top: `${top + 1}px`, height: `${height - 2}px` }}>
+                              <div className="text-[9px] font-bold opacity-90 truncate flex justify-between">
+                                 <span>{ot.folio}</span>
+                              </div>
+                              <div className="text-[9px] leading-tight truncate mt-0.5 font-medium">{m.nombre}</div>
+                              <div className="mt-auto text-[9px] truncate opacity-90">{ot.patente}</div>
+                           </div>
+                         )
+                      })
+                   )}
+                 </div>
+                 )
+              })}
+           </div>
+        </div>
+     );
+  };
+
+  const renderDayView = () => {
+     const activeMecanicos = mecanicos.filter(m => m.selected);
+     return (
+        <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-slate-900 overflow-hidden">
+           <div className="flex border-b border-slate-200 dark:border-slate-800">
+             <div className="w-16 shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 z-20"></div>
+             {activeMecanicos.map(m => (
+               <div key={m.id} className="flex-1 min-w-[150px] py-3 text-center border-r border-slate-200 dark:border-slate-800 last:border-r-0">
+                 <div className="font-semibold text-slate-800 dark:text-slate-200 text-sm truncate px-2">{m.nombre}</div>
+                 <div className="text-[10px] text-slate-500 uppercase mt-0.5">{m.especialidad}</div>
+               </div>
+             ))}
+             {activeMecanicos.length === 0 && (
+                <div className="flex-1 py-4 text-center text-slate-500 text-sm">Seleccione mecánicos en el panel izquierdo.</div>
+             )}
+           </div>
+           
+           <div className="flex-1 overflow-y-auto overflow-x-auto relative flex">
+              <div className="w-16 shrink-0 border-r border-slate-200 dark:border-slate-800 sticky left-0 bg-white dark:bg-slate-900 z-20">
+                 {hours.map(h => (
+                   <div key={h} className="h-20 border-b border-slate-100 dark:border-slate-800 relative bg-white dark:bg-slate-900">
+                     <span className="absolute -top-2.5 right-2 text-[10px] text-slate-500 font-medium">{h}:00</span>
+                   </div>
+                 ))}
+              </div>
+              {activeMecanicos.map(m => (
+                 <div key={m.id} className="flex-1 min-w-[150px] border-r border-slate-100 dark:border-slate-800 relative z-10">
+                   {hours.map(h => (
+                     <div key={h} className="h-20 border-b border-slate-100 dark:border-slate-800 border-dashed hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors"
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, m.id, h, currentDate.getDate() - 14)}>
+                     </div>
+                   ))}
+
+                   {m.ots.filter(ot => ot.dayOffset === (currentDate.getDate() - 14)).map(ot => {
+                      const top = (ot.startHour! - 8) * 80;
+                      const height = ot.duration! * 80;
+                      return (
+                        <div key={ot.id} onClick={() => navigate(`/flota/ordenes-trabajo/${ot.id.replace('e', '')}`)}
+                             draggable
+                             onDragStart={(e) => handleDragStart(e, ot.id)}
+                             className={cn("absolute left-1 right-1 rounded-lg p-2 text-white shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-all flex flex-col", 
+                               getTipoColor(ot.tipo),
+                               ot.isOverdue && "ring-2 ring-red-500 border-2 border-red-500 animate-pulse"
+                             )}
+                             style={{ top: `${top + 2}px`, height: `${height - 4}px` }}>
+                           <div className="text-[10px] font-bold opacity-90 leading-tight truncate flex justify-between">
+                              <span>{ot.folio}</span>
+                              {ot.isOverdue && <span className="text-white bg-red-600 px-1 rounded-sm text-[9px] uppercase tracking-wider flex items-center gap-1"><AlertCircle className="w-2.5 h-2.5" /> Atrasada</span>}
+                           </div>
+                           <div className="font-semibold text-xs leading-tight mt-0.5">{ot.tipo}</div>
+                           <div className="text-[10px] leading-tight mt-0.5">{ot.actividad}</div>
+                           
+                           <div className="mt-auto pt-1 text-[10px] font-medium opacity-90 flex items-center gap-1 truncate w-full">
+                              <Clock className="w-3 h-3 shrink-0" />
+                              <span>{ot.startHour}:00 - {ot.startHour! + ot.duration!}:00 ({ot.duration} hrs)</span>
+                              <span className="ml-auto font-bold">{ot.patente}</span>
+                           </div>
+                        </div>
+                      )
+                   })}
+                 </div>
+              ))}
+           </div>
+        </div>
+     );
   };
 
   return (
-    <div className="h-[calc(100vh-6rem)] flex flex-col bg-slate-50/50 dark:bg-slate-950 font-sans">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-slate-100">Panel de Programación</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Vista estilo Calendar, control de mecánicos, asignación y Drag & Drop.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm h-10">
-            <Download className="w-4 h-4 mr-2" /> Exportar Excel
-          </Button>
-          <div className="flex bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm h-10 items-center">
-            {['Día', 'Semana', 'Mes'].map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setViewMode(mode as any)}
-                className={cn(
-                  "px-4 py-1 rounded-md text-sm font-semibold transition-all",
-                  viewMode === mode 
-                    ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm" 
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                )}
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+    <div className="h-[calc(100vh-4rem)] -mt-6 -mx-6 flex bg-white dark:bg-slate-900 font-sans text-slate-800 dark:text-slate-200">
+      
+      {/* Left Sidebar (Google Calendar Style) */}
+      <div className="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0">
+         <div className="p-4 pt-6">
+            <Button variant="outline" onClick={() => setIsNewOtModalOpen(true)} className="w-full bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full py-6 pr-4 pl-3 justify-start">
+              <Plus className="w-6 h-6 mr-2 text-slate-500" />
+              <span className="font-medium text-sm text-slate-700 dark:text-slate-200">Crear OT</span>
+            </Button>
+         </div>
 
-      {/* Filters and Date Navigation */}
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 mb-6 shadow-sm gap-4">
-        <div className="flex flex-wrap gap-4 w-full xl:w-auto">
-          <div className="space-y-1.5 w-full sm:w-48">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Mecánico</label>
-            <select className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-blue-500">
-              <option>Todos</option>
-              {mecanicos.map(m => <option key={m.id}>{m.nombre}</option>)}
-            </select>
-          </div>
-          <div className="space-y-1.5 w-full sm:w-64">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Buscar (Folio, Patente)</label>
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input 
-                type="text" 
-                placeholder="Ej: OT-1045" 
-                className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-blue-500"
-              />
+         <div className="flex-1 overflow-y-auto scrollbar-thin px-4 space-y-6">
+            
+            {/* Nav Mini Calendar (Mock) */}
+            <div>
+               <div className="flex justify-between items-center mb-2 px-1">
+                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 capitalize">{getFormatDate(currentDate)}</span>
+                 <div className="flex gap-1">
+                   <button className="text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded p-1"><ChevronLeft className="w-4 h-4" /></button>
+                   <button className="text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded p-1"><ChevronRight className="w-4 h-4" /></button>
+                 </div>
+               </div>
+               <div className="grid grid-cols-7 text-center text-[10px] font-medium text-slate-500 mb-1">
+                 <span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span>
+               </div>
+               <div className="grid grid-cols-7 text-center text-xs gap-y-1">
+                 {[...Array(4)].map((_,i) => <span key={`e-${i}`} className="text-slate-300 dark:text-slate-600 py-1">{27+i}</span>)}
+                 {[...Array(31)].map((_,i) => {
+                    const d = i + 1;
+                    return (
+                      <span 
+                        key={`d-${i}`} 
+                        onClick={() => {
+                          const newDate = new Date(currentDate);
+                          newDate.setDate(d);
+                          setCurrentDate(newDate);
+                          setViewMode('Día');
+                        }}
+                        className={cn("w-6 h-6 flex items-center justify-center rounded-full mx-auto cursor-pointer transition-colors", 
+                           d === currentDate.getDate() && viewMode === 'Día' ? "bg-blue-600 text-white font-bold" : "hover:bg-slate-200 dark:hover:bg-slate-700",
+                           d === 14 && viewMode !== 'Día' ? "ring-2 ring-blue-500 font-bold" : "" // Highlight today if not selected
+                        )}
+                      >
+                        {d}
+                      </span>
+                    );
+                 })}
+               </div>
             </div>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-6 justify-between w-full xl:w-auto">
-          <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden shadow-sm">
-            <button onClick={() => navigateDays(-1)} className="p-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-colors">
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button onClick={() => setCurrentDate(new Date('2026-05-14'))} className="px-5 py-2.5 border-x border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-sm font-bold text-slate-800 dark:text-slate-200 transition-colors">
-              Hoy
-            </button>
-            <button onClick={() => navigateDays(1)} className="p-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-colors">
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="text-sm font-black text-slate-800 dark:text-slate-100 min-w-[120px] text-right">
-             {currentDate.toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
-          </div>
-        </div>
-      </div>
-
-      {/* Info Banner */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 p-3 rounded-lg border border-blue-100 dark:border-blue-900/50 mb-4 flex gap-3 text-sm shrink-0">
-        <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-        <div>
-          <strong className="block mb-0.5">Control de Tiempos y Tolerancia</strong>
-          <p>Para empresas con más de 20 mecánicos, utilice el selector de vista (Semana/Mes) o el filtro de mecánicos para limpiar la matriz. El control de tiempo exacto y alertas de atraso se validan automáticamente cuando el mecánico "Inicia" y "Detiene" el reloj en el detalle de la Orden de Trabajo a través de la App Móvil o Tablet del Taller.</p>
-        </div>
-      </div>
-
-      {/* Main Workspace */}
-      <div className="flex flex-1 overflow-hidden gap-6">
-        {/* Sidebar OTs Pendientes */}
-        <div className="w-80 flex flex-col shrink-0">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col h-full overflow-hidden">
-            <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex justify-between items-center">
-              <h3 className="font-bold text-slate-800 dark:text-slate-100">OTs Pendientes</h3>
-              <span className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold px-2 py-0.5 rounded-full">{pendingOts.length}</span>
+            {/* Pending OTs (Drag and Drop List) */}
+            <div
+               onDragOver={handleDragOver}
+               onDrop={handleDropToPending}
+               className={cn("transition-colors rounded-lg", draggedOt && !pendingOts.find(ot => ot.id === draggedOt) ? "bg-slate-50 dark:bg-slate-800/50 outline-dashed outline-2 outline-slate-300 dark:outline-slate-700 p-1" : "")}
+            >
+               <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-3 px-1 flex items-center justify-between">
+                 OTs Sin Asignar
+                 <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1.5 py-0.5 rounded-full text-[10px]">{pendingOts.length}</span>
+               </h3>
+               <div className="space-y-2">
+                 {pendingOts.map(ot => (
+                    <div key={ot.id} draggable onDragStart={(e) => handleDragStart(e, ot.id)}
+                         className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg text-xs shadow-sm cursor-grab active:cursor-grabbing hover:border-blue-400 transition-colors group">
+                       <div className="font-bold text-slate-800 dark:text-slate-200 flex justify-between items-start mb-1 text-[11px]">
+                         <span className="bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">{ot.folio}</span>
+                         <GripVertical className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
+                       </div>
+                       <div className="font-semibold text-slate-700 dark:text-slate-300">{ot.tipo}</div>
+                       <div className="text-slate-500 dark:text-slate-400 mt-0.5 truncate">{ot.actividad}</div>
+                    </div>
+                 ))}
+                 {pendingOts.length === 0 && (
+                    <div className="text-xs text-center text-slate-400 py-4 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg mx-1">
+                       Todo asignado
+                    </div>
+                 )}
+               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin">
-              {pendingOts.map(ot => (
-                <div 
-                  key={ot.id} 
-                  draggable 
-                  onDragStart={(e) => handleDragStart(e, ot.id)}
-                  onClick={() => navigate(`/flota/ordenes-trabajo/${ot.id}`)}
-                  className={cn(
-                    "bg-white dark:bg-slate-950 border rounded-xl p-3 flex shadow-sm cursor-grab active:cursor-grabbing hover:border-blue-400 dark:hover:border-blue-500 transition-all group",
-                    ot.id === draggedOt ? "opacity-50 border-blue-500 border-2" : "border-slate-200 dark:border-slate-800"
-                  )}
+
+            {/* Mechanics Filter */}
+            <div className="pb-4">
+               <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-2 mb-3 px-1">
+                 Mis Mecánicos
+               </h3>
+               <div className="space-y-1">
+                 {mecanicos.map(m => (
+                    <label key={m.id} className="flex items-center gap-3 cursor-pointer group hover:bg-slate-100 dark:hover:bg-slate-800 px-1 py-1.5 rounded-md">
+                       <div className={cn("w-4 h-4 rounded appearance-none border flex items-center justify-center transition-colors", 
+                          m.selected ? "bg-blue-600 border-transparent" : "border-slate-300 dark:border-slate-600 bg-transparent group-hover:border-slate-400"
+                       )}>
+                         {m.selected && <Check className="w-3 h-3 text-white" />}
+                       </div>
+                       <input type="checkbox" className="hidden" checked={m.selected} onChange={() => toggleMechanic(m.id)} />
+                       <span className="text-sm text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100 truncate flex-1">{m.nombre}</span>
+                    </label>
+                 ))}
+               </div>
+            </div>
+
+         </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-w-0">
+         
+         {/* Top Header Bar */}
+         <div className="h-16 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 lg:px-6 bg-white dark:bg-slate-900 shrink-0">
+            <div className="flex items-center gap-4 lg:gap-6">
+               <div className="flex items-center gap-4">
+                 <button onClick={() => { setCurrentDate(new Date('2026-05-14T12:00:00')); setViewMode('Día'); }} className="text-sm font-medium px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm">
+                   Hoy
+                 </button>
+                 <div className="flex gap-1">
+                   <button onClick={() => navigateDays(viewMode === 'Mes' ? -30 : viewMode === 'Semana' ? -7 : -1)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><ChevronLeft className="w-5 h-5 text-slate-600 dark:text-slate-400" /></button>
+                   <button onClick={() => navigateDays(viewMode === 'Mes' ? 30 : viewMode === 'Semana' ? 7 : 1)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><ChevronRight className="w-5 h-5 text-slate-600 dark:text-slate-400" /></button>
+                 </div>
+                 <h2 className="text-xl lg:text-2xl font-normal text-slate-800 dark:text-slate-100 min-w-[140px] capitalize">
+                   {getFormatDate(currentDate)}
+                 </h2>
+               </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+               <div className="relative hidden md:block">
+                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                 <input type="text" placeholder="Buscar OT, Patente..." 
+                        className="bg-slate-100 dark:bg-slate-800/50 border-transparent focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 rounded-md pl-10 pr-4 py-2 text-sm w-48 transition-all" />
+               </div>
+               
+               <select 
+                  value={viewMode} 
+                  onChange={(e) => setViewMode(e.target.value as any)}
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-medium rounded-md px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
                 >
-                  <div className="mr-3 flex items-center justify-center text-slate-300 dark:text-slate-600 group-hover:text-blue-400 transition-colors cursor-grab active:cursor-grabbing">
-                    <GripVertical className="w-5 h-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                       <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm truncate">{ot.tipo}</h4>
-                       <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1.5 py-0.5 rounded">{ot.folio}</span>
-                    </div>
-                    <p className="text-slate-500 dark:text-slate-400 text-xs truncate mt-0.5">{ot.patente} • {ot.actividad}</p>
-                    <p className="text-blue-500 dark:text-blue-400 text-[10px] font-semibold mt-2.5 uppercase tracking-wide">Arrastrar para programar</p>
-                  </div>
-                </div>
-              ))}
-              {pendingOts.length === 0 && (
-                <div className="text-center text-slate-500 text-sm py-8">
-                   No hay órdenes pendientes.
-                </div>
-              )}
+                 <option value="Día">Día</option>
+                 <option value="Semana">Semana</option>
+                 <option value="Mes">Mes</option>
+               </select>
+
+               <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-600 dark:text-slate-400"><CalendarIcon className="w-5 h-5" /></button>
             </div>
+         </div>
+
+         {/* Calendar Views */}
+         <div className="flex-1 overflow-hidden flex flex-col bg-slate-50/30 dark:bg-slate-950/50">
+            {viewMode === 'Mes' && renderMonthGrid()}
+            {viewMode === 'Día' && renderDayView()}
+            {viewMode === 'Semana' && renderWeekGrid()}
+         </div>
+
+      </div>
+
+      {/* Modals */}
+      <Modal isOpen={isNewOtModalOpen} onClose={() => setIsNewOtModalOpen(false)} title="Crear Orden de Trabajo">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Crea una nueva Orden de Trabajo para programarla en la pizarra.
+          </p>
+          <div className="space-y-3">
+             <div className="space-y-1">
+               <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Vehículo</label>
+               <select className="w-full text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500">
+                 <option>LDPJ-99 (MB Sprinter)</option>
+                 <option>KHYT-22 (Ford Transit)</option>
+                 <option>MNQP-15 (Peugeot Boxer)</option>
+               </select>
+             </div>
+             <div className="grid grid-cols-2 gap-4">
+               <div className="space-y-1">
+                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Fecha Programada</label>
+                 <input type="date" className="w-full text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500" />
+               </div>
+               <div className="space-y-1">
+                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Tipo Mantenimiento</label>
+                 <select className="w-full text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500">
+                   <option>Preventiva</option>
+                   <option>Correctiva</option>
+                   <option>Evaluativa</option>
+                   <option>Preventiva Neumático</option>
+                   <option>Correctiva Neumático</option>
+                   <option>Evaluativa Neumático</option>
+                   <option>Inspección</option>
+                 </select>
+               </div>
+             </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={() => setIsNewOtModalOpen(false)}>Cancelar</Button>
+            <Button className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => setIsNewOtModalOpen(false)}>Crear OT</Button>
           </div>
         </div>
+      </Modal>
 
-        {/* Calendar Grid */}
-        <div className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm flex flex-col overflow-hidden overflow-x-auto">
-          {viewMode === 'Día' ? (
-            <>
-              {/* Calendar Header */}
-              <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 min-w-max">
-                <div className="w-16 border-r border-slate-200 dark:border-slate-800 shrink-0 sticky left-0 z-20 bg-slate-50/50 dark:bg-slate-900/50"></div>
-                {mecanicos.map(m => (
-                  <div key={m.id} className="w-[200px] flex-1 py-4 text-center border-r border-slate-200 dark:border-slate-800 last:border-r-0">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">{m.especialidad}</div>
-                    <div className="font-bold text-slate-800 dark:text-slate-200 mt-1">{m.nombre}</div>
-                  </div>
-                ))}
-              </div>
-              
-              {/* Calendar Body */}
-              <div className="flex-1 overflow-y-auto scrollbar-thin bg-slate-50/30 dark:bg-slate-950 flex relative min-w-max">
-                {/* Time Column */}
-                <div className="w-16 shrink-0 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-white dark:bg-slate-900 z-10 sticky left-0">
-                  {hours.map(h => (
-                    <div key={h} className="h-24 border-b border-slate-100 dark:border-slate-800/50 flex justify-center pt-2">
-                      <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">{h}:00</span>
-                    </div>
-                  ))}
-                </div>
+      <Modal isOpen={dayEventsModal.isOpen} onClose={() => setDayEventsModal({ isOpen: false, date: null, events: [] })} title={`Programación del ${dayEventsModal.date} de Mayo`}>
+         <div className="space-y-2">
+            {dayEventsModal.events.map((ev, i) => (
+               <div 
+                 key={i} 
+                 onClick={() => {
+                   navigate(`/flota/ordenes-trabajo/${ev.otId.replace('e', '')}`);
+                   setDayEventsModal({ isOpen: false, date: null, events: [] });
+                 }}
+                 className={cn("px-3 py-2 rounded-md cursor-pointer hover:opacity-90 flex flex-col gap-1 shadow-sm transition-opacity",
+                    ev.color,
+                    ev.isOverdue ? "ring-2 ring-red-500" : "",
+                    "text-white"
+                 )}
+               >
+                 <span className="font-semibold text-sm">{ev.title}</span>
+               </div>
+            ))}
+            {dayEventsModal.events.length === 0 && (
+               <p className="text-slate-500 text-sm py-4 text-center">No hay órdenes programadas para este día.</p>
+            )}
+         </div>
+      </Modal>
 
-                {/* Mechanics Columns */}
-                {mecanicos.map(m => (
-                  <div key={m.id} className="w-[200px] flex-1 border-r border-slate-100 dark:border-slate-800/50 last:border-r-0 relative">
-                    {/* Grid Lines functioning as Drop Zones */}
-                    {hours.map(h => (
-                      <div 
-                        key={h} 
-                        className="h-24 border-b border-slate-100 dark:border-slate-800/50 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors"
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, m.id, h)}
-                      ></div>
-                    ))}
-
-                    {/* Events */}
-                    {m.ots.map(ot => {
-                      const top = (ot.startHour! - 8) * 96;
-                      const height = ot.duration! * 96;
-                      const theme = getEventStyles(ot.tipo);
-
-                      return (
-                        <div 
-                          key={ot.id}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, ot.id)}
-                          onClick={() => navigate(`/flota/ordenes-trabajo/${ot.id.replace('e', '')}`)}
-                          className={cn(
-                            "absolute left-2 right-2 rounded-xl p-3 shadow-sm border overflow-hidden cursor-pointer transition-transform hover:-translate-y-0.5 hover:shadow-md group",
-                            theme,
-                            ot.isOverdue && "border-red-400 dark:border-red-500 ring-2 ring-red-500/20"
-                          )}
-                          style={{ top: `${top}px`, height: `${height}px` }}
-                        >
-                          <div className="flex justify-between items-start mb-1">
-                             <h4 className="font-bold text-sm leading-tight flex items-center gap-1">
-                               {ot.tipo}
-                               {ot.isOverdue && <AlertCircle className="w-3.5 h-3.5 text-red-500" />}
-                             </h4>
-                          </div>
-                          <p className="opacity-80 text-xs truncate font-medium">{ot.patente} • {ot.folio}</p>
-                          <p className={cn("opacity-70 text-[11px] mt-0.5 line-clamp-2", height <= 96 && "truncate line-clamp-1")}>{ot.actividad}</p>
-
-                          <div className="absolute bottom-3 left-3 flex items-center opacity-70 text-[10px] font-bold tracking-wide">
-                            <Clock className="w-3 h-3 mr-1.5" />
-                            {formatTime(ot.startHour!)} - {formatTime(ot.startHour! + ot.duration!)}
-                          </div>
-                          {ot.isOverdue && (
-                            <div className="absolute top-2 right-2 flex items-center text-red-600 bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 rounded text-[9px] font-bold">
-                               Atrasada
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50 dark:bg-slate-900">
-               <CalendarIcon className="w-16 h-16 text-slate-300 dark:text-slate-700 mb-4" />
-               <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200">Vista {viewMode} en Desarrollo</h3>
-               <p className="text-slate-500 mt-2 max-w-md">La vista de {viewMode.toLowerCase()} presentará los días como columnas y permitirá filtrar por mecánico. Las mismas funciones de Drag & Drop y control de alertas de atraso estarán disponibles.</p>
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
-
-// Just adding Calendar Icon since we used it in the placeholder
-import { Calendar as CalendarIcon } from 'lucide-react';
-
