@@ -27,6 +27,11 @@ export default function OrdenesTrabajoDetail() {
         <Button variant="ghost" onClick={() => navigate('/flota/ordenes-trabajo')}><ArrowLeft className="w-4 h-4 mr-2" />Volver al listado</Button>
         <h1 className="text-xl font-bold">Orden de Trabajo #{ot.folio} <Badge className="ml-2 bg-green-600 text-white">{ot.estado.replace('_', ' ')}</Badge></h1>
         <div className="flex gap-2 font-bold">
+            {ot.tipo === 'INSPECCION' && (
+              <Button onClick={() => navigate('/flota/neumaticos?tab=inspeccion')} className="bg-purple-600 hover:bg-purple-700 text-white">
+                <FileText className="w-4 h-4 mr-2" /> Realizar Inspección
+              </Button>
+            )}
             <span className="flex items-center text-slate-600 dark:text-slate-400 mr-4"><Clock className="w-4 h-4 mr-1"/> Tiempo trabajado: {new Date(ot.tiempoTrabajadoSegundos * 1000).toISOString().substr(11, 8)}</span>
             <Button variant="outline"><Edit className="w-4 h-4 mr-2" />Editar OT</Button>
             <Button variant="outline"><CheckCircle className="w-4 h-4 mr-2" />Firmar Certificado</Button>

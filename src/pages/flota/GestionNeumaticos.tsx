@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Plus, Search, Activity, CircleDashed, BarChart3, Truck, Trash, ChevronDown, AlertCircle } from 'lucide-react';
+import { Plus, Search, Activity, CircleDashed, BarChart3, Truck, Trash, ChevronDown, AlertCircle, ChevronUp, DollarSign } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import Modal from '../../components/ui/Modal';
+import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 
 export default function GestionNeumaticos() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'inventario' | 'inspeccion'>('dashboard');
+  const queryParams = new URLSearchParams(window.location.search);
+  const initialTab = (queryParams.get('tab') as 'dashboard' | 'inventario' | 'inspeccion') || 'dashboard';
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'inventario' | 'inspeccion'>(initialTab);
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -20,31 +23,34 @@ export default function GestionNeumaticos() {
             Sistema de trazabilidad, control de desgaste y cálculo de CPK ($/km)
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button 
-            variant={activeTab === 'dashboard' ? 'default' : 'outline'}
+        <div className="flex bg-slate-100/50 dark:bg-slate-900/50 p-1 rounded-xl shadow-inner border border-slate-200/50 dark:border-slate-800/50">
+          <button 
             onClick={() => setActiveTab('dashboard')}
-            className={activeTab === 'dashboard' ? 'bg-blue-600 text-white' : 'dark:border-slate-800 dark:text-slate-300'}
+            className={cn(
+               "flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all",
+               activeTab === 'dashboard' ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/50 dark:border-slate-700/50" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
+            )}
           >
-            <BarChart3 className="w-4 h-4 mr-2" />
-            Rentabilidad
-          </Button>
-          <Button 
-            variant={activeTab === 'inventario' ? 'default' : 'outline'}
+            <BarChart3 className="w-4 h-4" /> Rentabilidad KPI
+          </button>
+          <button 
             onClick={() => setActiveTab('inventario')}
-            className={activeTab === 'inventario' ? 'bg-blue-600 text-white' : 'dark:border-slate-800 dark:text-slate-300'}
+            className={cn(
+               "flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all",
+               activeTab === 'inventario' ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/50 dark:border-slate-700/50" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
+            )}
           >
-            <CircleDashed className="w-4 h-4 mr-2" />
-            Inventario
-          </Button>
-          <Button 
-            variant={activeTab === 'inspeccion' ? 'default' : 'outline'}
+            <CircleDashed className="w-4 h-4" /> Inventario Maestro
+          </button>
+          <button 
             onClick={() => setActiveTab('inspeccion')}
-            className={activeTab === 'inspeccion' ? 'bg-blue-600 text-white' : 'dark:border-slate-800 dark:text-slate-300'}
+            className={cn(
+               "flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all",
+               activeTab === 'inspeccion' ? "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm border border-slate-200/50 dark:border-emerald-900/30 ring-1 ring-emerald-500/20" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
+            )}
           >
-            <Activity className="w-4 h-4 mr-2" />
-            Nueva Inspección
-          </Button>
+            <Activity className="w-4 h-4" /> Registrar Inspección
+          </button>
         </div>
       </div>
 
@@ -57,60 +63,158 @@ export default function GestionNeumaticos() {
 
 function DashboardNeumaticos() {
   return (
-    <div className="grid lg:grid-cols-3 gap-6">
-      <Card className="col-span-full lg:col-span-2">
-        <CardHeader>
-          <CardTitle>Rentabilidad por Marca y Modelo ($/km)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-64 flex items-center justify-center bg-slate-50 dark:bg-slate-900 border dark:border-slate-800 rounded-lg">
-            <span className="text-slate-400">Gráfico de Rentabilidad CPK (Simulado)</span>
-          </div>
-          <div className="mt-6 flex flex-col gap-4">
-             <div className="grid grid-cols-4 gap-4 text-xs font-bold text-slate-500 uppercase pb-2 border-b dark:border-slate-800">
-               <div>Marca - Perfil</div>
-               <div>Vida Útil Prom.</div>
-               <div>Costo Prom.</div>
-               <div className="text-right">CPK ($/km)</div>
-             </div>
-             {[
-               { m: "Michelin XZE2", v: "150,000 km", c: "$450,000", cpk: "$3.00", color: "text-emerald-500" },
-               { m: "Bridgestone R268", v: "135,000 km", c: "$420,000", cpk: "$3.11", color: "text-emerald-500" },
-               { m: "Goodyear KMAX", v: "120,000 km", c: "$395,000", cpk: "$3.29", color: "text-orange-500" },
-               { m: "Pirelli Formula", v: "95,000 km", c: "$350,000", cpk: "$3.68", color: "text-red-500" }
-             ].map((it, i) => (
-                <div key={i} className="grid grid-cols-4 gap-4 items-center border-b dark:border-slate-800 pb-3">
-                  <div className="font-semibold text-slate-800 dark:text-slate-200">{it.m}</div>
-                  <div className="text-slate-600 dark:text-slate-400">{it.v}</div>
-                  <div className="text-slate-600 dark:text-slate-400">{it.c}</div>
-                  <div className={cn("text-right font-black", it.color)}>{it.cpk}</div>
-                </div>
-             ))}
-          </div>
-        </CardContent>
-      </Card>
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-             <CardTitle className="text-sm">Alertas de Inspección</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-             {[
-               { pat: "KBCX-45", pos: "Pos 4", txt: "Baja presión (90 PSI)", t: "Hace 2 hrs" },
-               { pat: "LDPJ-99", pos: "Pos 8, 9", txt: "Surco crítico (3mm), programar retiro", t: "Ayer" },
-               { pat: "FRTY-12", pos: "Pos 2", txt: "Desgaste irregular detectado", t: "Ayer" }
-             ].map((a, i) => (
-                <div key={i} className="flex gap-3 p-3 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-lg">
-                  <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-bold text-red-700 dark:text-red-400">{a.pat} - {a.pos}</p>
-                    <p className="text-xs text-red-600 dark:text-red-300">{a.txt}</p>
-                    <p className="text-[10px] text-red-400 dark:text-red-500 mt-1">{a.t}</p>
-                  </div>
-                </div>
-             ))}
+    <div className="space-y-6">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-none shadow-md">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start">
+              <div className="space-y-2">
+                <p className="text-blue-100 text-sm font-medium">CPK Promedio Flota</p>
+                <h3 className="text-3xl font-black">$3.25 <span className="text-base font-medium text-blue-200">/ km</span></h3>
+              </div>
+              <div className="p-3 bg-white/20 rounded-lg"><BarChart3 className="w-5 h-5 text-white" /></div>
+            </div>
           </CardContent>
         </Card>
+        
+        <Card className="bg-white dark:bg-slate-900 shadow-md">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start">
+              <div className="space-y-2">
+                <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Neumáticos Activos</p>
+                <h3 className="text-3xl font-black text-slate-800 dark:text-slate-100">142</h3>
+              </div>
+              <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-lg"><CircleDashed className="w-5 h-5 text-slate-600 dark:text-slate-300" /></div>
+            </div>
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-4 flex items-center"><ChevronUp className="w-3 h-3 mr-1"/> 92% estado óptimo</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white dark:bg-slate-900 shadow-md">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start">
+              <div className="space-y-2">
+                <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Alertas Críticas</p>
+                <h3 className="text-3xl font-black text-red-600 dark:text-red-500">5</h3>
+              </div>
+              <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg"><AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" /></div>
+            </div>
+             <p className="text-xs text-red-600 dark:text-red-400 mt-4 flex items-center">Requieren retiro inmediato</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white dark:bg-slate-900 shadow-md">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start">
+              <div className="space-y-2">
+                <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Ahorro Proyectado</p>
+                <h3 className="text-3xl font-black text-emerald-600 dark:text-emerald-500">$1.2M</h3>
+              </div>
+              <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg"><DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /></div>
+            </div>
+             <p className="text-xs text-slate-500 dark:text-slate-400 mt-4 flex items-center">Al optimizar presión (+10% vida útil)</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-6">
+        <Card className="col-span-full lg:col-span-2 shadow-sm">
+          <CardHeader>
+            <CardTitle>Rentabilidad y Vida Útil por Modelo</CardTitle>
+          </CardHeader>
+          <CardContent>
+                        {/* Gráfico Real (Recharts) */}
+            <div className="h-80 w-full mt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart
+                  data={[
+                    { name: 'Michelin XZE2', vidaUtil: 150000, cpk: 3.00 },
+                    { name: 'BStone R268', vidaUtil: 135000, cpk: 3.11 },
+                    { name: 'GYear KMAX', vidaUtil: 120000, cpk: 3.29 },
+                    { name: 'FCargo SR-200', vidaUtil: 105000, cpk: 3.40 },
+                    { name: 'Pirelli Form', vidaUtil: 95000, cpk: 3.68 },
+                  ]}
+                  margin={{ top: 20, right: 20, bottom: 20, left: 10 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
+                  <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(value) => `${value / 1000}k`} />
+                  <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(value) => `${value}`} />
+                  <Tooltip 
+                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', color: '#0f172a' }}
+                     formatter={(value, name) => {
+                       if (name === 'Vida Útil (km)') return [`${value.toLocaleString()} km`, name];
+                       if (name === 'CPK ($/km)') return [`${(value as number).toFixed(2)}`, name];
+                       return [value, name];
+                     }}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                  <Bar yAxisId="left" dataKey="vidaUtil" name="Vida Útil (km)" radius={[4, 4, 0, 0]} barSize={40}>
+                    {
+                      [
+                        { name: 'Michelin XZE2', vidaUtil: 150000, cpk: 3.00 },
+                        { name: 'BStone R268', vidaUtil: 135000, cpk: 3.11 },
+                        { name: 'GYear KMAX', vidaUtil: 120000, cpk: 3.29 },
+                        { name: 'FCargo SR-200', vidaUtil: 105000, cpk: 3.40 },
+                        { name: 'Pirelli Form', vidaUtil: 95000, cpk: 3.68 },
+                      ].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.cpk < 3.2 ? '#10b981' : entry.cpk < 3.5 ? '#f59e0b' : '#ef4444'} />
+                      ))
+                    }
+                  </Bar>
+                  <Line yAxisId="right" type="monotone" dataKey="cpk" name="CPK ($/km)" stroke="#3b82f6" strokeWidth={3} dot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 8 }} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="mt-8 flex flex-col gap-4">
+               <div className="grid grid-cols-4 gap-4 text-xs font-bold text-slate-500 uppercase pb-2 border-b dark:border-slate-800">
+                 <div>Marca - Perfil</div>
+                 <div>Vida Útil Prom.</div>
+                 <div>Costo Prom.</div>
+                 <div className="text-right">CPK ($/km)</div>
+               </div>
+               {[
+                 { m: "Michelin XZE2", v: "150,000 km", c: "$450,000", cpk: "$3.00", color: "text-emerald-600 dark:text-emerald-400" },
+                 { m: "Bridgestone R268", v: "135,000 km", c: "$420,000", cpk: "$3.11", color: "text-emerald-600 dark:text-emerald-400" },
+                 { m: "Goodyear KMAX", v: "120,000 km", c: "$395,000", cpk: "$3.29", color: "text-amber-600 dark:text-amber-500" },
+                  { m: "FateCargo SR-200", v: "105,000 km", c: "$360,000", cpk: "$3.40", color: "text-orange-600 dark:text-orange-500" },
+                 { m: "Pirelli Formula", v: "95,000 km", c: "$350,000", cpk: "$3.68", color: "text-red-600 dark:text-red-500" }
+               ].map((it, i) => (
+                  <div key={i} className="grid grid-cols-4 gap-4 items-center border-b dark:border-slate-800 pb-3">
+                    <div className="font-semibold text-slate-800 dark:text-slate-200">{it.m}</div>
+                    <div className="text-slate-600 dark:text-slate-400">{it.v}</div>
+                    <div className="text-slate-600 dark:text-slate-400">{it.c}</div>
+                    <div className={cn("text-right font-black", it.color)}>{it.cpk}</div>
+                  </div>
+               ))}
+            </div>
+          </CardContent>
+        </Card>
+        <div className="space-y-6">
+          <Card className="shadow-sm">
+            <CardHeader>
+               <CardTitle className="text-sm">Alertas de Inspección</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+               {[
+                 { pat: "KBCX-45", pos: "Pos 4", txt: "Baja presión (90 PSI)", t: "Hace 2 hrs" },
+                 { pat: "LDPJ-99", pos: "Pos 8, 9", txt: "Surco crítico (3mm), programar retiro", t: "Ayer" },
+                 { pat: "FRTY-12", pos: "Pos 2", txt: "Desgaste irregular detectado", t: "Ayer" }
+               ].map((a, i) => (
+                  <div key={i} className="flex gap-3 p-3 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-xl">
+                    <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-bold text-red-700 dark:text-red-400">{a.pat} - {a.pos}</p>
+                      <p className="text-xs text-red-600 dark:text-red-300 mt-0.5 leading-snug">{a.txt}</p>
+                      <p className="text-[10px] text-red-400 dark:text-red-500 mt-1.5 font-medium">{a.t}</p>
+                    </div>
+                  </div>
+               ))}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
@@ -218,6 +322,7 @@ function FormularioInspeccion() {
                onChange={(e) => setNumPositions(parseInt(e.target.value))}
                value={numPositions}
              >
+               <option value="4">2 Ejes / Config. 2x2 (4 Neumáticos)</option>
                <option value="6">2 Ejes (6 Neumáticos)</option>
                <option value="10">3 Ejes (10 Neumáticos)</option>
                <option value="14">4 Ejes (14 Neumáticos)</option>

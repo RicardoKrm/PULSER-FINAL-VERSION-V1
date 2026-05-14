@@ -53,6 +53,7 @@ export default function GestionOrdenesTrabajo() {
     switch(tipo) {
         case 'PREVENTIVA': return 'bg-sky-100 text-sky-700 border-sky-200';
         case 'CORRECTIVA': return 'bg-amber-100 text-amber-700 border-amber-200';
+        case 'INSPECCION': return 'bg-purple-100 text-purple-700 border-purple-200';
         default: return 'bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800';
     }
   }
@@ -80,6 +81,7 @@ export default function GestionOrdenesTrabajo() {
                 <option value="Todos">Todos los Tipos</option>
                 <option value="PREVENTIVA">PREVENTIVA</option>
                 <option value="CORRECTIVA">CORRECTIVA</option>
+                <option value="INSPECCION">INSPECCION</option>
             </select>
             <select className="p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
                 <option value="Todos">Todos los Estados</option>

@@ -88,6 +88,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose }) =
                 <option value="PREVENTIVA">PREVENTIVA</option>
                 <option value="CORRECTIVA">CORRECTIVA</option>
                 <option value="EVALUATIVA">EVALUATIVA</option>
+                <option value="INSPECCION">INSPECCION</option>
                 <option value="PREVENTIVA_NEUMATICOS">PREVENTIVA NEUMATICOS</option>
                 <option value="CORRECTIVA_NEUMATICOS">CORRECTIVA NEUMATICOS</option>
                 <option value="EVALUATIVA_NEUMATICOS">EVALUATIVA NEUMATICOS</option>

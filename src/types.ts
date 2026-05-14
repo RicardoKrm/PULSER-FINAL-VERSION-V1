@@ -87,7 +87,7 @@ export interface OrdenDeTrabajo {
   folio: string;
   vehiculoId: string;
   tecnicoResponsable?: string;
-  tipo: 'PREVENTIVA' | 'CORRECTIVA' | 'EVALUATIVA' | 'PREVENTIVA_NEUMATICOS' | 'CORRECTIVA_NEUMATICOS' | 'EVALUATIVA_NEUMATICOS';
+  tipo: 'PREVENTIVA' | 'CORRECTIVA' | 'EVALUATIVA' | 'PREVENTIVA_NEUMATICOS' | 'CORRECTIVA_NEUMATICOS' | 'EVALUATIVA_NEUMATICOS' | 'INSPECCION';
   estado: 'ABIERTA' | 'EN_PROCESO' | 'FINALIZADA' | 'CANCELADA' | 'PAUSADA' | 'POR_ASIGNAR' | 'CERRADA_MECANICO' | 'PROGRAMADA' | 'CERRADA_POR_MECANICO';
   prioridad: 'BAJA' | 'MEDIA' | 'ALTA';
   kilometrajeApertura: number;
