@@ -5,7 +5,8 @@ import { Button } from '../../components/ui/Button';
 import { 
   Search, Filter, Plus, FileSpreadsheet, AlertTriangle, 
   CheckCircle, Clock, Truck, ChevronRight, Activity, Wrench,
-  MoreVertical, Edit3, History, TrendingUp, Archive, Trash2
+  MoreVertical, Edit3, History, TrendingUp, Archive, Trash2,
+  Table as TableIcon, List
 } from 'lucide-react';
 import { CrearOTModal } from '../../components/flota/CrearOTModal';
 import { CrearVehiculoModal } from '../../components/flota/CrearVehiculoModal';
@@ -18,6 +19,7 @@ export default function PizarraMantenimiento() {
   const [modalOTOpen, setModalOTOpen] = useState(false);
   const [vehiculoSeleccionadoOT, setVehiculoSeleccionadoOT] = useState<string | undefined>();
   const [selectedVehicleRow, setSelectedVehicleRow] = useState<number | null>(null);
+  const [vistaTabla, setVistaTabla] = useState(false);
   
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -147,13 +149,13 @@ export default function PizarraMantenimiento() {
   const getStatusBadge = (estado: string) => {
     switch (estado) {
       case 'NORMAL':
-        return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 shadow-sm"><CheckCircle className="w-3 h-3 mr-1" /> NORMALIDAD</Badge>;
+        return <div className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500 text-white shadow-sm uppercase"><CheckCircle className="w-3 h-3 mr-1" /> NORMALIDAD</div>;
       case 'PROXIMO':
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 shadow-sm hover:bg-yellow-200"><Clock className="w-3 h-3 mr-1" /> MANT. PRÓX</Badge>;
+        return <div className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-500 text-white shadow-sm uppercase"><Clock className="w-3 h-3 mr-1" /> MANT. PRÓX</div>;
       case 'VENCIDO':
-        return <Badge className="bg-red-100 text-red-800 border-red-200 shadow-sm hover:bg-red-200"><AlertTriangle className="w-3 h-3 mr-1" /> VENCIDO</Badge>;
+        return <div className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white shadow-sm uppercase"><AlertTriangle className="w-3 h-3 mr-1" /> VENCIDO</div>;
       default:
-        return <Badge variant="default">{estado}</Badge>;
+        return <div className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-500 text-white shadow-sm uppercase">{estado}</div>;
     }
   };
 
@@ -170,6 +172,121 @@ export default function PizarraMantenimiento() {
   const fechaTexto = new Date().toLocaleDateString('es-ES', opcionesFecha);
   const fechaHoy = fechaTexto.charAt(0).toUpperCase() + fechaTexto.slice(1);
 
+  const renderTablaDensa = () => (
+    <Card className="shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden w-full">
+      <div className="overflow-x-auto">
+        <table className="w-full text-[11px] text-center border-collapse">
+          <thead className="bg-[#f8f9fa] dark:bg-slate-900 border-b border-b-slate-200 dark:border-b-slate-700 text-slate-600 dark:text-slate-400 font-semibold whitespace-nowrap">
+            <tr>
+              <th className="px-2 py-3 border-r border-slate-200 dark:border-slate-800">N° Int. ▲</th>
+              <th className="px-2 py-3 border-r border-slate-200 dark:border-slate-800">PPU</th>
+              <th className="px-2 py-3 border-r border-slate-200 dark:border-slate-800">KM Últ. Mant.</th>
+              <th className="px-2 py-3 border-r border-slate-200 dark:border-slate-800">F. Últ. Mant.</th>
+              <th className="px-2 py-3 border-r border-slate-200 dark:border-slate-800">Tipo Mant.</th>
+              <th className="px-2 py-3 border-r border-slate-200 dark:border-slate-800">Cumplimiento</th>
+              <th className="px-2 py-3 border-r border-slate-200 dark:border-slate-800">Estatus</th>
+              <th className="px-2 py-3 border-r border-slate-200 dark:border-slate-800">Km Vencido</th>
+              <th className="px-2 py-3 border-r border-slate-200 dark:border-slate-800">Pauta Vencida</th>
+              <th className="px-2 py-3 border-r border-slate-200 dark:border-slate-800">KM Actual</th>
+              <th className="px-2 py-3 border-r border-slate-200 dark:border-slate-800">Fecha KM Actual</th>
+              <th className="px-2 py-3 border-r border-slate-200 dark:border-slate-800">KM Próx. Mant.</th>
+              <th className="px-2 py-3 border-r border-slate-200 dark:border-slate-800">Tipo Próx. Mant.</th>
+              <th className="px-2 py-3 border-r border-slate-200 dark:border-slate-800">Semáf.</th>
+              <th className="px-2 py-3 border-r border-slate-200 dark:border-slate-800">Fecha Próx. Mant.</th>
+              <th className="px-2 py-3">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-800 dark:text-slate-300 bg-white dark:bg-slate-900">
+            {vehiculosFiltrados.map((vehiculo) => {
+              const fKmActual = vehiculo.ultimoMant.fecha; 
+              let cumplimientoText = 'Normal';
+              let cumplimientoColor = 'text-slate-700 dark:text-slate-300';
+              if (vehiculo.estado === 'VENCIDO') { cumplimientoText = 'Retrasado'; cumplimientoColor = 'text-red-600 font-bold'; }
+              if (vehiculo.estado === 'PROXIMO') { cumplimientoText = 'Anticipado'; cumplimientoColor = 'text-emerald-600 font-bold'; }
+              if (vehiculo.estado === 'NORMAL') { cumplimientoText = 'Normal'; cumplimientoColor = 'text-slate-700 dark:text-slate-300 font-bold'; }
+
+              return (
+                <tr key={`dense-${vehiculo.id}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800 font-bold text-blue-900 dark:text-blue-100 whitespace-nowrap">{vehiculo.numeroInterno}</td>
+                  <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800 text-slate-500 whitespace-nowrap">{vehiculo.patente}</td>
+                  <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800">{vehiculo.ultimoMant.km.toLocaleString('es-CL')}</td>
+                  <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800 text-slate-500 whitespace-nowrap">{vehiculo.ultimoMant.fecha}</td>
+                  <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800 font-medium whitespace-nowrap">{vehiculo.ultimoMant.tipo}</td>
+                  <td className={`px-2 py-2 border-r border-slate-200 dark:border-slate-800 ${cumplimientoColor}`}>{cumplimientoText}</td>
+                  <td className="px-1 py-1 border-r border-slate-200 dark:border-slate-800">
+                    <div className="flex justify-center w-full transform scale-90">
+                      {getStatusBadge(vehiculo.estado)}
+                    </div>
+                  </td>
+                  <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800 text-slate-500">{vehiculo.proxMant.kmVencido ? vehiculo.proxMant.kmVencido.toLocaleString('es-CL') : '--'}</td>
+                  <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800 text-slate-500 whitespace-nowrap">{vehiculo.proxMant.vencidosStr || '--'}</td>
+                  <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800">{vehiculo.kmActual.toLocaleString('es-CL')}</td>
+                  <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800 text-slate-500 whitespace-nowrap">{fKmActual}</td>
+                  <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800">{vehiculo.proxMant.kmTarget.toLocaleString('es-CL')}</td>
+                  <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800 font-medium whitespace-nowrap">{vehiculo.proxMant.tipo}</td>
+                  <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800">
+                    <div className="flex justify-center">
+                      {getStatusIcon(vehiculo.estado)}
+                    </div>
+                  </td>
+                  <td className="px-2 py-2 border-r border-slate-200 dark:border-slate-800 text-slate-500 whitespace-nowrap">{vehiculo.proxMant.fechaProg}</td>
+                  <td className="px-2 py-2 relative text-right">
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => setActionMenuOpen(actionMenuOpen === vehiculo.id ? null : vehiculo.id)}>
+                      <MoreVertical className="w-3 h-3" />
+                    </Button>
+                    {actionMenuOpen === vehiculo.id && (
+                      <div 
+                        ref={menuRef}
+                        className="absolute right-8 top-10 w-56 bg-white dark:bg-slate-900 rounded-md shadow-lg border border-slate-200 dark:border-slate-800 z-[100] overflow-hidden text-left"
+                      >
+                        <div className="py-1">
+                          <button 
+                            className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center font-bold"
+                            onClick={() => {
+                              setVehiculoSeleccionadoOT(vehiculo.id.toString());
+                              setModalOTOpen(true);
+                              setActionMenuOpen(null);
+                            }}
+                          >
+                            <Plus className="w-4 h-4 mr-2" /> Crear OT
+                          </button>
+                          <div className="border-t border-slate-100 dark:border-slate-800 my-1"></div>
+                          <button className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center">
+                            <Edit3 className="w-4 h-4 mr-2" /> Actualizar KM
+                          </button>
+                          <button className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center">
+                            <History className="w-4 h-4 mr-2" /> Ver Historial
+                          </button>
+                          <button className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center">
+                            <TrendingUp className="w-4 h-4 mr-2" /> Costos y Tendencias
+                          </button>
+                          <div className="border-t border-slate-100 dark:border-slate-800 my-1"></div>
+                          <button 
+                            className="w-full text-left px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 flex items-center font-medium"
+                            onClick={() => handleArchive(vehiculo.id)}
+                          >
+                            <Archive className="w-4 h-4 mr-2" /> Archivar Vehículo
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+            {vehiculosFiltrados.length === 0 && (
+              <tr>
+                <td colSpan={16} className="px-5 py-8 text-center text-slate-500 dark:text-slate-400">
+                  No se encontraron vehículos.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -185,9 +302,16 @@ export default function PizarraMantenimiento() {
           </div>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" className="bg-white dark:bg-slate-900">
-            <FileSpreadsheet className="w-4 h-4 mr-2 text-green-600" />
-            Exportar XLSX
+          <Button 
+            variant="outline" 
+            className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+            onClick={() => setVistaTabla(!vistaTabla)}
+          >
+            {vistaTabla ? (
+              <><List className="w-4 h-4 mr-2" /> Vista Tarjetas</>
+            ) : (
+              <><TableIcon className="w-4 h-4 mr-2" /> Vista Tabla</>
+            )}
           </Button>
           <Button 
             className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
@@ -373,11 +497,14 @@ export default function PizarraMantenimiento() {
       </Card>
 
       {/* Tabla Maestro de Flota */}
-      <Card className="shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-xs uppercase font-semibold">
-              <tr>
+      {vistaTabla ? (
+        renderTablaDensa()
+      ) : (
+        <Card className="shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-xs uppercase font-semibold">
+                <tr>
                 <th className="px-5 py-4 w-12 text-center"></th>
                 <th className="px-5 py-4 w-12 text-center">STS</th>
                 <th className="px-5 py-4">Vehículo</th>
@@ -520,7 +647,8 @@ export default function PizarraMantenimiento() {
             </tbody>
           </table>
         </div>
-      </Card>
+        </Card>
+      )}
       {modalOTOpen && (
         <CrearOTModal 
           isOpen={modalOTOpen} 
