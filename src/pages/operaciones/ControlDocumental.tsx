@@ -238,7 +238,7 @@ export default function ControlDocumental() {
                      <div className="flex justify-between items-start mb-3">
                        <div>
                          <h4 className="font-bold text-slate-900 dark:text-white text-lg leading-tight">{d.nombre}</h4>
-                         <p className="text-xs text-slate-500 font-medium">{d.rut} • {d.cargo}</p>
+                         <p className="text-xs text-slate-500 font-medium dark:text-slate-400">{d.rut} • {d.cargo}</p>
                        </div>
                        <Badge variant={status === 'ACTIVO' ? 'default' : 'destructive'} className={status === 'ACTIVO' ? 'bg-emerald-500 hover:bg-emerald-600' : 'animate-pulse'}>
                          {status}
@@ -277,7 +277,7 @@ export default function ControlDocumental() {
                      <div className="flex justify-between items-start mb-3">
                        <div>
                          <h4 className="font-black text-slate-900 dark:text-white text-lg tracking-wide leading-tight">{v.patente}</h4>
-                         <p className="text-xs text-slate-500 font-medium">{v.tipo} • Año {v.anio} ({2026 - v.anio} Años)</p>
+                         <p className="text-xs text-slate-500 font-medium dark:text-slate-400">{v.tipo} • Año {v.anio} ({2026 - v.anio} Años)</p>
                        </div>
                        <Badge variant={status === 'ACTIVO' ? 'default' : 'destructive'} className={status === 'ACTIVO' ? 'bg-emerald-500 hover:bg-emerald-600' : 'animate-pulse'}>
                          {status}
@@ -320,23 +320,23 @@ export default function ControlDocumental() {
             <div className="p-6">
               <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); setIsAddingEntity(null); }}>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1">Nombre Completo</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Nombre Completo</label>
                   <input type="text" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1">RUT</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">RUT</label>
                   <input type="text" placeholder="12.345.678-9" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1">Cargo</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Cargo</label>
                     <select className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
                       <option>Conductor Interprovincial</option>
                       <option>Conductor Interno Mina</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1">Tipo de Licencia</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Tipo de Licencia</label>
                     <select className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
                       <option>A1</option>
                       <option>A2</option>
@@ -346,11 +346,11 @@ export default function ControlDocumental() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1">Venc. Licencia</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Venc. Licencia</label>
                     <input type="date" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1">Venc. Salud</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Venc. Salud</label>
                     <input type="date" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
                   </div>
                 </div>
@@ -383,11 +383,11 @@ export default function ControlDocumental() {
               <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); setIsAddingEntity(null); }}>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1">Patente</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Patente</label>
                     <input type="text" placeholder="AB-CD-12" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1">Tipo</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Tipo</label>
                     <select className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
                       <option>Bus</option>
                       <option>Camion</option>
@@ -395,19 +395,19 @@ export default function ControlDocumental() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1">Año Inscrip.</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Año Inscrip.</label>
                     <input type="number" defaultValue={2026} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1">Km Actuales</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Km Actuales</label>
                     <input type="number" defaultValue={0} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1">Venc. Rev. Técnica</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Venc. Rev. Técnica</label>
                     <input type="date" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1">Venc. Seguro</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Venc. Seguro</label>
                     <input type="date" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
                   </div>
                 </div>
@@ -437,7 +437,7 @@ export default function ControlDocumental() {
                    <h2 className="font-black text-slate-800 dark:text-white text-lg">
                      {modalType === 'driver' ? selectedEntity.nombre : selectedEntity.patente}
                    </h2>
-                   <p className="text-xs font-medium text-slate-500">
+                   <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                      {modalType === 'driver' ? `${selectedEntity.rut} - ${selectedEntity.cargo}` : `${selectedEntity.tipo} - Año ${selectedEntity.anio}`}
                    </p>
                  </div>
@@ -462,9 +462,9 @@ export default function ControlDocumental() {
                  
                  <div className="space-y-3">
                    {selectedEntity.documentos?.length === 0 && (
-                     <div className="p-6 border-2 border-dashed border-slate-200 rounded-xl text-center">
+                     <div className="p-6 border-2 border-dashed border-slate-200 rounded-xl text-center dark:border-slate-800">
                        <FileWarning className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                       <p className="text-sm font-bold text-slate-500">No hay documentos adjuntos</p>
+                       <p className="text-sm font-bold text-slate-500 dark:text-slate-400">No hay documentos adjuntos</p>
                      </div>
                    )}
                    {selectedEntity.documentos?.map((doc: any) => (

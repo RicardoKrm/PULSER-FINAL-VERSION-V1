@@ -29,14 +29,14 @@ export default function GestionFallas() {
       <Card className="p-4">
         <table className="w-full">
             <thead>
-                <tr className="text-left border-b">
+                <tr className="text-left border-b dark:border-slate-800">
                     <th className="p-2">Nombre</th>
                     <th className="p-2">Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {tiposFalla.map(tf => (
-                    <tr key={tf.id} className="border-b">
+                    <tr key={tf.id} className="border-b dark:border-slate-800">
                         <td className="p-2">{tf.nombre}</td>
                         <td className="p-2">
                            <Button variant="ghost" onClick={() => eliminarTipoFalla(tf.id)}><Trash className="w-4 h-4 text-red-500" /></Button>
@@ -51,7 +51,7 @@ export default function GestionFallas() {
         <form onSubmit={handleSubmit} className="space-y-4">
             <div>
                 <label className="block text-sm font-medium">Nombre</label>
-                <input type="text" className="w-full p-2 border rounded-md" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+                <input type="text" className="w-full p-2 border dark:border-slate-800 rounded-md dark:bg-slate-800 dark:text-slate-100" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
             </div>
             <Button type="submit" className="w-full bg-cyan-600">Guardar</Button>
         </form>

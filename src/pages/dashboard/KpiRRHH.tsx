@@ -207,7 +207,7 @@ export default function KpiRRHH() {
                 <BarChart3 className="w-8 h-8 text-blue-500 mb-4" />
                 <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-2">{ctx.desc}</h3>
                 <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Cómputo / Origen</h4>
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 dark:text-slate-400">Cómputo / Origen</h4>
                   <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{ctx.formula}</p>
                 </div>
               </div>
@@ -282,7 +282,7 @@ export default function KpiRRHH() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-xl flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Técnicos Activos</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 dark:text-slate-400">Técnicos Activos</p>
                 <p className="text-2xl font-black text-slate-800 dark:text-white">{kpisObj.tecnicos_activos}</p>
               </div>
               <div className="bg-white dark:bg-slate-900 p-2 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
@@ -292,7 +292,7 @@ export default function KpiRRHH() {
             
             <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-xl flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Horas Registradas</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 dark:text-slate-400">Horas Registradas</p>
                 <p className="text-2xl font-black text-slate-800 dark:text-white">{kpisObj.horas_registradas}</p>
               </div>
               <div className="bg-white dark:bg-slate-900 p-2 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
@@ -302,7 +302,7 @@ export default function KpiRRHH() {
 
             <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-xl flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">OTs Finalizadas</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 dark:text-slate-400">OTs Finalizadas</p>
                 <p className="text-2xl font-black text-slate-800 dark:text-white">{kpisObj.ots_finalizadas}</p>
               </div>
               <div className="bg-white dark:bg-slate-900 p-2 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
@@ -312,7 +312,7 @@ export default function KpiRRHH() {
 
             <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-xl flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">OTs con Atraso</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 dark:text-slate-400">OTs con Atraso</p>
                 <p className="text-2xl font-black text-slate-800 dark:text-white">{kpisObj.ots_atraso}</p>
               </div>
               <div className="bg-white dark:bg-slate-900 p-2 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">

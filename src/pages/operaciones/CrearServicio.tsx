@@ -208,7 +208,7 @@ export default function CrearServicio() {
         <div className="text-center py-20 bg-slate-50 dark:bg-slate-900/50 rounded-3xl border border-slate-200 dark:border-slate-800 border-dashed">
           <Activity className="w-12 h-12 text-slate-300 mx-auto mb-3" />
           <h3 className="text-lg font-bold text-slate-900 dark:text-white">No hay servicios</h3>
-          <p className="text-slate-500 mt-1">Prueba ajustando los filtros de búsqueda.</p>
+          <p className="text-slate-500 mt-1 dark:text-slate-400">Prueba ajustando los filtros de búsqueda.</p>
         </div>
       )}
 
@@ -235,12 +235,12 @@ export default function CrearServicio() {
                   </div>
                   <div>
                     <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">{editingServicio ? 'Editar Servicio' : 'Programar Nuevo Servicio'}</h2>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-0.5">Asignación dinámica e inteligencia operativa</p>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-0.5 dark:text-slate-400">Asignación dinámica e inteligencia operativa</p>
                   </div>
                 </div>
                 <button 
                   onClick={() => setIsModalOpen(false)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition-colors"
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition-colors dark:text-slate-400"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -449,7 +449,7 @@ export default function CrearServicio() {
                 </div>
                 <button 
                   onClick={() => setSelectedServicio(null)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition-colors"
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition-colors dark:text-slate-400"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -464,13 +464,13 @@ export default function CrearServicio() {
                     <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4">
                       
                       <div>
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Contrato o Cliente</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 dark:text-slate-400">Contrato o Cliente</p>
                         <p className="text-sm font-semibold text-slate-900 dark:text-white">{selectedServicio.contrato}</p>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col gap-1">
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tipo Operación</p>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider dark:text-slate-400">Tipo Operación</p>
                           <div className="flex">
                             <span className="inline-block px-2.5 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-bold text-xs rounded-md">
                               {selectedServicio.tipo}
@@ -478,7 +478,7 @@ export default function CrearServicio() {
                           </div>
                         </div>
                         <div className="flex flex-col gap-1">
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Subtipo</p>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider dark:text-slate-400">Subtipo</p>
                           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
                             {selectedServicio.subtipo}
                           </p>
@@ -487,13 +487,13 @@ export default function CrearServicio() {
 
                       <div className="pt-4 border-t border-slate-200 dark:border-slate-800 grid grid-cols-2 gap-4">
                         <div>
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Ingreso Estimado</p>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 dark:text-slate-400">Ingreso Estimado</p>
                           <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">
                             ${selectedServicio.ingreso?.toLocaleString('es-CL') || '0'}
                           </p>
                         </div>
                         <div>
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Costo Estimado</p>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 dark:text-slate-400">Costo Estimado</p>
                           <p className="text-lg font-black text-red-600 dark:text-red-400">
                             ${selectedServicio.costo?.toLocaleString('es-CL') || '0'}
                           </p>
@@ -509,11 +509,11 @@ export default function CrearServicio() {
                       <div className="flex flex-col gap-5">
                         <div className="flex gap-4 items-start relative">
                            <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center z-10">
-                             <MapPin className="w-4 h-4 text-slate-500" />
+                             <MapPin className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                            </div>
                            <div className="absolute top-8 left-4 bottom-[-20px] w-0.5 bg-slate-200 dark:bg-slate-800"></div>
                            <div>
-                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Origen</p>
+                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5 dark:text-slate-400">Origen</p>
                              <p className="text-sm font-semibold text-slate-900 dark:text-white">{selectedServicio.origen}</p>
                            </div>
                         </div>
@@ -522,7 +522,7 @@ export default function CrearServicio() {
                              <MapPin className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                            </div>
                            <div>
-                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Destino</p>
+                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5 dark:text-slate-400">Destino</p>
                              <p className="text-sm font-semibold text-slate-900 dark:text-white">{selectedServicio.destino}</p>
                            </div>
                         </div>
@@ -531,7 +531,7 @@ export default function CrearServicio() {
                       <div className="mt-5 pt-5 border-t border-slate-200 dark:border-slate-800 flex items-center gap-3">
                          <CalendarIcon className="w-5 h-5 text-slate-400" />
                          <div>
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Fecha Programada</p>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5 dark:text-slate-400">Fecha Programada</p>
                             <p className="text-sm font-bold text-slate-900 dark:text-white">{new Date(selectedServicio.fecha).toLocaleString('es-CL')}</p>
                          </div>
                       </div>
@@ -546,14 +546,14 @@ export default function CrearServicio() {
                         <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center mb-3">
                           <User className="w-5 h-5 text-slate-600 dark:text-slate-400" />
                         </div>
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Conductor</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 dark:text-slate-400">Conductor</p>
                         <p className="text-sm font-bold text-slate-900 dark:text-white">{selectedServicio.conductor}</p>
                       </div>
                       <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col items-center text-center">
                         <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center mb-3">
                           <Truck className="w-5 h-5 text-slate-600 dark:text-slate-400" />
                         </div>
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Unidad</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 dark:text-slate-400">Unidad</p>
                         <p className="text-sm font-bold text-slate-900 dark:text-white">{selectedServicio.unidad}</p>
                       </div>
                     </div>
@@ -613,7 +613,7 @@ export default function CrearServicio() {
                   <div>
                     <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Hoja de Ruta Digital</h2>
                     <div className="flex items-center gap-3 mt-1">
-                      <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">{selectedServicio.codigo}</span>
+                      <span className="text-sm font-bold text-slate-500 uppercase tracking-wider dark:text-slate-400">{selectedServicio.codigo}</span>
                       <div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700"></div>
                       <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">{selectedServicio.contrato}</span>
                     </div>
@@ -626,7 +626,7 @@ export default function CrearServicio() {
                   </button>
                   <button 
                     onClick={() => setShowHojaRuta(false)}
-                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition-colors bg-slate-100 dark:bg-slate-900"
+                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition-colors bg-slate-100 dark:bg-slate-900 dark:text-slate-400"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -659,7 +659,7 @@ export default function CrearServicio() {
                          <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 w-full ml-6">
                            <div className="flex justify-between items-start mb-2">
                              <h4 className="font-bold text-slate-900 dark:text-white text-base">Salida: {selectedServicio.origen}</h4>
-                             <span className="text-xs font-bold text-slate-500 bg-white dark:bg-slate-800 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 flex items-center gap-1">
+                             <span className="text-xs font-bold text-slate-500 bg-white dark:bg-slate-800 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 flex items-center gap-1 dark:text-slate-400">
                                <Clock className="w-3 h-3" />
                                {new Date(selectedServicio.fecha).toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'})}
                              </span>
@@ -693,7 +693,7 @@ export default function CrearServicio() {
                        {/* Destino */}
                        <div className="relative flex items-start group">
                          <div className="absolute left-[-32px] w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 border-4 border-white dark:border-slate-950 flex items-center justify-center shadow-sm z-10">
-                           <MapPin className="w-4 h-4 text-slate-500" />
+                           <MapPin className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                          </div>
                          <div className="bg-white dark:bg-slate-950 opacity-60 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 border-dashed w-full ml-6">
                            <div className="flex justify-between items-start mb-2">
@@ -719,7 +719,7 @@ export default function CrearServicio() {
                          {/* Placeholder para QR Real */}
                          <Activity className="w-10 h-10 text-slate-300 dark:text-slate-700" />
                        </div>
-                       <p className="text-xs text-slate-500 font-medium">Escanear para registrar llegada e iniciar protocolo de descarga.</p>
+                       <p className="text-xs text-slate-500 font-medium dark:text-slate-400">Escanear para registrar llegada e iniciar protocolo de descarga.</p>
                      </div>
 
                      {/* Datos Conductor / Vehículo */}
@@ -733,7 +733,7 @@ export default function CrearServicio() {
                           </div>
                           <div className="pl-11 space-y-1">
                             <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">{selectedServicio.conductor}</p>
-                            <p className="text-xs text-slate-500 font-medium">Licencia A-5, A-2 Vigente</p>
+                            <p className="text-xs text-slate-500 font-medium dark:text-slate-400">Licencia A-5, A-2 Vigente</p>
                           </div>
                         </div>
                         
@@ -748,7 +748,7 @@ export default function CrearServicio() {
                           </div>
                           <div className="pl-11 space-y-1">
                             <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">{selectedServicio.unidad}</p>
-                            <p className="text-xs text-slate-500 font-medium">Patente: AB-CD-12</p>
+                            <p className="text-xs text-slate-500 font-medium dark:text-slate-400">Patente: AB-CD-12</p>
                           </div>
                         </div>
                      </div>

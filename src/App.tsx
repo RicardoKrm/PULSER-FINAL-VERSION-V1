@@ -27,6 +27,7 @@ import GestionOrdenesTrabajo from './pages/flota/OrdenesTrabajo';
 import OrdenesTrabajoDetail from './pages/flota/OrdenesTrabajoDetail';
 import GestionPautas from './pages/flota/GestionPautas';
 import GestionTareas from './pages/flota/GestionTareas';
+import GestionKits from './pages/herramientas/GestionKits';
 import { ThemeProvider } from './components/ThemeProvider';
 import { CompanyProvider } from './contexts/CompanyContext';
 import { AppProvider } from './context/AppContext';
@@ -57,6 +58,7 @@ const router = createBrowserRouter([
       { path: "flota/ordenes-trabajo/:id", element: <OrdenesTrabajoDetail /> },
       { path: "configuracion/pautas", element: <GestionPautas /> },
       { path: "configuracion/tareas", element: <GestionTareas /> },
+      { path: "herramientas/kits", element: <GestionKits /> },
       { path: "*", element: <GenericPage /> },
     ]
   }

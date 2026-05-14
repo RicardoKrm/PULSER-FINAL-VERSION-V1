@@ -176,7 +176,7 @@ export default function ReporteMaestro() {
              </div>
              <div className="p-5 space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Rango de Fechas</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide dark:text-slate-400">Rango de Fechas</label>
                   <div className="grid grid-cols-2 gap-2">
                     <input type="date" className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-sm text-slate-700 dark:text-slate-300 font-medium outline-none focus:border-indigo-500 transition-colors" defaultValue="2026-05-01" />
                     <input type="date" className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-sm text-slate-700 dark:text-slate-300 font-medium outline-none focus:border-indigo-500 transition-colors" defaultValue="2026-05-31" />
@@ -184,7 +184,7 @@ export default function ReporteMaestro() {
                 </div>
 
                 <div>
-                   <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Pre-Filtros del Módulo</label>
+                   <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide dark:text-slate-400">Pre-Filtros del Módulo</label>
                    <select className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm text-slate-700 dark:text-slate-300 font-medium outline-none focus:border-indigo-500 transition-colors appearance-none cursor-pointer">
                       <option>Todos los registros</option>
                       {activeModule === 'mantenimiento' && <><option>Solo OTs Cerradas</option><option>Solo Mantenimiento Preventivo</option></>}
@@ -258,7 +258,7 @@ export default function ReporteMaestro() {
                   <Settings2 className="w-5 h-5 text-indigo-500" />
                   Estructura del Reporte
                 </h2>
-                <p className="text-sm text-slate-500 font-medium mt-1">Selecciona los campos que deseas incluir en la exportación.</p>
+                <p className="text-sm text-slate-500 font-medium mt-1 dark:text-slate-400">Selecciona los campos que deseas incluir en la exportación.</p>
               </div>
               <div className="bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-mono text-xs font-bold px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800">
                 {selectedColumns.length} de {currentColumns.length} Columnas
@@ -298,7 +298,7 @@ export default function ReporteMaestro() {
                    <Table2 className="w-5 h-5 text-emerald-500" />
                    Vista Previa de Datos Reales
                  </h2>
-                 <p className="text-xs font-bold text-slate-500 mt-1 tracking-wider uppercase">
+                 <p className="text-xs font-bold text-slate-500 mt-1 tracking-wider uppercase dark:text-slate-400">
                    Módulo: {reportModules.find(m => m.id === activeModule)?.name}
                  </p>
                </div>
@@ -350,14 +350,14 @@ export default function ReporteMaestro() {
                 </table>
                 
                 {/* Mobile placeholder */}
-                <div className="sm:hidden p-8 flex flex-col items-center justify-center text-center h-full text-slate-500">
+                <div className="sm:hidden p-8 flex flex-col items-center justify-center text-center h-full text-slate-500 dark:text-slate-400">
                    <Table2 className="w-12 h-12 mb-4 opacity-20" />
                    <p className="font-bold">Vista de tabla no disponible en móvil.</p>
                    <p className="text-sm mt-1">Gira tu dispositivo o expórtalo para verlo completo.</p>
                 </div>
              </div>
 
-             <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 flex justify-between items-center text-xs font-bold text-slate-500">
+             <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 flex justify-between items-center text-xs font-bold text-slate-500 dark:text-slate-400">
                <span className="flex items-center gap-1.5"><Info className="w-4 h-4" /> Mostrando muestra de 8 registros de la base de datos real.</span>
                <span className="px-2 py-1 bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800">12,450 filas aproximadas en total</span>
              </div>

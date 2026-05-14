@@ -274,13 +274,13 @@ export default function GPS() {
                 >
                   <Popup className="font-sans">
                     <div className="p-1 min-w-[200px]">
-                      <div className="font-black border-b border-slate-100 pb-2 mb-2 text-sm flex items-center justify-between text-slate-800">
+                      <div className="font-black border-b border-slate-100 pb-2 mb-2 text-sm flex items-center justify-between text-slate-800 dark:text-slate-200">
                         {v.patente}
                         <span className={`text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-wider ${v.condicion === 'detenido' || v.condicion === 'exceso_velocidad' ? 'bg-red-100 text-red-700' : v.condicion === 'ralenti' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-600'}`}>
                           {v.condicion === 'detenido' ? 'DETENIDO' : v.condicion === 'exceso_velocidad' ? 'SOBREVELOCIDAD' : v.condicion === 'ralenti' ? 'RALENTÍ' : 'EN RUTA'}
                         </span>
                       </div>
-                      <div className="text-xs space-y-1.5 text-slate-600">
+                      <div className="text-xs space-y-1.5 text-slate-600 dark:text-slate-400">
                         <p className="flex justify-between">
                           <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Conductor:</span> 
                           <span className="font-bold">{v.conductor}</span>
@@ -292,7 +292,7 @@ export default function GPS() {
                         <div className={`p-2 rounded-lg mt-2 border ${v.condicion === 'exceso_velocidad' ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-slate-100'}`}>
                           <p className="flex justify-between items-center pb-1 mb-1 border-b border-slate-200/50">
                             <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Límite Tramo:</span>
-                            <span className="font-bold text-slate-700">{v.limite} km/h</span>
+                            <span className="font-bold text-slate-700 dark:text-slate-300">{v.limite} km/h</span>
                           </p>
                           <p className="flex justify-between items-center">
                             <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Velocidad Actual:</span> 
@@ -404,7 +404,7 @@ export default function GPS() {
 
                   {v.historialInfracciones && v.historialInfracciones.length > 0 && (
                     <div className="mb-3 ml-2">
-                      <p className="text-[10px] font-black tracking-wider text-slate-500 mb-2 uppercase">Infracción Registrada (Ya Redujo):</p>
+                      <p className="text-[10px] font-black tracking-wider text-slate-500 mb-2 uppercase dark:text-slate-400">Infracción Registrada (Ya Redujo):</p>
                       <div className="space-y-1 mt-1 pl-2 border-l-2 border-slate-200 dark:border-slate-800">
                         {v.historialInfracciones.map((inf, i) => (
                            <div key={i} className="text-xs text-slate-600 dark:text-slate-400 font-medium">

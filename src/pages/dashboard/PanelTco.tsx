@@ -344,19 +344,19 @@ export default function PanelTco() {
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm ${
               showFilters 
-                ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20' 
-                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-b dark:border-slate-800lue-500/20' 
+                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:bg-slate-900/50 dark:hover:bg-slate-800'
             }`}
           >
             <Filter className={`w-4 h-4 ${showFilters ? 'text-blue-500' : 'text-slate-400'}`} />
             Filtros Avanzados
           </button>
           <div className="h-8 w-px bg-slate-200 dark:bg-slate-800 hidden md:block"></div>
-          <button className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold transition-all hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm">
+          <button className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold transition-all hover:bg-slate-50 dark:bg-slate-900/50 dark:hover:bg-slate-800 shadow-sm">
             <FileText className="w-4 h-4 text-red-500" />
             PDF
           </button>
-          <button className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold transition-all hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm">
+          <button className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold transition-all hover:bg-slate-50 dark:bg-slate-900/50 dark:hover:bg-slate-800 shadow-sm">
             <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
             Exportar
           </button>
@@ -374,61 +374,61 @@ export default function PanelTco() {
             <div className="bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm mb-6 mt-2">
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-5">
                 <div className="space-y-1.5 focus-within:text-blue-600 transition-colors">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Fecha de Inicio</label>
+                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Fecha de Inicio</label>
                   <div className="relative">
-                    <input type="date" defaultValue="2025-11-05" onChange={simulateFiltering} className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all" />
+                    <input type="date" defaultValue="2025-11-05" onChange={simulateFiltering} className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-b dark:border-slate-800lue-500 focus:ring-4 focus:ring-blue-500/10 transition-all" />
                   </div>
                 </div>
                 <div className="space-y-1.5 focus-within:text-blue-600 transition-colors">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Fecha de Fin</label>
+                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Fecha de Fin</label>
                   <div className="relative">
-                    <input type="date" defaultValue="2026-11-05" onChange={simulateFiltering} className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all" />
+                    <input type="date" defaultValue="2026-11-05" onChange={simulateFiltering} className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-b dark:border-slate-800lue-500 focus:ring-4 focus:ring-blue-500/10 transition-all" />
                   </div>
                 </div>
                 <div className="space-y-1.5 focus-within:text-blue-600 transition-colors">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Contrato</label>
-                  <select onChange={simulateFiltering} className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all cursor-pointer appearance-none">
+                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Contrato</label>
+                  <select onChange={simulateFiltering} className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-b dark:border-slate-800lue-500 focus:ring-4 focus:ring-blue-500/10 transition-all cursor-pointer appearance-none">
                     <option>Todos los Contratos</option>
                     <option>Contrato Norte</option>
                     <option>Contrato Sur</option>
                   </select>
                 </div>
                 <div className="space-y-1.5 focus-within:text-blue-600 transition-colors">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Marca</label>
-                  <select onChange={simulateFiltering} className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all cursor-pointer appearance-none">
+                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Marca</label>
+                  <select onChange={simulateFiltering} className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-b dark:border-slate-800lue-500 focus:ring-4 focus:ring-blue-500/10 transition-all cursor-pointer appearance-none">
                     <option>Todas</option>
                     <option>Volvo</option>
                     <option>Scania</option>
                   </select>
                 </div>
                 <div className="space-y-1.5 focus-within:text-blue-600 transition-colors">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Modelo</label>
-                  <select onChange={simulateFiltering} className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all cursor-pointer appearance-none">
+                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Modelo</label>
+                  <select onChange={simulateFiltering} className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-b dark:border-slate-800lue-500 focus:ring-4 focus:ring-blue-500/10 transition-all cursor-pointer appearance-none">
                     <option>Todos</option>
                   </select>
                 </div>
                 <div className="space-y-1.5 focus-within:text-blue-600 transition-colors">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Ruta</label>
-                  <select onChange={simulateFiltering} className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all cursor-pointer appearance-none">
+                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Ruta</label>
+                  <select onChange={simulateFiltering} className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-b dark:border-slate-800lue-500 focus:ring-4 focus:ring-blue-500/10 transition-all cursor-pointer appearance-none">
                     <option>Todas</option>
                     <option>Norte Grande</option>
                   </select>
                 </div>
                 <div className="space-y-1.5 focus-within:text-blue-600 transition-colors">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Tipo de Mantención</label>
-                  <select onChange={simulateFiltering} className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all cursor-pointer appearance-none">
+                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Tipo de Mantención</label>
+                  <select onChange={simulateFiltering} className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-b dark:border-slate-800lue-500 focus:ring-4 focus:ring-blue-500/10 transition-all cursor-pointer appearance-none">
                     <option>Todas</option>
                     <option>Preventiva</option>
                   </select>
                 </div>
                 <div className="space-y-1.5 focus-within:text-blue-600 transition-colors">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Razón Social</label>
-                  <select onChange={simulateFiltering} className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all cursor-pointer appearance-none">
+                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Razón Social</label>
+                  <select onChange={simulateFiltering} className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-b dark:border-slate-800lue-500 focus:ring-4 focus:ring-blue-500/10 transition-all cursor-pointer appearance-none">
                     <option>Todas</option>
                   </select>
                 </div>
                 <div className="space-y-1.5 focus-within:text-blue-600 transition-colors lg:col-span-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">Vehículos (opcional)</label>
+                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Vehículos (opcional)</label>
                   <div className="relative">
                     <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input 
@@ -437,7 +437,7 @@ export default function PanelTco() {
                       onChange={(e) => {
                         if (e.target.value.length > 2 || e.target.value.length === 0) simulateFiltering();
                       }}
-                      className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all placeholder:font-medium placeholder:text-slate-400" 
+                      className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-b dark:border-slate-800lue-500 focus:ring-4 focus:ring-blue-500/10 transition-all placeholder:font-medium placeholder:text-slate-400" 
                     />
                   </div>
                 </div>
@@ -497,7 +497,7 @@ export default function PanelTco() {
           <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-8 gap-4">
             <div>
               <h3 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-tight">Proyección vs Presupuesto</h3>
-              <p className="text-xs font-medium text-slate-500 mt-1">Comparativa de ejecución real versus presupuesto asignado (12 meses)</p>
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">Comparativa de ejecución real versus presupuesto asignado (12 meses)</p>
             </div>
             <span className="text-[10px] font-bold bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 px-4 py-1.5 rounded-full self-start md:self-auto">Gasto Operativo</span>
           </div>

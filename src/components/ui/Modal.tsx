@@ -13,7 +13,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm">
-      <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-white shadow-xl rounded-xl m-4">
+      <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-white shadow-xl rounded-xl m-4 dark:bg-slate-900">
         <CardHeader className="flex justify-between items-center">
             <CardTitle>{title}</CardTitle>
             <Button variant="ghost" onClick={onClose}>X</Button>

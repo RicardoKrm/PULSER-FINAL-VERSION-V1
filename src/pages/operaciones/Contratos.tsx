@@ -156,7 +156,7 @@ export default function Contratos() {
         <div className="text-center py-20 bg-slate-50 dark:bg-slate-900/50 rounded-3xl border border-slate-200 dark:border-slate-800 border-dashed">
           <Briefcase className="w-12 h-12 text-slate-300 mx-auto mb-3" />
           <h3 className="text-lg font-bold text-slate-900 dark:text-white">No hay resultados</h3>
-          <p className="text-slate-500 mt-1">Prueba ajustando los filtros de búsqueda.</p>
+          <p className="text-slate-500 mt-1 dark:text-slate-400">Prueba ajustando los filtros de búsqueda.</p>
         </div>
       )}
 
@@ -184,12 +184,12 @@ export default function Contratos() {
                   </div>
                   <div>
                     <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Nuevo Contrato Comercial</h2>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-0.5">Ingreso de datos del acuerdo</p>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-0.5 dark:text-slate-400">Ingreso de datos del acuerdo</p>
                   </div>
                 </div>
                 <button 
                   onClick={() => setIsModalOpen(false)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition-colors"
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition-colors dark:text-slate-400"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -281,7 +281,7 @@ export default function Contratos() {
                       </div>
 
                       <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
-                         <input type="checkbox" id="renovacion_auto" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600" />
+                         <input type="checkbox" id="renovacion_auto" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 dark:border-slate-700 dark:text-slate-100" />
                          <label htmlFor="renovacion_auto" className="text-sm font-bold text-slate-700 dark:text-slate-300 cursor-pointer">Renovación Automática</label>
                       </div>
                     </div>
@@ -307,7 +307,7 @@ export default function Contratos() {
                       <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 h-48 overflow-y-auto space-y-2">
                         {mockVehiculos.map(v => (
                           <label key={v} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors shadow-sm">
-                            <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 dark:bg-slate-800 dark:border-slate-700" />
+                            <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" />
                             <div className="flex items-center gap-2">
                                <Truck className="w-4 h-4 text-slate-400" />
                                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{v}</span>
@@ -321,7 +321,7 @@ export default function Contratos() {
                       <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 h-48 overflow-y-auto space-y-2">
                         {mockMaquinas.map(m => (
                           <label key={m} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors shadow-sm">
-                            <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 dark:bg-slate-800 dark:border-slate-700" />
+                            <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" />
                             <div className="flex items-center gap-2">
                                <Wrench className="w-4 h-4 text-slate-400" />
                                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{m}</span>
@@ -382,7 +382,7 @@ export default function Contratos() {
                   <div>
                     <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">{selectedContrato.cliente}</h2>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Detalle Contrato</span>
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider dark:text-slate-400">Detalle Contrato</span>
                       {selectedContrato.activo ? (
                         <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
                       ) : (
@@ -393,7 +393,7 @@ export default function Contratos() {
                 </div>
                 <button 
                   onClick={() => setSelectedContrato(null)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition-colors"
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition-colors dark:text-slate-400"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -408,12 +408,12 @@ export default function Contratos() {
                     <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4">
                       
                       <div>
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Descripción</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 dark:text-slate-400">Descripción</p>
                         <p className="text-sm font-semibold text-slate-900 dark:text-white">{selectedContrato.descripcion}</p>
                       </div>
 
                       <div className="flex flex-col gap-1">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tipo de Servicio</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider dark:text-slate-400">Tipo de Servicio</p>
                         <div className="flex">
                           <span className="inline-block px-2.5 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-bold text-xs rounded-md">
                             {selectedContrato.tipo}
@@ -422,7 +422,7 @@ export default function Contratos() {
                       </div>
 
                       <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Valor Total Proyectado</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 dark:text-slate-400">Valor Total Proyectado</p>
                         <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{formatCurrency(selectedContrato.valor)}</p>
                       </div>
                     </div>
@@ -433,11 +433,11 @@ export default function Contratos() {
                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Vigencia</h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col justify-center items-center text-center">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Fecha de Inicio</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 dark:text-slate-400">Fecha de Inicio</p>
                         <p className="text-lg font-bold text-slate-900 dark:text-white">{selectedContrato.inicio}</p>
                       </div>
                       <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col justify-center items-center text-center">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Fecha de Término</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 dark:text-slate-400">Fecha de Término</p>
                         <p className="text-lg font-bold text-slate-900 dark:text-white">{selectedContrato.termino}</p>
                       </div>
                     </div>
@@ -454,17 +454,17 @@ export default function Contratos() {
                       <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2">
                         <div className="bg-indigo-600 h-2 rounded-full" style={{ width: '45%' }}></div>
                       </div>
-                      <p className="text-xs font-medium text-slate-500 mt-3 leading-relaxed">
+                      <p className="text-xs font-medium text-slate-500 mt-3 leading-relaxed dark:text-slate-400">
                         Se han completado 45 de los 100 servicios pactados estimados en este periodo. Rentabilidad actual del acuerdo: <strong>14.2%</strong>
                       </p>
                     </div>
 
                     {/* Flota Asignada */}
                     <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
-                      <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">Flota y Maquinaria Asignada</h4>
+                      <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 dark:text-slate-400">Flota y Maquinaria Asignada</h4>
                       
                       {selectedContrato.vehiculosAsignados.length === 0 && selectedContrato.maquinasAsignadas.length === 0 ? (
-                        <div className="flex items-center gap-2 text-slate-500 text-sm">
+                        <div className="flex items-center gap-2 text-slate-500 text-sm dark:text-slate-400">
                           <AlertCircle className="w-4 h-4" />
                           <span>No hay flota asignada a este contrato.</span>
                         </div>

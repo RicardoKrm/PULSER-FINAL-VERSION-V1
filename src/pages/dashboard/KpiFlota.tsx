@@ -360,7 +360,7 @@ export default function KpiFlota() {
               </div>
               <button 
                 onClick={() => setActiveDetail(null)}
-                className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 transition-colors"
+                className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 transition-colors dark:hover:bg-slate-800"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -370,7 +370,7 @@ export default function KpiFlota() {
                 <BarChart3 className="w-8 h-8 text-blue-500 mb-4" />
                 <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-2">{ctx.desc}</h3>
                 <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Cómputo / Origen</h4>
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 dark:text-slate-400">Cómputo / Origen</h4>
                   <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{ctx.formula}</p>
                 </div>
               </div>

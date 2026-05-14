@@ -198,7 +198,7 @@ export default function Layout() {
               <UserCircle className="h-8 w-8 text-slate-400" />
               <div className="flex flex-col">
                 <span className="text-sm font-medium text-white">Admin Usuario</span>
-                <span className="text-xs text-slate-500 text-blue-400">Súper Administrador</span>
+                <span className="text-xs text-slate-500 text-blue-400 dark:text-slate-400">Súper Administrador</span>
               </div>
             </div>
           </div>

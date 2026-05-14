@@ -65,7 +65,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose }) =
 
   const renderSection = (title: string, children: React.ReactNode) => (
     <div className="space-y-3 pt-4 border-t">
-      <h3 className="text-sm font-bold text-gray-400 uppercase">{title}</h3>
+      <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase">{title}</h3>
       {children}
     </div>
   );
@@ -77,14 +77,14 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose }) =
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium">Vehículo</label>
-              <select name="vehiculoId" className="w-full p-2 border rounded-md" onChange={handleChange} required>
+              <select name="vehiculoId" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} required>
                 <option value="">---------</option>
                 {vehiculos.map(v => <option key={v.id} value={v.id}>{v.patente}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium">Tipo OT</label>
-              <select name="tipo" className="w-full p-2 border rounded-md" value={formData.tipo} onChange={handleChange}>
+              <select name="tipo" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={formData.tipo} onChange={handleChange}>
                 <option value="PREVENTIVA">PREVENTIVA</option>
                 <option value="CORRECTIVA">CORRECTIVA</option>
                 <option value="EVALUATIVA">EVALUATIVA</option>
@@ -95,11 +95,11 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose }) =
             </div>
             <div>
               <label className="block text-sm font-medium">Kilometraje Apertura</label>
-              <input type="number" name="kilometrajeApertura" className="w-full p-2 border rounded-md" onChange={handleChange} />
+              <input type="number" name="kilometrajeApertura" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
             </div>
             <div>
               <label className="block text-sm font-medium">Prioridad</label>
-              <select name="prioridad" className="w-full p-2 border rounded-md" onChange={handleChange}>
+              <select name="prioridad" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange}>
                 <option value="BAJA">Baja</option>
                 <option value="MEDIA">Media</option>
                 <option value="ALTA">Alta</option>
@@ -114,14 +114,14 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose }) =
               <>
                   <div>
                     <label className="block text-sm font-medium">Pauta Mantenimiento</label>
-                    <select name="pauta" className="w-full p-2 border rounded-md" onChange={handleChange}>
+                    <select name="pauta" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange}>
                         <option value="">---------</option>
                         {pautas.map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium">Kit Repuestos</label>
-                    <select name="kitRepuestos" className="w-full p-2 border rounded-md" onChange={handleChange}>
+                    <select name="kitRepuestos" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange}>
                         <option value="">---------</option>
                         {kitsRepuesto.map(k => <option key={k.id} value={k.nombre}>{k.nombre}</option>)}
                     </select>
@@ -132,21 +132,21 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose }) =
                <>
                 <div>
                   <label className="block text-sm font-medium">Tipo de Falla</label>
-                  <select name="tipoFalla" className="w-full p-2 border rounded-md" onChange={handleChange}>
+                  <select name="tipoFalla" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange}>
                       <option value="">---------</option>
                       {tiposFalla.map(tf => <option key={tf.id} value={tf.nombre}>{tf.nombre}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium">Síntomas</label>
-                  <input type="text" name="sintomas" className="w-full p-2 border rounded-md" onChange={handleChange} />
+                  <input type="text" name="sintomas" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
                 </div>
                </>
             )}
             {formData.tipo === 'EVALUATIVA_NEUMATICOS' && (
               <div>
                 <label className="block text-sm font-medium">Inspección Tren Motriz</label>
-                <select name="inspeccionTrenMotriz" className="w-full p-2 border rounded-md" onChange={handleChange}>
+                <select name="inspeccionTrenMotriz" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange}>
                    <option value="">Configuración Ejes...</option>
                    <option value="4x2">4x2 (6 Ruedas)</option>
                    <option value="6x2">6x2 (8 Ruedas)</option>
@@ -158,7 +158,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose }) =
             {(formData.tipo.includes('NEUMATICOS')) && (
                 <div>
                     <label className="block text-sm font-medium">Presión Neumático (PSI)</label>
-                    <input type="number" name="presionNeumatico" className="w-full p-2 border rounded-md" onChange={handleChange} />
+                    <input type="number" name="presionNeumatico" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
                 </div>
             )}
           </div>
@@ -168,14 +168,14 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose }) =
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium">Personal Operativo</label>
-              <select name="personalOperativo" className="w-full p-2 border rounded-md" onChange={handleChange} required>
+              <select name="personalOperativo" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} required>
                   <option value="">---------</option>
                   {mecanicos.map(m => <option key={m.id} value={m.nombre}>{m.nombre}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium">Fecha Programada</label>
-              <input type="date" name="fechaProgramada" className="w-full p-2 border rounded-md" onChange={handleChange} />
+              <input type="date" name="fechaProgramada" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
             </div>
           </div>
         ))}
@@ -184,27 +184,27 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose }) =
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
              <div>
                <label className="block text-sm font-medium">Proveedor</label>
-               <input type="text" name="proveedor" className="w-full p-2 border rounded-md" onChange={handleChange} />
+               <input type="text" name="proveedor" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
              </div>
              <div>
                <label className="block text-sm font-medium">Empresa Externa</label>
-               <input type="text" name="empresaExterna" className="w-full p-2 border rounded-md" onChange={handleChange} />
+               <input type="text" name="empresaExterna" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
              </div>
              <div>
                <label className="block text-sm font-medium">RUT Empresa</label>
-               <input type="text" name="rutEmpresa" className="w-full p-2 border rounded-md" onChange={handleChange} />
+               <input type="text" name="rutEmpresa" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
              </div>
              <div>
                <label className="block text-sm font-medium">Valor HH</label>
-               <input type="number" name="valorHH" className="w-full p-2 border rounded-md" onChange={handleChange} />
+               <input type="number" name="valorHH" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
              </div>
              <div>
                 <label className="block text-sm font-medium">Presupuesto Aprobado</label>
-                <input type="number" name="presupuestoAprobado" className="w-full p-2 border rounded-md" onChange={handleChange} />
+                <input type="number" name="presupuestoAprobado" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
              </div>
              <div>
                 <label className="block text-sm font-medium">Observaciones</label>
-                <input type="text" name="observaciones" className="w-full p-2 border rounded-md" onChange={handleChange} />
+                <input type="text" name="observaciones" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
              </div>
           </div>
         ))}

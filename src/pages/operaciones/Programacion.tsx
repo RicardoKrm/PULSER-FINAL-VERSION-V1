@@ -200,7 +200,7 @@ export default function Programacion() {
       <div className="bg-white dark:bg-slate-900 p-4 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm mb-6 flex flex-wrap gap-4 shrink-0 justify-between items-end">
         <div className="flex flex-wrap gap-4 items-end">
           <div className="w-full sm:w-48 relative">
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Contrato</label>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1 dark:text-slate-400">Contrato</label>
             <select className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
               <option>Todos</option>
               <option>Minera Escondida</option>
@@ -208,7 +208,7 @@ export default function Programacion() {
             </select>
           </div>
           <div className="flex-1 min-w-[200px] relative">
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Ruta (Origen/Destino)</label>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1 dark:text-slate-400">Ruta (Origen/Destino)</label>
             <input 
               type="text" 
               placeholder="Ej: Santiago"
@@ -219,13 +219,13 @@ export default function Programacion() {
         
         {/* Date Navigation */}
         <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950 p-1.5 rounded-xl border border-slate-200 dark:border-slate-800 h-[42px]">
-           <button onClick={() => navigateDate(-1)} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-500">
+           <button onClick={() => navigateDate(-1)} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-500 dark:text-slate-400">
              <ChevronLeft className="w-4 h-4" />
            </button>
            <button onClick={goToToday} className="px-3 py-1 font-bold text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors">
              Hoy
            </button>
-           <button onClick={() => navigateDate(1)} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-500">
+           <button onClick={() => navigateDate(1)} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-500 dark:text-slate-400">
              <ChevronRight className="w-4 h-4" />
            </button>
            <div className="px-3 border-l border-slate-200 dark:border-slate-700 flex items-center min-w-[140px] justify-center">
@@ -283,7 +283,7 @@ export default function Programacion() {
                      const isToday = formatDateString(day) === formatDateString(new Date());
                      return (
                       <div key={idx} className="flex-1 text-center py-3 border-r border-slate-200 dark:border-slate-800 last:border-r-0 flex flex-col items-center justify-center gap-1">
-                        <span className="text-xs font-bold text-slate-500 uppercase">{DAYS_ES[day.getDay() === 0 ? 6 : day.getDay() - 1]}</span>
+                        <span className="text-xs font-bold text-slate-500 uppercase dark:text-slate-400">{DAYS_ES[day.getDay() === 0 ? 6 : day.getDay() - 1]}</span>
                         <span className={cn(
                           "bg-transparent w-8 h-8 flex items-center justify-center rounded-full text-lg font-black text-slate-900 dark:text-white",
                           isToday && "bg-indigo-600 text-white dark:text-white shadow-md shadow-indigo-600/20"
@@ -374,7 +374,7 @@ export default function Programacion() {
                 <div className="flex border-b border-slate-200 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900 sticky top-0 z-20">
                   {DAYS_ES.map((dayName, idx) => (
                     <div key={idx} className="flex-1 text-center py-3 border-r border-slate-200 dark:border-slate-800 last:border-r-0">
-                      <span className="text-xs font-bold text-slate-500 uppercase">{dayName}</span>
+                      <span className="text-xs font-bold text-slate-500 uppercase dark:text-slate-400">{dayName}</span>
                     </div>
                   ))}
                 </div>
