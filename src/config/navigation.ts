@@ -77,10 +77,10 @@ export const navigation = [
     href: '/flota',
     submodules: [
       { title: 'Pizarra de Mantenimiento', icon: Wrench, href: '/flota/mantenimiento' },
+      { title: 'Pizarra de Programación', icon: Calendar, href: '/flota/programacion' },
       { title: 'Órdenes de Trabajo (OT)', icon: FileText, href: '/flota/ordenes-trabajo' },
       { title: 'Gestión de Neumáticos', icon: CircleDashed, href: '/flota/neumaticos' },
       { title: 'Control de Combustible', icon: Droplet, href: '/flota/combustible' },
-      { title: 'Vehículos Archivados', icon: Archive, href: '/flota/archivo' },
     ],
   },
   {
@@ -117,6 +117,7 @@ export const navigation = [
       { title: 'Gestión de Pautas', icon: FileText, href: '/configuracion/pautas' },
       { title: 'Gestión de Tareas', icon: ClipboardList, href: '/configuracion/tareas' },
       { title: 'Tipos de Falla', icon: AlertCircle, href: '/configuracion/fallas' },
+      { title: 'Vehículos Archivados', icon: Archive, href: '/configuracion/vehiculos-archivados' },
       { title: 'Kit de Repuestos', icon: Package, href: '/herramientas/kits' },
       { title: 'Tipos de Pausa', icon: Clock, href: '/configuracion/pausas' },
       { title: 'Pulser AI', icon: Cpu, href: '/configuracion/ai' },

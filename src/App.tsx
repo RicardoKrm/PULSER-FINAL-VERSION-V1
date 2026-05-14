@@ -23,10 +23,13 @@ import AnalisisFallas from './pages/dashboard/AnalisisFallas';
 import PanelTco from './pages/dashboard/PanelTco';
 import ReporteMaestro from './pages/dashboard/ReporteMaestro';
 import PizarraMantenimiento from './pages/flota/Mantenimiento';
+import PizarraProgramacion from './pages/flota/PizarraProgramacion';
 import GestionOrdenesTrabajo from './pages/flota/OrdenesTrabajo';
 import OrdenesTrabajoDetail from './pages/flota/OrdenesTrabajoDetail';
+import ConfiguracionEmpresa from './pages/configuracion/Empresa';
 import GestionPautas from './pages/flota/GestionPautas';
 import GestionTareas from './pages/flota/GestionTareas';
+import VehiculosArchivados from './pages/configuracion/VehiculosArchivados';
 import GestionKits from './pages/herramientas/GestionKits';
 import GestionNeumaticos from './pages/flota/GestionNeumaticos';
 import GestionCombustible from './pages/flota/GestionCombustible';
@@ -56,12 +59,14 @@ const router = createBrowserRouter([
       { path: "dashboard/tco", element: <PanelTco /> },
       { path: "dashboard/reporte-maestro", element: <ReporteMaestro /> },
       { path: "flota/mantenimiento", element: <PizarraMantenimiento /> },
+      { path: "flota/programacion", element: <PizarraProgramacion /> },
       { path: "flota/ordenes-trabajo", element: <GestionOrdenesTrabajo /> },
       { path: "flota/ordenes-trabajo/:id", element: <OrdenesTrabajoDetail /> },
       { path: "flota/neumaticos", element: <GestionNeumaticos /> },
       { path: "flota/combustible", element: <GestionCombustible /> },
       { path: "configuracion/pautas", element: <GestionPautas /> },
       { path: "configuracion/tareas", element: <GestionTareas /> },
+      { path: "configuracion/vehiculos-archivados", element: <VehiculosArchivados /> },
       { path: "herramientas/kits", element: <GestionKits /> },
       { path: "*", element: <GenericPage /> },
     ]
