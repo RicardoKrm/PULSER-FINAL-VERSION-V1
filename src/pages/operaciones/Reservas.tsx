@@ -163,11 +163,11 @@ export default function ReservasTurismo() {
 
   const getCategoryTheme = (cat: ReservaTurismo['categoria']) => {
     switch (cat) {
-      case 'Web': return { card: 'bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800', textBase: 'text-blue-700 dark:text-blue-400', innerBox: 'border-blue-400 dark:border-blue-700 bg-white dark:bg-slate-900', innerText: 'text-blue-700 dark:text-blue-300', button: 'border-blue-500 text-blue-600 dark:text-blue-400', iconBox: 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400' };
-      case 'Minera': return { card: 'bg-emerald-50/50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800', textBase: 'text-emerald-700 dark:text-emerald-400', innerBox: 'border-emerald-600 dark:border-emerald-700 bg-white dark:bg-slate-900', innerText: 'text-emerald-700 dark:text-emerald-300', button: 'border-emerald-600 text-emerald-700 dark:text-emerald-400', iconBox: 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400' };
-      case 'Extranjero': return { card: 'bg-fuchsia-50/40 dark:bg-fuchsia-900/20 border-fuchsia-200 dark:border-fuchsia-800', textBase: 'text-fuchsia-700 dark:text-fuchsia-400', innerBox: 'border-fuchsia-500 dark:border-fuchsia-700 bg-white dark:bg-slate-900', innerText: 'text-fuchsia-700 dark:text-fuchsia-300', button: 'border-fuchsia-500 text-fuchsia-600 dark:text-fuchsia-400', iconBox: 'bg-fuchsia-100 dark:bg-fuchsia-900/50 text-fuchsia-700 dark:text-fuchsia-400' };
-      case 'Operador': return { card: 'bg-orange-50/50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800', textBase: 'text-orange-700 dark:text-orange-400', innerBox: 'border-orange-500 dark:border-orange-700 bg-white dark:bg-slate-900', innerText: 'text-orange-700 dark:text-orange-300', button: 'border-orange-500 text-orange-600 dark:text-orange-400', iconBox: 'bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-400' };
-      default: return { card: 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800', textBase: 'text-slate-700 dark:text-slate-300', innerBox: 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900', innerText: 'text-slate-700 dark:text-slate-300', button: 'border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300', iconBox: 'bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300' };
+      case 'Web': return { card: 'bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800', textBase: 'text-blue-700 dark:text-blue-400', innerBox: 'border-blue-400 dark:border-blue-700 bg-white dark:bg-slate-800/50', innerText: 'text-blue-700 dark:text-blue-300', button: 'border-blue-500 text-blue-600 dark:text-blue-400', iconBox: 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400' };
+      case 'Minera': return { card: 'bg-emerald-50/50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800', textBase: 'text-emerald-700 dark:text-emerald-400', innerBox: 'border-emerald-600 dark:border-emerald-700 bg-white dark:bg-slate-800/50', innerText: 'text-emerald-700 dark:text-emerald-300', button: 'border-emerald-600 text-emerald-700 dark:text-emerald-400', iconBox: 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400' };
+      case 'Extranjero': return { card: 'bg-fuchsia-50/40 dark:bg-fuchsia-900/20 border-fuchsia-200 dark:border-fuchsia-800', textBase: 'text-fuchsia-700 dark:text-fuchsia-400', innerBox: 'border-fuchsia-500 dark:border-fuchsia-700 bg-white dark:bg-slate-800/50', innerText: 'text-fuchsia-700 dark:text-fuchsia-300', button: 'border-fuchsia-500 text-fuchsia-600 dark:text-fuchsia-400', iconBox: 'bg-fuchsia-100 dark:bg-fuchsia-900/50 text-fuchsia-700 dark:text-fuchsia-400' };
+      case 'Operador': return { card: 'bg-orange-50/50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800', textBase: 'text-orange-700 dark:text-orange-400', innerBox: 'border-orange-500 dark:border-orange-700 bg-white dark:bg-slate-800/50', innerText: 'text-orange-700 dark:text-orange-300', button: 'border-orange-500 text-orange-600 dark:text-orange-400', iconBox: 'bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-400' };
+      default: return { card: 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-800', textBase: 'text-slate-700 dark:text-slate-300', innerBox: 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/50', innerText: 'text-slate-700 dark:text-slate-300', button: 'border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300', iconBox: 'bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300' };
     }
   };
 
@@ -202,7 +202,7 @@ export default function ReservasTurismo() {
       </div>
 
       {/* Filters */}
-      <Card className="border-none shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
+      <Card className="border-none shadow-sm bg-white dark:bg-slate-800/50 overflow-hidden">
         <div className="h-1 bg-gradient-to-r from-blue-500 via-fuchsia-500 to-emerald-500"></div>
         <CardContent className="p-4">
           <div className="grid gap-4 md:grid-cols-5">
@@ -355,9 +355,9 @@ export default function ReservasTurismo() {
 
       {/* Modal Detalle / Finanzas / Auditoría */}
       {mostrarDetalle && reservaSeleccionada && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-4xl bg-white dark:bg-slate-900 shadow-2xl rounded-xl overflow-hidden animate-in fade-in zoom-in duration-200">
-            <CardHeader className="flex flex-row items-center justify-between border-b bg-white dark:bg-slate-900 px-6 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 dark:bg-slate-800/50/80 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-4xl bg-white dark:bg-slate-800/50 shadow-2xl rounded-xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <CardHeader className="flex flex-row items-center justify-between border-b bg-white dark:bg-slate-800/50 px-6 py-4">
               <div className="flex items-center gap-3">
                  <div className={`p-2 rounded-lg ${getCategoryTheme(reservaSeleccionada.categoria).iconBox}`}>
                     <Briefcase className="h-5 w-5" />
@@ -408,7 +408,7 @@ export default function ReservasTurismo() {
 
                     <section className="space-y-4">
                        <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest border-b pb-1">Hoja de Ruta (Tracking)</h4>
-                       <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg space-y-3">
+                       <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg space-y-3">
                           <div>
                              <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase">Origen Detallado</p>
                              <p className="text-sm font-medium">{reservaSeleccionada.lugares.origen}</p>
@@ -427,11 +427,11 @@ export default function ReservasTurismo() {
                   <section className="space-y-4">
                     <h4 className="text-[10px] font-black text-purple-600 uppercase tracking-widest border-b pb-1">Instrucciones & Comentarios</h4>
                     <div className="grid grid-cols-2 gap-4">
-                       <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg border dark:border-slate-800 border-blue-100">
+                       <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg border dark:border-slate-800 border-blue-100 dark:text-slate-100">
                           <p className="text-[10px] text-blue-600 font-black uppercase mb-1">C1: Para el Conductor</p>
                           <p className="text-xs text-slate-700 dark:text-slate-300 italic">"{reservaSeleccionada.comentarios.conductor}"</p>
                        </div>
-                       <div className="bg-red-50 dark:bg-red-900/30 p-3 rounded-lg border dark:border-slate-800 border-red-100">
+                       <div className="bg-red-50 dark:bg-red-900/30 p-3 rounded-lg border dark:border-slate-800 border-red-100 dark:border-red-900/30 dark:text-slate-100">
                           <p className="text-[10px] text-red-600 font-black uppercase mb-1">C2: Interno Administrativo</p>
                           <p className="text-xs text-slate-700 dark:text-slate-300 italic">"{reservaSeleccionada.comentarios.interno}"</p>
                        </div>
@@ -443,7 +443,7 @@ export default function ReservasTurismo() {
                        <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Historial de Auditoría</h4>
                        <Info className="h-3 w-3 text-slate-400 dark:text-slate-500" />
                     </div>
-                    <div className="bg-slate-50 dark:bg-slate-900/50 p-2 rounded divide-y divide-slate-200 dark:divide-slate-800">
+                    <div className="bg-slate-50 dark:bg-slate-800/50 p-2 rounded divide-y divide-slate-200 dark:divide-slate-800">
                        {reservaSeleccionada.auditLogs.map((log, i) => (
                          <div key={i} className="py-2 flex justify-between text-[10px]">
                             <span className="font-bold text-slate-600 dark:text-slate-400">{log.quien} (Admin)</span>
@@ -455,7 +455,7 @@ export default function ReservasTurismo() {
                 </div>
 
                 {/* Finanzas Panel */}
-                <div className="bg-slate-50 dark:bg-slate-900/50 p-6 space-y-6">
+                <div className="bg-slate-50 dark:bg-slate-800/50 p-6 space-y-6">
                    <section className="space-y-4">
                       <h4 className="text-[10px] font-black text-green-700 uppercase tracking-widest border-b pb-1">Cálculo Financiero Pulse</h4>
                       <div className="space-y-3">
@@ -485,7 +485,7 @@ export default function ReservasTurismo() {
                    <section className="space-y-4 pt-4">
                       <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b pb-1">Estado Tributario</h4>
                       <div className="space-y-2">
-                         <div className="p-3 border rounded-lg dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2">
+                         <div className="p-3 border rounded-lg dark:border-slate-800 bg-white dark:bg-slate-800/50 space-y-2 dark:text-slate-100">
                             <div className="flex justify-between items-center text-xs">
                                <span className="text-slate-500 dark:text-slate-400">Doc: {reservaSeleccionada.finanzas.tipoDocumento}</span>
                                <span className="font-bold">{reservaSeleccionada.finanzas.folioFactura || 'Sin Folio'}</span>
@@ -512,10 +512,10 @@ export default function ReservasTurismo() {
                 </div>
               </div>
             </CardContent>
-            <div className="p-4 border-t bg-white dark:bg-slate-900 flex justify-between items-center">
+            <div className="p-4 border-t bg-white dark:bg-slate-800/50 flex justify-between items-center">
                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="bg-white dark:bg-slate-900">Editar</Button>
-                  <Button variant="outline" size="sm" className="bg-white dark:bg-slate-900 border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30">Anular OP</Button>
+                  <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800/50">Editar</Button>
+                  <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800/50 border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30">Anular OP</Button>
                </div>
                <Button onClick={() => setMostrarDetalle(false)} className="bg-slate-900 text-white hover:bg-black">Finalizar Revisión</Button>
             </div>
@@ -525,8 +525,8 @@ export default function ReservasTurismo() {
 
       {/* Formulario Nueva Reserva / Clonación */}
       {mostrarFormulario && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md p-4">
-          <Card className="w-full max-w-4xl bg-white dark:bg-slate-900 shadow-2xl rounded-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 dark:bg-slate-800/50/80 backdrop-blur-md p-4">
+          <Card className="w-full max-w-4xl bg-white dark:bg-slate-800/50 shadow-2xl rounded-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
             <CardHeader className="flex flex-row items-center justify-between border-b bg-blue-600 text-white px-6 py-4">
               <div className="flex items-center gap-3">
                  <MapPin className="h-6 w-6" />
@@ -551,7 +551,7 @@ export default function ReservasTurismo() {
                           className={`px-3 py-2 text-xs font-bold border rounded-lg dark:border-slate-800 transition-all ${
                             formReserva.categoria === cat 
                               ? 'bg-blue-600 border-blue-600 text-white shadow-md transform scale-105' 
-                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-blue-400'
+                              : 'bg-white dark:bg-slate-800/50 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-blue-400'
                           }`}
                         >
                           {cat}
@@ -566,14 +566,14 @@ export default function ReservasTurismo() {
                         <Users className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500 group-focus-within:text-blue-500" />
                         <input 
                           type="text" required placeholder="Nombre / Empresa Principal"
-                          className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-900"
+                          className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                           value={formReserva.cliente.nombre}
                           onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, nombre: e.target.value}})}
                         />
                       </div>
                       <input 
                         type="text" placeholder="RUT Empresa (Opcional)"
-                        className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-900"
+                        className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                         value={formReserva.cliente.rut_empresa}
                         onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, rut_empresa: e.target.value}})}
                       />
@@ -581,7 +581,7 @@ export default function ReservasTurismo() {
                          <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500 focus-within:text-blue-500" />
                          <input 
                           type="email" required placeholder="Email de Facturación"
-                          className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-900"
+                          className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                           value={formReserva.cliente.email}
                           onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, email: e.target.value}})}
                         />
@@ -590,7 +590,7 @@ export default function ReservasTurismo() {
                          <Hash className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500 focus-within:text-blue-500" />
                          <input 
                           type="text" required placeholder="DNI / Pasaporte"
-                          className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-900"
+                          className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                           value={formReserva.cliente.dni_pasaporte}
                           onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, dni_pasaporte: e.target.value}})}
                         />
@@ -608,7 +608,7 @@ export default function ReservasTurismo() {
                       <div className="space-y-3">
                          <input 
                             type="text" required placeholder="Nombre de quien viaja"
-                            className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-slate-50 dark:bg-slate-900/50"
+                            className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-slate-50 dark:bg-slate-800/50 dark:text-slate-100"
                             value={formReserva.pasajeros.nombre}
                             onChange={(e) => setFormReserva({...formReserva, pasajeros: {...formReserva.pasajeros, nombre: e.target.value}})}
                          />
@@ -617,14 +617,14 @@ export default function ReservasTurismo() {
                                <Phone className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500" />
                                <input 
                                   type="text" required placeholder="Teléfono Pax"
-                                  className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-slate-50 dark:bg-slate-900/50"
+                                  className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-slate-50 dark:bg-slate-800/50 dark:text-slate-100"
                                   value={formReserva.pasajeros.telefono}
                                   onChange={(e) => setFormReserva({...formReserva, pasajeros: {...formReserva.pasajeros, telefono: e.target.value}})}
                                />
                             </div>
                             <input 
                                type="number" required placeholder="Total PAX" min="1"
-                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-slate-50 dark:bg-slate-900/50 text-center"
+                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-slate-50 dark:bg-slate-800/50 text-center dark:text-slate-100"
                                value={formReserva.pasajeros.cantidad}
                                onChange={(e) => setFormReserva({...formReserva, pasajeros: {...formReserva.pasajeros, cantidad: parseInt(e.target.value)}})}
                             />
@@ -641,7 +641,7 @@ export default function ReservasTurismo() {
                             <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase text-center">Maletas G (23K)</span>
                             <input 
                                type="number" required min="0"
-                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm text-center bg-slate-50 dark:bg-slate-900/50"
+                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm text-center bg-slate-50 dark:bg-slate-800/50 dark:text-slate-100"
                                value={formReserva.logistica.maletasGrandes}
                                onChange={(e) => setFormReserva({...formReserva, logistica: {...formReserva.logistica, maletasGrandes: parseInt(e.target.value)}})}
                             />
@@ -650,7 +650,7 @@ export default function ReservasTurismo() {
                             <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase text-center">Maletas Cabina</span>
                             <input 
                                type="number" required min="0"
-                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm text-center bg-slate-50 dark:bg-slate-900/50"
+                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm text-center bg-slate-50 dark:bg-slate-800/50 dark:text-slate-100"
                                value={formReserva.logistica.maletasChicas}
                                onChange={(e) => setFormReserva({...formReserva, logistica: {...formReserva.logistica, maletasChicas: parseInt(e.target.value)}})}
                             />
@@ -666,7 +666,7 @@ export default function ReservasTurismo() {
                                />
                                {formReserva.logistica.sillaBebe && (
                                  <input 
-                                   type="number" min="1" className="w-10 px-1 py-1 border rounded dark:border-slate-800 text-xs text-center"
+                                   type="number" min="1" className="w-10 px-1 py-1 border rounded dark:border-slate-800 text-xs text-center dark:bg-slate-800/50 dark:text-slate-100"
                                    value={formReserva.logistica.cantidadSillas}
                                    onChange={(e) => setFormReserva({...formReserva, logistica: {...formReserva.logistica, cantidadSillas: parseInt(e.target.value)}})}
                                  />
@@ -678,7 +678,7 @@ export default function ReservasTurismo() {
                 </div>
 
                 {/* Bloque 3: Ruta y Horario */}
-                <div className="p-6 grid md:grid-cols-2 gap-8 bg-slate-50 dark:bg-slate-900/50/30">
+                <div className="p-6 grid md:grid-cols-2 gap-8 bg-slate-50 dark:bg-slate-900/50">
                    <div className="space-y-4">
                       <h3 className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-2">
                         <MapPin className="h-4 w-4 text-emerald-500" /> RUTA Y SEGUIMIENTO
@@ -687,26 +687,26 @@ export default function ReservasTurismo() {
                          <div className="grid grid-cols-2 gap-3">
                             <input 
                                type="text" required placeholder="Origen (ej: Hotel / Oficina)"
-                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-900"
+                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                                value={formReserva.lugares.origen}
                                onChange={(e) => setFormReserva({...formReserva, lugares: {...formReserva.lugares, origen: e.target.value}})}
                             />
                             <input 
                                type="text" placeholder="N° Vuelo (Tracking)"
-                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-900"
+                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                                value={formReserva.lugares.numeroVuelo}
                                onChange={(e) => setFormReserva({...formReserva, lugares: {...formReserva.lugares, numeroVuelo: e.target.value}})}
                             />
                          </div>
                          <input 
                             type="text" required placeholder="Destino Final del Servicio"
-                            className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-900"
+                            className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                             value={formReserva.lugares.destino}
                             onChange={(e) => setFormReserva({...formReserva, lugares: {...formReserva.lugares, destino: e.target.value}})}
                          />
                          <input 
                             type="text" required placeholder="Nombre del Servicio (ej: City Tour Premium)"
-                            className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-900 font-bold"
+                            className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 font-bold dark:text-slate-100"
                             value={formReserva.servicio}
                             onChange={(e) => setFormReserva({...formReserva, servicio: e.target.value})}
                          />
@@ -722,7 +722,7 @@ export default function ReservasTurismo() {
                             <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Fecha</span>
                             <input 
                                type="date" required
-                               className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-900"
+                               className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                                value={formReserva.fecha}
                                onChange={(e) => setFormReserva({...formReserva, fecha: e.target.value})}
                             />
@@ -731,7 +731,7 @@ export default function ReservasTurismo() {
                             <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Hora Inicio</span>
                             <input 
                                type="time" required
-                               className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-900"
+                               className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                                value={formReserva.horaInicio}
                                onChange={(e) => setFormReserva({...formReserva, horaInicio: e.target.value})}
                             />
@@ -740,7 +740,7 @@ export default function ReservasTurismo() {
                             <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Hora Termino</span>
                             <input 
                                type="time" required
-                               className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-900"
+                               className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                                value={formReserva.horaTermino}
                                onChange={(e) => setFormReserva({...formReserva, horaTermino: e.target.value})}
                             />
@@ -750,7 +750,7 @@ export default function ReservasTurismo() {
                          <div className="col-span-1">
                             <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Vehículo</span>
                             <select 
-                               required className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-900"
+                               required className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                                value={formReserva.tipoVehiculo}
                                onChange={(e) => setFormReserva({...formReserva, tipoVehiculo: e.target.value as any})}
                             >
@@ -762,7 +762,7 @@ export default function ReservasTurismo() {
                          <div className="col-span-2">
                             <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Asignar Chofer</span>
                             <select 
-                               required className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-900"
+                               required className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                                value={formReserva.conductorId}
                                onChange={(e) => setFormReserva({...formReserva, conductorId: e.target.value})}
                             >
@@ -777,9 +777,9 @@ export default function ReservasTurismo() {
                 </div>
 
                 {/* Bloque 4: Finanzas y Cobranza */}
-                <div className="p-6 grid md:grid-cols-2 gap-8 bg-green-50 dark:bg-green-900/30/20">
+                <div className="p-6 grid md:grid-cols-2 gap-8 bg-green-50/50 dark:bg-green-900/10">
                    <div className="space-y-4">
-                      <h3 className="text-xs font-black text-green-700 flex items-center gap-2">
+                      <h3 className="text-xs font-black text-green-700 dark:text-green-500 flex items-center gap-2">
                         <DollarSign className="h-4 w-4" /> GESTIÓN DE COBROS Y TRIBUTARIA
                       </h3>
                       <div className="grid grid-cols-2 gap-3">
@@ -787,7 +787,7 @@ export default function ReservasTurismo() {
                             <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Monto Bruto</span>
                             <input 
                                type="number" required placeholder="$ Total Pactado"
-                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-900 font-bold"
+                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 font-bold dark:text-slate-100"
                                value={formReserva.finanzas.montoBruto}
                                onChange={(e) => setFormReserva({...formReserva, finanzas: {...formReserva.finanzas, montoBruto: parseInt(e.target.value)}})}
                             />
@@ -796,7 +796,7 @@ export default function ReservasTurismo() {
                             <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Gts. Adic. (Peajes/Estac)</span>
                             <input 
                                type="number" required placeholder="$ Gastos"
-                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-900"
+                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                                value={formReserva.finanzas.gastosAdicionales}
                                onChange={(e) => setFormReserva({...formReserva, finanzas: {...formReserva.finanzas, gastosAdicionales: parseInt(e.target.value)}})}
                             />
@@ -804,7 +804,7 @@ export default function ReservasTurismo() {
                          <div className="flex flex-col gap-1">
                             <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Forma de Pago</span>
                             <select 
-                               required className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-900"
+                               required className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                                value={formReserva.finanzas.formaPago}
                                onChange={(e) => setFormReserva({...formReserva, finanzas: {...formReserva.finanzas, formaPago: e.target.value as any}})}
                             >
@@ -817,7 +817,7 @@ export default function ReservasTurismo() {
                          <div className="flex flex-col gap-1">
                             <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Tipo Documento</span>
                             <select 
-                               required className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-900"
+                               required className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                                value={formReserva.finanzas.tipoDocumento}
                                onChange={(e) => setFormReserva({...formReserva, finanzas: {...formReserva.finanzas, tipoDocumento: e.target.value as any}})}
                             >
@@ -829,23 +829,23 @@ export default function ReservasTurismo() {
                    </div>
 
                    <div className="space-y-4">
-                      <h3 className="text-xs font-black text-orange-700 flex items-center gap-2">
+                      <h3 className="text-xs font-black text-orange-700 dark:text-orange-500 flex items-center gap-2">
                         <Info className="h-4 w-4" /> COMENTARIOS DUALES
                       </h3>
                       <div className="grid gap-3">
                          <div className="flex flex-col gap-1">
                             <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">C1: Comentario Conductor</span>
                             <textarea 
-                               className="w-full px-3 py-1.5 border rounded-lg dark:border-slate-800 text-xs h-12 bg-white dark:bg-slate-900"
+                               className="w-full px-3 py-1.5 border rounded-lg dark:border-slate-800 text-xs h-12 bg-white dark:bg-slate-800/50 dark:text-slate-100"
                                placeholder="Instrucciones de recojo, cartel, ruta..."
                                value={formReserva.comentarios.conductor}
                                onChange={(e) => setFormReserva({...formReserva, comentarios: {...formReserva.comentarios, conductor: e.target.value}})}
                             />
                          </div>
                          <div className="flex flex-col gap-1">
-                            <span className="text-[9px] text-red-600 font-bold uppercase">C2: Comentario Interno (Privado)</span>
+                            <span className="text-[9px] text-red-600 dark:text-red-500 font-bold uppercase">C2: Comentario Interno (Privado)</span>
                             <textarea 
-                               className="w-full px-3 py-1.5 border rounded-lg dark:border-slate-800 text-xs h-12 bg-white dark:bg-slate-900 border-red-100"
+                               className="w-full px-3 py-1.5 border rounded-lg dark:border-slate-800 text-xs h-12 bg-white dark:bg-slate-800/50 border-red-100 dark:border-red-900/30 dark:text-slate-100"
                                placeholder="Notas de cobro, colaciones, depósitos..."
                                value={formReserva.comentarios.interno}
                                onChange={(e) => setFormReserva({...formReserva, comentarios: {...formReserva.comentarios, interno: e.target.value}})}
