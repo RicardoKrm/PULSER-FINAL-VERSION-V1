@@ -29,6 +29,7 @@ import GestionPautas from './pages/flota/GestionPautas';
 import GestionTareas from './pages/flota/GestionTareas';
 import GestionKits from './pages/herramientas/GestionKits';
 import GestionNeumaticos from './pages/flota/GestionNeumaticos';
+import GestionCombustible from './pages/flota/GestionCombustible';
 import { ThemeProvider } from './components/ThemeProvider';
 import { CompanyProvider } from './contexts/CompanyContext';
 import { AppProvider } from './context/AppContext';
@@ -58,6 +59,7 @@ const router = createBrowserRouter([
       { path: "flota/ordenes-trabajo", element: <GestionOrdenesTrabajo /> },
       { path: "flota/ordenes-trabajo/:id", element: <OrdenesTrabajoDetail /> },
       { path: "flota/neumaticos", element: <GestionNeumaticos /> },
+      { path: "flota/combustible", element: <GestionCombustible /> },
       { path: "configuracion/pautas", element: <GestionPautas /> },
       { path: "configuracion/tareas", element: <GestionTareas /> },
       { path: "herramientas/kits", element: <GestionKits /> },
