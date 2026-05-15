@@ -209,14 +209,14 @@ export default function OrdenesCompra() {
     const totalMonto = mockItems.reduce((acc, curr) => acc + curr.total, 0);
 
     return (
-      <div className="p-6 max-w-[1600px] mx-auto space-y-6 bg-[#f1f5f9] min-h-screen">
+      <div className="p-6 max-w-[1600px] mx-auto space-y-6">
         {/* Header Detalle */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex justify-between items-center">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 flex justify-between items-center">
           <div>
-            <h1 className="text-[24px] font-black text-slate-800 flex items-center gap-3">
+            <h1 className="text-[24px] font-black text-slate-800 dark:text-white flex items-center gap-3">
               <FileText className="w-6 h-6 text-blue-500" /> Detalle de Orden de Compra {selectedOrder}
             </h1>
-            <p className="text-slate-500 font-bold text-sm tracking-wide mt-1 uppercase">GEStión de compra y recepción de suministros</p>
+            <p className="text-slate-500 dark:text-slate-400 font-bold text-sm tracking-wide mt-1 uppercase">GEStión de compra y recepción de suministros</p>
           </div>
           <div className="flex gap-3">
             <Button 
@@ -235,11 +235,11 @@ export default function OrdenesCompra() {
         </div>
 
         {/* Información General */}
-        <Card className="rounded-2xl border-slate-200 shadow-sm overflow-hidden">
-          <CardHeader className="bg-white border-b border-slate-100 py-4 px-6 flex flex-row items-center justify-between">
+        <Card className="rounded-2xl border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden bg-white dark:bg-slate-800">
+          <CardHeader className="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 py-4 px-6 flex flex-row items-center justify-between">
             <div className="flex items-center gap-2">
               <Info className="w-5 h-5 text-blue-500" />
-              <CardTitle className="text-sm font-black text-slate-700 tracking-wider uppercase">Información General</CardTitle>
+              <CardTitle className="text-sm font-black text-slate-700 dark:text-slate-200 tracking-wider uppercase">Información General</CardTitle>
             </div>
             {!isReceived ? (
               <Button 
@@ -249,71 +249,71 @@ export default function OrdenesCompra() {
                 <PackageCheck className="w-4 h-4 mr-2" /> RECIBIR MERCADERÍA
               </Button>
             ) : (
-              <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-lg font-black text-xs">
+              <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg font-black text-xs">
                 <PackageCheck className="w-4 h-4" /> MERCADERÍA RECIBIDA
               </div>
             )}
           </CardHeader>
           <CardContent className="p-0">
-            <div className="grid grid-cols-4 divide-x divide-slate-100 bg-white">
+            <div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-slate-100 dark:divide-slate-700 bg-white dark:bg-slate-800">
               <div className="p-6">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Proveedor</span>
-                <span className="font-black text-blue-600 text-lg">{ordenObj?.proveedor || "KAUFMANN"}</span>
+                <span className="font-black text-blue-600 dark:text-blue-400 text-lg">{ordenObj?.proveedor || "KAUFMANN"}</span>
               </div>
               <div className="p-6">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Fecha Emisión</span>
-                <span className="font-bold text-slate-700 text-lg">{ordenObj?.fecha || "20/04/2026 15:56"}</span>
+                <span className="font-bold text-slate-700 dark:text-slate-200 text-lg">{ordenObj?.fecha || "20/04/2026 15:56"}</span>
               </div>
               <div className="p-6">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Estado Actual</span>
-                <span className={`${isReceived ? 'bg-emerald-50 text-emerald-500' : 'bg-blue-50 text-blue-500'} px-3 py-1 rounded-md text-[10px] font-black tracking-wider inline-flex`}>
+                <span className={`${isReceived ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 dark:text-emerald-400' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-500 dark:text-blue-400'} px-3 py-1 rounded-md text-[10px] font-black tracking-wider inline-flex`}>
                   {ordenObj?.estado || "PENDIENTE"}
                 </span>
               </div>
               <div className="p-6">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Emitida Por</span>
-                <span className="font-bold text-slate-700 text-lg">administrador</span>
+                <span className="font-bold text-slate-700 dark:text-slate-200 text-lg">administrador</span>
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Detalle de la compra */}
-        <Card className="rounded-2xl border-slate-200 shadow-sm overflow-hidden mt-6">
-          <CardHeader className="bg-white border-b border-slate-100 py-4 px-6">
+        <Card className="rounded-2xl border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden mt-6 bg-white dark:bg-slate-800">
+          <CardHeader className="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 py-4 px-6">
             <div className="flex items-center gap-2">
               <List className="w-5 h-5 text-purple-500" />
-              <CardTitle className="text-sm font-black text-slate-700 tracking-wider uppercase">Detalle de la Compra</CardTitle>
+              <CardTitle className="text-sm font-black text-slate-700 dark:text-slate-200 tracking-wider uppercase">Detalle de la Compra</CardTitle>
             </div>
           </CardHeader>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50/50">
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Descripción / Repuesto</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Cantidad</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Precio Unitario</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Total Línea</th>
+                <tr className="bg-slate-50/50 dark:bg-slate-900/50">
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Descripción / Repuesto</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Cantidad</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right">Precio Unitario</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right">Total Línea</th>
                 </tr>
               </thead>
-              <tbody className="bg-white">
+              <tbody className="bg-white dark:bg-slate-800">
                 {mockItems.map((item, idx) => (
-                  <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-slate-700 text-xs">{item.repuesto}</td>
+                  <tr key={idx} className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                    <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200 text-xs">{item.repuesto}</td>
                     <td className="px-6 py-4">
-                      <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs font-black">{item.cantidad} UND</span>
+                      <span className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-2 py-1 rounded text-xs font-black">{item.cantidad} UND</span>
                     </td>
-                    <td className="px-6 py-4 font-bold text-slate-600 text-xs text-right">${item.precioU.toLocaleString('es-CL')}</td>
-                    <td className="px-6 py-4 font-black text-slate-800 text-sm text-right">${item.total.toLocaleString('es-CL')}</td>
+                    <td className="px-6 py-4 font-bold text-slate-600 dark:text-slate-300 text-xs text-right">${item.precioU.toLocaleString('es-CL')}</td>
+                    <td className="px-6 py-4 font-black text-slate-800 dark:text-white text-sm text-right">${item.total.toLocaleString('es-CL')}</td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="bg-slate-50">
+              <tfoot className="bg-slate-50 dark:bg-slate-900">
                 <tr>
-                  <td colSpan={3} className="px-6 py-4 text-right text-[12px] font-black text-slate-700 uppercase tracking-widest border-t border-slate-200">
+                  <td colSpan={3} className="px-6 py-4 text-right text-[12px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest border-t border-slate-200 dark:border-slate-700">
                     Inversión Total
                   </td>
-                  <td className="px-6 py-4 text-right font-black text-slate-900 text-2xl border-t border-slate-200">
+                  <td className="px-6 py-4 text-right font-black text-slate-900 dark:text-white text-2xl border-t border-slate-200 dark:border-slate-700">
                     ${totalMonto.toLocaleString('es-CL')}
                   </td>
                 </tr>
@@ -322,23 +322,23 @@ export default function OrdenesCompra() {
           </div>
         </Card>
 
-        <div className="grid grid-cols-2 gap-6 mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
           {/* Pedidos asociados */}
-          <Card className="rounded-2xl border-slate-200 shadow-sm overflow-hidden">
-            <CardHeader className="bg-white border-b border-slate-100 py-4 px-6">
+          <Card className="rounded-2xl border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden bg-white dark:bg-slate-800">
+            <CardHeader className="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 py-4 px-6">
               <div className="flex items-center gap-2">
                 <Wrench className="w-5 h-5 text-orange-500" />
-                <CardTitle className="text-sm font-black text-slate-700 tracking-wider uppercase">Pedidos de Taller Asociados</CardTitle>
+                <CardTitle className="text-sm font-black text-slate-700 dark:text-slate-200 tracking-wider uppercase">Pedidos de Taller Asociados</CardTitle>
               </div>
             </CardHeader>
-            <CardContent className="p-6 bg-slate-50">
-              <div className="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center">
+            <CardContent className="p-6 bg-slate-50 dark:bg-slate-900">
+              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 flex justify-between items-center">
                 <div>
-                  <h4 className="font-black text-slate-800 text-sm">NONE</h4>
+                  <h4 className="font-black text-slate-800 dark:text-white text-sm">NONE</h4>
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Solicitado Por: DEMO</span>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                  <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded text-xs font-black">1</span>
+                  <span className="bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 px-3 py-1 rounded text-xs font-black">1</span>
                   <span className="text-[10px] font-bold text-slate-400">#OT-0344</span>
                 </div>
               </div>
@@ -346,15 +346,15 @@ export default function OrdenesCompra() {
           </Card>
 
           {/* Observaciones y Notas */}
-          <Card className="rounded-2xl border-slate-200 shadow-sm overflow-hidden">
-            <CardHeader className="bg-white border-b border-slate-100 py-4 px-6">
+          <Card className="rounded-2xl border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden bg-white dark:bg-slate-800">
+            <CardHeader className="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 py-4 px-6">
               <div className="flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-cyan-500" />
-                <CardTitle className="text-sm font-black text-slate-700 tracking-wider uppercase">Observaciones y Notas</CardTitle>
+                <CardTitle className="text-sm font-black text-slate-700 dark:text-slate-200 tracking-wider uppercase">Observaciones y Notas</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-6">
-              <p className="text-sm text-slate-600 italic font-medium">
+              <p className="text-sm text-slate-600 dark:text-slate-400 italic font-medium">
                 O.C. generada automáticamente desde 1 solicitudes de taller.
               </p>
             </CardContent>
@@ -366,14 +366,14 @@ export default function OrdenesCompra() {
 
   if (view === 'historial') {
     return (
-      <div className="p-6 max-w-[1600px] mx-auto space-y-6 bg-[#f1f5f9] min-h-screen">
+      <div className="p-6 max-w-[1600px] mx-auto space-y-6">
         {/* Header Historial */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex justify-between items-center">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 flex justify-between items-center">
           <div>
-            <h1 className="text-[28px] font-black text-slate-800 flex items-center gap-3">
+            <h1 className="text-[28px] font-black text-slate-800 dark:text-white flex items-center gap-3">
               <History className="w-8 h-8 text-blue-500" /> Historial de Órdenes
             </h1>
-            <p className="text-emerald-600 font-bold text-sm tracking-wide mt-2 flex items-center gap-2">
+            <p className="text-emerald-600 dark:text-emerald-400 font-bold text-sm tracking-wide mt-2 flex items-center gap-2">
               <span className="text-xl">💰</span> Total en Filtro: $ 0
             </p>
           </div>
@@ -388,7 +388,7 @@ export default function OrdenesCompra() {
         </div>
 
         {/* Filters */}
-        <Card className="rounded-2xl border-slate-200 shadow-sm overflow-hidden p-6">
+        <Card className="rounded-2xl border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden p-6 bg-white dark:bg-slate-800">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Buscador Inteligente</label>
@@ -396,27 +396,27 @@ export default function OrdenesCompra() {
                 <input 
                   type="text" 
                   placeholder="Folio, Proveedor o Ítem..." 
-                  className="w-full h-11 px-4 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-blue-500 transition-colors"
+                  className="w-full h-11 px-4 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-200 bg-transparent outline-none focus:border-blue-500 transition-colors placeholder:text-slate-400"
                 />
               </div>
             </div>
             <div className="w-full md:w-48">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Proveedor</label>
-              <select className="w-full h-11 px-4 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-blue-500 bg-white">
-                <option>Todos</option>
+              <select className="w-full h-11 px-4 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-200 bg-transparent outline-none focus:border-blue-500">
+                <option value="Todos">Todos</option>
               </select>
             </div>
             <div className="w-full md:w-40">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Desde</label>
               <div className="relative">
-                <input type="text" placeholder="mm / dd / yyyy" className="w-full h-11 px-4 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-blue-500" />
+                <input type="text" placeholder="mm / dd / yyyy" className="w-full h-11 px-4 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-200 bg-transparent outline-none focus:border-blue-500 placeholder:text-slate-400" />
                 <CalendarIcon className="w-4 h-4 text-slate-400 absolute right-3 top-3.5" />
               </div>
             </div>
             <div className="w-full md:w-40">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Hasta</label>
               <div className="relative">
-                <input type="text" placeholder="mm / dd / yyyy" className="w-full h-11 px-4 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-blue-500" />
+                <input type="text" placeholder="mm / dd / yyyy" className="w-full h-11 px-4 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-200 bg-transparent outline-none focus:border-blue-500 placeholder:text-slate-400" />
                 <CalendarIcon className="w-4 h-4 text-slate-400 absolute right-3 top-3.5" />
               </div>
             </div>
@@ -424,44 +424,44 @@ export default function OrdenesCompra() {
         </Card>
 
         {/* Table */}
-        <Card className="rounded-2xl border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center text-sm font-bold text-slate-600">
+        <Card className="rounded-2xl border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden bg-white dark:bg-slate-800">
+          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center text-sm font-bold text-slate-600 dark:text-slate-400">
             Show 
-            <select className="mx-2 h-8 px-2 border border-slate-200 rounded text-sm outline-none">
-              <option>25</option>
+            <select className="mx-2 h-8 px-2 border border-slate-200 dark:border-slate-700 bg-transparent rounded text-sm outline-none">
+              <option value="25">25</option>
             </select>
             entries
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[800px]">
               <thead>
-                <tr className="bg-slate-50/50 border-b border-slate-100">
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Folio OC</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Fecha Emisión</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Proveedor</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Resumen de Ítems</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Estado</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Monto Total</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Acciones</th>
+                <tr className="bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700">
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Folio OC</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Fecha Emisión</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Proveedor</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Resumen de Ítems</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">Estado</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right">Monto Total</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700 bg-white dark:bg-slate-800">
                 {historialOrdenes.map((orden, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 font-black text-slate-800 text-sm">{orden.folio}</td>
-                    <td className="px-6 py-4 font-bold text-slate-700 text-xs">{orden.fecha}</td>
-                    <td className="px-6 py-4 font-bold text-slate-800 text-xs">{orden.proveedor}</td>
-                    <td className="px-6 py-4 font-medium text-slate-500 text-xs">{orden.resumen}</td>
+                  <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                    <td className="px-6 py-4 font-black text-slate-800 dark:text-white text-sm">{orden.folio}</td>
+                    <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-300 text-xs">{orden.fecha}</td>
+                    <td className="px-6 py-4 font-bold text-slate-800 dark:text-slate-200 text-xs">{orden.proveedor}</td>
+                    <td className="px-6 py-4 font-medium text-slate-500 dark:text-slate-400 text-xs">{orden.resumen}</td>
                     <td className="px-6 py-4 text-center">
                       <span className={`px-3 py-1 rounded-md text-[10px] font-black tracking-wider text-white ${orden.estado === 'PENDIENTE' ? 'bg-blue-500' : 'bg-emerald-500'}`}>
                         {orden.estado}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right font-black text-slate-800 text-sm">${orden.monto}</td>
+                    <td className="px-6 py-4 text-right font-black text-slate-800 dark:text-white text-sm">${orden.monto}</td>
                     <td className="px-6 py-4 text-center">
                       <button 
                         onClick={() => handleViewDetail(orden.folio)}
-                        className="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-500 transition-colors"
+                        className="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 text-blue-500 transition-colors"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
@@ -471,12 +471,12 @@ export default function OrdenesCompra() {
               </tbody>
             </table>
           </div>
-          <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+          <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mostrando 5 órdenes registradas</span>
             <div className="flex items-center gap-1">
-              <Button variant="outline" className="h-8 px-3 rounded-lg text-xs font-bold text-slate-600 border-slate-200">Anterior</Button>
+              <Button variant="outline" className="h-8 px-3 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700">Anterior</Button>
               <Button className="h-8 w-8 p-0 rounded-lg text-xs font-bold bg-blue-500 hover:bg-blue-600 text-white">1</Button>
-              <Button variant="outline" className="h-8 px-3 rounded-lg text-xs font-bold text-slate-600 border-slate-200">Siguiente</Button>
+              <Button variant="outline" className="h-8 px-3 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700">Siguiente</Button>
             </div>
           </div>
         </Card>
@@ -485,15 +485,15 @@ export default function OrdenesCompra() {
   }
 
   return (
-    <div className="p-6 max-w-[1600px] mx-auto space-y-6 bg-[#f1f5f9] min-h-screen">
+    <div className="p-6 max-w-[1600px] mx-auto space-y-6">
       
       {/* Header Container */}
-      <div className="bg-gradient-to-r from-slate-100 to-white rounded-2xl p-6 shadow-sm border border-slate-200 flex justify-between items-center">
+      <div className="bg-gradient-to-r from-slate-100 to-white dark:from-slate-800 dark:to-slate-900 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 flex justify-between items-center">
         <div>
-          <h1 className="text-[28px] font-black text-slate-800 flex items-center gap-3">
+          <h1 className="text-[28px] font-black text-slate-800 dark:text-white flex items-center gap-3">
             <ShoppingCart className="w-8 h-8 text-blue-500" /> Panel de Adquisiciones
           </h1>
-          <p className="text-slate-500 font-bold text-sm tracking-wide mt-1 uppercase">Gestión central de compras y pedidos de taller</p>
+          <p className="text-slate-500 dark:text-slate-400 font-bold text-sm tracking-wide mt-1 uppercase">Gestión central de compras y pedidos de taller</p>
         </div>
         <div className="flex items-center gap-3">
           <Button 
@@ -512,15 +512,15 @@ export default function OrdenesCompra() {
       </div>
 
       {/* SECTION 1: Pedidos pendientes de taller */}
-      <Card className="rounded-2xl border-slate-200 shadow-sm overflow-hidden">
-        <CardHeader className="bg-white border-b border-slate-100 py-4 px-6 flex flex-row items-center justify-between">
+      <Card className="rounded-2xl border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden bg-white dark:bg-slate-800">
+        <CardHeader className="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 py-4 px-6 flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">
             <Wrench className="w-5 h-5 text-orange-500" />
-            <CardTitle className="text-sm font-black text-slate-700 tracking-wider uppercase">Pedidos pendientes de taller</CardTitle>
+            <CardTitle className="text-sm font-black text-slate-700 dark:text-slate-200 tracking-wider uppercase">Pedidos pendientes de taller</CardTitle>
           </div>
           <div className="flex items-center gap-3">
             <select 
-              className="h-9 px-3 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 outline-none w-64 bg-white"
+              className="h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 outline-none w-64 bg-transparent"
               value={proveedorSeleccionadoTaller}
               onChange={(e) => setProveedorSeleccionadoTaller(e.target.value)}
             >
@@ -539,49 +539,49 @@ export default function OrdenesCompra() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/50">
-                <th className="px-6 py-4 w-12"><input type="checkbox" className="rounded border-slate-300" onChange={(e) => setPedidosTaller(pedidosTaller.map(p => ({ ...p, selected: e.target.checked })))} /></th>
-                <th className="px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Fecha</th>
-                <th className="px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Prioridad</th>
-                <th className="px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Vehículo / OT</th>
-                <th className="px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Repuesto Solicitado</th>
-                <th className="px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Sugerencia</th>
-                <th className="px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Cant.</th>
-                <th className="px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Motivo / Justificación</th>
+              <tr className="bg-slate-50/50 dark:bg-slate-900/50">
+                <th className="px-6 py-4 w-12"><input type="checkbox" className="rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800" onChange={(e) => setPedidosTaller(pedidosTaller.map(p => ({ ...p, selected: e.target.checked })))} /></th>
+                <th className="px-4 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Fecha</th>
+                <th className="px-4 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Prioridad</th>
+                <th className="px-4 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Vehículo / OT</th>
+                <th className="px-4 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Repuesto Solicitado</th>
+                <th className="px-4 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Sugerencia</th>
+                <th className="px-4 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Cant.</th>
+                <th className="px-4 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Motivo / Justificación</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700 bg-white dark:bg-slate-800">
               {pedidosTaller.length === 0 ? (
-                <tr><td colSpan={8} className="px-6 py-8 text-center text-xs font-bold text-slate-500 italic">No hay pedidos pendientes de taller.</td></tr>
+                <tr><td colSpan={8} className="px-6 py-8 text-center text-xs font-bold text-slate-500 dark:text-slate-400 italic">No hay pedidos pendientes de taller.</td></tr>
               ) : pedidosTaller.map((pedido, idx) => (
-                <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4"><input type="checkbox" checked={pedido.selected} onChange={() => togglePedidoTallerSelection(pedido.id)} className="rounded border-slate-300" /></td>
+                <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                  <td className="px-6 py-4"><input type="checkbox" checked={pedido.selected} onChange={() => togglePedidoTallerSelection(pedido.id)} className="rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800" /></td>
                   <td className="px-4 py-4">
                     <div className="flex flex-col">
-                      <span className="font-bold text-slate-700 text-xs">{pedido.fecha.split(' ')[0]}</span>
+                      <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{pedido.fecha.split(' ')[0]}</span>
                       <span className="text-[10px] font-bold text-slate-400">{pedido.fecha.split(' ')[1]} {pedido.fecha.split(' ')[2]}</span>
                     </div>
                   </td>
                   <td className="px-4 py-4">
-                    <span className="bg-red-100 text-red-600 px-2.5 py-1 rounded-md text-[10px] font-black tracking-wider">
+                    <span className="bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400 px-2.5 py-1 rounded-md text-[10px] font-black tracking-wider">
                       {pedido.prioridad}
                     </span>
                   </td>
                   <td className="px-4 py-4">
                     <div 
-                      className="flex items-center gap-2 cursor-pointer hover:bg-blue-50/50 p-1.5 -ml-1.5 rounded-lg transition-colors group"
+                      className="flex items-center gap-2 cursor-pointer hover:bg-blue-50/50 dark:hover:bg-blue-500/10 p-1.5 -ml-1.5 rounded-lg transition-colors group"
                       onClick={() => navigate(`/flota/ordenes-trabajo/${pedido.vehiculo.split(' ')[1]}`)}
                     >
-                       <span className="font-black text-blue-600 text-xs group-hover:text-blue-700">{pedido.vehiculo.split(' ')[0]}</span>
-                       <span className="bg-blue-50 text-blue-500 px-2 py-0.5 rounded text-[10px] font-bold group-hover:bg-blue-100 group-hover:text-blue-600">{pedido.vehiculo.split(' ')[1]}</span>
+                       <span className="font-black text-blue-600 dark:text-blue-400 text-xs group-hover:text-blue-700">{pedido.vehiculo.split(' ')[0]}</span>
+                       <span className="bg-blue-50 dark:bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded text-[10px] font-bold group-hover:bg-blue-100 dark:group-hover:bg-blue-500/20 group-hover:text-blue-600 dark:group-hover:text-blue-400">{pedido.vehiculo.split(' ')[1]}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-4 font-bold text-slate-800 text-xs">{pedido.repuesto}</td>
-                  <td className="px-4 py-4 font-bold text-slate-600 text-xs">{pedido.sugerencia}</td>
+                  <td className="px-4 py-4 font-bold text-slate-800 dark:text-slate-200 text-xs">{pedido.repuesto}</td>
+                  <td className="px-4 py-4 font-bold text-slate-600 dark:text-slate-400 text-xs">{pedido.sugerencia}</td>
                   <td className="px-4 py-4">
-                    <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded text-xs font-black">x{pedido.cantidad}</span>
+                    <span className="bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 px-2 py-1 rounded text-xs font-black">x{pedido.cantidad}</span>
                   </td>
-                  <td className="px-4 py-4 font-medium text-slate-500 text-xs italic">{pedido.motivo}</td>
+                  <td className="px-4 py-4 font-medium text-slate-500 dark:text-slate-400 text-xs italic">{pedido.motivo}</td>
                 </tr>
               ))}
             </tbody>
@@ -590,32 +590,32 @@ export default function OrdenesCompra() {
       </Card>
 
       {/* SECTION 2: Órdenes de compra en tránsito / pendientes */}
-      <Card className="rounded-2xl border-slate-200 shadow-sm overflow-hidden mt-6">
-        <CardHeader className="bg-white border-b border-slate-100 py-4 px-6">
+      <Card className="rounded-2xl border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden mt-6 bg-white dark:bg-slate-800">
+        <CardHeader className="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 py-4 px-6">
           <div className="flex items-center gap-2">
             <Truck className="w-5 h-5 text-blue-500" />
-            <CardTitle className="text-sm font-black text-slate-700 tracking-wider uppercase">Órdenes de compra en tránsito / pendientes</CardTitle>
+            <CardTitle className="text-sm font-black text-slate-700 dark:text-slate-200 tracking-wider uppercase">Órdenes de compra en tránsito / pendientes</CardTitle>
           </div>
         </CardHeader>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/50">
-                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Folio OC</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Fecha</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Proveedor</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Monto Estimado</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Estado</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Acciones</th>
+              <tr className="bg-slate-50/50 dark:bg-slate-900/50">
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Folio OC</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Fecha</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Proveedor</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Monto Estimado</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Estado</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700 bg-white dark:bg-slate-800">
               {ordenesPendientes.map((oc, idx) => (
-                <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-5 font-black text-slate-800 text-sm">{oc.folio}</td>
-                  <td className="px-6 py-5 font-bold text-slate-700 text-xs">{oc.fecha}</td>
-                  <td className="px-6 py-5 font-bold text-slate-800 text-xs">{oc.proveedor}</td>
-                  <td className="px-6 py-5 font-black text-slate-800 text-sm">${oc.monto}</td>
+                <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                  <td className="px-6 py-5 font-black text-slate-800 dark:text-white text-sm">{oc.folio}</td>
+                  <td className="px-6 py-5 font-bold text-slate-700 dark:text-slate-300 text-xs">{oc.fecha}</td>
+                  <td className="px-6 py-5 font-bold text-slate-800 dark:text-slate-200 text-xs">{oc.proveedor}</td>
+                  <td className="px-6 py-5 font-black text-slate-800 dark:text-white text-sm">${oc.monto}</td>
                   <td className="px-6 py-5">
                     <span className={`${oc.estado === 'RECIBIDA' ? 'bg-emerald-500' : 'bg-blue-500'} text-white px-3 py-1 rounded-md text-[10px] font-black tracking-wider`}>
                       {oc.estado}
@@ -625,13 +625,13 @@ export default function OrdenesCompra() {
                     <div className="flex items-center justify-end gap-2">
                        <button 
                          onClick={() => handleViewDetail(oc.folio)}
-                         className="h-8 px-3 rounded-lg text-[10px] font-black tracking-wider bg-slate-100 text-slate-600 border border-transparent hover:bg-slate-200 transition-colors"
+                         className="h-8 px-3 rounded-lg text-[10px] font-black tracking-wider bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-transparent hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
                        >
                          GESTIONAR
                        </button>
                        <button 
                          onClick={() => window.print()}
-                         className="h-8 w-8 flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-100 text-red-500 transition-colors"
+                         className="h-8 w-8 flex items-center justify-center rounded-lg bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-500 transition-colors"
                          title="Exportar PDF"
                        >
                           <FileDown className="w-5 h-5" />
@@ -646,28 +646,28 @@ export default function OrdenesCompra() {
       </Card>
 
       {/* SECTION 3: Últimas facturas ingresadas */}
-      <Card className="rounded-2xl border-slate-200 shadow-sm overflow-hidden mt-6 pb-8">
-        <CardHeader className="bg-white border-b border-slate-100 py-4 px-6">
+      <Card className="rounded-2xl border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden mt-6 pb-8 bg-white dark:bg-slate-800">
+        <CardHeader className="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 py-4 px-6">
           <div className="flex items-center gap-2">
             <BrainCircuit className="w-5 h-5 text-purple-500" />
-            <CardTitle className="text-sm font-black text-slate-700 tracking-wider uppercase">Últimas facturas ingresadas (Cerebro OCR)</CardTitle>
+            <CardTitle className="text-sm font-black text-slate-700 dark:text-slate-200 tracking-wider uppercase">Últimas facturas ingresadas (Cerebro OCR)</CardTitle>
           </div>
         </CardHeader>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/50">
-                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Nº Factura</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Proveedor</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Fecha Emisión</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Monto Total</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Procesado Por</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Estado</th>
+              <tr className="bg-slate-50/50 dark:bg-slate-900/50">
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Nº Factura</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Proveedor</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Fecha Emisión</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Monto Total</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Procesado Por</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right">Estado</th>
               </tr>
             </thead>
-            <tbody className="bg-white">
+            <tbody className="bg-white dark:bg-slate-800">
                <tr>
-                 <td colSpan={6} className="px-6 py-8 text-center text-xs font-bold text-slate-500 italic">
+                 <td colSpan={6} className="px-6 py-8 text-center text-xs font-bold text-slate-500 dark:text-slate-400 italic">
                    No hay facturas procesadas recientemente.
                  </td>
                </tr>
@@ -678,17 +678,17 @@ export default function OrdenesCompra() {
 
       <Modal isOpen={showNuevaOCModal} onClose={() => setShowNuevaOCModal(false)} title="Nueva Orden de Compra General">
         <div className="space-y-6 pt-2">
-          <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50">
-            <p className="text-sm text-slate-600 font-medium">
+          <div className="bg-blue-50/50 dark:bg-blue-500/10 p-4 rounded-xl border border-blue-100/50 dark:border-blue-500/20">
+            <p className="text-sm text-slate-600 dark:text-slate-400 font-medium">
               Usa este formulario para compras administrativas, insumos de oficina o gastos de taller sin OT.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className="text-sm font-black text-slate-700">Seleccionar Proveedor</label>
+              <label className="text-sm font-black text-slate-700 dark:text-slate-200">Seleccionar Proveedor</label>
               <select 
-                className="w-full h-11 px-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all bg-white shadow-sm"
+                className="w-full h-11 px-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20 transition-all bg-white dark:bg-slate-800 shadow-sm"
                 value={nuevaOCProveedor}
                 onChange={(e) => setNuevaOCProveedor(e.target.value)}
               >
@@ -699,9 +699,9 @@ export default function OrdenesCompra() {
               </select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-black text-slate-700">Notas / Observaciones</label>
+              <label className="text-sm font-black text-slate-700 dark:text-slate-200">Notas / Observaciones</label>
               <textarea 
-                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all shadow-sm"
+                className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20 transition-all shadow-sm bg-transparent placeholder:text-slate-400"
                 placeholder="Ej: Insumos mensuales oficina central..."
                 rows={1}
                 value={nuevaOCNotas}
@@ -710,32 +710,32 @@ export default function OrdenesCompra() {
             </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-            <div className="bg-slate-50/80 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm">
+            <div className="bg-slate-50/80 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <List className="w-5 h-5 text-blue-500" />
-                <span className="font-black text-slate-800 tracking-wide">Ítems de la Compra</span>
+                <span className="font-black text-slate-800 dark:text-white tracking-wide">Ítems de la Compra</span>
               </div>
             </div>
             
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
-                    <th className="px-6 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest w-[20%]">Repuesto (Opcional)</th>
-                    <th className="px-6 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest w-[35%]">Descripción Manual</th>
-                    <th className="px-6 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest w-[20%]">Centro de Costo</th>
-                    <th className="px-6 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest w-[10%]">Cant.</th>
-                    <th className="px-6 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest w-[12%]">Precio Unit.</th>
-                    <th className="px-6 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest w-[3%]"></th>
+                  <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-700">
+                    <th className="px-6 py-3 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest w-[20%]">Repuesto (Opcional)</th>
+                    <th className="px-6 py-3 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest w-[35%]">Descripción Manual</th>
+                    <th className="px-6 py-3 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest w-[20%]">Centro de Costo</th>
+                    <th className="px-6 py-3 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest w-[10%]">Cant.</th>
+                    <th className="px-6 py-3 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest w-[12%]">Precio Unit.</th>
+                    <th className="px-6 py-3 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest w-[3%]"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700 border-b border-slate-100 dark:border-slate-700">
                   {nuevaOCLineas.map((linea, index) => (
-                    <tr key={linea.id} className="bg-white hover:bg-slate-50/50 transition-colors">
+                    <tr key={linea.id} className="bg-white dark:bg-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-700/50 transition-colors">
                       <td className="p-3 pl-6">
                         <select 
-                          className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 outline-none focus:border-blue-500 transition-colors bg-white hover:bg-slate-50"
+                          className="w-full h-10 px-3 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500 transition-colors bg-white dark:bg-slate-800"
                           value={linea.repuesto}
                           onChange={(e) => handleChangeLineaNuevaOC(linea.id, 'repuesto', e.target.value)}
                         >
@@ -748,14 +748,14 @@ export default function OrdenesCompra() {
                         <input 
                           type="text" 
                           placeholder="Si no es repuesto..."
-                          className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 outline-none focus:border-blue-500 transition-colors placeholder:text-slate-400"
+                          className="w-full h-10 px-3 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500 transition-colors placeholder:text-slate-400 bg-transparent"
                           value={linea.descripcion}
                           onChange={(e) => handleChangeLineaNuevaOC(linea.id, 'descripcion', e.target.value)}
                         />
                       </td>
                       <td className="p-3">
                         <select 
-                          className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 outline-none focus:border-blue-500 transition-colors bg-white hover:bg-slate-50"
+                          className="w-full h-10 px-3 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500 transition-colors bg-white dark:bg-slate-800"
                           value={linea.centroCosto}
                           onChange={(e) => handleChangeLineaNuevaOC(linea.id, 'centroCosto', e.target.value)}
                         >
@@ -767,7 +767,7 @@ export default function OrdenesCompra() {
                       <td className="p-3">
                         <input 
                           type="number" 
-                          className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm font-black text-slate-700 outline-none focus:border-blue-500 transition-colors text-center"
+                          className="w-full h-10 px-3 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-black text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500 transition-colors text-center bg-transparent"
                           value={linea.cantidad || ''}
                           min={1}
                           onChange={(e) => handleChangeLineaNuevaOC(linea.id, 'cantidad', parseInt(e.target.value))}
@@ -778,7 +778,7 @@ export default function OrdenesCompra() {
                           <span className="absolute left-3 top-2.5 text-slate-400 font-bold">$</span>
                           <input 
                             type="number" 
-                            className="w-full h-10 pl-7 pr-3 border border-slate-200 rounded-lg text-sm font-black text-slate-700 outline-none focus:border-blue-500 transition-colors"
+                            className="w-full h-10 pl-7 pr-3 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-black text-slate-700 dark:text-slate-200 outline-none focus:border-blue-500 transition-colors bg-transparent"
                             value={linea.precioUnitario || ''}
                             step="0.01"
                             onChange={(e) => handleChangeLineaNuevaOC(linea.id, 'precioUnitario', parseFloat(e.target.value))}
@@ -788,7 +788,7 @@ export default function OrdenesCompra() {
                       <td className="p-3 pr-6 text-center">
                         <button 
                           onClick={() => handleEliminarLineaNuevaOC(linea.id)}
-                          className="h-8 w-8 flex items-center justify-center rounded border border-transparent text-slate-400 hover:text-red-600 hover:bg-red-50 hover:border-red-100 transition-all"
+                          className="h-8 w-8 flex items-center justify-center rounded border border-transparent text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 hover:border-red-100 dark:hover:border-red-500/20 transition-all"
                           title="Eliminar línea"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -800,28 +800,28 @@ export default function OrdenesCompra() {
               </table>
             </div>
             
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+            <div className="p-4 bg-slate-50 dark:bg-slate-900/50 flex items-center justify-between">
               <Button 
                 variant="outline" 
-                className="text-blue-600 border-blue-200 bg-white hover:bg-blue-50 hover:border-blue-300 h-9 font-bold text-xs rounded-lg shadow-sm transition-all"
+                className="text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/50 h-9 font-bold text-xs rounded-lg shadow-sm transition-all"
                 onClick={handleAgregarLineaNuevaOC}
               >
                 <Plus className="w-4 h-4 mr-1.5" /> AGREGAR OTRA LÍNEA
               </Button>
               
-              <div className="flex items-center gap-4 bg-white px-4 py-2 border border-slate-200 rounded-xl shadow-sm">
-                <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Total Estimado</span>
-                <span className="text-lg font-black text-blue-600">
+              <div className="flex items-center gap-4 bg-white dark:bg-slate-800 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
+                <span className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Total Estimado</span>
+                <span className="text-lg font-black text-blue-600 dark:text-blue-400">
                    ${nuevaOCLineas.reduce((acc, l) => acc + ((l.cantidad || 0) * (l.precioUnitario || 0)), 0).toLocaleString('es-CL')}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-slate-100">
+          <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-slate-100 dark:border-slate-700">
             <Button 
               variant="outline" 
-              className="bg-white border-slate-200 text-slate-600 font-bold hover:bg-slate-50 hover:text-slate-800 rounded-xl px-6" 
+              className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white rounded-xl px-6" 
               onClick={() => setShowNuevaOCModal(false)}
             >
               Cancelar
