@@ -20,6 +20,7 @@ import { navigation } from '../config/navigation';
 import { cn } from '../lib/utils';
 import { useTheme } from './ThemeProvider';
 import { useCompany } from '../contexts/CompanyContext';
+import { ChatBot } from './chatbot/ChatBot';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -318,6 +319,8 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
+
+      <ChatBot />
     </div>
   );
 }

@@ -32,6 +32,15 @@ import VehiculosArchivados from './pages/configuracion/VehiculosArchivados';
 import GestionKits from './pages/herramientas/GestionKits';
 import GestionNeumaticos from './pages/flota/GestionNeumaticos';
 import GestionCombustible from './pages/flota/GestionCombustible';
+import GestionSuministros from './pages/logistica/GestionSuministros';
+import GestionBodegas from './pages/logistica/GestionBodegas';
+import GestionProveedores from './pages/herramientas/GestionProveedores';
+import PuertoEscaneo from './pages/logistica/PuertoEscaneo';
+import Aprobaciones from './pages/logistica/Aprobaciones';
+import GestionAuditorias from './pages/logistica/GestionAuditorias';
+import DetalleAuditoria from './pages/logistica/DetalleAuditoria';
+import OrdenesCompra from './pages/compras/OrdenesCompra';
+import IngresoFacturas from './pages/compras/IngresoFacturas';
 import { ThemeProvider } from './components/ThemeProvider';
 import { CompanyProvider } from './contexts/CompanyContext';
 import { AppProvider } from './context/AppContext';
@@ -67,6 +76,15 @@ const router = createBrowserRouter([
       { path: "configuracion/tareas", element: <GestionTareas /> },
       { path: "configuracion/vehiculos-archivados", element: <VehiculosArchivados /> },
       { path: "herramientas/kits", element: <GestionKits /> },
+      { path: "compras/ordenes", element: <OrdenesCompra /> },
+      { path: "compras/facturas", element: <IngresoFacturas /> },
+      { path: "compras/proveedores", element: <GestionProveedores /> },
+      { path: "logistica/suministros", element: <GestionSuministros /> },
+      { path: "logistica/bodegas", element: <GestionBodegas /> },
+      { path: "logistica/escaneo", element: <PuertoEscaneo /> },
+      { path: "logistica/validaciones", element: <Aprobaciones /> },
+      { path: "logistica/auditorias", element: <GestionAuditorias /> },
+      { path: "logistica/auditorias/:id", element: <DetalleAuditoria /> },
       { path: "*", element: <GenericPage /> },
     ]
   }

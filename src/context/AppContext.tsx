@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
-import { ReservaTurismo, Conductor, Vehiculo, OrdenDeTrabajo, PautaMantenimiento, TareaEstandar, TipoFalla, KitRepuesto, Usuario } from '../types';
+import { ReservaTurismo, Conductor, Vehiculo, OrdenDeTrabajo, PautaMantenimiento, TareaEstandar, TipoFalla, KitRepuesto, Usuario, Proveedor } from '../types';
 
 interface AppContextType {
   reservasTurismo: ReservaTurismo[];
@@ -11,13 +11,17 @@ interface AppContextType {
   tiposFalla: TipoFalla[];
   kitsRepuesto: KitRepuesto[];
   usuarios: Usuario[];
+  proveedores: Proveedor[];
   crearReservaTurismo: (reserva: ReservaTurismo) => void;
   crearOrdenTrabajo: (ot: OrdenDeTrabajo) => void;
   eliminarOrdenTrabajo: (id: string) => void;
+  actualizarOrdenTrabajo: (ot: OrdenDeTrabajo) => void;
   crearTipoFalla: (tipoFalla: TipoFalla) => void;
   eliminarTipoFalla: (id: string) => void;
   crearKitRepuesto: (kit: KitRepuesto) => void;
   eliminarKitRepuesto: (id: string) => void;
+  crearProveedor: (proveedor: Proveedor) => void;
+  eliminarProveedor: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -166,13 +170,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     { id: 'tf4', nombre: 'MOTOR NO ARRANCA' }
   ]);
   const [kitsRepuesto, setKitsRepuesto] = useState<KitRepuesto[]>([
-    { id: 'kr1', nombre: 'KIT SERVICIO 10K' },
-    { id: 'kr2', nombre: 'KIT FRENOS' }
+    { 
+      id: 'kr1', 
+      nombre: 'KIT SERVICIO 10K',
+      descripcion: 'Kit de mantenimiento preventivo a los 10,000 KM para furgones diesel.',
+      detalles: [
+        { repuesto: 'Aceite Motor 5W30', cantidad: 5 },
+        { repuesto: 'Filtro de Aceite D22', cantidad: 1 },
+        { repuesto: 'Filtro de Aire CABD1', cantidad: 1 }
+      ]
+    },
+    { 
+      id: 'kr2', 
+      nombre: 'KIT FRENOS',
+      descripcion: 'Cambio de pastillas delanteras y rectificado básico.',
+      detalles: [
+        { repuesto: 'Pastillas de Freno Delanteras (Set 4)', cantidad: 1 },
+        { repuesto: 'Líquido de Frenos DOT 4', cantidad: 1 },
+        { repuesto: 'Limpiador de Frenos', cantidad: 1 }
+      ]
+    }
   ]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([
     { id: 'u1', nombre: 'Mecánico Juan', cargo: 'Mecánico' },
     { id: 'u2', nombre: 'Mecánico Pedro', cargo: 'Mecánico' },
     { id: 'u3', nombre: 'Administradora María', cargo: 'Admin' }
+  ]);
+  const [proveedores, setProveedores] = useState<Proveedor[]>([
+    { id: 'prov1', nombre: 'Kaufmann S.A.', rut: '76.123.456-7' },
+    { id: 'prov2', nombre: 'Autoplanet', rut: '77.222.333-k' },
   ]);
 
   const crearReservaTurismo = (reserva: ReservaTurismo) => {
@@ -185,6 +211,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const eliminarOrdenTrabajo = (id: string) => {
     setOrdenesTrabajo(ordenesTrabajo.filter(ot => ot.id !== id));
+  };
+
+  const actualizarOrdenTrabajo = (otActualizada: OrdenDeTrabajo) => {
+    setOrdenesTrabajo(ordenesTrabajo.map(ot => ot.id === otActualizada.id ? otActualizada : ot));
   };
 
   const crearTipoFalla = (tipoFalla: TipoFalla) => {
@@ -203,8 +233,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setKitsRepuesto(kitsRepuesto.filter(kr => kr.id !== id));
   };
 
+  const crearProveedor = (proveedor: Proveedor) => {
+    setProveedores([...proveedores, proveedor]);
+  };
+
+  const eliminarProveedor = (id: string) => {
+    setProveedores(proveedores.filter(p => p.id !== id));
+  };
+
   return (
-    <AppContext.Provider value={{ reservasTurismo, ordenesTrabajo, conductores, vehiculos, pautas, tareasEstandar, tiposFalla, kitsRepuesto, usuarios, crearReservaTurismo, crearOrdenTrabajo, eliminarOrdenTrabajo, crearTipoFalla, eliminarTipoFalla, crearKitRepuesto, eliminarKitRepuesto }}>
+    <AppContext.Provider value={{ reservasTurismo, ordenesTrabajo, conductores, vehiculos, pautas, tareasEstandar, tiposFalla, kitsRepuesto, usuarios, proveedores, crearReservaTurismo, crearOrdenTrabajo, eliminarOrdenTrabajo, actualizarOrdenTrabajo, crearTipoFalla, eliminarTipoFalla, crearKitRepuesto, eliminarKitRepuesto, crearProveedor, eliminarProveedor }}>
       {children}
     </AppContext.Provider>
   );

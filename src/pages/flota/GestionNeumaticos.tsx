@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Plus, Search, Activity, CircleDashed, BarChart3, Truck, Trash, ChevronDown, AlertCircle, ChevronUp, DollarSign, X, Info, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Activity, CircleDashed, BarChart3, Truck, Trash, ChevronDown, AlertCircle, ChevronUp, DollarSign, X, Info, TrendingUp, AlertTriangle, ChevronRight, Box } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Modal } from '../../components/ui/Modal';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
@@ -40,7 +40,7 @@ export default function GestionNeumaticos() {
                activeTab === 'inventario' ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/50 dark:border-slate-700/50" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
             )}
           >
-            <CircleDashed className="w-4 h-4" /> Inventario Maestro
+            <CircleDashed className="w-4 h-4" /> Neumáticos
           </button>
           <button 
             onClick={() => setActiveTab('inspeccion')}
@@ -356,65 +356,294 @@ function DashboardNeumaticos() {
 }
 
 function InventarioNeumaticos() {
+  const [selectedNeu, setSelectedNeu] = useState<any | null>(null);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+
   const inventory = [
-    { id: "DOT-M1933", marca: "Michelin", modelo: "XZE2", medida: "295/80R22.5", tipo: "Original", estado: "Montado", placa: "KBCX-45", pos: 3, costo: 450000, km: 45000 },
-    { id: "DOT-B9921", marca: "Bridgestone", modelo: "M729", medida: "295/80R22.5", tipo: "Reencauche (R1)", estado: "Montado", placa: "LDPJ-99", pos: 8, costo: 180000, km: 12000 },
-    { id: "DOT-G551x", marca: "Goodyear", modelo: "KMAX S", medida: "295/80R22.5", tipo: "Original", estado: "Bodega", placa: "-", pos: null, costo: 395000, km: 0 },
+    { id: "NEU-001", marca: "Michelin", modelo: "X Multi Z", medida: "295/80R22.5", estado: "BUENO", statusColor: "text-blue-700 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400", ubicacion: "MONTADO", vehiculo: "#101", pos: "Delantero Izq", profActual: 12, profNueva: 16, km: 45000, costo: 450000, instalacion: "01/01/2023" },
+    { id: "NEU-002", marca: "Michelin", modelo: "X Multi Z", medida: "295/80R22.5", estado: "BUENO", statusColor: "text-blue-700 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400", ubicacion: "MONTADO", vehiculo: "#101", pos: "Delantero Der", profActual: 11.5, profNueva: 16, km: 45000, costo: 450000, instalacion: "01/01/2023" },
+    { id: "NEU-003", marca: "Bridgestone", modelo: "M729", medida: "295/80R22.5", estado: "REGULAR", statusColor: "text-amber-700 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800", ubicacion: "MONTADO", vehiculo: "#101", pos: "Trasero Izq Ext", profActual: 6, profNueva: 18, km: 120000, costo: 380000, instalacion: "15/06/2022" },
+    { id: "NEU-004", marca: "Bridgestone", modelo: "M729", medida: "295/80R22.5", estado: "REGULAR", statusColor: "text-amber-700 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800", ubicacion: "MONTADO", vehiculo: "#101", pos: "Trasero Izq Int", profActual: 5.8, profNueva: 18, km: 120000, costo: 380000, instalacion: "15/06/2022" },
+    { id: "NEU-005", marca: "Goodyear", modelo: "Wrangler", medida: "265/65R17", estado: "NUEVO", statusColor: "text-emerald-700 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400", ubicacion: "MONTADO", vehiculo: "#102", pos: "Delantero Izq", profActual: 9, profNueva: 9, km: 2000, costo: 210000, instalacion: "10/05/2026" },
+    { id: "NEU-006", marca: "Goodyear", modelo: "Wrangler", medida: "265/65R17", estado: "NUEVO", statusColor: "text-emerald-700 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400", ubicacion: "MONTADO", vehiculo: "#102", pos: "Delantero Der", profActual: 9, profNueva: 9, km: 2000, costo: 210000, instalacion: "10/05/2026" },
+    { id: "NEU-007", marca: "Michelin", modelo: "X Multi D", medida: "295/80R22.5", estado: "CRITICO", statusColor: "text-red-700 bg-red-100 dark:bg-red-900/30 dark:text-red-400", ubicacion: "MONTADO", vehiculo: "#103", pos: "Trasero Der Ext", profActual: 2.5, profNueva: 18, km: 180000, costo: 480000, instalacion: "10/11/2021" },
+    { id: "NEU-008", marca: "Pirelli", modelo: "FG88", medida: "13R22.5", estado: "NUEVO", statusColor: "text-emerald-700 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400", ubicacion: "BODEGA", vehiculo: "-", pos: "", profActual: 20, profNueva: 20, km: 0, costo: 420000, instalacion: "-" },
+    { id: "NEU-009", marca: "Pirelli", modelo: "FG88", medida: "13R22.5", estado: "NUEVO", statusColor: "text-emerald-700 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400", ubicacion: "BODEGA", vehiculo: "-", pos: "", profActual: 20, profNueva: 20, km: 0, costo: 420000, instalacion: "-" },
+    { id: "NEU-010", marca: "Michelin", modelo: "X Multi Z", medida: "295/80R22.5", estado: "BAJA", statusColor: "text-slate-700 bg-slate-200 dark:bg-slate-800 dark:text-slate-400", ubicacion: "DESECHO", vehiculo: "-", pos: "", profActual: 1, profNueva: 16, km: 210000, costo: 450000, instalacion: "-" },
   ];
 
+  const getProgressBarColor = (actual: number, max: number) => {
+    const ratio = actual / max;
+    if (ratio > 0.6) return "bg-emerald-500";
+    if (ratio > 0.3) return "bg-amber-500";
+    if (ratio > 0.15) return "bg-orange-500";
+    return "bg-red-600";
+  };
+
   return (
-    <Card>
-      <CardHeader className="flex flex-row justify-between items-center bg-slate-50 dark:bg-slate-900/50 border-b dark:border-slate-800 rounded-t-xl mb-4 p-4">
-         <CardTitle>Registro Maestro de Neumáticos</CardTitle>
-         <Button className="bg-blue-600 text-white" size="sm"><Plus className="w-4 h-4 mr-2" /> Agregar</Button>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase text-left border-b dark:border-slate-800">
-              <tr>
-                <th className="pb-3 pr-4">ID/DOT</th>
-                <th className="pb-3 px-4">Marca y Modelo</th>
-                <th className="pb-3 px-4">Medida</th>
-                <th className="pb-3 px-4">Tipo</th>
-                <th className="pb-3 px-4">Estado Actual</th>
-                <th className="pb-3 px-4">Ubicación</th>
-                <th className="pb-3 px-4 text-right">Km Recorrido</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {inventory.map((inv, i) => (
-                <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                  <td className="py-3 pr-4 font-mono text-sm text-slate-800 dark:text-slate-200 font-semibold">{inv.id}</td>
-                  <td className="py-3 px-4">
-                     <div className="font-semibold text-slate-700 dark:text-slate-300">{inv.marca}</div>
-                     <div className="text-xs text-slate-500 dark:text-slate-400">{inv.modelo}</div>
-                  </td>
-                  <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400">{inv.medida}</td>
-                  <td className="py-3 px-4">
-                     <span className="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">{inv.tipo}</span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className={cn(
-                      "text-[10px] font-bold px-2 py-1 rounded uppercase",
-                      inv.estado === 'Montado' ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                    )}>
-                      {inv.estado}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400">
-                     {inv.estado === 'Montado' ? `${inv.placa} (Pos: ${inv.pos})` : 'Bodega Central'}
-                  </td>
-                  <td className="py-3 px-4 text-right font-medium text-slate-700 dark:text-slate-300">
-                     {inv.km.toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden lg:h-[calc(100vh-140px)] min-h-[500px] w-full">
+      <div className="flex-1 flex flex-col w-full h-full">
+        
+        {/* Filters Header */}
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex gap-4 bg-slate-50 dark:bg-slate-900/50">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Buscar por código, marca o patente..."
+              className="w-full pl-9 pr-4 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-400"
+            />
+          </div>
+          <select className="px-4 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer w-48">
+            <option>Todas las ubicaciones</option>
+            <option>Montado</option>
+            <option>Bodega</option>
+            <option>Desecho</option>
+          </select>
+          <select className="px-4 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer w-48">
+            <option>Todos los estados</option>
+            <option>Nuevo</option>
+            <option>Bueno</option>
+            <option>Regular</option>
+            <option>Crítico</option>
+          </select>
+        </div>
+
+        {/* Table Content */}
+        <div className="flex-1 overflow-y-auto w-full">
+          <table className="w-full text-left min-w-[800px]">
+             <thead className="sticky top-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-sm z-10">
+               <tr className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+                 <th className="py-4 px-6 tracking-wide">Código</th>
+                 <th className="py-4 px-6 tracking-wide">Marca / Modelo</th>
+                 <th className="py-4 px-6 tracking-wide">Medida</th>
+                 <th className="py-4 px-6 tracking-wide">Estado</th>
+                 <th className="py-4 px-6 tracking-wide">Ubicación</th>
+                 <th className="py-4 px-6 tracking-wide w-48">Profundidad</th>
+                 <th className="py-4 px-6 tracking-wide text-right">Km Acum.</th>
+                 <th className="py-4 pr-6 pl-2 tracking-wide text-center">Acciones</th>
+               </tr>
+             </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {inventory.map((inv) => (
+                  <tr 
+                    key={inv.id} 
+                    className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group"
+                  >
+                    <td className="py-4 px-6">
+                      <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">{inv.id}</span>
+                    </td>
+                    <td className="py-4 px-6 flex flex-col">
+                      <span className="font-semibold text-slate-900 dark:text-slate-100">{inv.marca}</span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">{inv.modelo}</span>
+                    </td>
+                    <td className="py-4 px-6 text-sm text-slate-700 dark:text-slate-300">{inv.medida}</td>
+                    <td className="py-4 px-6 text-sm">
+                      <span className={cn("px-2 py-1 rounded text-xs font-bold uppercase", inv.statusColor)}>
+                        {inv.estado}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6 text-sm">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider">
+                          {inv.ubicacion === 'MONTADO' && <Truck className="w-3.5 h-3.5 mr-1.5" />}
+                          {inv.ubicacion === 'BODEGA' && <Box className="w-3.5 h-3.5 mr-1.5" />}
+                          {inv.ubicacion === 'DESECHO' && <Trash className="w-3.5 h-3.5 mr-1.5" />}
+                          {inv.ubicacion}
+                        </div>
+                        {inv.ubicacion === 'MONTADO' && (
+                          <span className="text-xs text-slate-500">{inv.vehiculo} &bull; {inv.pos}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                       <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="font-bold text-slate-900 dark:text-slate-100">{inv.profActual}mm</span>
+                          <span className="text-slate-400">/ {inv.profNueva}mm</span>
+                       </div>
+                       <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden flex">
+                          <div 
+                            className={cn("h-full rounded-full transition-all", getProgressBarColor(inv.profActual, inv.profNueva))} 
+                            style={{ width: `${Math.min(100, Math.max(0, (inv.profActual / inv.profNueva) * 100))}%` }}
+                           />
+                       </div>
+                    </td>
+                    <td className="py-4 px-6 text-right font-mono text-sm text-slate-700 dark:text-slate-300">
+                      {inv.km.toLocaleString()} km
+                    </td>
+                    <td className="py-4 pr-6 pl-2 text-center">
+                      <button 
+                        onClick={() => setSelectedNeu(inv)}
+                        className="p-2 text-slate-400 group-hover:text-blue-600 rounded-lg hover:bg-white dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+             </tbody>
           </table>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      {/* Right Drawer / Detail View Modal */}
+      {selectedNeu && (
+        <div className="fixed inset-0 z-[100] flex justify-end bg-slate-900/20 backdrop-blur-sm" onClick={() => setSelectedNeu(null)}>
+          <div 
+            className="w-[420px] bg-slate-50 dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col h-full shadow-2xl animate-in slide-in-from-right duration-300 transform"
+            onClick={(e) => e.stopPropagation()}
+          >
+             {/* Header */}
+           <div className="p-6 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 pb-8 relative pt-8">
+             <button onClick={() => setSelectedNeu(null)} className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors">
+               <X className="w-5 h-5" />
+             </button>
+             <div className="flex items-center gap-4 mb-6">
+               <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-200 dark:border-blue-800/50">
+                 <CircleDashed className="w-6 h-6" />
+               </div>
+               <div>
+                 <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                   {selectedNeu.id}
+                 </h2>
+                 <p className="text-sm text-slate-500 font-medium">{selectedNeu.marca} {selectedNeu.modelo}</p>
+               </div>
+             </div>
+
+             <div className="flex gap-3">
+               <div className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3">
+                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Medida</p>
+                 <p className="font-semibold text-slate-900 dark:text-white">{selectedNeu.medida}</p>
+               </div>
+               <div className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3">
+                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Costo</p>
+                 <p className="font-semibold text-slate-900 dark:text-white">${selectedNeu.costo.toLocaleString()}</p>
+               </div>
+             </div>
+           </div>
+
+           {/* Scrollable Content */}
+           <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              
+              {/* Estado Actual */}
+              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-5">
+                 <h3 className="text-sm font-bold text-violet-800 dark:text-violet-400 flex items-center mb-4">
+                   <Activity className="w-4 h-4 mr-2" /> Estado Actual
+                 </h3>
+                 
+                 <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                    <span className="text-sm text-slate-600 dark:text-slate-400">Condición</span>
+                    <span className={cn("px-2 py-1 rounded text-[10px] font-bold uppercase", selectedNeu.statusColor)}>
+                      {selectedNeu.estado}
+                    </span>
+                 </div>
+
+                 <div className="mb-4">
+                    <div className="flex justify-between text-sm mb-2">
+                       <span className="text-slate-600 dark:text-slate-400">Profundidad de Huella</span>
+                       <span className="font-bold text-slate-900 dark:text-white">{selectedNeu.profActual} mm</span>
+                    </div>
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 overflow-hidden flex mb-2">
+                      <div 
+                        className={cn("h-full rounded-full transition-all", getProgressBarColor(selectedNeu.profActual, selectedNeu.profNueva))} 
+                        style={{ width: `${Math.min(100, Math.max(0, (selectedNeu.profActual / selectedNeu.profNueva) * 100))}%` }}
+                       />
+                    </div>
+                    <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                       <span>0 mm (Desecho)</span>
+                       <span>{selectedNeu.profNueva} mm (Nuevo)</span>
+                    </div>
+                 </div>
+
+                 <div className="flex gap-3 text-sm">
+                    <div className="flex-1 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg flex flex-col justify-center">
+                       <span className="text-slate-500 mb-1">KM Acumulados</span>
+                       <span className="font-bold text-base text-slate-900 dark:text-white">{selectedNeu.km.toLocaleString()}</span>
+                    </div>
+                    <div className="flex-1 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg flex flex-col justify-center">
+                       <span className="text-slate-500 mb-1">Costo / KM</span>
+                       <span className="font-bold text-base text-slate-900 dark:text-white">${selectedNeu.km > 0 ? (selectedNeu.costo / selectedNeu.km).toFixed(1) : '-.-'}</span>
+                    </div>
+                 </div>
+              </div>
+
+              {/* Ubicacion */}
+              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-5">
+                 <h3 className="text-sm font-bold text-violet-800 dark:text-violet-400 flex items-center mb-4">
+                   <Truck className="w-4 h-4 mr-2" /> Ubicación
+                 </h3>
+                 
+                 <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+                       {selectedNeu.ubicacion === 'MONTADO' && <Truck className="w-5 h-5 text-blue-600 dark:text-blue-500" />}
+                       {selectedNeu.ubicacion === 'BODEGA' && <Box className="w-5 h-5 text-emerald-600 dark:text-emerald-500" />}
+                       {selectedNeu.ubicacion === 'DESECHO' && <Trash className="w-5 h-5 text-slate-500" />}
+                    </div>
+                    <div>
+                       {selectedNeu.ubicacion === 'MONTADO' ? (
+                         <>
+                           <p className="font-bold text-slate-900 dark:text-white text-base">Vehículo {selectedNeu.vehiculo.replace('#', '')}</p>
+                           <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Posición: <span className="font-semibold text-slate-800 dark:text-slate-300">{selectedNeu.pos}</span></p>
+                           <p className="text-xs text-slate-400 mt-2">Instalado el {selectedNeu.instalacion}</p>
+                         </>
+                       ) : (
+                         <p className="font-bold text-slate-900 dark:text-white text-base mt-2 capitalize">{selectedNeu.ubicacion.toLowerCase()}</p>
+                       )}
+                    </div>
+                 </div>
+              </div>
+
+           </div>
+
+           {/* Footer Actions */}
+           <div className="px-6 py-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex gap-3 z-10 sticky bottom-0">
+              <Button 
+                variant="outline" 
+                className="flex-1 bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
+                onClick={() => setIsHistoryModalOpen(true)}
+              >
+                Historial
+              </Button>
+              <Button className="flex-[2] bg-blue-600 hover:bg-blue-700 text-white font-medium">
+                {selectedNeu.ubicacion === 'MONTADO' ? 'Desmontar' : 'Montar en Vehículo'}
+              </Button>
+           </div>
+        </div>
+        </div>
+      )}
+
+      {/* Historial Modal */}
+      <Modal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} title={`Historial: ${selectedNeu?.id || ''}`}>
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+            A continuación se muestra el historial de movimientos y mantenciones del neumático seleccionado.
+          </p>
+          <div className="relative border-l border-slate-200 dark:border-slate-700 ml-3 space-y-6 pb-4">
+             <div className="relative pl-6">
+                <div className="absolute w-3 h-3 bg-blue-500 rounded-full -left-1.5 top-1"></div>
+                <p className="text-xs text-slate-500 font-bold mb-0.5">15 MAY 2026</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Inspección Rutinaria</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">Profundidad registrada: {selectedNeu?.profActual} mm. Se detectó desgaste regular.</p>
+             </div>
+             <div className="relative pl-6">
+                <div className="absolute w-3 h-3 bg-emerald-500 rounded-full -left-1.5 top-1"></div>
+                <p className="text-xs text-slate-500 font-bold mb-0.5">01 ENE 2023</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Montaje en Vehículo</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">Instalado en {selectedNeu?.vehiculo || 'vehículo'} posición {selectedNeu?.pos || 'N/A'}.</p>
+             </div>
+             <div className="relative pl-6">
+                <div className="absolute w-3 h-3 bg-slate-300 dark:bg-slate-600 rounded-full -left-1.5 top-1"></div>
+                <p className="text-xs text-slate-500 font-bold mb-0.5">10 DIC 2022</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Ingreso a Bodega</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">Compra inicial de lote. Costo: ${selectedNeu?.costo?.toLocaleString() || 0}.</p>
+             </div>
+          </div>
+          <div className="flex justify-end pt-4 border-t border-slate-200 dark:border-slate-800">
+             <Button variant="outline" onClick={() => setIsHistoryModalOpen(false)}>Cerrar</Button>
+          </div>
+        </div>
+      </Modal>
+    </div>
   );
 }
 

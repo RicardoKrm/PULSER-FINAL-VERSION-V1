@@ -1,0 +1,1294 @@
+import React, { useState } from 'react';
+import { 
+  Package, History, Smartphone, Boxes, Plus, Download, 
+  Search, Pencil, Trash2, AlertTriangle, AlertCircle, ArrowLeft, ArrowRightLeft, CheckCircle,
+  FileText as Edit
+} from 'lucide-react';
+import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
+import { useAppContext } from '../../context/AppContext';
+
+// Mock data based on screenshots
+const sumInsumosData = [
+  { id: 1, nombre: "ABRAZADERA INTER.", sku: "132165165", proveedor: "Kaufmann", ubicacion: "Estante A-4", calidad: "Alternativo Genérico", stock: 20, min: 2, ultMov: "17/04/2026", precio: 20000.00, valorTotal: 400000.00, isCritico: false },
+  { id: 2, nombre: "ACC. VISCOSO", sku: "A 000 457 3001:MBB", proveedor: "--", ubicacion: "INMOVILIZADO", calidad: "Alternativo Genérico", stock: 98, min: 1, ultMov: "17/04/2026", precio: 360000.00, valorTotal: 35280000.00, isCritico: false },
+  { id: 3, nombre: "ACDELCO ATF DEXRON VI", sku: "965472:SHLAM", proveedor: "--", ubicacion: "INMOVILIZADO", calidad: "Alternativo Genérico", stock: 100, min: 2, ultMov: "--", precio: 7329.00, valorTotal: 732900.00, isCritico: false },
+  { id: 4, nombre: "ACOPLE RAPIDO 12MM.", sku: "28390755:MBB", proveedor: "--", ubicacion: "INMOVILIZADO", calidad: "Alternativo Genérico", stock: 100, min: 10, ultMov: "--", precio: 8000.00, valorTotal: 800000.00, isCritico: false },
+  { id: 5, nombre: "ACOPLE RAPIDO 8MM", sku: "28390744:LOC", proveedor: "--", ubicacion: "INMOVILIZADO", calidad: "Alternativo Genérico", stock: 100, min: 10, ultMov: "--", precio: 4500.00, valorTotal: 450000.00, isCritico: false },
+  { id: 6, nombre: "ACOPLE RAPIDO 8MM.", sku: "28390744:MBB", proveedor: "--", ubicacion: "INMOVILIZADO", calidad: "Alternativo Genérico", stock: 100, min: 10, ultMov: "--", precio: 12971.00, valorTotal: 1297100.00, isCritico: false },
+  { id: 7, nombre: "ALARMA RETROCESO", sku: "508327:LOC", proveedor: "--", ubicacion: "INMOVILIZADO", calidad: "Alternativo Genérico", stock: 100, min: 2, ultMov: "--", precio: 7140.00, valorTotal: 714000.00, isCritico: false },
+  { id: 8, nombre: "AMP. 1 CONT. 12 V H7", sku: "1002", proveedor: "--", ubicacion: "Sin Ubicación", calidad: "Alternativo Genérico", stock: 0, min: 5, ultMov: "24/02/2026", precio: 1178.00, valorTotal: 0.00, isCritico: true },
+  { id: 9, nombre: "AMP. 1 CONT. 24 V H1", sku: "1004", proveedor: "--", ubicacion: "Bodega Matrix", calidad: "Alternativo Genérico", stock: 100, min: 5, ultMov: "--", precio: 1290.00, valorTotal: 129000.00, isCritico: false },
+  { id: 10, nombre: "AMP. 1 CONT. 24 V H7", sku: "1003", proveedor: "--", ubicacion: "Bodega Matrix", calidad: "Alternativo Genérico", stock: 100, min: 5, ultMov: "--", precio: 2860.00, valorTotal: 286000.00, isCritico: false },
+  { id: 11, nombre: "AMP. GL. GR. 24 V", sku: "1005", proveedor: "--", ubicacion: "Bodega Matrix", calidad: "Alternativo Genérico", stock: 100, min: 5, ultMov: "--", precio: 291.00, valorTotal: 29100.00, isCritico: false },
+  { id: 12, nombre: "AMP. H1 LUZ ALTA", sku: "1000", proveedor: "--", ubicacion: "Bodega Matrix", calidad: "Alternativo Genérico", stock: 100, min: 5, ultMov: "--", precio: 1867.00, valorTotal: 186700.00, isCritico: false },
+];
+
+const mockHistorialMovimientos = [
+  { id: 1, fechaHora: "17/04/2026 17:25 hrs", tipo: "Salida por OT", cant: -1, responsable: "administrador", referencia: "--", notas: "TERMINAL DÍA | Destino: Gasto General | Retira: No especificado | Autoriza: No especificado | Validado como GASTO GENERAL: TALLER | Por: administrador" },
+  { id: 2, fechaHora: "17/04/2026 16:14 hrs", tipo: "Ajuste de Inventario (Suma)", cant: 0, responsable: "administrador", referencia: "--", notas: "TRASLADO: 100 un. desde INMOVILIZADO a INMOVILIZADO" },
+  { id: 3, fechaHora: "17/04/2026 16:13 hrs", tipo: "Ajuste de Inventario (Suma)", cant: 0, responsable: "administrador", referencia: "--", notas: "TRASLADO: 100 un. desde Bodega Matrix a Bodega Matrix" },
+  { id: 4, fechaHora: "17/04/2026 16:03 hrs", tipo: "Ajuste de Inventario (Suma)", cant: 0, responsable: "administrador", referencia: "--", notas: "TRASLADO MASIVO: Desde INMOVILIZADO a Bodega Turno Noche" },
+  { id: 5, fechaHora: "16/04/2026 17:48 hrs", tipo: "Ajuste de Inventario (Suma)", cant: 0, responsable: "administrador", referencia: "--", notas: "TRASLADO MASIVO: Desde INMOVILIZADO a INMOVILIZADO" },
+];
+
+const mockAuditoriaData = [
+  { id: 1, fecha: "05/05/2026", hora: "10:28 HRS", repuestoNombre: "FAROL TRAS. G7", sku: "SKU MARSAL1211", proveedor: "--", ubicacion: "Estante A-2", tipo: "SALIDA", cant: 1, notas: "VALIDADO GASTO DÍA | DESTINO: ASD1 | RETIRA: ASDASD | AUTORIZA: ASDASDASD | VALIDADO COMO TALLER POR ADMINISTRADOR", usuario: "administrador" },
+  { id: 2, fecha: "05/05/2026", hora: "10:20 HRS", repuestoNombre: "FILTRO ACEITE DIRECCIÓN HIDRÁULICA SCANIA", sku: "38377546", proveedor: "--", ubicacion: "Estante A-1", tipo: "SALIDA", cant: 1, notas: "VALIDADO GASTO DÍA | DESTINO: ASD | RETIRA: YO | AUTORIZA: YOOO | VALIDADO COMO TALLER POR ADMINISTRADOR", usuario: "administrador" },
+  { id: 3, fecha: "29/04/2026", hora: "10:40 HRS", repuestoNombre: "FILTRO ACEITE DIRECCIÓN HIDRÁULICA SCANIA", sku: "38377546", proveedor: "--", ubicacion: "Estante A-1", tipo: "SALIDA", cant: 4, notas: "VALIDADO GASTO DÍA | DESTINO: CAMION | RETIRA: MIGUELITO | AUTORIZA: GONZALO | VALIDADO COMO TALLER POR ADMINISTRADOR", usuario: "administrador" },
+  { id: 4, fecha: "29/04/2026", hora: "10:39 HRS", repuestoNombre: "FILTRO ACEITE DIRECCIÓN HIDRÁULICA SCANIA", sku: "38377546", proveedor: "--", ubicacion: "Estante A-1", tipo: "ENTRADA", cant: 4, notas: "INGRESO TERMINAL DÍA - TERMINAL", usuario: "administrador" },
+  { id: 5, fecha: "29/04/2026", hora: "10:38 HRS", repuestoNombre: "FILTRO ACEITE DIRECCIÓN HIDRÁULICA SCANIA", sku: "38377546", proveedor: "--", ubicacion: "Estante A-1", tipo: "SALIDA", cant: 1, notas: "OT-OT-0348", usuario: "administrador", esEnlace: true },
+  { id: 6, fecha: "27/04/2026", hora: "10:55 HRS", repuestoNombre: "FILTRO DE POLVO VS30", sku: "A 910 830 11 00:MBA", proveedor: "--", ubicacion: "Estante A-1", tipo: "SALIDA", cant: 1, notas: "OT-OT-0349", usuario: "demo", esEnlace: true },
+  { id: 7, fecha: "27/04/2026", hora: "10:55 HRS", repuestoNombre: "FILTRO AIRE NCV3", sku: "A 0000903751:HENGST", proveedor: "--", ubicacion: "Estante A-1", tipo: "SALIDA", cant: 1, notas: "OT-OT-0349", usuario: "demo", esEnlace: true },
+  { id: 8, fecha: "27/04/2026", hora: "10:55 HRS", repuestoNombre: "FILTRO ACEITE NCV3 + VS30", sku: "A 651 180 01 09:HENGST", proveedor: "--", ubicacion: "Estante A-1", tipo: "SALIDA", cant: 1, notas: "OT-OT-0349", usuario: "demo", esEnlace: true },
+];
+
+const mockValidacionesData = [
+  { id: 1, fecha: "15/05/2026", hora: "08:30 HRS", repuestoNombre: "BATERÍA 12V 70AH", sku: "BAT-1270", cant: -2, notas: "TERMINAL DÍA | Destino: Taller Mecánico | Retira: Juan", usuario: "operador1" },
+  { id: 2, fecha: "14/05/2026", hora: "15:45 HRS", repuestoNombre: "FRENOS PASTILLAS DELANTERAS", sku: "FR-PD-001", cant: -1, notas: "TERMINAL DÍA | Destino: Revisión Técnica | Retira: Pedro", usuario: "operador2" },
+  { id: 3, fecha: "14/05/2026", hora: "11:20 HRS", repuestoNombre: "ACEITE MOTOR 5W30 1L", sku: "AC-5W30-1L", cant: -5, notas: "TERMINAL NOCHE | Destino: Mantenimiento Preventivo | Retira: Ana", usuario: "operador3" },
+];
+
+export default function GestionSuministros() {
+  const { proveedores } = useAppContext();
+  const [activeView, setActiveView] = useState<'inventario' | 'auditoria' | 'validaciones'>('inventario');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBodega, setSelectedBodega] = useState('Todas las bodegas');
+  const [selectedCalidad, setSelectedCalidad] = useState('Todas las calidades');
+  const [selectedProveedor, setSelectedProveedor] = useState('Todos los proveedores');
+  const [filterBajoStock, setFilterBajoStock] = useState(false);
+  const [filterSinMov, setFilterSinMov] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<number[]>([]);
+  const [selectedRepuestoDetalle, setSelectedRepuestoDetalle] = useState<typeof sumInsumosData[0] | null>(null);
+  
+  // States for Movimiento Masivo
+  const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [destinationBodega, setDestinationBodega] = useState('');
+
+  // States for Validaciones
+  const [isValidateModalOpen, setIsValidateModalOpen] = useState(false);
+  const [itemToValidate, setItemToValidate] = useState<typeof mockValidacionesData[0] | null>(null);
+  const [validateType, setValidateType] = useState<'OT' | 'GASTO'>('OT');
+  const [validateOtId, setValidateOtId] = useState('');
+  const [validateGastoCat, setValidateGastoCat] = useState('');
+  const [validacionesList, setValidacionesList] = useState(mockValidacionesData);
+
+  const [validacionesSearchTerm, setValidacionesSearchTerm] = useState('');
+
+  // States for Terminal (Entrada / Salida)
+  const [isTerminalModalOpen, setIsTerminalModalOpen] = useState(false);
+  const [terminalForm, setTerminalForm] = useState({
+    sku: '',
+    nombre: '',
+    bodegaId: '',
+    tipoMovimiento: 'SALIDA',
+    cantidad: 1,
+    solicitante: '',
+    autorizador: '',
+    destino: ''
+  });
+
+  // States for New Repuesto (Nuevo)
+  const [isNewRepuestoModalOpen, setIsNewRepuestoModalOpen] = useState(false);
+  const [newRepuestoForm, setNewRepuestoForm] = useState({
+    nombre: '',
+    numeroParte: '',
+    calidad: 'ORIGINAL',
+    origen: 'OEM',
+    nivelCriticidad: 'INSUMO',
+    stockActual: 0,
+    stockMinimo: 0,
+    diasStockObjetivo: 30,
+    ubicacion: '',
+    precioUnitario: 0,
+    bodegaId: '1', // Default bodega
+    proveedorId: ''
+  });
+
+  const filteredValidaciones = validacionesList.filter(v => 
+    v.repuestoNombre.toLowerCase().includes(validacionesSearchTerm.toLowerCase()) ||
+    v.sku.toLowerCase().includes(validacionesSearchTerm.toLowerCase()) ||
+    v.notas.toLowerCase().includes(validacionesSearchTerm.toLowerCase()) ||
+    v.usuario.toLowerCase().includes(validacionesSearchTerm.toLowerCase())
+  );
+
+  // Function to format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-CL', {
+      style: 'currency',
+      currency: 'CLP',
+    }).format(amount);
+  };
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedItems(filteredData.map(item => item.id));
+    } else {
+      setSelectedItems([]);
+    }
+  };
+
+  const handleSelectItem = (id: number) => {
+    if (selectedItems.includes(id)) {
+      setSelectedItems(selectedItems.filter(itemId => itemId !== id));
+    } else {
+      setSelectedItems([...selectedItems, id]);
+    }
+  };
+
+  // Helper to check if a date string 'DD/MM/YYYY' is older than 6 months
+  const isOlderThan6Months = (dateStr: string) => {
+    if (dateStr === '--') return true; // Assuming never moved implies no movement in 6 months
+    const [day, month, year] = dateStr.split('/');
+    if (!day || !month || !year) return false;
+    const itemDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    return itemDate < sixMonthsAgo;
+  };
+
+  // Filtering logic
+  const filteredData = sumInsumosData.filter((item) => {
+    // 1. Text Search (SKU / Nombre)
+    const matchesSearch = 
+      searchTerm === '' || 
+      item.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.sku.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // 2. Bodega Filter
+    const matchesBodega = 
+      selectedBodega === 'Todas las bodegas' || 
+      item.ubicacion === selectedBodega;
+
+    // 3. Calidad Filter
+    const matchesCalidad = 
+      selectedCalidad === 'Todas las calidades' || 
+      item.calidad === selectedCalidad;
+
+    // 4. Proveedor Filter
+    const matchesProveedor = 
+      selectedProveedor === 'Todos los proveedores' || 
+      item.proveedor === selectedProveedor;
+
+    // 5. Bajo Stock Filter
+    const matchesBajoStock = filterBajoStock ? (item.stock < item.min) : true;
+
+    // 6. Sin Movimiento (6 meses)
+    const matchesSinMov = filterSinMov ? isOlderThan6Months(item.ultMov) : true;
+
+    return matchesSearch && matchesBodega && matchesCalidad && matchesProveedor && matchesBajoStock && matchesSinMov;
+  });
+
+  const exportInventario = () => {
+    const headers = ['Nombre', 'SKU', 'Ubicación', 'Posición', 'Calidad', 'Proveedor', 'Precio Un.', 'Stock Actual', 'Mínimo', 'Último Mov.', 'Valor Total'];
+    
+    const rows = filteredData.map(item => [
+      `"${item.nombre}"`,
+      `"${item.sku}"`,
+      `"${item.ubicacion}"`,
+      `""`,
+      `"${item.calidad}"`,
+      `"${item.proveedor}"`,
+      item.precio,
+      item.stock,
+      item.min,
+      `"${item.ultMov}"`,
+      item.valorTotal
+    ]);
+
+    const csvContent = "\uFEFF" + [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `inventario_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  const valorizacionFiltrada = filteredData.reduce((acc, item) => acc + item.valorTotal, 0);
+
+  if (activeView === 'auditoria') {
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {/* Header section with metrics and actions */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center p-6 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <History className="w-8 h-8 text-slate-800 dark:text-slate-200" />
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Auditoría de Bodega</h1>
+            </div>
+            <div className="mt-2 flex items-center gap-2 text-sm text-slate-500 uppercase font-medium">
+              CONTROL E HISTORIAL DE MOVIMIENTOS
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" className="bg-slate-500 hover:bg-slate-600 text-white border-0" onClick={() => setActiveView('inventario')}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              VOLVER
+            </Button>
+            
+            <Button className="bg-[#10b981] hover:bg-[#059669] text-white">
+              <Download className="w-4 h-4 mr-2" />
+              EXPORTAR EXCEL
+            </Button>
+          </div>
+        </div>
+
+        {/* Filters section */}
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-wrap gap-4 items-center">
+          <div className="flex-1 min-w-[200px]">
+            <input 
+              type="text" 
+              placeholder="Buscar Repuesto, SKU o Notas..."
+              className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-400"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 font-medium">DESDE:</span>
+            <input type="date" className="border border-slate-300 dark:border-slate-700 rounded-md px-3 py-1.5 bg-transparent text-sm dark:bg-slate-800" />
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 font-medium">HASTA:</span>
+            <input type="date" className="border border-slate-300 dark:border-slate-700 rounded-md px-3 py-1.5 bg-transparent text-sm dark:bg-slate-800" />
+          </div>
+
+          <select className="border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800">
+            <option>Cualquier Movimiento</option>
+            <option>ENTRADA</option>
+            <option>SALIDA</option>
+          </select>
+
+          <select className="border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800">
+            <option>Cualquier Usuario</option>
+            <option>administrador</option>
+            <option>demo</option>
+          </select>
+        </div>
+
+        {/* Table section */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+          <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+              Show 
+              <select className="border border-slate-300 dark:border-slate-700 rounded px-2 py-1 mx-1 bg-transparent">
+                <option>50</option>
+                <option>100</option>
+              </select> 
+              entries
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-[10px] uppercase text-slate-500 border-b border-slate-200 dark:border-slate-800 font-bold bg-slate-50 dark:bg-slate-800/50">
+                <tr>
+                  <th className="px-4 py-3">FECHA / HORA <span className="font-light">▼</span></th>
+                  <th className="px-4 py-3">REPUESTO / SKU <span className="font-light">▼</span></th>
+                  <th className="px-4 py-3">PROVEEDOR <span className="font-light">▼</span></th>
+                  <th className="px-4 py-3">UBIC. <span className="font-light">▼</span></th>
+                  <th className="px-4 py-3 text-center">TIPO <span className="font-light">▼</span></th>
+                  <th className="px-4 py-3 text-center">CANT. <span className="font-light">▼</span></th>
+                  <th className="px-4 py-3 w-1/3">REFERENCIA / NOTAS</th>
+                  <th className="px-4 py-3">USUARIO <span className="font-light">▼</span></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {mockAuditoriaData.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                    <td className="px-4 py-3 align-top whitespace-nowrap">
+                      <div className="font-bold text-slate-800 dark:text-slate-200 text-xs">{item.fecha}</div>
+                      <div className="text-[10px] text-slate-500">{item.hora}</div>
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <div className="font-bold text-blue-600 dark:text-blue-400 text-xs hover:underline cursor-pointer">
+                        {item.repuestoNombre}
+                      </div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        SKU: {item.sku}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 align-top text-xs text-slate-600 dark:text-slate-400">{item.proveedor}</td>
+                    <td className="px-4 py-3 align-top text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {item.ubicacion.split(' ').map((p, i) => <div key={i}>{p}</div>)}
+                    </td>
+                    <td className="px-4 py-3 align-top text-center">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase
+                        ${item.tipo === 'SALIDA' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'}`}>
+                        {item.tipo}
+                      </span>
+                    </td>
+                    <td className={`px-4 py-3 align-top text-center font-bold text-sm ${item.tipo === 'SALIDA' ? 'text-orange-500' : 'text-emerald-500'}`}>
+                      {item.cant}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      {item.esEnlace ? (
+                        <a href="#" className="text-[10px] font-bold text-blue-500 hover:underline">{item.notas}</a>
+                      ) : (
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-medium leading-tight">
+                          {item.notas}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 align-top text-xs font-bold text-slate-600 dark:text-slate-400">
+                      {item.usuario}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (activeView === 'validaciones') {
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center p-6 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl">
+                <AlertCircle className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Validación de Salidas de Bodega</h1>
+            </div>
+            <div className="mt-2 flex items-center gap-2 text-sm text-slate-500 uppercase font-medium">
+              Repositorio temporal para movimientos pendientes (24 Horas)
+            </div>
+          </div>
+
+          <Button variant="secondary" className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-sm" onClick={() => setActiveView('inventario')}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            VOLVER AL INVENTARIO
+          </Button>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+          <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-lg">Pendientes de Validación</h3>
+            <div className="relative w-full sm:w-72">
+              <input 
+                type="text" 
+                placeholder="Buscar repuesto, nota o usuario..."
+                value={validacionesSearchTerm}
+                onChange={(e) => setValidacionesSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+              />
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-[10px] uppercase text-slate-500 border-b border-slate-200 dark:border-slate-800 font-bold bg-slate-50 dark:bg-slate-800/50">
+                <tr>
+                  <th className="px-6 py-4">DETALLE DEL REPUESTO</th>
+                  <th className="px-6 py-4 text-center">CANT.</th>
+                  <th className="px-6 py-4">NOTAS / ORIGEN</th>
+                  <th className="px-6 py-4">USUARIO / FECHA</th>
+                  <th className="px-6 py-4 text-right">ACCIÓN</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {filteredValidaciones.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center">
+                      <div className="flex flex-col items-center justify-center text-slate-500">
+                        <AlertCircle className="w-10 h-10 mb-3 text-slate-300 dark:text-slate-600" />
+                        <p className="text-base font-medium text-slate-600 dark:text-slate-400">No hay salidas pendientes de validación</p>
+                        <p className="text-sm mt-1">Todas las salidas de bodega están asignadas correctamente.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredValidaciones.map((item) => (
+                    <tr key={item.id} className="hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-colors group">
+                      <td className="px-6 py-4 align-top">
+                        <div className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                          {item.repuestoNombre}
+                        </div>
+                        <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mt-1">
+                          SKU: {item.sku}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 align-top text-center">
+                        <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-md bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-bold text-sm border border-red-100 dark:border-red-800/30">
+                          {item.cant}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 align-top">
+                        <div className="max-w-xs xl:max-w-md">
+                          <p className="text-xs text-slate-600 dark:text-slate-400 uppercase font-medium leading-relaxed bg-slate-50 dark:bg-slate-800 p-2 rounded border border-slate-100 dark:border-slate-700">
+                            {item.notas}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 align-top">
+                        <div className="font-medium text-slate-700 dark:text-slate-300 text-sm">
+                          {item.usuario}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1 group-hover:text-indigo-500 transition-colors">
+                          <History className="w-3 h-3" />
+                          {item.fecha} {item.hora}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 align-middle text-right">
+                        <Button 
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-all"
+                          onClick={() => {
+                            setItemToValidate(item);
+                            setIsValidateModalOpen(true);
+                          }}
+                        >
+                          VALIDAR
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Validate Modal */}
+        <Modal
+          isOpen={isValidateModalOpen}
+          onClose={() => setIsValidateModalOpen(false)}
+          title="Validar Consumo / Salida"
+        >
+          {itemToValidate && (
+            <div className="space-y-6">
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+                <h4 className="font-semibold text-slate-800 dark:text-slate-200 text-sm mb-2">Detalles del Movimiento</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="block text-xs text-slate-500">Repuesto</span>
+                    <span className="font-medium dark:text-slate-300">{itemToValidate.repuestoNombre}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-slate-500">Cantidad</span>
+                    <span className="font-bold text-red-500">{itemToValidate.cant}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="block text-xs text-slate-500">Notas</span>
+                    <span className="text-slate-600 dark:text-slate-400 italic text-xs">{itemToValidate.notas}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="font-medium text-slate-800 dark:text-slate-200 text-sm">¿Cómo quieres validar este movimiento?</h4>
+                <div className="flex gap-4">
+                  <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-colors ${validateType === 'OT' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
+                    <input type="radio" name="validateType" value="OT" className="hidden" checked={validateType === 'OT'} onChange={() => setValidateType('OT')} />
+                    Cargar a O.T.
+                  </label>
+                  <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-colors ${validateType === 'GASTO' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
+                    <input type="radio" name="validateType" value="GASTO" className="hidden" checked={validateType === 'GASTO'} onChange={() => setValidateType('GASTO')} />
+                    Gasto Interno
+                  </label>
+                </div>
+
+                {validateType === 'OT' ? (
+                  <div className="space-y-2 animate-in fade-in duration-300">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Seleccionar O.T. Abierta</label>
+                    <select 
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-transparent focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 dark:text-slate-200"
+                      value={validateOtId}
+                      onChange={(e) => setValidateOtId(e.target.value)}
+                    >
+                      <option value="">Seleccione una OT...</option>
+                      <option value="OT-1001">OT-1001 - Camión Volvo FH16 (En Proceso)</option>
+                      <option value="OT-1002">OT-1002 - Bus Scania K400 (Pendiente)</option>
+                      <option value="OT-1005">OT-1005 - Camioneta Hilux (En Proceso)</option>
+                    </select>
+                  </div>
+                ) : (
+                  <div className="space-y-2 animate-in fade-in duration-300">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Categoría de Gasto</label>
+                    <select 
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-transparent focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 dark:text-slate-200"
+                      value={validateGastoCat}
+                      onChange={(e) => setValidateGastoCat(e.target.value)}
+                    >
+                      <option value="">Seleccione una categoría...</option>
+                      <option value="Taller">Taller / Reparación Interna</option>
+                      <option value="Administracion">Administración</option>
+                      <option value="Consumo de Chofer">Consumo de Chofer</option>
+                      <option value="Merma">Merma / Pérdida</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-slate-200 dark:border-slate-700">
+            <Button variant="secondary" onClick={() => setIsValidateModalOpen(false)}>Cancelar</Button>
+            <Button 
+              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              disabled={validateType === 'OT' ? !validateOtId : !validateGastoCat}
+              onClick={() => {
+                if (itemToValidate) {
+                  setValidacionesList(validacionesList.filter(v => v.id !== itemToValidate.id));
+                  setIsValidateModalOpen(false);
+                  setItemToValidate(null);
+                  setValidateOtId('');
+                  setValidateGastoCat('');
+                  // Optionally show a success toast here
+                }
+              }}
+            >
+              Confirmar Validación
+            </Button>
+          </div>
+        </Modal>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Header section with metrics and actions */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center p-6 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+            <Boxes className="w-8 h-8 text-slate-800 dark:text-slate-200" />
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Gestión de Suministros</h1>
+          </div>
+          <div className="mt-2 flex items-center gap-2 text-sm">
+            <span>💰 Valorización Filtrada:</span>
+            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+              {formatCurrency(valorizacionFiltrada)}
+            </span>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button className="bg-[#4285f4] hover:bg-[#3367d6] text-white" onClick={() => setActiveView('auditoria')}>
+            <History className="w-4 h-4 mr-2" />
+            Historial Bodega
+          </Button>
+          
+          {selectedItems.length > 0 && (
+            <Button 
+              className="bg-[#8b5cf6] hover:bg-[#7c3aed] text-white"
+              onClick={() => setIsMoveModalOpen(true)}
+            >
+              <Boxes className="w-4 h-4 mr-2" />
+              Movimiento Masivo ( {selectedItems.length} )
+            </Button>
+          )}
+          
+          <Button className="bg-[#6366f1] hover:bg-[#4f46e5] text-white" onClick={() => setActiveView('validaciones')}>
+            <AlertCircle className="w-4 h-4 mr-2" />
+            Validaciones
+          </Button>
+          
+          <Button className="bg-[#f59e0b] hover:bg-[#d97706] text-white" onClick={() => setIsTerminalModalOpen(true)}>
+            <ArrowRightLeft className="w-4 h-4 mr-2" />
+            Entrada / Salida
+          </Button>
+          
+          <Button className="bg-[#06b6d4] hover:bg-[#0891b2] text-white" onClick={() => setIsNewRepuestoModalOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo
+          </Button>
+          
+          <Button className="bg-[#10b981] hover:bg-[#059669] text-white" onClick={exportInventario}>
+            <Download className="w-4 h-4 mr-2" />
+            Exportar
+          </Button>
+        </div>
+      </div>
+
+      {/* Filters section */}
+      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-wrap gap-4 items-center">
+        <select 
+          className="border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800"
+          value={selectedBodega}
+          onChange={(e) => setSelectedBodega(e.target.value)}
+        >
+          <option>Todas las bodegas</option>
+          <option>Bodega Matrix</option>
+          <option>Bodega Consignación</option>
+          <option>INMOVILIZADO</option>
+          <option>Sin Ubicación</option>
+        </select>
+
+        <select 
+          className="border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800"
+          value={selectedCalidad}
+          onChange={(e) => setSelectedCalidad(e.target.value)}
+        >
+          <option>Todas las calidades</option>
+          <option>Alternativo Genérico</option>
+          <option>Original</option>
+          <option>Otro</option>
+        </select>
+
+        <select 
+          className="border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800"
+          value={selectedProveedor}
+          onChange={(e) => setSelectedProveedor(e.target.value)}
+        >
+          <option>Todos los proveedores</option>
+          <option>Kaufmann</option>
+          <option>Epysa</option>
+          <option>Volvo</option>
+        </select>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500 font-medium">DESDE:</span>
+          <input type="date" className="border border-slate-300 dark:border-slate-700 rounded-md px-3 py-1.5 bg-transparent text-sm dark:bg-slate-800" />
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500 font-medium">HASTA:</span>
+          <input type="date" className="border border-slate-300 dark:border-slate-700 rounded-md px-3 py-1.5 bg-transparent text-sm dark:bg-slate-800" />
+        </div>
+
+        <button 
+          className={`flex items-center gap-2 px-4 py-1.5 rounded-full border text-sm ml-auto
+            ${filterBajoStock ? 'bg-red-50 dark:bg-red-900/30 border-red-500 text-red-600 dark:text-red-400' : 'border-red-200 text-red-500 hover:bg-red-50 dark:border-red-900/50 dark:hover:bg-red-900/20'}
+          `}
+          onClick={() => setFilterBajoStock(!filterBajoStock)}
+        >
+          <div className="w-3 h-3 border border-current rounded-sm"></div>
+          <AlertTriangle className="w-4 h-4" />
+          Bajo stock
+        </button>
+
+        <button 
+          className={`flex items-center gap-2 px-4 py-1.5 rounded-full border text-sm
+            ${filterSinMov ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-indigo-200 text-indigo-500 hover:bg-indigo-50 dark:border-indigo-900/50 dark:hover:bg-indigo-900/20'}
+          `}
+          onClick={() => setFilterSinMov(!filterSinMov)}
+        >
+          <div className="w-3 h-3 border border-current rounded-sm"></div>
+          Sin mov. (6 meses)
+        </button>
+      </div>
+
+      {/* Table section */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+        <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+            Show 
+            <select className="border border-slate-300 dark:border-slate-700 rounded px-2 py-1 mx-1 bg-transparent">
+              <option>25</option>
+              <option>50</option>
+              <option>100</option>
+            </select> 
+            entries
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-600 dark:text-slate-400">Buscador SKU / Nombre / Equivalente:</span>
+            <div className="relative">
+              <input 
+                type="text" 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-3 pr-8 py-1 border border-slate-300 dark:border-slate-700 rounded-md bg-transparent focus:outline-none focus:ring-1 focus:ring-slate-400"
+              />
+              <Search className="w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" strokeWidth={1.5} />
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="text-xs uppercase text-slate-500 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 font-medium whitespace-nowrap">
+              <tr>
+                <th className="px-4 py-3 text-center w-10">
+                  <input type="checkbox" onChange={handleSelectAll} className="rounded border-slate-300" />
+                </th>
+                <th className="px-4 py-3">NOMBRE REPUESTO <span className="font-light text-[10px]">▼</span></th>
+                <th className="px-4 py-3">SKU / N° PARTE <span className="font-light text-[10px]">▼</span></th>
+                <th className="px-4 py-3">PROVEEDOR <span className="font-light text-[10px]">▼</span></th>
+                <th className="px-4 py-3">UBICACIÓN / BODEGA <span className="font-light text-[10px]">▼</span></th>
+                <th className="px-4 py-3">CALIDAD <span className="font-light text-[10px]">▼</span></th>
+                <th className="px-4 py-3 text-center">STOCK <span className="font-light text-[10px]">▼</span></th>
+                <th className="px-4 py-3 text-center">MÍN. <span className="font-light text-[10px]">▼</span></th>
+                <th className="px-4 py-3">ÚLT. MOV <span className="font-light text-[10px]">▼</span></th>
+                <th className="px-4 py-3 text-right">PRECIO UNIT. <span className="font-light text-[10px]">▼</span></th>
+                <th className="px-4 py-3 text-right">VALOR TOTAL <span className="font-light text-[10px]">▼</span></th>
+                <th className="px-4 py-3 text-center">ACCIONES</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredData.map((item) => (
+                <tr 
+                  key={item.id} 
+                  className={`border-b dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors
+                    ${item.isCritico ? 'bg-red-50/50 dark:bg-red-900/10' : ''}
+                  `}
+                >
+                  <td className="px-4 py-3 text-center">
+                    <input 
+                      type="checkbox" 
+                      checked={selectedItems.includes(item.id)}
+                      onChange={() => handleSelectItem(item.id)}
+                      className="rounded border-slate-300" 
+                    />
+                  </td>
+                  <td 
+                    className="px-4 py-3 font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                    onClick={() => setSelectedRepuestoDetalle(item)}
+                  >
+                    {item.nombre}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs">{item.sku}</td>
+                  <td className="px-4 py-3">{item.proveedor}</td>
+                  <td className="px-4 py-3">{item.ubicacion}</td>
+                  <td className="px-4 py-3">{item.calidad}</td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`font-bold ${item.isCritico ? 'bg-red-500 text-white px-2 py-0.5 rounded-md' : ''}`}>
+                      {item.stock}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-center text-slate-500">{item.min}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">{item.ultMov}</td>
+                  <td className="px-4 py-3 text-right">{formatCurrency(item.precio)}</td>
+                  <td className="px-4 py-3 text-right font-medium">{formatCurrency(item.valorTotal)}</td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <button className="p-1.5 text-slate-400 hover:text-blue-500 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm transition-colors" title="Editar">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button className="p-1.5 text-slate-400 hover:text-red-500 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm transition-colors" onClick={(e) => e.preventDefault()} title="Eliminar Registro">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Detalle Repuesto Modal */}
+      <Modal 
+        isOpen={!!selectedRepuestoDetalle} 
+        onClose={() => setSelectedRepuestoDetalle(null)} 
+        title="Detalle de Repuesto"
+      >
+        {selectedRepuestoDetalle && (
+          <div className="space-y-6">
+            <div className="flex flex-col md:flex-row justify-between md:items-end gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+                <div>
+                   <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 uppercase">{selectedRepuestoDetalle.nombre} <span className="text-slate-400 font-normal">| SKU: {selectedRepuestoDetalle.sku}</span></h2>
+                </div>
+                <div className="flex gap-2">
+                    <Button variant="secondary" className="bg-slate-500 hover:bg-slate-600 text-white border-0" onClick={() => setSelectedRepuestoDetalle(null)}>
+                      <ArrowLeft className="w-4 h-4 mr-2" /> VOLVER AL INVENTARIO
+                    </Button>
+                    <Button className="bg-[#06b6d4] hover:bg-[#0891b2] text-white border-0">
+                      <Edit className="w-4 h-4 mr-2" /> EDITAR DATOS
+                    </Button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Left Column: Info & Control */}
+              <div className="space-y-6">
+                <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700">
+                  <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-4 flex items-center gap-2">
+                    <span className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center text-[10px] text-white">i</span>
+                    INFORMACIÓN GENERAL
+                  </h3>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase">NOMBRE OFICIAL</p>
+                      <p className="font-bold text-slate-900 dark:text-white">{selectedRepuestoDetalle.nombre}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase">CALIDAD / ORIGEN</p>
+                      <p className="font-medium text-slate-900 dark:text-white">{selectedRepuestoDetalle.calidad}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase">UBICACIÓN ACTUAL</p>
+                      <p className="font-medium text-slate-900 dark:text-white">{selectedRepuestoDetalle.ubicacion}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase">PROVEEDOR HABITUAL</p>
+                      <p className="font-medium text-slate-900 dark:text-white">{selectedRepuestoDetalle.proveedor}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase">PRECIO UNITARIO</p>
+                      <p className="font-bold text-xl text-emerald-600 dark:text-emerald-400">{formatCurrency(selectedRepuestoDetalle.precio)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700">
+                  <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-4 flex items-center gap-2">
+                    <Boxes className="w-4 h-4 text-orange-500" />
+                    CONTROL DE EXISTENCIAS
+                  </h3>
+                  
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-xl text-center mb-6 border-dashed">
+                    <div className={`text-5xl font-black mb-2 ${selectedRepuestoDetalle.isCritico ? 'text-red-600' : 'text-emerald-700'}`}>
+                      {selectedRepuestoDetalle.stock}
+                    </div>
+                    <div className="text-xs text-slate-500 font-bold uppercase tracking-wider">
+                      UNIDADES DISPONIBLES
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center text-sm mb-6">
+                    <div>
+                      <p className="text-slate-500 font-medium">STOCK MÍNIMO</p>
+                      <p className="font-bold">{selectedRepuestoDetalle.min} unidades</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-slate-500 font-medium">VALORIZACIÓN</p>
+                      <p className="font-bold">{formatCurrency(selectedRepuestoDetalle.valorTotal)}</p>
+                    </div>
+                  </div>
+
+                  <Button className="w-full bg-[#4285f4] hover:bg-[#3367d6] text-white">
+                    <ArrowRightLeft className="w-4 h-4 mr-2" />
+                    REGISTRAR MOVIMIENTO MANUAL
+                  </Button>
+                </div>
+              </div>
+
+              {/* Right Column: History */}
+              <div className="md:col-span-2 bg-slate-50 dark:bg-slate-800/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                    <History className="w-4 h-4 text-purple-500" />
+                    HISTORIAL DE MOVIMIENTOS
+                  </h3>
+                  <span className="text-xs bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded-full font-medium text-slate-600 dark:text-slate-300">
+                    {mockHistorialMovimientos.length} REGISTROS
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="text-slate-500 border-b border-slate-200 dark:border-slate-700">
+                      <tr>
+                        <th className="py-2 pr-2 font-bold uppercase whitespace-nowrap">FECHA / HORA</th>
+                        <th className="py-2 px-2 font-bold uppercase">TIPO DE MOVIMIENTO</th>
+                        <th className="py-2 px-2 font-bold uppercase text-center">CANT.</th>
+                        <th className="py-2 px-2 font-bold uppercase">RESPONSABLE</th>
+                        <th className="py-2 px-2 font-bold uppercase">REFERENCIA</th>
+                        <th className="py-2 pl-2 font-bold uppercase w-1/3">NOTAS</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-700/50">
+                      {mockHistorialMovimientos.map((mov) => (
+                        <tr key={mov.id}>
+                          <td className="py-4 pr-2 font-medium whitespace-nowrap">
+                            {mov.fechaHora.split(' ').map((part, i) => (
+                              <div key={i} className={i === 1 || i === 2 ? 'text-slate-500 text-[10px]' : ''}>{part}</div>
+                            ))}
+                          </td>
+                          <td className="py-4 px-2">
+                            <span className="bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded-md text-[10px] font-medium leading-tight inline-block text-slate-700 dark:text-slate-300">
+                              {mov.tipo}
+                            </span>
+                          </td>
+                          <td className={`py-4 px-2 text-center font-bold ${mov.cant < 0 ? 'text-red-500' : (mov.cant > 0 ? 'text-emerald-500' : 'text-slate-500')}`}>
+                            {mov.cant}
+                          </td>
+                          <td className="py-4 px-2 font-medium">
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-5 h-5 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center shrink-0">
+                                👤
+                              </span>
+                              {mov.responsable}
+                            </div>
+                          </td>
+                          <td className="py-4 px-2 text-slate-400">{mov.referencia}</td>
+                          <td className="py-4 pl-2 text-[10px] font-medium italic text-slate-600 dark:text-slate-400 leading-relaxed">
+                            {mov.notas}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Movimiento Masivo Modal */}
+      <Modal
+        isOpen={isMoveModalOpen}
+        onClose={() => setIsMoveModalOpen(false)}
+        title="Movimiento Masivo"
+      >
+        <div className="flex flex-col items-center justify-center space-y-6 py-4">
+          <p className="text-slate-600 dark:text-slate-300 text-lg">
+            Vas a trasladar {selectedItems.length} artículos. ¿A qué bodega van?
+          </p>
+          <select 
+            className="w-full max-w-sm border border-slate-300 dark:border-slate-700 rounded-md px-4 py-3 bg-transparent dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+            value={destinationBodega}
+            onChange={(e) => setDestinationBodega(e.target.value)}
+          >
+            <option value="" disabled>Selecciona bodega de destino</option>
+            <option value="Kaufmann">Kaufmann</option>
+            <option value="Bodega Matrix">Bodega Matrix</option>
+            <option value="Bodega Consignación">Bodega Consignación</option>
+            <option value="Turno Noche">Turno Noche</option>
+          </select>
+          <div className="flex gap-4 pt-4">
+            <Button 
+              className="bg-[#8b5cf6] hover:bg-[#7c3aed] text-white px-8 py-2"
+              onClick={() => {
+                if (destinationBodega) {
+                  setIsMoveModalOpen(false);
+                  setIsSuccessModalOpen(true);
+                  // Optionally clear items after move: setSelectedItems([]) string later
+                }
+              }}
+              disabled={!destinationBodega}
+            >
+              Confirmar Traslado
+            </Button>
+            <Button 
+              variant="secondary" 
+              className="bg-slate-500 hover:bg-slate-600 text-white px-8 py-2 border-0"
+              onClick={() => setIsMoveModalOpen(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Success Modal */}
+      <Modal
+        isOpen={isSuccessModalOpen}
+        onClose={() => {
+          setIsSuccessModalOpen(false);
+          setSelectedItems([]);
+          setDestinationBodega('');
+        }}
+        title=""
+      >
+        <div className="flex flex-col items-center justify-center space-y-6 py-8 text-center">
+          <div className="w-24 h-24 rounded-full border-4 border-emerald-100 flex items-center justify-center mb-2">
+            <CheckCircle className="w-16 h-16 text-emerald-400" strokeWidth={1.5} />
+          </div>
+          <h2 className="text-3xl font-medium text-slate-800 dark:text-slate-100">¡Éxito!</h2>
+          <p className="text-slate-600 dark:text-slate-300 text-lg">
+            ¡Éxito! Se trasladaron {selectedItems.length} artículos a {destinationBodega}.
+          </p>
+          <Button 
+            className="bg-[#8b5cf6] hover:bg-[#7c3aed] text-white px-12 py-2 mt-4"
+            onClick={() => {
+              setIsSuccessModalOpen(false);
+              setSelectedItems([]);
+              setDestinationBodega('');
+            }}
+          >
+            OK
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Terminal / Entrada Salida Modal */}
+      <Modal
+        isOpen={isTerminalModalOpen}
+        onClose={() => setIsTerminalModalOpen(false)}
+        title="Entrada / Salida (Control Móvil)"
+      >
+        <div className="space-y-4 pt-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">TIPO DE MOVIMIENTO</label>
+              <select 
+                className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                value={terminalForm.tipoMovimiento}
+                onChange={(e) => setTerminalForm({...terminalForm, tipoMovimiento: e.target.value})}
+              >
+                <option value="ENTRADA">Entrada (Ingreso de Stock)</option>
+                <option value="SALIDA">Salida (Consumo / Descuento)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CANTIDAD</label>
+              <input 
+                type="number"
+                min="1"
+                className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                value={terminalForm.cantidad}
+                onChange={(e) => setTerminalForm({...terminalForm, cantidad: parseInt(e.target.value) || 1})}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">BODEGA</label>
+            <select 
+              className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              value={terminalForm.bodegaId}
+              onChange={(e) => setTerminalForm({...terminalForm, bodegaId: e.target.value})}
+            >
+              <option value="">Seleccione una bodega...</option>
+              <option value="1">Kaufmann</option>
+              <option value="2">Bodega Matrix</option>
+              <option value="3">Bodega Consignación</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">SKU / CÓDIGO BARRAS</label>
+              <input 
+                type="text" 
+                placeholder="Escanee o escriba..."
+                className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                value={terminalForm.sku}
+                onChange={(e) => setTerminalForm({...terminalForm, sku: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">NOMBRE (SI ES NUEVO)</label>
+              <input 
+                type="text"
+                placeholder="Nombre del repuesto..."
+                className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                value={terminalForm.nombre}
+                onChange={(e) => setTerminalForm({...terminalForm, nombre: e.target.value})}
+              />
+            </div>
+          </div>
+
+          <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg border border-amber-100 dark:border-amber-900/50 space-y-4">
+            <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-500">Datos de Trazabilidad</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-amber-700/70 dark:text-amber-500/70 uppercase mb-1">SOLICITANTE</label>
+                <input 
+                  type="text" 
+                  className="w-full border border-amber-200 dark:border-amber-800 rounded-md px-3 py-2 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  value={terminalForm.solicitante}
+                  onChange={(e) => setTerminalForm({...terminalForm, solicitante: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-amber-700/70 dark:text-amber-500/70 uppercase mb-1">AUTORIZADOR</label>
+                <input 
+                  type="text" 
+                  className="w-full border border-amber-200 dark:border-amber-800 rounded-md px-3 py-2 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  value={terminalForm.autorizador}
+                  onChange={(e) => setTerminalForm({...terminalForm, autorizador: e.target.value})}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-amber-700/70 dark:text-amber-500/70 uppercase mb-1">DESTINO / USO</label>
+                <input 
+                  type="text" 
+                  className="w-full border border-amber-200 dark:border-amber-800 rounded-md px-3 py-2 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  value={terminalForm.destino}
+                  onChange={(e) => setTerminalForm({...terminalForm, destino: e.target.value})}
+                  placeholder="Ej: Camión Volvo FH16, Gasto General, etc."
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 flex justify-end gap-3 border-t border-slate-100 dark:border-slate-800">
+            <Button variant="secondary" onClick={() => setIsTerminalModalOpen(false)}>Cancelar</Button>
+            <Button 
+              className="bg-amber-500 hover:bg-amber-600 text-white"
+              onClick={() => {
+                setIsTerminalModalOpen(false);
+                setTerminalForm({
+                  sku: '', nombre: '', bodegaId: '', tipoMovimiento: 'SALIDA', 
+                  cantidad: 1, solicitante: '', autorizador: '', destino: ''
+                });
+                alert("Movimiento procesado correctamente");
+              }}
+            >
+              Procesar Movimiento
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* New Repuesto Modal */}
+      <Modal
+        isOpen={isNewRepuestoModalOpen}
+        onClose={() => setIsNewRepuestoModalOpen(false)}
+        title="Ingresar Nuevo Repuesto al Maestro"
+      >
+        <div className="space-y-4 pt-4 max-h-[80vh] overflow-y-auto px-1 -mx-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nombre Descriptivo *</label>
+              <input 
+                type="text" 
+                placeholder="Ej: Filtro de Aceite Motor OM906"
+                className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                value={newRepuestoForm.nombre}
+                onChange={(e) => setNewRepuestoForm({...newRepuestoForm, nombre: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">SKU / N° de Parte *</label>
+              <input 
+                type="text" 
+                placeholder="Ej: A 651 180 01 09"
+                className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                value={newRepuestoForm.numeroParte}
+                onChange={(e) => setNewRepuestoForm({...newRepuestoForm, numeroParte: e.target.value})}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Calidad</label>
+              <select 
+                className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                value={newRepuestoForm.calidad}
+                onChange={(e) => setNewRepuestoForm({...newRepuestoForm, calidad: e.target.value})}
+              >
+                <option value="ORIGINAL">Original</option>
+                <option value="OEM">Alternativo OEM</option>
+                <option value="GENERICO">Alternativo Genérico</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Origen</label>
+              <select 
+                className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                value={newRepuestoForm.origen}
+                onChange={(e) => setNewRepuestoForm({...newRepuestoForm, origen: e.target.value})}
+              >
+                <option value="OEM">Original / Marca (Alta Durabilidad)</option>
+                <option value="CHINO">Alternativo Chino (Baja)</option>
+                <option value="RECAUCHE">Recauche / Recuperado</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Criticidad</label>
+              <select 
+                className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                value={newRepuestoForm.nivelCriticidad}
+                onChange={(e) => setNewRepuestoForm({...newRepuestoForm, nivelCriticidad: e.target.value})}
+              >
+                <option value="INSUMO">Insumo General</option>
+                <option value="MINA">Consumo 'Mina'</option>
+                <option value="PANA">Crítico 'Pana'</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Stock Inicial *</label>
+              <input 
+                type="number" 
+                min="0"
+                className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                value={newRepuestoForm.stockActual}
+                onChange={(e) => setNewRepuestoForm({...newRepuestoForm, stockActual: parseInt(e.target.value) || 0})}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Stock Mínimo</label>
+              <input 
+                type="number" 
+                min="0"
+                className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                value={newRepuestoForm.stockMinimo}
+                onChange={(e) => setNewRepuestoForm({...newRepuestoForm, stockMinimo: parseInt(e.target.value) || 0})}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Precio Un. ($)</label>
+              <input 
+                type="number" 
+                min="0"
+                className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                value={newRepuestoForm.precioUnitario}
+                onChange={(e) => setNewRepuestoForm({...newRepuestoForm, precioUnitario: parseInt(e.target.value) || 0})}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Bodega de Destino</label>
+              <select 
+                className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                value={newRepuestoForm.bodegaId}
+                onChange={(e) => setNewRepuestoForm({...newRepuestoForm, bodegaId: e.target.value})}
+              >
+                <option value="1">Kaufmann</option>
+                <option value="2">Bodega Matrix</option>
+                <option value="3">Bodega Consignación</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Ubicación (Pasillo/Estante)</label>
+              <input 
+                type="text" 
+                placeholder="Ej: Estante B-4"
+                className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                value={newRepuestoForm.ubicacion}
+                onChange={(e) => setNewRepuestoForm({...newRepuestoForm, ubicacion: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Proveedor Habitual</label>
+              <select 
+                className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                value={newRepuestoForm.proveedorId}
+                onChange={(e) => setNewRepuestoForm({...newRepuestoForm, proveedorId: e.target.value})}
+              >
+                <option value="">Seleccione proveedor...</option>
+                {proveedores.map(prov => (
+                  <option key={prov.id} value={prov.id}>{prov.nombre}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="pt-4 flex justify-end gap-3 border-t border-slate-100 dark:border-slate-800 mt-6">
+            <Button variant="secondary" onClick={() => setIsNewRepuestoModalOpen(false)}>Cancelar</Button>
+            <Button 
+              className="bg-cyan-600 hover:bg-cyan-700 text-white"
+              disabled={!newRepuestoForm.nombre || !newRepuestoForm.numeroParte}
+              onClick={() => {
+                setIsNewRepuestoModalOpen(false);
+                setNewRepuestoForm({
+                  nombre: '', numeroParte: '', calidad: 'ORIGINAL', origen: 'OEM', 
+                  nivelCriticidad: 'INSUMO', stockActual: 0, stockMinimo: 0, 
+                  diasStockObjetivo: 30, ubicacion: '', precioUnitario: 0, bodegaId: '1', proveedorId: ''
+                });
+                alert("Repuesto credo exitosamente.");
+              }}
+            >
+              Guardar Repuesto
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+    </div>
+  );
+}

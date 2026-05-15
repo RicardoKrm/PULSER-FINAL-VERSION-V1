@@ -9,9 +9,10 @@ import { ArrowLeft, Edit, Printer, Clock, Wrench, Boxes, History, ChevronDown, C
 export default function OrdenesTrabajoDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { ordenesTrabajo, vehiculos } = useAppContext();
+  const { ordenesTrabajo, vehiculos, kitsRepuesto, actualizarOrdenTrabajo } = useAppContext();
   const [activeTab, setActiveTab] = useState<'tareas' | 'insumos' | 'historial'>('tareas');
   const [activePanels, setActivePanels] = useState<Record<string, boolean>>({ diagnostico: false, pauta: false, personal: false, estado: false });
+  const [selectedKitToAdd, setSelectedKitToAdd] = useState('');
   
   const ot = ordenesTrabajo.find(o => o.id === id);
   const vehiculo = vehiculos.find(v => v.id === ot?.vehiculoId);
@@ -20,6 +21,34 @@ export default function OrdenesTrabajoDetail() {
 
   const togglePanel = (panel: string) => setActivePanels(prev => ({ ...prev, [panel]: !prev[panel] }));
   const totalCosto = ot.costoInsumos + ot.costoManoObraTareas + ot.costoManoObraHH;
+
+  const handleCargarKit = () => {
+    if (!selectedKitToAdd || !ot) return;
+    const kit = kitsRepuesto.find(k => k.id === selectedKitToAdd);
+    if (!kit || !kit.detalles) return;
+
+    const nuevosInsumos = kit.detalles.map(det => ({
+      id: Math.random().toString(36).substr(2, 9),
+      nombre: det.repuesto,
+      cantidad: det.cantidad,
+      precioUnitario: 0
+    }));
+
+    actualizarOrdenTrabajo({
+      ...ot,
+      insumos: [...ot.insumos, ...nuevosInsumos],
+      historial: [
+        ...ot.historial,
+        {
+          id: Math.random().toString(36).substr(2, 9),
+          descripcion: `Agregado Kit de repuestos: ${kit.nombre}`,
+          fechaEvento: new Date().toISOString(),
+          usuario: 'Sistema/Admin'
+        }
+      ]
+    });
+    setSelectedKitToAdd('');
+  };
 
   return (
     <div className="space-y-6 p-6">
@@ -83,7 +112,32 @@ export default function OrdenesTrabajoDetail() {
                     )}
                     {activeTab === 'insumos' && (
                         <div>
-                            <div className="flex justify-between items-center mb-4"><h3 className="font-bold">Insumos</h3><Button size="sm"><Plus className="w-4 h-4 mr-2"/>añadir insumo</Button></div>
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold">Insumos</h3>
+                                <div className="flex gap-2 items-center">
+                                    <div className="flex bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden">
+                                        <select 
+                                            className="p-1 px-2 text-sm bg-transparent outline-none dark:text-slate-100 min-w-[150px]"
+                                            value={selectedKitToAdd}
+                                            onChange={(e) => setSelectedKitToAdd(e.target.value)}
+                                        >
+                                            <option value="">Seleccionar Kit...</option>
+                                            {kitsRepuesto.map(k => (
+                                                <option key={k.id} value={k.id}>{k.nombre}</option>
+                                            ))}
+                                        </select>
+                                        <Button size="sm" variant="ghost" onClick={handleCargarKit} disabled={!selectedKitToAdd} className="rounded-none border-l dark:border-slate-800 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 text-cyan-600">
+                                            Cargar Kit
+                                        </Button>
+                                    </div>
+                                    <Button size="sm"><Plus className="w-4 h-4 mr-2"/>añadir insumo</Button>
+                                </div>
+                            </div>
+                            {ot.insumos.length === 0 && (
+                                <p className="text-sm text-slate-500 py-4 text-center border-2 border-dashed rounded-lg dark:border-slate-800">
+                                    No hay insumos registrados en esta OT.
+                                </p>
+                            )}
                             {ot.insumos.map(i => <div key={i.id} className="flex justify-between p-2 border-b last:border border-0 dark:border-slate-800"><span>{i.nombre} (x{i.cantidad})</span><span className="font-mono text-slate-600 dark:text-slate-400">${(i.precioUnitario * i.cantidad).toLocaleString()}</span></div>)}
                         </div>
                     )}

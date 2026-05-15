@@ -144,9 +144,25 @@ export interface TipoFalla {
   nombre: string;
 }
 
+export interface Proveedor {
+  id: string;
+  nombre: string;
+  rut?: string;
+  direccion?: string;
+  telefono?: string;
+  email?: string;
+}
+
+export interface KitRepuestoDetalle {
+  repuesto: string;
+  cantidad: number;
+}
+
 export interface KitRepuesto {
   id: string;
   nombre: string;
+  descripcion?: string;
+  detalles?: KitRepuestoDetalle[];
 }
 
 export interface Usuario {

@@ -30,6 +30,20 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    let insumosDesdeKit: any[] = [];
+    if (formData.kitRepuestos) {
+      const selectedKit = kitsRepuesto.find(k => k.nombre === formData.kitRepuestos);
+      if (selectedKit && selectedKit.detalles) {
+        insumosDesdeKit = selectedKit.detalles.map(det => ({
+          id: Math.random().toString(36).substr(2, 9),
+          nombre: det.repuesto,
+          cantidad: det.cantidad,
+          precioUnitario: 0 // Placeholder, as in standard the app sets this manually or fetched
+        }));
+      }
+    }
+
     const nuevaOT: OrdenDeTrabajo = {
       id: Math.random().toString(36).substr(2, 9),
       folio: `OT-${Math.floor(Math.random() * 1000)}`,
@@ -40,7 +54,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
       kilometrajeApertura: Number(formData.kilometrajeApertura),
       fechaCreacion: formData.fechaCreacion || new Date().toISOString(),
       tareasRealizadas: [],
-      insumos: [],
+      insumos: insumosDesdeKit,
       observacionInicial: formData.observacionInicial,
       pauta: formData.pauta,
       kitRepuestos: formData.kitRepuestos,
@@ -56,7 +70,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
       valorHH: formData.valorHH ? Number(formData.valorHH) : undefined,
       presupuestoAprobado: formData.presupuestoAprobado ? Number(formData.presupuestoAprobado) : undefined,
       observaciones: formData.observaciones,
-      historial: [],
+      historial: [{ id: Math.random().toString(36).substring(7), descripcion: 'OT Creada', fechaEvento: new Date().toISOString(), usuario: 'Sistema' }],
       costoInsumos: 0,
       costoManoObraTareas: 0,
       costoManoObraHH: 0,

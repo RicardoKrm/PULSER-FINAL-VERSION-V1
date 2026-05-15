@@ -90,8 +90,8 @@ export const navigation = [
     submodules: [
       { title: 'Gestión de Suministros', icon: Package, href: '/logistica/suministros' },
       { title: 'Gestión de Bodegas', icon: Boxes, href: '/logistica/bodegas' },
-      { title: 'Terminal de Escaneo', icon: ScanBarcode, href: '/logistica/escaneo' },
-      { title: 'Validaciones', icon: CheckSquare, href: '/logistica/validaciones' },
+      { title: 'Puerto de Escaneo', icon: ScanBarcode, href: '/logistica/escaneo' },
+      { title: 'Aprobaciones', icon: CheckSquare, href: '/logistica/validaciones' },
       { title: 'Auditorías', icon: ClipboardList, href: '/logistica/auditorias' },
     ],
   },
