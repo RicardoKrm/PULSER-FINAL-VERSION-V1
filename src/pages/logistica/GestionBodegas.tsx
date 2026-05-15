@@ -1,22 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Building2, Plus, Search, Edit, Trash2, MapPin
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
-
-const initialBodegas = [
-  { id: 1, nombre: "Kaufmann", tipo: "Proveedor", responsable: "Juan Pérez", ubicacion: "Santiago", estado: "Activo" },
-  { id: 2, nombre: "Bodega Matrix", tipo: "Principal", responsable: "María Gómez", ubicacion: "Planta Central", estado: "Activo" },
-  { id: 3, nombre: "Bodega Consignación", tipo: "Secundaria", responsable: "Carlos Ruiz", ubicacion: "Sector Norte", estado: "Activo" },
-  { id: 4, nombre: "Turno Noche", tipo: "Transitoria", responsable: "Ana Silva", ubicacion: "Patio", estado: "Activo" },
-];
+import Swal from 'sweetalert2';
 
 export default function GestionBodegas() {
-  const [bodegas, setBodegas] = useState(initialBodegas);
+  const [bodegas, setBodegas] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingBodega, setEditingBodega] = useState<typeof bodegas[0] | null>(null);
+  const [editingBodega, setEditingBodega] = useState<any | null>(null);
+
+  useEffect(() => {
+    fetchBodegas();
+  }, []);
+
+  const fetchBodegas = async () => {
+    try {
+      const res = await fetch('/api/bodegas');
+      const data = await res.json();
+      setBodegas(data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const [formData, setFormData] = useState({
     nombre: '',
@@ -33,16 +41,30 @@ export default function GestionBodegas() {
     b.responsable.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingBodega) {
-      setBodegas(bodegas.map(b => b.id === editingBodega.id ? { ...formData, id: b.id } : b));
-    } else {
-      setBodegas([...bodegas, { ...formData, id: Date.now() }]);
+    try {
+      if (editingBodega) {
+        await fetch(`/api/bodegas/${editingBodega.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        });
+      } else {
+        await fetch('/api/bodegas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        });
+      }
+      fetchBodegas();
+      setIsModalOpen(false);
+      setEditingBodega(null);
+      setFormData({ nombre: '', tipo: 'Principal', identificador: 1, proveedor: '', responsable: '', ubicacion: 'Sin ubicación', estado: 'Activo' });
+      Swal.fire('Éxito', 'Bodega guardada correctamente', 'success');
+    } catch (e) {
+      Swal.fire('Error', 'No se pudo guardar', 'error');
     }
-    setIsModalOpen(false);
-    setEditingBodega(null);
-    setFormData({ nombre: '', tipo: 'Principal', identificador: 1, proveedor: '', responsable: '', ubicacion: 'Sin ubicación', estado: 'Activo' });
   };
 
   const openEditModal = (bodega: typeof bodegas[0] & { identificador?: number, proveedor?: string }) => {
@@ -59,9 +81,23 @@ export default function GestionBodegas() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm('¿Estás seguro de que deseas eliminar esta bodega?')) {
-      setBodegas(bodegas.filter(b => b.id !== id));
+  const handleDelete = async (id: number) => {
+    const result = await Swal.fire({
+      title: '¿Estás seguro?',
+      text: "No podrás revertir esto",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      confirmButtonColor: '#ef4444'
+    });
+    if (result.isConfirmed) {
+      try {
+        await fetch(`/api/bodegas/${id}`, { method: 'DELETE' });
+        fetchBodegas();
+        Swal.fire('Eliminado!', 'La bodega ha sido eliminada.', 'success');
+      } catch (e) {
+        console.error(e);
+      }
     }
   };
 

@@ -122,6 +122,34 @@ async function startServer() {
     res.json(mockBodegas);
   });
 
+  app.post("/api/bodegas", (req, res) => {
+    const newBodega = { id: mockBodegas.length + 1, ...req.body };
+    mockBodegas.push(newBodega);
+    res.json(newBodega);
+  });
+
+  app.put("/api/bodegas/:id", (req, res) => {
+    const id = parseInt(req.params.id);
+    const index = mockBodegas.findIndex(b => b.id === id);
+    if (index !== -1) {
+      mockBodegas[index] = { ...mockBodegas[index], ...req.body };
+      res.json(mockBodegas[index]);
+    } else {
+      res.status(404).json({ message: "Not found" });
+    }
+  });
+
+  app.delete("/api/bodegas/:id", (req, res) => {
+    const id = parseInt(req.params.id);
+    const index = mockBodegas.findIndex(b => b.id === id);
+    if (index !== -1) {
+      mockBodegas.splice(index, 1);
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ message: "Not found" });
+    }
+  });
+
   // API Route for active audits
   app.get("/api/auditorias/activas", (req, res) => {
     res.json(mockAuditorias.filter(a => a.estado === 'CAPTURANDO'));
