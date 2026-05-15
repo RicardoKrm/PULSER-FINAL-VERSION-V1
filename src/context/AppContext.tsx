@@ -11,6 +11,8 @@ interface AppContextType {
   tiposFalla: TipoFalla[];
   kitsRepuesto: KitRepuesto[];
   usuarios: Usuario[];
+  currentUser: Usuario;
+  setCurrentUser: (usuario: Usuario) => void;
   proveedores: Proveedor[];
   crearReservaTurismo: (reserva: ReservaTurismo) => void;
   crearOrdenTrabajo: (ot: OrdenDeTrabajo) => void;
@@ -195,8 +197,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [usuarios, setUsuarios] = useState<Usuario[]>([
     { id: 'u1', nombre: 'Mecánico Juan', cargo: 'Mecánico' },
     { id: 'u2', nombre: 'Mecánico Pedro', cargo: 'Mecánico' },
-    { id: 'u3', nombre: 'Administradora María', cargo: 'Admin' }
+    { id: 'u3', nombre: 'Administradora María', cargo: 'Admin' },
+    { id: 'u4', nombre: 'Super Admin', cargo: 'Super Administrador' }
   ]);
+  const [currentUser, setCurrentUser] = useState<Usuario>({ id: 'u4', nombre: 'Admin Usuario', cargo: 'Súper Administrador' });
   const [proveedores, setProveedores] = useState<Proveedor[]>([
     { id: 'prov1', nombre: 'Kaufmann S.A.', rut: '76.123.456-7' },
     { id: 'prov2', nombre: 'Autoplanet', rut: '77.222.333-k' },
@@ -243,7 +247,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AppContext.Provider value={{ reservasTurismo, ordenesTrabajo, conductores, vehiculos, pautas, tareasEstandar, tiposFalla, kitsRepuesto, usuarios, proveedores, crearReservaTurismo, crearOrdenTrabajo, eliminarOrdenTrabajo, actualizarOrdenTrabajo, crearTipoFalla, eliminarTipoFalla, crearKitRepuesto, eliminarKitRepuesto, crearProveedor, eliminarProveedor }}>
+    <AppContext.Provider value={{ reservasTurismo, ordenesTrabajo, conductores, vehiculos, pautas, tareasEstandar, tiposFalla, kitsRepuesto, usuarios, currentUser, setCurrentUser, proveedores, crearReservaTurismo, crearOrdenTrabajo, eliminarOrdenTrabajo, actualizarOrdenTrabajo, crearTipoFalla, eliminarTipoFalla, crearKitRepuesto, eliminarKitRepuesto, crearProveedor, eliminarProveedor }}>
       {children}
     </AppContext.Provider>
   );
