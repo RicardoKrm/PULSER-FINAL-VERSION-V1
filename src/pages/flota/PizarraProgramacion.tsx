@@ -59,9 +59,12 @@ export default function PizarraProgramacion() {
 
   const [pendingOts, setPendingOts] = useState<OtMock[]>([
     { id: 'ot4', folio: 'OT-004', tipo: 'Preventiva', patente: 'EF-GH-34', actividad: 'Revisión técnica', estado: 'PROGRAMADA' },
-    { id: 'ot5', folio: 'OT-005', tipo: 'Correctiva', patente: 'AB-CD-12', actividad: 'Cambio de aceite transmisión', estado: 'PROGRAMADA' },
-    { id: 'ot6', folio: 'OT-006', tipo: 'Correctiva', patente: 'XY-ZW-99', actividad: 'Reparación de aire acondicionado', estado: 'PROGRAMADA' },
-    { id: 'ot7', folio: 'OT-007', tipo: 'Preventiva', patente: 'KL-NM-11', actividad: 'Alineación y balanceo', estado: 'PROGRAMADA' },
+    { id: 'ot5', folio: 'OT-005', tipo: 'Correctiva', patente: 'AB-CD-12', actividad: 'Cambio de transmisión', estado: 'PROGRAMADA' },
+    { id: 'ot6', folio: 'OT-006', tipo: 'Evaluativa', patente: 'XY-ZW-99', actividad: 'Evaluación de daños', estado: 'PROGRAMADA' },
+    { id: 'ot7', folio: 'OT-007', tipo: 'Inspección', patente: 'KL-NM-11', actividad: 'Inspección técnica', estado: 'PROGRAMADA' },
+    { id: 'ot20', folio: 'OT-020', tipo: 'Preventiva Neumático', patente: 'TR-CK-55', actividad: 'Rotación de neumáticos', estado: 'PROGRAMADA' },
+    { id: 'ot21', folio: 'OT-021', tipo: 'Correctiva Neumático', patente: 'ZZ-WW-02', actividad: 'Cambio de neumático pinchado', estado: 'PROGRAMADA' },
+    { id: 'ot22', folio: 'OT-022', tipo: 'Evaluativa Neumático', patente: 'UU-YY-11', actividad: 'Evaluación de desgaste', estado: 'PROGRAMADA' },
   ]);
 
   const [mecanicos, setMecanicos] = useState<MecanicoMock[]>([
