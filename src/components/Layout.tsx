@@ -80,7 +80,7 @@ export default function Layout() {
   }, [location.pathname]);
 
   return (
-    <div className="flex h-screen w-full bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200">
+    <div className="flex h-screen w-full bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div 
@@ -217,7 +217,7 @@ export default function Layout() {
         {/* User profile brief in sidebar */}
         {sidebarOpen && (
           <div className="p-4 border-t border-slate-800">
-            <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-slate-800 dark:bg-slate-900">
+            <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-slate-800 dark:bg-slate-900/50 border border-slate-700 dark:border-slate-800">
               <UserCircle className="h-8 w-8 text-slate-400" />
               <div className="flex flex-col">
                 <span className="text-sm font-medium text-white">Admin Usuario</span>
@@ -229,9 +229,9 @@ export default function Layout() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
         {/* Header */}
-        <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 lg:px-6 shrink-0 shadow-sm z-10 transition-colors duration-200">
+        <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 lg:px-6 shrink-0 shadow-sm z-10 transition-colors duration-200">
           <div className="flex items-center gap-2 md:gap-4 flex-1">
             <button 
               onClick={() => setSidebarOpen(!sidebarOpen)}

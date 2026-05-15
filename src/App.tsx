@@ -27,8 +27,8 @@ import PizarraMantenimiento from './pages/flota/Mantenimiento';
 import PizarraProgramacion from './pages/flota/PizarraProgramacion';
 import GestionOrdenesTrabajo from './pages/flota/OrdenesTrabajo';
 import OrdenesTrabajoDetail from './pages/flota/OrdenesTrabajoDetail';
-import GestionPautas from './pages/flota/GestionPautas';
-import GestionTareas from './pages/flota/GestionTareas';
+import GestionPautas from './pages/configuracion/GestionPautas';
+import GestionTareas from './pages/configuracion/GestionTareas';
 import VehiculosArchivados from './pages/configuracion/VehiculosArchivados';
 import GestionKits from './pages/herramientas/GestionKits';
 import GestionNeumaticos from './pages/flota/GestionNeumaticos';
@@ -45,6 +45,8 @@ import IngresoFacturas from './pages/compras/IngresoFacturas';
 import UsuariosCargos from './pages/configuracion/UsuariosCargos';
 import GestionFallas from './pages/configuracion/GestionFallas';
 import ConfiguracionEmpresa from './pages/configuracion/ConfiguracionEmpresa';
+import CargaMasiva from './pages/configuracion/CargaMasiva';
+import GestionPausas from './pages/configuracion/GestionPausas';
 import Integraciones from './pages/soporte/Integraciones';
 import CentroAyuda from './pages/soporte/CentroAyuda';
 import ManualUso from './pages/soporte/ManualUso';
@@ -86,6 +88,8 @@ const router = createBrowserRouter([
       { path: "configuracion/empresa", element: <ConfiguracionEmpresa /> },
       { path: "configuracion/tareas", element: <GestionTareas /> },
       { path: "configuracion/vehiculos-archivados", element: <VehiculosArchivados /> },
+      { path: "configuracion/pausas", element: <GestionPausas /> },
+      { path: "configuracion/carga-masiva", element: <CargaMasiva /> },
       { path: "herramientas/kits", element: <GestionKits /> },
       { path: "compras/ordenes", element: <OrdenesCompra /> },
       { path: "compras/facturas", element: <IngresoFacturas /> },
