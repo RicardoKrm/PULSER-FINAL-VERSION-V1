@@ -61,6 +61,30 @@ const MODULES = [
       { subtitle: 'Mesa de Ayuda', text: 'El sistema permite crear tickets de soporte técnico aislados de manera segura por empresa. Mantenga comunicación continua con el agente de soporte técnico a través del flujo de chat.' },
       { subtitle: 'Integradores API', text: 'En el menú Integraciones, agregue conectores externos ingresando un nombre y tipo (ej. FLEETSAT GPS, SAP, CRM). Una vez creado el registro, utilice el panel de configuración para ingresar la URL del API y la clave de acceso.' },
     ]
+  },
+  {
+    id: 'logistica_suministros',
+    title: 'Logística y Bodega',
+    description: 'Gestión de inventario de repuestos, bodega e historial de suministros.',
+    duration: '09:15',
+    videoUrl: 'https://images.unsplash.com/photo-1553413077-190dd305871c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80',
+    content: [
+      { subtitle: 'Inventario de Repuestos', text: 'Controla el stock de repuestos y elementos de mantenimiento disponibles en bodega. Ajusta el stock mínimo para recibir alertas automatizadas de reposición.' },
+      { subtitle: 'Recepción de Suministros', text: 'Registra el ingreso de nuevos materiales a través de órdenes de compra, validando las cantidades recibidas.' },
+      { subtitle: 'Despacho y Asignación', text: 'Registra los movimientos de salida de repuestos y consumibles, asociándolos a órdenes de trabajo (OT) o vehículos específicos para mantener trazabilidad.' },
+    ]
+  },
+  {
+    id: 'compras_proveedores',
+    title: 'Compras y Proveedores',
+    description: 'Administración de órdenes de compra, control presupuestario y listado de proveedores.',
+    duration: '11:45',
+    videoUrl: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80',
+    content: [
+      { subtitle: 'Gestión de Proveedores', text: 'Mantén un registro actualizado con los datos de contacto y la evaluación de desempeño de los proveedores de repuestos o servicios externos.' },
+      { subtitle: 'Órdenes de Compra', text: 'Genera solicitudes formales de cotización o compra. Realiza seguimiento desde la emisión hasta la facturación y cierre, validando el presupuesto departamental.' },
+      { subtitle: 'Control de Facturas', text: 'Audita y lleva registro de las facturas que los proveedores emiten para facilitar su posterior pago u homologación con tu sistema contable.' },
+    ]
   }
 ];
 
