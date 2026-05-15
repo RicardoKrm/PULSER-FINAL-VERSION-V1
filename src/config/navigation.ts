@@ -71,7 +71,7 @@ export const navigation = [
       { title: 'Reservas', icon: Calendar, href: '/operaciones/reservas' },
       { title: 'Programación', icon: CalendarClock, href: '/operaciones/programacion' },
       { title: 'Control Documental', icon: FileCheck, href: '/operaciones/control-documental' },
-      { title: 'Operaciones', icon: Activity, href: '/operaciones/monitor' },
+      { title: 'Historial', icon: Activity, href: '/operaciones/historial' },
       { title: 'GPS FleetSat', icon: MapPin, href: '/operaciones/gps' },
       { title: 'Alertas', icon: AlertCircle, href: '/operaciones/alertas' },
     ],

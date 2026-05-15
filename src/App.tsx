@@ -18,6 +18,7 @@ import Programacion from './pages/operaciones/Programacion';
 import Reservas from './pages/operaciones/Reservas';
 import GPS from './pages/operaciones/GPS';
 import ControlDocumental from './pages/operaciones/ControlDocumental';
+import Historial from './pages/operaciones/Historial';
 import KpiFlota from './pages/dashboard/KpiFlota';
 import KpiRRHH from './pages/dashboard/KpiRRHH';
 import AnalisisFallas from './pages/dashboard/AnalisisFallas';
@@ -72,6 +73,7 @@ const router = createBrowserRouter([
       { path: "operaciones/programacion", element: <Programacion /> },
       { path: "operaciones/gps", element: <GPS /> },
       { path: "operaciones/control-documental", element: <ControlDocumental /> },
+      { path: "operaciones/historial", element: <Historial /> },
       { path: "super-admin/empresas", element: <SuperAdminEmpresas /> },
       { path: "super-admin/perfiles", element: <SuperAdminPerfiles /> },
       { path: "super-admin/vision-evolucion", element: <SuperAdminVisionEvolucion /> },
