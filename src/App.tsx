@@ -7,6 +7,7 @@ import { StrictMode } from 'react';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import GenericPage from './pages/GenericPage';
+import Dashboard from './pages/Dashboard';
 import SuperAdminEmpresas from './pages/super-admin/Empresas';
 import SuperAdminPerfiles from './pages/super-admin/Perfiles';
 import SuperAdminVisionEvolucion from './pages/super-admin/VisionEvolucion';
@@ -41,6 +42,12 @@ import GestionAuditorias from './pages/logistica/GestionAuditorias';
 import DetalleAuditoria from './pages/logistica/DetalleAuditoria';
 import OrdenesCompra from './pages/compras/OrdenesCompra';
 import IngresoFacturas from './pages/compras/IngresoFacturas';
+import UsuariosCargos from './pages/configuracion/UsuariosCargos';
+import GestionFallas from './pages/configuracion/GestionFallas';
+import ConfiguracionEmpresa from './pages/configuracion/ConfiguracionEmpresa';
+import Integraciones from './pages/soporte/Integraciones';
+import CentroAyuda from './pages/soporte/CentroAyuda';
+import ManualUso from './pages/soporte/ManualUso';
 import { ThemeProvider } from './components/ThemeProvider';
 import { CompanyProvider } from './contexts/CompanyContext';
 import { AppProvider } from './context/AppContext';
@@ -50,7 +57,8 @@ const router = createBrowserRouter([
     path: "/",
     element: <Layout />,
     children: [
-      { index: true, element: <Navigate to="/operaciones/alertas" replace /> },
+      { index: true, element: <Navigate to="/dashboard" replace /> },
+      { path: "dashboard", element: <Dashboard /> },
       { path: "operaciones/alertas", element: <OperacionesAlertas /> },
       { path: "operaciones/contratos", element: <Contratos /> },
       { path: "operaciones/servicios", element: <CrearServicio /> },
@@ -73,6 +81,9 @@ const router = createBrowserRouter([
       { path: "flota/neumaticos", element: <GestionNeumaticos /> },
       { path: "flota/combustible", element: <GestionCombustible /> },
       { path: "configuracion/pautas", element: <GestionPautas /> },
+      { path: "configuracion/usuarios", element: <UsuariosCargos /> },
+      { path: "configuracion/fallas", element: <GestionFallas /> },
+      { path: "configuracion/empresa", element: <ConfiguracionEmpresa /> },
       { path: "configuracion/tareas", element: <GestionTareas /> },
       { path: "configuracion/vehiculos-archivados", element: <VehiculosArchivados /> },
       { path: "herramientas/kits", element: <GestionKits /> },
@@ -85,6 +96,9 @@ const router = createBrowserRouter([
       { path: "logistica/validaciones", element: <Aprobaciones /> },
       { path: "logistica/auditorias", element: <GestionAuditorias /> },
       { path: "logistica/auditorias/:id", element: <DetalleAuditoria /> },
+      { path: "soporte/integraciones", element: <Integraciones /> },
+      { path: "soporte/tickets", element: <CentroAyuda /> },
+      { path: "soporte/manual", element: <ManualUso /> },
       { path: "*", element: <GenericPage /> },
     ]
   }

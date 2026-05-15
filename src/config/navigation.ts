@@ -30,7 +30,11 @@ import {
   CheckSquare,
   Calendar,
   Zap,
-  Clock
+  Clock,
+  HelpCircle,
+  MessageSquare,
+  Link,
+  BookOpen
 } from 'lucide-react';
 
 export const navigation = [
@@ -49,6 +53,7 @@ export const navigation = [
     icon: BarChart3,
     href: '/dashboard',
     submodules: [
+      { title: 'Dashboard', icon: BarChart3, href: '/dashboard' },
       { title: 'KPI Flota', icon: Activity, href: '/dashboard/kpi-flota' },
       { title: 'KPI RR.HH.', icon: Users, href: '/dashboard/kpi-rrhh' },
       { title: 'Análisis de Fallas', icon: AlertCircle, href: '/dashboard/fallas' },
@@ -122,6 +127,16 @@ export const navigation = [
       { title: 'Tipos de Pausa', icon: Clock, href: '/configuracion/pausas' },
       { title: 'Pulser AI', icon: Cpu, href: '/configuracion/ai' },
       { title: 'Carga Masiva', icon: Zap, href: '/configuracion/carga-masiva' },
+    ],
+  },
+  {
+    title: 'Soporte y Ayuda',
+    icon: HelpCircle,
+    href: '/soporte',
+    submodules: [
+      { title: 'Integraciones', icon: Link, href: '/soporte/integraciones' },
+      { title: 'Centro de Ayuda', icon: MessageSquare, href: '/soporte/tickets' },
+      { title: 'Manual de Uso', icon: BookOpen, href: '/soporte/manual' },
     ],
   },
 ];

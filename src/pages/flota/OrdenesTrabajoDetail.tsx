@@ -14,7 +14,7 @@ export default function OrdenesTrabajoDetail() {
   const [activePanels, setActivePanels] = useState<Record<string, boolean>>({ diagnostico: false, pauta: false, personal: false, estado: false });
   const [selectedKitToAdd, setSelectedKitToAdd] = useState('');
   
-  const ot = ordenesTrabajo.find(o => o.id === id);
+  const ot = ordenesTrabajo.find(o => o.id === id || o.folio === id);
   const vehiculo = vehiculos.find(v => v.id === ot?.vehiculoId);
 
   if (!ot) return <div className="p-8 text-center text-slate-500 dark:text-slate-400">OT no encontrada</div>;

@@ -40,6 +40,53 @@ async function startServer() {
     { id: 'FE-9922', emisor: 'ENERGIA SUR', fecha: '2026-05-12', monto: 850000, estado: 'APROBADA', oc: 'Directa' },
   ];
 
+  const mockUsers = [
+    { id: 1, rut: '12.345.678-9', nombre: 'Juan', apellidoPaterno: 'Perez', apellidoMaterno: 'Gonzalez', sexo: 'HOMBRE', empresa: 'Transportes del Norte', cargo: 'Mecánico de Mantenimiento', rol: 'MECANICO', tipo: 'INTERNO', estado: 'ACTIVO', sueldo: 850000, email: 'j.perez@transnorte.cl' },
+    { id: 2, rut: '15.223.445-2', nombre: 'Maria', apellidoPaterno: 'Soto', apellidoMaterno: 'Tapia', sexo: 'MUJER', empresa: 'Transportes del Norte', cargo: 'Jefe de Taller', rol: 'ADMINISTRADOR', tipo: 'INTERNO', estado: 'ACTIVO', sueldo: 1500000, email: 'm.soto@transnorte.cl' },
+    { id: 3, rut: '18.445.667-0', nombre: 'Carlos', apellidoPaterno: 'Ruiz', apellidoMaterno: 'Vargas', sexo: 'HOMBRE', empresa: 'Transportes del Norte', cargo: 'Conductor', rol: 'CONDUCTOR', tipo: 'INTERNO', estado: 'ACTIVO', sueldo: 950000, email: 'c.ruiz@transnorte.cl' },
+  ];
+
+  const mockCargos = [
+    { id: 1, nombre: 'Mecánico de Mantenimiento', departamento: 'Taller', sueldoBase: 650000, usuarios: 12 },
+    { id: 2, nombre: 'Jefe de Taller', departamento: 'Taller', sueldoBase: 1200000, usuarios: 2 },
+    { id: 3, nombre: 'Conductor', departamento: 'Operaciones', sueldoBase: 700000, usuarios: 45 },
+    { id: 4, nombre: 'Bodeguero', departamento: 'Logística', sueldoBase: 600000, usuarios: 5 },
+  ];
+
+  const mockFallas = [
+    { id: 1, nombre: 'Falla Eléctrica - Cortocircuito', criticidad: 'ALTA', frecuencia: 'BAJA' },
+    { id: 2, nombre: 'Desgaste Irregular Neumáticos', criticidad: 'MEDIA', frecuencia: 'ALTA' },
+    { id: 3, nombre: 'Fuga Refrigerante', criticidad: 'ALTA', frecuencia: 'MEDIA' },
+    { id: 4, nombre: 'Ruido en Frenos', criticidad: 'MEDIA', frecuencia: 'ALTA' },
+    { id: 5, nombre: 'Problema Inyectores', criticidad: 'MUY ALTA', frecuencia: 'BAJA' },
+  ];
+
+  const mockPautas = [
+    { id: 1, nombre: 'Mantenimiento Preventivo 10K', modeloVehiculo: 'Volvo FH16', kmAplicacion: 10000, tipo: 'PREVENTIVA', estado: 'ACTIVA' },
+    { id: 2, nombre: 'Cambio de Aceite Premium', modeloVehiculo: 'Scania R500', kmAplicacion: 20000, tipo: 'LUBRICACION', estado: 'ACTIVA' },
+    { id: 3, nombre: 'Revisión Sistemas de Frenos', modeloVehiculo: 'Mercedes Actros', kmAplicacion: 50000, tipo: 'SEGURIDAD', estado: 'ACTIVA' },
+  ];
+
+  // API Route for Users
+  app.get("/api/configuracion/usuarios", (req, res) => {
+    res.json(mockUsers);
+  });
+
+  // API Route for Cargos
+  app.get("/api/configuracion/cargos", (req, res) => {
+    res.json(mockCargos);
+  });
+
+  // API Route for Fallas
+  app.get("/api/configuracion/fallas", (req, res) => {
+    res.json(mockFallas);
+  });
+
+  // API Route for Pautas
+  app.get("/api/configuracion/pautas", (req, res) => {
+    res.json(mockPautas);
+  });
+
   // API Route for repuestos search
   app.get("/api/repuestos/search", (req, res) => {
     const { q, bodega_id } = req.query;

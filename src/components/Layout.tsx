@@ -71,7 +71,7 @@ export default function Layout() {
     }
     
     navigation.forEach(item => {
-      if (item.submodules.some(sub => location.pathname.startsWith(sub.href))) {
+      if (item.submodules?.some(sub => location.pathname.startsWith(sub.href))) {
         if (!expandedMenus.includes(item.title)) {
           setExpandedMenus([item.title]);
         }
@@ -124,21 +124,48 @@ export default function Layout() {
 
             return (
               <div key={item.title} className="mb-2">
-                <button
-                  onClick={() => {
-                    if (sidebarOpen) {
-                      toggleMenu(item.title);
-                    } else {
-                      setSidebarOpen(true);
-                      setExpandedMenus([item.title]);
-                    }
-                  }}
-                  className={cn(
-                    "w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-colors group overflow-hidden whitespace-nowrap",
-                    isActive ? "bg-slate-800 dark:bg-slate-800/80 text-blue-400" : "hover:bg-slate-800/50 hover:text-white"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
+                {item.submodules ? (
+                  <button
+                    onClick={() => {
+                      if (sidebarOpen) {
+                        toggleMenu(item.title);
+                      } else {
+                        setSidebarOpen(true);
+                        setExpandedMenus([item.title]);
+                      }
+                    }}
+                    className={cn(
+                      "w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-colors group overflow-hidden whitespace-nowrap",
+                      isActive ? "bg-slate-800 dark:bg-slate-800/80 text-blue-400" : "hover:bg-slate-800/50 hover:text-white"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon className="h-5 w-5 shrink-0" />
+                      <span 
+                        className={cn(
+                          "font-medium text-sm text-left transition-all duration-300",
+                          sidebarOpen ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-4"
+                        )}
+                      >
+                        {item.title}
+                      </span>
+                    </div>
+                    <ChevronRight 
+                      className={cn(
+                        "h-4 w-4 shrink-0 transition-all duration-300 text-slate-500",
+                        isExpanded && "rotate-90",
+                        sidebarOpen ? "opacity-100" : "opacity-0 translate-x-4"
+                      )} 
+                    />
+                  </button>
+                ) : (
+                  <NavLink
+                    to={item.href}
+                    className={({ isActive: isItemActive }) => cn(
+                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group overflow-hidden whitespace-nowrap",
+                      isItemActive ? "bg-slate-800 dark:bg-slate-800/80 text-blue-400" : "hover:bg-slate-800/50 hover:text-white"
+                    )}
+                  >
                     <Icon className="h-5 w-5 shrink-0" />
                     <span 
                       className={cn(
@@ -148,45 +175,40 @@ export default function Layout() {
                     >
                       {item.title}
                     </span>
-                  </div>
-                  <ChevronRight 
-                    className={cn(
-                      "h-4 w-4 shrink-0 transition-all duration-300 text-slate-500",
-                      isExpanded && "rotate-90",
-                      sidebarOpen ? "opacity-100" : "opacity-0 translate-x-4"
-                    )} 
-                  />
-                </button>
+                  </NavLink>
+                )}
 
                 {/* Submodules */}
-                <div 
-                  className={cn(
-                    "grid transition-all duration-300 ease-in-out",
-                    sidebarOpen && isExpanded ? "grid-rows-[1fr] opacity-100 mt-1" : "grid-rows-[0fr] opacity-0 mt-0"
-                  )}
-                >
-                  <div className="overflow-hidden">
-                    <div className="space-y-1 pl-11 pr-2 pb-1">
-                      {item.submodules.map(subItem => {
-                        const SubIcon = subItem.icon;
-                        return (
-                          <NavLink
-                            key={subItem.href}
-                            to={subItem.href}
-                            className={({ isActive: isSubActive }) => cn(
-                              "flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors whitespace-nowrap overflow-hidden",
-                              isSubActive 
-                                ? "bg-blue-600/10 text-blue-400 font-medium" 
-                                : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-                            )}
-                          >
-                            <span className="truncate">{subItem.title}</span>
-                          </NavLink>
-                        )
-                      })}
+                {item.submodules && (
+                  <div 
+                    className={cn(
+                      "grid transition-all duration-300 ease-in-out",
+                      sidebarOpen && isExpanded ? "grid-rows-[1fr] opacity-100 mt-1" : "grid-rows-[0fr] opacity-0 mt-0"
+                    )}
+                  >
+                    <div className="overflow-hidden">
+                      <div className="space-y-1 pl-11 pr-2 pb-1">
+                        {item.submodules.map(subItem => {
+                          const SubIcon = subItem.icon;
+                          return (
+                            <NavLink
+                              key={subItem.href}
+                              to={subItem.href}
+                              className={({ isActive: isSubActive }) => cn(
+                                "flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors whitespace-nowrap overflow-hidden",
+                                isSubActive 
+                                  ? "bg-blue-600/10 text-blue-400 font-medium" 
+                                  : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+                              )}
+                            >
+                              <span className="truncate">{subItem.title}</span>
+                            </NavLink>
+                          )
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             );
           })}

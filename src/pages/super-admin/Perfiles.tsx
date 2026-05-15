@@ -16,10 +16,10 @@ export default function SuperAdminPerfiles() {
 
   // Initializing permissions state
   const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({
-    'Super Administrador': navigation.flatMap(m => [m.title, ...m.submodules.map(s => `${m.title}:${s.title}`)]),
+    'Super Administrador': navigation.flatMap(m => [m.title, ...(m.submodules || []).map(s => `${m.title}:${s.title}`)]),
     'Admin Flota': navigation.flatMap(m => {
       if (m.title === 'Super Administrador') return [];
-      const subs = m.submodules.filter(s => !s.title.includes('RR.HH')).map(s => `${m.title}:${s.title}`);
+      const subs = (m.submodules || []).filter(s => !s.title.includes('RR.HH')).map(s => `${m.title}:${s.title}`);
       return [m.title, ...subs];
     }),
     'Supervisor Terreno': [],
@@ -37,7 +37,7 @@ export default function SuperAdminPerfiles() {
         newPerms = rolePerms.filter(p => p !== moduleTitle && !p.startsWith(`${moduleTitle}:`));
       } else {
         const m = navigation.find(x => x.title === moduleTitle);
-        const subPerms = m ? m.submodules.map(s => `${moduleTitle}:${s.title}`) : [];
+        const subPerms = m ? (m.submodules || []).map(s => `${moduleTitle}:${s.title}`) : [];
         newPerms = [...rolePerms, moduleTitle, ...subPerms];
       }
       return { ...prev, [selectedRole]: newPerms };
@@ -162,34 +162,36 @@ export default function SuperAdminPerfiles() {
                     </div>
                   </label>
                   
-                  <div className="pl-6 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 ml-5">
-                    {module.submodules.map((sub) => {
-                      const isSubEnabled = currentPerms.includes(`${module.title}:${sub.title}`);
-                      
-                      return (
-                        <label key={sub.href} className="flex items-center gap-3 cursor-pointer group">
-                          <input 
-                            type="checkbox" 
-                            className="hidden" 
-                            checked={isSubEnabled}
-                            onChange={() => toggleSubmodule(module.title, sub.title)}
-                          />
-                          <div className={cn(
-                            "flex items-center justify-center w-4 h-4 rounded border transition-colors",
-                            isSubEnabled ? "bg-indigo-500 border-indigo-500 text-white" : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 group-hover:border-indigo-300"
-                          )}>
-                            {isSubEnabled && <Check className="h-3 w-3" />}
-                          </div>
-                          <span className={cn(
-                            "text-sm transition-colors",
-                            isSubEnabled ? "text-slate-700 dark:text-slate-300 font-medium" : "text-slate-500 dark:text-slate-500"
-                          )}>
-                            {sub.title}
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
+                  {module.submodules && module.submodules.length > 0 && (
+                    <div className="pl-6 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 ml-5">
+                      {module.submodules.map((sub) => {
+                        const isSubEnabled = currentPerms.includes(`${module.title}:${sub.title}`);
+                        
+                        return (
+                          <label key={sub.href} className="flex items-center gap-3 cursor-pointer group">
+                            <input 
+                              type="checkbox" 
+                              className="hidden" 
+                              checked={isSubEnabled}
+                              onChange={() => toggleSubmodule(module.title, sub.title)}
+                            />
+                            <div className={cn(
+                              "flex items-center justify-center w-4 h-4 rounded border transition-colors",
+                              isSubEnabled ? "bg-indigo-500 border-indigo-500 text-white" : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 group-hover:border-indigo-300"
+                            )}>
+                              {isSubEnabled && <Check className="h-3 w-3" />}
+                            </div>
+                            <span className={cn(
+                              "text-sm transition-colors",
+                              isSubEnabled ? "text-slate-700 dark:text-slate-300 font-medium" : "text-slate-500 dark:text-slate-500"
+                            )}>
+                              {sub.title}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}

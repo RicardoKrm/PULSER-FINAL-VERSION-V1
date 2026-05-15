@@ -1,0 +1,184 @@
+src/components/ThemeProvider.tsx:    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+src/components/flota/CrearOTModal.tsx:              <select name="vehiculoId" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={formData.vehiculoId} onChange={handleChange} required>
+src/components/flota/CrearOTModal.tsx:                {vehiculos.map(v => <option key={v.id} value={v.id}>{v.patente}</option>)}
+src/components/flota/CrearOTModal.tsx:              <select name="tipo" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={formData.tipo} onChange={handleChange}>
+src/components/flota/CrearOTModal.tsx:                        {pautas.map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+src/components/flota/CrearOTModal.tsx:                        {kitsRepuesto.map(k => <option key={k.id} value={k.nombre}>{k.nombre}</option>)}
+src/components/flota/CrearOTModal.tsx:                      {tiposFalla.map(tf => <option key={tf.id} value={tf.nombre}>{tf.nombre}</option>)}
+src/components/flota/CrearOTModal.tsx:                  {mecanicos.map(m => <option key={m.id} value={m.nombre}>{m.nombre}</option>)}
+src/components/flota/CrearVehiculoModal.tsx:                  <input type="text" name="numeroInterno" value={formData.numeroInterno} onChange={handleChange} className="w-full px-3 py-2 border rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 bg-slate-50 border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+src/components/flota/CrearVehiculoModal.tsx:                  <input type="text" name="patente" value={formData.patente} onChange={handleChange} className="w-full px-3 py-2 border rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 bg-slate-50 border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+src/components/flota/CrearVehiculoModal.tsx:                  <select name="normaEuro" value={formData.normaEuro} onChange={handleChange} className="w-full px-3 py-2 border rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 bg-slate-50 border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+src/components/flota/CrearVehiculoModal.tsx:                        value={nuevoModeloLocal}
+src/components/flota/CrearVehiculoModal.tsx:                      <select name="modelo" value={formData.modelo} onChange={handleChange} className="w-full px-3 py-2 border rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 bg-slate-50 border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+src/components/flota/CrearVehiculoModal.tsx:                          <option key={m} value={m}>{m}</option>
+src/components/flota/CrearVehiculoModal.tsx:                  <select name="tipoAceite" value={formData.tipoAceite} onChange={handleChange} className="w-full px-3 py-2 border rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 bg-slate-50 border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+src/components/flota/CrearVehiculoModal.tsx:                  <input type="number" name="kilometrajeActual" value={formData.kilometrajeActual} onChange={handleChange} className="w-full px-3 py-2 border rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 bg-slate-50 border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+src/components/flota/CrearVehiculoModal.tsx:                  <input type="number" name="intervaloMantKm" value={formData.intervaloMantKm} onChange={handleChange} className="w-full px-3 py-2 border rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 bg-slate-50 border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+src/components/flota/CrearVehiculoModal.tsx:                  <input type="text" readOnly value={kmDiaAuto} className="w-full px-3 py-2 border border-transparent rounded-md bg-slate-100 dark:bg-slate-800/50 dark:text-slate-400 text-slate-500 cursor-not-allowed" />
+src/components/flota/CrearVehiculoModal.tsx:                  <input type="number" name="kmUltMant" value={formData.kmUltMant} onChange={handleChange} className="w-full px-3 py-2 border rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 bg-slate-50 border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+src/components/flota/CrearVehiculoModal.tsx:                  <input type="date" name="fechaUltMant" value={formData.fechaUltMant} onChange={handleChange} className="w-full px-3 py-2 border rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 bg-slate-50 border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+src/components/flota/CrearVehiculoModal.tsx:                  <select name="tipoUltPauta" value={formData.tipoUltPauta} onChange={handleChange} className="w-full px-3 py-2 border rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 bg-slate-50 border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+src/components/flota/CrearVehiculoModal.tsx:                      <option key={p.id} value={p.id}>{p.nombre} - {(p as any).tipoAceite || ''}</option>
+src/components/flota/CrearVehiculoModal.tsx:                  <input type="text" name="razonSocial" value={formData.razonSocial} onChange={handleChange} className="w-full px-3 py-2 border rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 bg-slate-50 border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+src/components/flota/CrearVehiculoModal.tsx:                  <input type="text" name="rut" value={formData.rut} onChange={handleChange} className="w-full px-3 py-2 border rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 bg-slate-50 border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+src/components/flota/CrearVehiculoModal.tsx:                  <input type="text" name="chasis" value={formData.chasis} onChange={handleChange} className="w-full px-3 py-2 border rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 bg-slate-50 border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+src/components/flota/CrearVehiculoModal.tsx:                  <input type="text" name="motor" value={formData.motor} onChange={handleChange} className="w-full px-3 py-2 border rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 bg-slate-50 border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+src/components/flota/CrearVehiculoModal.tsx:                  <input type="number" name="capacidadCarga" value={formData.capacidadCarga} onChange={handleChange} className="w-full px-3 py-2 border rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 bg-slate-50 border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Opcional" />
+src/components/flota/CrearVehiculoModal.tsx:                  <select name="aplicacion" value={formData.aplicacion} onChange={handleChange} required className="w-full px-3 py-2 border rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100 bg-slate-50 border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+src/components/Layout.tsx:                value={activeCompanyId}
+src/components/Layout.tsx:                  <option key={company.id} value={company.id} className="text-slate-900 bg-white dark:bg-slate-800 dark:text-slate-100">
+src/components/chatbot/ChatBot.tsx:              value={inputMessage}
+src/pages/operaciones/ControlDocumental.tsx:            value={searchQuery}
+src/pages/operaciones/Contratos.tsx:            value={searchTerm}
+src/pages/operaciones/Contratos.tsx:            value={dateFilter}
+src/pages/operaciones/Reservas.tsx:                value={busqueda}
+src/pages/operaciones/Reservas.tsx:              value={filtroCategoria}
+src/pages/operaciones/Reservas.tsx:              value={filtroVehiculo}
+src/pages/operaciones/Reservas.tsx:              value={filtroEstado}
+src/pages/operaciones/Reservas.tsx:                 value={fechaInicio}
+src/pages/operaciones/Reservas.tsx:                 value={fechaFin}
+src/pages/operaciones/Reservas.tsx:                          value={formReserva.cliente.nombre}
+src/pages/operaciones/Reservas.tsx:                        value={formReserva.cliente.rut_empresa}
+src/pages/operaciones/Reservas.tsx:                          value={formReserva.cliente.email}
+src/pages/operaciones/Reservas.tsx:                          value={formReserva.cliente.dni_pasaporte}
+src/pages/operaciones/Reservas.tsx:                            value={formReserva.pasajeros.nombre}
+src/pages/operaciones/Reservas.tsx:                                  value={formReserva.pasajeros.telefono}
+src/pages/operaciones/Reservas.tsx:                               value={formReserva.pasajeros.cantidad}
+src/pages/operaciones/Reservas.tsx:                               value={formReserva.logistica.maletasGrandes}
+src/pages/operaciones/Reservas.tsx:                               value={formReserva.logistica.maletasChicas}
+src/pages/operaciones/Reservas.tsx:                                   value={formReserva.logistica.cantidadSillas}
+src/pages/operaciones/Reservas.tsx:                               value={formReserva.lugares.origen}
+src/pages/operaciones/Reservas.tsx:                               value={formReserva.lugares.numeroVuelo}
+src/pages/operaciones/Reservas.tsx:                            value={formReserva.lugares.destino}
+src/pages/operaciones/Reservas.tsx:                            value={formReserva.servicio}
+src/pages/operaciones/Reservas.tsx:                               value={formReserva.fecha}
+src/pages/operaciones/Reservas.tsx:                               value={formReserva.horaInicio}
+src/pages/operaciones/Reservas.tsx:                               value={formReserva.horaTermino}
+src/pages/operaciones/Reservas.tsx:                               value={formReserva.tipoVehiculo}
+src/pages/operaciones/Reservas.tsx:                               value={formReserva.conductorId}
+src/pages/operaciones/Reservas.tsx:                                 <option key={c.id} value={c.id}>{c.nombre}</option>
+src/pages/operaciones/Reservas.tsx:                               value={formReserva.finanzas.montoBruto}
+src/pages/operaciones/Reservas.tsx:                               value={formReserva.finanzas.gastosAdicionales}
+src/pages/operaciones/Reservas.tsx:                               value={formReserva.finanzas.formaPago}
+src/pages/operaciones/Reservas.tsx:                               value={formReserva.finanzas.tipoDocumento}
+src/pages/operaciones/Reservas.tsx:                               value={formReserva.comentarios.conductor}
+src/pages/operaciones/Reservas.tsx:                               value={formReserva.comentarios.interno}
+src/pages/operaciones/CrearServicio.tsx:            value={searchTerm}
+src/pages/operaciones/CrearServicio.tsx:            value={dateFilter}
+src/pages/operaciones/CrearServicio.tsx:                          <select value={newContrato} onChange={(e) => setNewContrato(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
+src/pages/operaciones/CrearServicio.tsx:                          <input type="datetime-local" value={newFecha} onChange={(e) => setNewFecha(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white [color-scheme:light] dark:[color-scheme:dark]" />
+src/pages/operaciones/CrearServicio.tsx:                          <select value={newTipoCarga} onChange={e => setNewTipoCarga(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
+src/pages/operaciones/CrearServicio.tsx:                          <select value={newSubtipo} onChange={e => setNewSubtipo(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
+src/pages/operaciones/CrearServicio.tsx:                          <input type="text" value={newOrigen} onChange={(e) => setNewOrigen(e.target.value)} placeholder="Ej: Bodega Central" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+src/pages/operaciones/CrearServicio.tsx:                          <input type="text" value={newDestino} onChange={(e) => setNewDestino(e.target.value)} placeholder="Ej: Puerto Antofagasta" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+src/pages/operaciones/CrearServicio.tsx:                          <select value={newConductor} onChange={e => setNewConductor(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
+src/pages/operaciones/CrearServicio.tsx:                          <select value={newUnidad} onChange={(e) => setNewUnidad(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
+src/pages/operaciones/CrearServicio.tsx:                          <input type="number" value={newIngreso} onChange={e => setNewIngreso(Number(e.target.value))} min={0} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+src/pages/operaciones/CrearServicio.tsx:                          <input type="number" value={newCosto} onChange={e => setNewCosto(Number(e.target.value))} min={0} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+src/pages/flota/GestionNeumaticos.tsx:               value={numPositions}
+src/pages/flota/GestionCombustible.tsx:               value={fechaDesde}
+src/pages/flota/GestionCombustible.tsx:               value={fechaHasta}
+src/pages/flota/GestionCombustible.tsx:                  value={busqueda}
+src/pages/flota/OrdenesTrabajoDetail.tsx:                                            value={selectedKitToAdd}
+src/pages/flota/OrdenesTrabajoDetail.tsx:                                                <option key={k.id} value={k.id}>{k.nombre}</option>
+src/pages/flota/OrdenesTrabajo.tsx:            <select className="p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={filtroVehiculo} onChange={(e) => setFiltroVehiculo(e.target.value)}>
+src/pages/flota/OrdenesTrabajo.tsx:                {vehiculos.map(v => <option key={v.id} value={v.patente}>{v.patente}</option>)}
+src/pages/flota/OrdenesTrabajo.tsx:            <select className="p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}>
+src/pages/flota/OrdenesTrabajo.tsx:            <select className="p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
+src/pages/flota/OrdenesTrabajo.tsx:            <input type="date" className="p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={filtroDesde} onChange={(e) => setFiltroDesde(e.target.value)} placeholder="Desde" />
+src/pages/flota/OrdenesTrabajo.tsx:            <input type="date" className="p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={filtroHasta} onChange={(e) => setFiltroHasta(e.target.value)} placeholder="Hasta" />
+src/pages/flota/PizarraProgramacion.tsx:                  value={viewMode} 
+src/pages/flota/Mantenimiento.tsx:                value={busqueda}
+src/pages/flota/Mantenimiento.tsx:                  value={filtroModelo}
+src/pages/flota/Mantenimiento.tsx:                    <option key={m} value={m}>{m}</option>
+src/pages/flota/Mantenimiento.tsx:                  value={filtroTipoMant}
+src/pages/flota/Mantenimiento.tsx:                    <option key={t} value={t}>{t}</option>
+src/pages/flota/Mantenimiento.tsx:                  value={filtroProxMantDesde}
+src/pages/flota/Mantenimiento.tsx:                  value={filtroProxMantHasta}
+src/pages/flota/Mantenimiento.tsx:                  value={filtroUltMantDesde}
+src/pages/flota/Mantenimiento.tsx:                  value={filtroUltMantHasta}
+src/pages/flota/GestionPautas.tsx:                value={filtroBusqueda}
+src/pages/flota/GestionTareas.tsx:          <input type="text" placeholder="Buscar por descripción..." className="flex-1 outline-none dark:text-slate-100" value={filtroBusqueda} onChange={(e) => setFiltroBusqueda(e.target.value)} />
+src/pages/super-admin/Empresas.tsx:                  value={formData.name}
+src/pages/super-admin/Empresas.tsx:                  value={formData.razonSocial}
+src/pages/super-admin/Empresas.tsx:                    value={formData.joinDate}
+src/pages/super-admin/Empresas.tsx:                    value={formData.usersCount}
+src/pages/super-admin/Empresas.tsx:                  value={formData.expirationDate}
+src/pages/super-admin/Empresas.tsx:                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+src/pages/super-admin/Empresas.tsx:                      value={formData.customExpirationValue}
+src/pages/super-admin/VisionEvolucion.tsx:              value={selectedCompanyIdForDashboard}
+src/pages/super-admin/VisionEvolucion.tsx:                <option key={c.id} value={c.id}>{c.name}</option>
+src/pages/herramientas/GestionKits.tsx:            value={searchTerm}
+src/pages/herramientas/GestionKits.tsx:                  value={nombre} 
+src/pages/herramientas/GestionKits.tsx:                  value={descripcion} 
+src/pages/herramientas/GestionKits.tsx:                  value={newRepuesto}
+src/pages/herramientas/GestionKits.tsx:                  value={newCantidad}
+src/pages/herramientas/GestionProveedores.tsx:            value={searchTerm}
+src/pages/herramientas/GestionProveedores.tsx:                value={nombre} 
+src/pages/herramientas/GestionProveedores.tsx:                value={rut} 
+src/pages/herramientas/GestionProveedores.tsx:                value={telefono} 
+src/pages/herramientas/GestionProveedores.tsx:                value={email} 
+src/pages/herramientas/GestionProveedores.tsx:                value={direccion} 
+src/pages/configuracion/GestionFallas.tsx:                value={searchTerm}
+src/pages/configuracion/GestionFallas.tsx:                  value={nombre} 
+src/pages/configuracion/UsuariosCargos.tsx:              value={searchTerm}
+src/pages/configuracion/ConfiguracionEmpresa.tsx:                    value={formData.nombre}
+src/pages/configuracion/ConfiguracionEmpresa.tsx:                    value={formData.rut}
+src/pages/configuracion/ConfiguracionEmpresa.tsx:                    value={formData.direccion}
+src/pages/configuracion/ConfiguracionEmpresa.tsx:                    value={formData.ciudad}
+src/pages/configuracion/ConfiguracionEmpresa.tsx:                    value={formData.pais}
+src/pages/configuracion/ConfiguracionEmpresa.tsx:                    value={formData.moneda}
+src/pages/configuracion/ConfiguracionEmpresa.tsx:                    value={formData.zonaHoraria}
+src/pages/logistica/GestionSuministros.tsx:                value={validacionesSearchTerm}
+src/pages/logistica/GestionSuministros.tsx:                      value={validateOtId}
+src/pages/logistica/GestionSuministros.tsx:                      value={validateGastoCat}
+src/pages/logistica/GestionSuministros.tsx:          value={selectedBodega}
+src/pages/logistica/GestionSuministros.tsx:          value={selectedCalidad}
+src/pages/logistica/GestionSuministros.tsx:          value={selectedProveedor}
+src/pages/logistica/GestionSuministros.tsx:                value={searchTerm}
+src/pages/logistica/GestionSuministros.tsx:            value={destinationBodega}
+src/pages/logistica/GestionSuministros.tsx:                value={terminalForm.tipoMovimiento}
+src/pages/logistica/GestionSuministros.tsx:                value={terminalForm.cantidad}
+src/pages/logistica/GestionSuministros.tsx:              value={terminalForm.bodegaId}
+src/pages/logistica/GestionSuministros.tsx:                value={terminalForm.sku}
+src/pages/logistica/GestionSuministros.tsx:                value={terminalForm.nombre}
+src/pages/logistica/GestionSuministros.tsx:                  value={terminalForm.solicitante}
+src/pages/logistica/GestionSuministros.tsx:                  value={terminalForm.autorizador}
+src/pages/logistica/GestionSuministros.tsx:                  value={terminalForm.destino}
+src/pages/logistica/GestionSuministros.tsx:                value={newRepuestoForm.nombre}
+src/pages/logistica/GestionSuministros.tsx:                value={newRepuestoForm.numeroParte}
+src/pages/logistica/GestionSuministros.tsx:                value={newRepuestoForm.calidad}
+src/pages/logistica/GestionSuministros.tsx:                value={newRepuestoForm.origen}
+src/pages/logistica/GestionSuministros.tsx:                value={newRepuestoForm.nivelCriticidad}
+src/pages/logistica/GestionSuministros.tsx:                value={newRepuestoForm.stockActual}
+src/pages/logistica/GestionSuministros.tsx:                value={newRepuestoForm.stockMinimo}
+src/pages/logistica/GestionSuministros.tsx:                value={newRepuestoForm.precioUnitario}
+src/pages/logistica/GestionSuministros.tsx:                value={newRepuestoForm.bodegaId}
+src/pages/logistica/GestionSuministros.tsx:                value={newRepuestoForm.ubicacion}
+src/pages/logistica/GestionSuministros.tsx:                value={newRepuestoForm.proveedorId}
+src/pages/logistica/GestionSuministros.tsx:                  <option key={prov.id} value={prov.id}>{prov.nombre}</option>
+src/pages/logistica/GestionBodegas.tsx:              value={searchTerm}
+src/pages/logistica/GestionBodegas.tsx:                value={formData.nombre}
+src/pages/logistica/GestionBodegas.tsx:                  value={formData.tipo}
+src/pages/logistica/GestionBodegas.tsx:                  value={formData.identificador}
+src/pages/logistica/GestionBodegas.tsx:                value={formData.proveedor}
+src/pages/logistica/GestionBodegas.tsx:                value={formData.responsable}
+src/pages/logistica/PuertoEscaneo.tsx:              value={manualSearch}
+src/pages/logistica/PuertoEscaneo.tsx:              value={bodegaId}
+src/pages/logistica/PuertoEscaneo.tsx:              {bodegas.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
+src/pages/logistica/PuertoEscaneo.tsx:              value={tipoMov}
+src/pages/logistica/PuertoEscaneo.tsx:              value={ubicacionConteo}
+src/pages/logistica/PuertoEscaneo.tsx:              value={auditoriaId}
+src/pages/logistica/PuertoEscaneo.tsx:                <option key={a.id} value={a.id}>AUD #{a.id} - {a.bodega.nombre}</option>
+src/pages/logistica/PuertoEscaneo.tsx:                  value={currentItem.nombre}
+src/pages/logistica/PuertoEscaneo.tsx:                        value={currentItem.solicitante || ''}
+src/pages/logistica/PuertoEscaneo.tsx:                        value={currentItem.autorizador || ''}
+src/pages/logistica/PuertoEscaneo.tsx:                      value={currentItem.destino || ''}
+src/pages/logistica/GestionAuditorias.tsx:                  value={newAudit.bodega_id}
+src/pages/logistica/GestionAuditorias.tsx:                  {bodegas.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
+src/pages/logistica/GestionAuditorias.tsx:                  value={newAudit.notas}
+src/pages/logistica/DetalleAuditoria.tsx:            value={filter}
+src/pages/compras/OrdenesCompra.tsx:              value={filter}
+src/contexts/CompanyContext.tsx:    <CompanyContext.Provider value={{ companies, activeCompanyId, setActiveCompanyId, activeCompany, addCompany, toggleCompanyStatus, expirationOptions, addExpirationOption }}>
+src/context/AppContext.tsx:    <AppContext.Provider value={{ reservasTurismo, ordenesTrabajo, conductores, vehiculos, pautas, tareasEstandar, tiposFalla, kitsRepuesto, usuarios, proveedores, crearReservaTurismo, crearOrdenTrabajo, eliminarOrdenTrabajo, actualizarOrdenTrabajo, crearTipoFalla, eliminarTipoFalla, crearKitRepuesto, eliminarKitRepuesto, crearProveedor, eliminarProveedor }}>

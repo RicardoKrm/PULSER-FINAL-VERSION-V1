@@ -15,9 +15,11 @@ export default function GenericPage() {
     if (path.startsWith(mod.href)) {
       moduleTitle = mod.title;
       PageIcon = mod.icon;
-      const sub = mod.submodules.find(s => s.href === path);
+      const sub = mod.submodules?.find(s => s.href === path);
       if (sub) {
         pageTitle = sub.title;
+      } else if (path === mod.href) {
+        pageTitle = mod.title;
       }
     }
   });
