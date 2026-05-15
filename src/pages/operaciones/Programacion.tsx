@@ -128,6 +128,25 @@ export default function Programacion() {
     setDraggedItem(null);
   };
 
+  const handleDropToPending = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!draggedItem) return;
+
+    const { item, source } = draggedItem;
+    
+    if (source === 'scheduled') {
+      setScheduled(prev => prev.filter(s => s.id !== item.id));
+      setPendings(prev => [...prev, {
+        id: item.id,
+        tipo: item.tipo,
+        origen: item.origen,
+        destino: item.destino,
+        bgColor: 'bg-white dark:bg-slate-800'
+      }]);
+    }
+    setDraggedItem(null);
+  };
+
   // Navegación
   const goToToday = () => setCurrentDate(new Date());
   
@@ -238,7 +257,11 @@ export default function Programacion() {
       <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0 overflow-hidden">
         
         {/* Left Sidebar - Pending Services */}
-        <div className="w-full lg:w-72 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col shrink-0 overflow-hidden">
+        <div 
+          className="w-full lg:w-72 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col shrink-0 overflow-hidden"
+          onDragOver={handleDragOver}
+          onDrop={handleDropToPending}
+        >
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
             <h2 className="font-bold text-slate-900 dark:text-white text-sm">Servicios Pendientes</h2>
           </div>
