@@ -126,7 +126,6 @@ export const navigation = [
       { title: 'Vehículos Archivados', icon: Archive, href: '/configuracion/vehiculos-archivados' },
       { title: 'Kit de Repuestos', icon: Package, href: '/herramientas/kits' },
       { title: 'Gestión de Pausas', icon: Clock, href: '/configuracion/pausas' },
-      { title: 'Pulser AI', icon: Cpu, href: '/configuracion/ai' },
       { title: 'Carga Masiva', icon: Zap, href: '/configuracion/carga-masiva' },
     ],
   },
