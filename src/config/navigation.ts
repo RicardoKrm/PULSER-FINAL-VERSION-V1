@@ -66,7 +66,7 @@ export const navigation = [
     icon: MapPin,
     href: '/operaciones',
     submodules: [
-      { title: 'Contratos', icon: Briefcase, href: '/operaciones/contratos' },
+      { title: 'Contratos Clientes', icon: Briefcase, href: '/operaciones/contratos' },
       { title: 'Crear Servicio', icon: ClipboardList, href: '/operaciones/servicios' },
       { title: 'Reservas', icon: Calendar, href: '/operaciones/reservas' },
       { title: 'Programación', icon: CalendarClock, href: '/operaciones/programacion' },
@@ -108,8 +108,8 @@ export const navigation = [
       { title: 'Órdenes de Compra', icon: ShoppingCart, href: '/compras/ordenes' },
       { title: 'Ingreso de Facturas', icon: FileText, href: '/compras/facturas' },
       { title: 'Proveedores', icon: Users, href: '/compras/proveedores' },
-      { title: 'Contratos', icon: Briefcase, href: '/compras/contratos' },
-      { title: 'Precio de Combustible', icon: DollarSign, href: '/compras/precio-combustible' },
+      { title: 'Cotizaciones', icon: FileText, href: '/compras/cotizaciones' },
+      { title: 'Contrato Proveedores', icon: Briefcase, href: '/compras/contratos' },
     ],
   },
   {
@@ -119,6 +119,7 @@ export const navigation = [
     submodules: [
       { title: 'Configuración Empresa', icon: Settings, href: '/configuracion/empresa' },
       { title: 'Usuarios y Cargos', icon: Users, href: '/configuracion/usuarios' },
+      { title: 'Precio de Combustible', icon: DollarSign, href: '/configuracion/precio-combustible' },
       { title: 'Gestión de Pautas', icon: FileText, href: '/configuracion/pautas' },
       { title: 'Gestión de Tareas', icon: ClipboardList, href: '/configuracion/tareas' },
       { title: 'Gestión de Fallas', icon: AlertCircle, href: '/configuracion/fallas' },

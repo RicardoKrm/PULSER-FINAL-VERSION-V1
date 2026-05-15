@@ -44,7 +44,7 @@ export default function Contratos() {
       <div className="mb-6 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
         <div>
           <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
-            Gestión de Contratos
+            Contratos Clientes
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm font-medium">
             Administración de acuerdos comerciales, tipos de servicio y facturación.

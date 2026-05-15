@@ -26,13 +26,12 @@ import { Badge } from '../../components/ui/Badge';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function GestionCombustible() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'vehiculos' | 'cargas' | 'precios'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'vehiculos' | 'cargas'>('dashboard');
   const [busqueda, setBusqueda] = useState('');
   
   // Modal states
   const [isAjustarMetasOpen, setIsAjustarMetasOpen] = useState(false);
   const [isRegistrarCargaOpen, setIsRegistrarCargaOpen] = useState(false);
-  const [isActualizarPrecioOpen, setIsActualizarPrecioOpen] = useState(false);
   const [isKmManual, setIsKmManual] = useState(false);
 
   // Detail panel state
@@ -42,12 +41,6 @@ export default function GestionCombustible() {
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState<typeof tablaFlota[0] | null>(null);
-
-  const preciosHistoricos = [
-    { id: 1, fecha: '15-May-2026', tipo: 'Diésel', precio: 1050, usuario: 'Admin' },
-    { id: 2, fecha: '01-May-2026', tipo: 'Diésel', precio: 1020, usuario: 'Admin' },
-    { id: 3, fecha: '15-Abr-2026', tipo: 'Diésel', precio: 990, usuario: 'Admin' },
-  ];
 
   // Mocks
   const kpis = {
@@ -188,15 +181,6 @@ export default function GestionCombustible() {
               )}
             >
               <Droplet className="w-4 h-4" /> Cargas
-            </button>
-            <button 
-              onClick={() => setActiveTab('precios')}
-              className={cn(
-                 "flex items-center whitespace-nowrap gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all",
-                 activeTab === 'precios' ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/50 dark:border-slate-700/50" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
-              )}
-            >
-              <Banknote className="w-4 h-4" /> Precios
             </button>
           </div>
         </div>
@@ -590,48 +574,6 @@ export default function GestionCombustible() {
         </Card>
       )}
 
-      {!selectedVehicle && activeTab === 'precios' && (
-        <Card className="shadow-sm">
-           <CardHeader className="flex flex-row items-center justify-between border-b dark:border-slate-800 pb-4">
-            <div>
-              <CardTitle>Gestión de Precios</CardTitle>
-              <p className="text-sm text-slate-500 mt-1">Configuración del costo por litro para valorización dinámica</p>
-            </div>
-            <Button onClick={() => setIsActualizarPrecioOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white"><Plus className="w-4 h-4 mr-2" /> Actualizar Precio</Button>
-          </CardHeader>
-          <CardContent className="p-0">
-             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-900/50 border-b dark:border-slate-800">
-                  <tr>
-                    <th className="px-6 py-4 font-semibold">Fecha de Vigencia</th>
-                    <th className="px-6 py-4 font-semibold">Tipo</th>
-                    <th className="px-6 py-4 font-semibold text-right">Precio ($ CLP)</th>
-                    <th className="px-6 py-4 font-semibold text-right">Registrado Por</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                  {preciosHistoricos.map((p, index) => (
-                    <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center text-slate-600 dark:text-slate-300">
-                            {index === 0 && <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded mr-2 uppercase">Activo</span>}
-                            <Calendar className="w-4 h-4 mr-2 text-slate-400" />
-                            {p.fecha}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 font-medium text-slate-700 dark:text-slate-300">{p.tipo}</td>
-                      <td className="px-6 py-4 text-right font-bold text-slate-900 dark:text-zinc-100">${p.precio}</td>
-                      <td className="px-6 py-4 text-right text-slate-500">{p.usuario}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {selectedVehicle && (
         <div className="space-y-6 animate-in fade-in duration-300">
           <Button variant="ghost" onClick={() => setSelectedVehicle(null)} className="mb-2 -ml-2 text-slate-500">
@@ -789,32 +731,6 @@ export default function GestionCombustible() {
           <div className="md:col-span-2 flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setIsRegistrarCargaOpen(false)}>Cancelar</Button>
             <Button className="bg-blue-600 hover:bg-blue-700 text-white">Registrar</Button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal isOpen={isActualizarPrecioOpen} onClose={() => setIsActualizarPrecioOpen(false)} title="Actualizar Precio Combustible">
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Fecha de Vigencia</label>
-            <input type="date" className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm" />
-            <p className="text-xs text-slate-500">Este precio aplicará a todas las cargas a partir de esta fecha.</p>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Tipo de Combustible</label>
-            <select className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm">
-               <option>Diésel</option>
-               <option>Gasolina 93</option>
-               <option>Gasolina 95</option>
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Precio por Litro ($ CLP)</label>
-            <input type="number" placeholder="Ej: 1050" className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm" />
-          </div>
-          <div className="flex justify-end gap-2 mt-6">
-            <Button variant="outline" onClick={() => setIsActualizarPrecioOpen(false)}>Cancelar</Button>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white">Guardar Precio</Button>
           </div>
         </div>
       </Modal>

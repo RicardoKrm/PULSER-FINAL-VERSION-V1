@@ -42,6 +42,9 @@ import GestionAuditorias from './pages/logistica/GestionAuditorias';
 import DetalleAuditoria from './pages/logistica/DetalleAuditoria';
 import OrdenesCompra from './pages/compras/OrdenesCompra';
 import IngresoFacturas from './pages/compras/IngresoFacturas';
+import Cotizaciones from './pages/compras/Cotizaciones';
+import ContratosProveedores from './pages/compras/ContratosProveedores';
+import PrecioCombustible from './pages/configuracion/PrecioCombustible';
 import UsuariosCargos from './pages/configuracion/UsuariosCargos';
 import GestionFallas from './pages/configuracion/GestionFallas';
 import ConfiguracionEmpresa from './pages/configuracion/ConfiguracionEmpresa';
@@ -94,6 +97,9 @@ const router = createBrowserRouter([
       { path: "compras/ordenes", element: <OrdenesCompra /> },
       { path: "compras/facturas", element: <IngresoFacturas /> },
       { path: "compras/proveedores", element: <GestionProveedores /> },
+      { path: "compras/cotizaciones", element: <Cotizaciones /> },
+      { path: "compras/contratos", element: <ContratosProveedores /> },
+      { path: "configuracion/precio-combustible", element: <PrecioCombustible /> },
       { path: "logistica/suministros", element: <GestionSuministros /> },
       { path: "logistica/bodegas", element: <GestionBodegas /> },
       { path: "logistica/escaneo", element: <PuertoEscaneo /> },
