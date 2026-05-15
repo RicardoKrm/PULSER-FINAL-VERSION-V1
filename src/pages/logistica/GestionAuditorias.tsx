@@ -11,9 +11,11 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  FileText
+  FileText,
+  Warehouse
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '../../components/ui/Button';
 import Swal from 'sweetalert2';
 
 interface Auditoria {
@@ -36,6 +38,7 @@ export default function GestionAuditorias() {
   const [bodegas, setBodegas] = useState<Bodega[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [newAudit, setNewAudit] = useState({ bodega_id: '', notas: '' });
 
   useEffect(() => {
@@ -88,151 +91,184 @@ export default function GestionAuditorias() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'CAPTURANDO':
-        return <span className="px-3 py-1 rounded-lg bg-blue-100 text-blue-600 text-[10px] font-black uppercase tracking-wider">Capturando</span>;
+        return <span className="px-3 py-1 rounded-md bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-[10px] font-black uppercase tracking-wider">Capturando</span>;
       case 'ESPERANDO':
-        return <span className="px-3 py-1 rounded-lg bg-amber-100 text-amber-600 text-[10px] font-black uppercase tracking-wider">Esperando Ajuste</span>;
+        return <span className="px-3 py-1 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-black uppercase tracking-wider">Esperando Ajuste</span>;
       case 'FINALIZADA':
-        return <span className="px-3 py-1 rounded-lg bg-emerald-100 text-emerald-600 text-[10px] font-black uppercase tracking-wider">Finalizada</span>;
+        return <span className="px-3 py-1 rounded-md bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider">Finalizada</span>;
       default:
-        return <span className="px-3 py-1 rounded-lg bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-wider">{status}</span>;
+        return <span className="px-3 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-black uppercase tracking-wider">{status}</span>;
     }
   };
 
+  const filteredAuditorias = auditorias.filter(a => 
+    a.bodega.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    a.responsable.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    a.id.toString().includes(searchTerm)
+  );
+
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-end">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-3">
-            Inventarios <span className="text-cyan-600">Físicos</span>
+            <ClipboardList className="w-8 h-8 text-cyan-600 dark:text-cyan-500" />
+            Inventarios Físicos
           </h1>
-          <p className="text-slate-500 font-medium">Historial y control de auditorías de bodega.</p>
+          <p className="text-slate-500 font-medium mt-1 uppercase tracking-wider text-sm">Historial y control de auditorías de bodega.</p>
         </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2 shadow-lg shadow-cyan-600/20 transition-all active:scale-95"
-        >
-          <Plus className="w-5 h-5" /> NUEVA AUDITORÍA
-        </button>
+        
+        <div className="flex flex-wrap gap-3">
+          <Button 
+            className="flex items-center gap-2 font-bold px-6 bg-cyan-600 hover:bg-cyan-700 text-white shadow-md shadow-cyan-500/20"
+            onClick={() => setIsModalOpen(true)}
+          >
+            <Plus className="w-5 h-5" /> Nueva Auditoría
+          </Button>
+        </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
-                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">ID / BODEGA</th>
-                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">RESPONSABLE</th>
-                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">FECHA INICIO</th>
-                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">FECHA TÉRMINO</th>
-                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">ESTADO</th>
-                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">ACCIONES</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400">Cargando auditorías...</td>
-                </tr>
-              ) : auditorias.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400">No hay auditorías registradas</td>
-                </tr>
-              ) : (
-                auditorias.map((a) => (
-                  <tr key={a.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="font-black text-slate-800 dark:text-slate-200 text-lg">#{a.id}</span>
-                        <span className="text-[10px] font-black text-cyan-600 uppercase tracking-tight">{a.bodega.nombre}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                          <User className="w-4 h-4 text-slate-400" />
-                        </div>
-                        <span className="font-bold text-slate-700 dark:text-slate-300 text-sm">{a.responsable}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5 text-slate-500 font-medium text-sm">
-                        <Calendar className="w-3.5 h-3.5" />
-                        {new Date(a.fecha_inicio).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {a.fecha_termino ? (
-                        <div className="flex items-center gap-1.5 text-slate-500 font-medium text-sm">
-                          <Clock className="w-3.5 h-3.5" />
-                          {new Date(a.fecha_termino).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                      ) : (
-                        <span className="text-slate-300 italic font-medium">---</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      {getStatusBadge(a.estado)}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button 
-                        onClick={() => navigate(`/logistica/auditorias/${a.id}`)}
-                        className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-cyan-600 transition-colors"
-                      >
-                        <Eye className="w-5 h-5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      {/* Toolbox */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row gap-4 justify-between items-center">
+         <div className="relative w-full md:w-96">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Buscar por ID, bodega o responsable..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl text-sm font-bold focus:ring-2 focus:ring-cyan-500/50 outline-none transition-all dark:text-white"
+            />
+         </div>
+         <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+            <div className="px-4 py-1.5 text-sm font-bold text-slate-500 dark:text-slate-400">Total: <span className="text-cyan-600 dark:text-cyan-400">{filteredAuditorias.length}</span></div>
+         </div>
       </div>
+
+      {/* Grid List */}
+      {isLoading ? (
+         <div className="flex items-center justify-center p-12">
+           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-600"></div>
+         </div>
+      ) : filteredAuditorias.length === 0 ? (
+         <div className="bg-slate-50 dark:bg-slate-800/50 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-12 text-center">
+            <ClipboardList className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
+            <h3 className="text-lg font-black text-slate-700 dark:text-slate-200 mb-1">No hay auditorías</h3>
+            <p className="text-slate-500 text-sm font-medium">No se encontraron resultados para tu búsqueda.</p>
+         </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {filteredAuditorias.map((a) => (
+            <div key={a.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col h-full">
+              {/* Card Header: ID & Status */}
+              <div className="flex justify-between items-start mb-4">
+                 <div>
+                    <span className="text-xs font-black text-cyan-600 dark:text-cyan-500 uppercase tracking-widest block mb-1">
+                      AUD-{a.id.toString().padStart(3, '0')}
+                    </span>
+                    <h3 className="text-lg font-black text-slate-800 dark:text-slate-100 leading-tight">
+                      {a.bodega.nombre}
+                    </h3>
+                 </div>
+                 <div>
+                    {getStatusBadge(a.estado)}
+                 </div>
+              </div>
+
+              {/* Card Body: Info */}
+              <div className="space-y-3 mb-6 flex-1 mt-2">
+                <div className="flex items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-400">
+                  <User className="w-4 h-4 text-slate-400 shrink-0" />
+                  <span className="truncate">{a.responsable}</span>
+                </div>
+                
+                <div className="flex items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-400">
+                  <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Inicio</span>
+                    <span>{new Date(a.fecha_inicio).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-400">
+                  <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Término</span>
+                    <span>
+                      {a.fecha_termino 
+                        ? new Date(a.fecha_termino).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        : <span className="text-slate-400 italic">En proceso...</span>
+                      }
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card Footer: Action Button */}
+              <div className="pt-4 mt-auto">
+                 <button 
+                   onClick={() => navigate(`/logistica/auditorias/${a.id}`)}
+                   className="w-full bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold py-2.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-700"
+                 >
+                   <span>Ver Detalle de Auditoría</span>
+                 </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* New Audit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200">
-            <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100 mb-2">Iniciar Inventario Físico</h2>
-            <p className="text-slate-500 font-medium mb-8">Selecciona la bodega y agrega notas para los auditores.</p>
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl p-6 md:p-8 shadow-2xl animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-3 mb-2">
+               <div className="p-3 bg-cyan-50 dark:bg-cyan-900/30 rounded-xl text-cyan-600 dark:text-cyan-500">
+                  <FileText className="w-6 h-6" />
+               </div>
+               <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100">Iniciar Inventario Físico</h2>
+            </div>
+            <p className="text-slate-500 font-medium mb-8 text-sm">Selecciona la bodega y agrega notas para los auditores. Se generará una nueva sesión de inventario.</p>
 
             <div className="space-y-6 mb-8">
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Bodega a Auditar</label>
+                <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest block mb-1.5">Bodega a Auditar</label>
                 <select 
                   value={newAudit.bodega_id}
                   onChange={(e) => setNewAudit({ ...newAudit, bodega_id: e.target.value })}
-                  className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold border border-slate-200 dark:border-slate-700 focus:border-cyan-500 outline-none transition-all text-slate-800 dark:text-slate-100"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-bold focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition-all text-slate-800 dark:text-slate-100"
                 >
                   {bodegas.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
                 </select>
               </div>
 
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Notas / Instrucciones</label>
+                <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest block mb-1.5">Notas / Instrucciones (Opcional)</label>
                 <textarea 
                   rows={3}
                   placeholder="Ej: Inventario general de cierre de mes..."
                   value={newAudit.notas}
                   onChange={(e) => setNewAudit({ ...newAudit, notas: e.target.value })}
-                  className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold border border-slate-200 dark:border-slate-700 focus:border-cyan-500 outline-none transition-all text-slate-800 dark:text-slate-100 placeholder:text-slate-300"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-bold focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 outline-none transition-all text-slate-800 dark:text-slate-100 placeholder:text-slate-400 resize-none"
                 ></textarea>
               </div>
             </div>
 
-            <div className="flex gap-4">
-              <button 
-                onClick={handleStartAudit}
-                className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white p-5 rounded-3xl font-black text-lg shadow-xl shadow-cyan-600/20 transition-all active:scale-95"
-              >
-                INICIAR SESIÓN DE INVENTARIO
-              </button>
-              <button 
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-6 border-t border-slate-100 dark:border-slate-800">
+              <Button 
+                variant="outline"
                 onClick={() => setIsModalOpen(false)}
-                className="px-6 font-black text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-widest text-sm"
+                className="w-full sm:w-auto"
               >
                 Cancelar
-              </button>
+              </Button>
+              <Button 
+                onClick={handleStartAudit}
+                className="w-full sm:w-auto bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-8 shadow-sm shadow-cyan-600/20"
+              >
+                Inciar Sesión
+              </Button>
             </div>
           </div>
         </div>
@@ -240,3 +276,4 @@ export default function GestionAuditorias() {
     </div>
   );
 }
+
