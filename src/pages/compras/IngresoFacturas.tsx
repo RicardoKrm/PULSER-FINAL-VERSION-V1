@@ -13,110 +13,242 @@ import {
   Calendar,
   CreditCard,
   DollarSign,
-  ScanBarcode
+  ScanBarcode,
+  UploadCloud,
+  FileCheck,
+  Paperclip,
+  ArrowLeft
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
+import Swal from 'sweetalert2';
 
 interface Invoice {
   id: string;
   emisor: string;
+  rut: string;
   fecha: string;
   monto: number;
   estado: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
   oc: string;
 }
 
-export default function IngresoFacturas() {
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'lista' | 'nuevo'>('lista');
+const INITIAL_INVOICES: Invoice[] = [
+  { id: 'FE-10293', emisor: 'Lubricantes y Filtros S.A.', rut: '76.123.456-K', fecha: '2026-05-15', monto: 1540000, estado: 'PENDIENTE', oc: 'OC-2501' },
+  { id: 'FE-10294', emisor: 'Neumáticos del Sur', rut: '77.987.654-2', fecha: '2026-05-12', monto: 3200000, estado: 'APROBADA', oc: 'OC-2498' },
+];
 
-  useEffect(() => {
-    fetch('/api/compras/facturas')
-      .then(res => res.json())
-      .then(data => {
-        setInvoices(data);
-        setLoading(false);
+export default function IngresoFacturas() {
+  const [invoices, setInvoices] = useState<Invoice[]>(INITIAL_INVOICES);
+  const [activeTab, setActiveTab] = useState<'lista' | 'nuevo'>('lista');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+
+  // Form State
+  const [rut, setRut] = useState('');
+  const [razonSocial, setRazonSocial] = useState('');
+  const [nDoc, setNDoc] = useState('');
+  const [nOc, setNOc] = useState('');
+  const [fechaEmision, setFechaEmision] = useState(new Date().toISOString().split('T')[0]);
+  const [montoTotal, setMontoTotal] = useState<number>(0);
+
+  const filteredInvoices = invoices.filter(inv => 
+    inv.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    inv.emisor.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    inv.rut.includes(searchTerm)
+  );
+
+  const handleConsultarSII = () => {
+    if (!rut) {
+       Swal.fire('Error', 'Ingrese un RUT válido', 'error');
+       return;
+    }
+    // Mockup SII fetch
+    Swal.fire({
+      title: 'Consultando a SII...',
+      text: 'Obteniendo información del contribuyente',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
+    setTimeout(() => {
+      Swal.close();
+      setRazonSocial('EMPRESA DE PRUEBA S.A.');
+      Swal.fire({
+        title: '¡RUT Encontrado!',
+        text: 'Los datos del emisor han sido cargados.',
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false
       });
-  }, []);
+    }, 1500);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rut || !nDoc || montoTotal <= 0) {
+      Swal.fire('Campos requeridos', 'Por favor complete RUT, N° Documento y Monto', 'warning');
+      return;
+    }
+
+    const newInvoice: Invoice = {
+      id: `FE-${nDoc}`,
+      emisor: razonSocial || 'Proveedor sin nombre',
+      rut,
+      fecha: fechaEmision,
+      monto: montoTotal,
+      estado: 'PENDIENTE',
+      oc: nOc || 'Directa'
+    };
+
+    setInvoices([newInvoice, ...invoices]);
+    Swal.fire({
+      title: '¡Factura Registrada!',
+      text: 'El documento ha sido ingresado al sistema.',
+      icon: 'success',
+      confirmButtonColor: '#4f46e5'
+    });
+    
+    // Reset form
+    setRut('');
+    setRazonSocial('');
+    setNDoc('');
+    setNOc('');
+    setFechaEmision(new Date().toISOString().split('T')[0]);
+    setMontoTotal(0);
+    setActiveTab('lista');
+  };
+
+  const getStatusBadge = (estado: string) => {
+    switch (estado) {
+      case 'APROBADA':
+        return <span className="px-3 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/50 flex w-fit items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> Aprobada</span>;
+      case 'RECHAZADA':
+        return <span className="px-3 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 border border-rose-100 dark:border-rose-800/50 flex w-fit items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /> Rechazada</span>;
+      default:
+        return <span className="px-3 py-1 rounded-md text-xs font-bold bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-100 dark:border-amber-800/50 flex w-fit items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /> Pendiente</span>;
+    }
+  };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-end">
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-3">
-            Ingreso de <span className="text-cyan-600">Facturas</span>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <FileText className="w-6 h-6 text-indigo-500" /> {activeTab === 'lista' ? 'Ingreso de Facturas' : 'Digitalizar Factura'}
           </h1>
-          <p className="text-slate-500 font-medium">Digitalización, validación y carga de documentos tributarios.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+            {activeTab === 'lista' ? 'Historial y gestión de documentos tributarios de proveedores.' : 'Ingrese los datos o cargue un documento para su digitación.'}
+          </p>
         </div>
-        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
-          <button 
-            onClick={() => setActiveTab('lista')}
-            className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'lista' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500'}`}
-          >
-            HISTORIAL
-          </button>
-          <button 
+        
+        {activeTab === 'lista' ? (
+          <Button 
             onClick={() => setActiveTab('nuevo')}
-            className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'nuevo' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm' : 'text-slate-500'}`}
+            className="flex items-center gap-2 font-bold px-6 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/20"
           >
-             DIGITALIZAR
-          </button>
-        </div>
+            <Plus className="w-5 h-5" /> Digitalizar Nueva
+          </Button>
+        ) : (
+          <Button 
+            onClick={() => setActiveTab('lista')}
+            variant="outline"
+            className="flex items-center gap-2 font-bold px-6 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
+            <ArrowLeft className="w-4 h-4" /> Volver al Historial
+          </Button>
+        )}
       </div>
 
       {activeTab === 'nuevo' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-4">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-4">
           <div className="space-y-6">
-             <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm">
-                <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 mb-6 flex items-center gap-2">
-                   <ScanBarcode className="w-6 h-6 text-cyan-600" /> Datos del Emisor
+             <div className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest border-b border-slate-200 dark:border-slate-700 pb-2 flex items-center gap-2 mb-6">
+                   <Building2 className="w-4 h-4 text-indigo-500" /> Datos del Emisor
                 </h3>
-                <div className="space-y-5">
-                   <div className="grid grid-cols-2 gap-4">
-                      <div>
-                         <label className="text-[10px] font-black text-slate-400 uppercase block mb-1.5 ml-1">RUT Emisor</label>
-                         <input type="text" placeholder="76.123.456-K" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold border border-transparent focus:border-cyan-500 outline-none transition-all text-sm" />
-                      </div>
-                      <div className="flex items-end">
-                         <Button className="w-full h-14 rounded-2xl bg-slate-800 text-white font-black">
-                            <Search className="w-4 h-4 mr-2" /> CONSULTAR SII
-                         </Button>
-                      </div>
-                   </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                    <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase block mb-1.5 ml-1">Razón Social</label>
-                      <input type="text" placeholder="NOMBRE DE LA EMPRESA" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold border border-transparent focus:border-cyan-500 outline-none transition-all text-sm" />
+                      <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">RUT Emisor *</label>
+                      <input 
+                        type="text" 
+                        value={rut}
+                        onChange={(e) => setRut(e.target.value)}
+                        placeholder="Ej. 76.123.456-K" 
+                        required
+                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-white transition-all" 
+                      />
                    </div>
+                   <div className="flex items-end">
+                      <Button type="button" onClick={handleConsultarSII} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-10 rounded-xl shadow-sm">
+                         <Search className="w-4 h-4 mr-2" /> Consultar SII
+                      </Button>
+                   </div>
+                </div>
+                <div className="mt-4">
+                   <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Razón Social</label>
+                   <input 
+                     type="text" 
+                     value={razonSocial}
+                     onChange={(e) => setRazonSocial(e.target.value)}
+                     placeholder="NOMBRE DE LA EMPRESA" 
+                     className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-white transition-all" 
+                   />
                 </div>
              </div>
 
-             <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm">
-                <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 mb-6 flex items-center gap-2">
-                   <FileText className="w-6 h-6 text-cyan-600" /> Detalle del Documento
+             <div className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest border-b border-slate-200 dark:border-slate-700 pb-2 flex items-center gap-2 mb-6">
+                   <FileText className="w-4 h-4 text-emerald-500" /> Detalle del Documento
                 </h3>
-                <div className="space-y-5">
-                   <div className="grid grid-cols-2 gap-4">
-                      <div>
-                         <label className="text-[10px] font-black text-slate-400 uppercase block mb-1.5 ml-1">N° Documento</label>
-                         <input type="text" placeholder="FE-10293" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold border border-transparent focus:border-cyan-500 outline-none transition-all text-sm" />
-                      </div>
-                      <div>
-                         <label className="text-[10px] font-black text-slate-400 uppercase block mb-1.5 ml-1">N° Órden de Compra</label>
-                         <input type="text" placeholder="OC-2501 (Opcional)" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold border border-transparent focus:border-cyan-500 outline-none transition-all text-sm" />
-                      </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                   <div>
+                      <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">N° Documento *</label>
+                      <input 
+                        type="text" 
+                        value={nDoc}
+                        onChange={(e) => setNDoc(e.target.value)}
+                        placeholder="Ej. 10293" 
+                        required
+                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-white transition-all" 
+                      />
                    </div>
-                   <div className="grid grid-cols-2 gap-4">
-                      <div>
-                         <label className="text-[10px] font-black text-slate-400 uppercase block mb-1.5 ml-1">Fecha Emisión</label>
-                         <input type="date" className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold border border-transparent focus:border-cyan-500 outline-none transition-all text-sm" />
-                      </div>
-                      <div>
-                         <label className="text-[10px] font-black text-slate-400 uppercase block mb-1.5 ml-1">Monto Total</label>
-                         <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-400">$</span>
-                            <input type="number" placeholder="0" className="w-full pl-8 pr-4 py-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold border border-transparent focus:border-cyan-500 outline-none transition-all text-sm" />
-                         </div>
+                   <div>
+                      <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Orden de Compra (OC)</label>
+                      <input 
+                        type="text" 
+                        value={nOc}
+                        onChange={(e) => setNOc(e.target.value)}
+                        placeholder="Opcional" 
+                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-white transition-all" 
+                      />
+                   </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                   <div>
+                      <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Fecha Emisión *</label>
+                      <input 
+                        type="date" 
+                        value={fechaEmision}
+                        onChange={(e) => setFechaEmision(e.target.value)}
+                        required
+                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-white transition-all" 
+                      />
+                   </div>
+                   <div>
+                      <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Monto Total ($) *</label>
+                      <div className="relative">
+                         <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-400">$</span>
+                         <input 
+                           type="number" 
+                           value={montoTotal || ''}
+                           onChange={(e) => setMontoTotal(Number(e.target.value))}
+                           placeholder="0" 
+                           required
+                           className="w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-white transition-all" 
+                         />
                       </div>
                    </div>
                 </div>
@@ -124,88 +256,180 @@ export default function IngresoFacturas() {
           </div>
 
           <div className="space-y-6">
-             <div className="bg-slate-100 dark:bg-slate-800/50 p-8 rounded-[3rem] border-2 border-dashed border-slate-300 dark:border-slate-700 flex flex-col items-center justify-center min-h-[400px] group transition-all hover:border-cyan-500/50">
-                <div className="w-20 h-20 rounded-3xl bg-white dark:bg-slate-800 flex items-center justify-center shadow-xl mb-6 group-hover:scale-110 transition-transform">
-                   <Upload className="w-10 h-10 text-cyan-600" />
+             <div className="bg-slate-50 dark:bg-slate-800/50 p-8 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 flex flex-col items-center justify-center min-h-[300px] group transition-all hover:border-indigo-500/50">
+                <div className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-800 flex items-center justify-center shadow-lg mb-6 group-hover:scale-110 transition-transform">
+                   <UploadCloud className="w-8 h-8 text-indigo-500" />
                 </div>
-                <h4 className="text-xl font-black text-slate-700 dark:text-slate-300 mb-2 text-center">SOLTAR PDF O IMAGEN</h4>
-                <p className="text-slate-400 font-medium text-center text-sm mb-8">El sistema procesará automáticamente mediante OCR para extraer los datos.</p>
+                <h4 className="text-xl font-black text-slate-700 dark:text-slate-300 mb-2 text-center">Ajuntar PDF o Imagen</h4>
+                <p className="text-slate-500 font-medium text-center text-sm mb-6 max-w-sm">Si ajustas una factura, intentaremos extraer los datos automáticamente (Simulado).</p>
                 <div className="flex gap-4">
-                   <Button className="rounded-2xl h-14 px-8 bg-cyan-600 font-black shadow-lg shadow-cyan-600/20">
-                      SELECCIONAR ARCHIVO
-                   </Button>
-                   <Button variant="outline" className="rounded-2xl h-14 px-6 border-slate-300 bg-white dark:bg-slate-900 font-black">
-                      <Camera className="w-5 h-5" />
+                   <Button type="button" className="rounded-xl h-12 bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md shadow-indigo-500/20">
+                      Explorar Archivos
                    </Button>
                 </div>
              </div>
 
-             <div className="p-8 bg-emerald-50 dark:bg-emerald-950/20 rounded-[2.5rem] border border-emerald-100 dark:border-emerald-900/50">
-                <div className="flex gap-4 items-start">
-                   <div className="p-3 bg-white dark:bg-slate-900 rounded-2xl shadow-sm text-emerald-600">
-                      <CheckCircle2 className="w-6 h-6" />
-                   </div>
-                   <div>
-                      <h4 className="text-emerald-900 dark:text-emerald-400 font-black mb-1">Pulser AI Ready</h4>
-                      <p className="text-emerald-700 dark:text-emerald-600 font-medium text-sm">Carga el documento y extraeremos proveedores, productos y valores en segundos.</p>
-                   </div>
-                </div>
+             <div className="p-6 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-start gap-4">
+                 <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
+                    <FileCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                 </div>
+                 <div>
+                    <h4 className="font-bold text-slate-800 dark:text-slate-100">Carga Segura</h4>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Los documentos quedarán asignados a la orden de compra y se derivarán para pago.</p>
+                 </div>
              </div>
 
-             <Button className="w-full h-16 rounded-3xl bg-slate-900 text-white font-black text-lg shadow-2xl">
-                REGISTRAR FACTURA EN SISTEMA
+             <Button type="submit" className="w-full h-14 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-lg shadow-xl shrink-0 gap-2 flex items-center justify-center px-4">
+                <CheckCircle2 className="w-5 h-5" /> Registrar Factura en Sistema
              </Button>
           </div>
-        </div>
+        </form>
       ) : (
-        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden animate-in fade-in">
-          <div className="p-6 border-b border-slate-100 dark:border-slate-800">
-             <div className="relative w-full md:w-96">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden animate-in fade-in">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col sm:flex-row gap-4 justify-between items-center">
+             <div className="relative w-full sm:w-96">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input 
                    type="text"
-                   placeholder="Buscar factura por RUT o N°..."
-                   className="w-full pl-12 pr-4 py-3 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-transparent focus:border-cyan-500 outline-none transition-all font-bold text-sm"
+                   placeholder="Buscar factura por RUT, emisor o N°..."
+                   value={searchTerm}
+                   onChange={(e) => setSearchTerm(e.target.value)}
+                   className="w-full pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white"
                 />
              </div>
           </div>
           <div className="overflow-x-auto">
-             <table className="w-full text-left">
+             <table className="w-full text-left text-sm">
                 <thead>
-                   <tr className="bg-slate-50 dark:bg-slate-800/50">
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">N° FACTURA</th>
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Emisor</th>
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">OC Relacionada</th>
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Fecha</th>
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Monto</th>
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Estado</th>
+                   <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+                      <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400 uppercase text-xs">Documento</th>
+                      <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400 uppercase text-xs">Emisor</th>
+                      <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400 uppercase text-xs text-center">Asociación</th>
+                      <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400 uppercase text-xs">Monto Total</th>
+                      <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400 uppercase text-xs text-right">Estado</th>
+                      <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400 uppercase text-xs text-right">Acciones</th>
                    </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                   {invoices.map(invoice => (
-                     <tr key={invoice.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="px-6 py-4 font-black">{invoice.id}</td>
-                        <td className="px-6 py-4 font-bold text-slate-600 dark:text-slate-300">{invoice.emisor}</td>
+                   {filteredInvoices.map(invoice => (
+                     <tr 
+                        key={invoice.id} 
+                        className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                        onClick={() => setSelectedInvoice(invoice)}
+                     >
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1"><FileText className="w-3.5 h-3.5 text-slate-400" /> {invoice.id}</span>
+                            <span className="text-xs text-slate-500 flex items-center gap-1 mt-1"><Calendar className="w-3 h-3" /> {new Date(invoice.fecha).toLocaleDateString()}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                             <span className="font-bold text-slate-800 dark:text-slate-200">{invoice.emisor}</span>
+                             <span className="text-[10px] uppercase font-black tracking-widest text-slate-500 mt-0.5">{invoice.rut}</span>
+                          </div>
+                        </td>
                         <td className="px-6 py-4 text-center">
-                           <span className={`px-2 py-1 rounded text-[10px] font-black ${invoice.oc === 'Directa' ? 'bg-slate-100 text-slate-500' : 'bg-cyan-50 text-cyan-600'}`}>
-                              {invoice.oc}
+                           <span className={`px-2.5 py-1 rounded-md text-xs font-bold inline-flex items-center gap-1 ${invoice.oc === 'Directa' ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'}`}>
+                              <Database className="w-3.5 h-3.5" /> {invoice.oc}
                            </span>
                         </td>
-                        <td className="px-6 py-4 text-slate-500 text-sm font-bold">{invoice.fecha}</td>
-                        <td className="px-6 py-4 font-black">${invoice.monto.toLocaleString('es-CL')}</td>
+                        <td className="px-6 py-4 font-mono font-bold text-slate-800 dark:text-slate-200">
+                          ${invoice.monto.toLocaleString('es-CL')}
+                        </td>
                         <td className="px-6 py-4 text-right">
-                           <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-wider ${
-                              invoice.estado === 'APROBADA' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'
-                           }`}>
-                              {invoice.estado}
-                           </span>
+                           <div className="flex justify-end">
+                             {getStatusBadge(invoice.estado)}
+                           </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                           <Button 
+                             variant="outline" 
+                             className="h-9 px-3 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 pointer-events-none"
+                           >
+                             <Paperclip className="w-4 h-4 mr-1.5" /> Ver PDF
+                           </Button>
                         </td>
                      </tr>
                    ))}
+                   {filteredInvoices.length === 0 && (
+                     <tr>
+                        <td colSpan={6} className="py-12 text-center text-slate-500 dark:text-slate-400">
+                           No se encontraron facturas registradas.
+                        </td>
+                     </tr>
+                   )}
                 </tbody>
              </table>
           </div>
         </div>
+      )}
+
+      {selectedInvoice && (
+        <Modal
+          isOpen={!!selectedInvoice}
+          onClose={() => setSelectedInvoice(null)}
+          title="Detalle de Factura"
+          size="lg"
+        >
+          <div className="space-y-6">
+            <div className="flex justify-between items-start">
+               <div>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                     <FileText className="w-6 h-6 text-indigo-500" /> Factura {selectedInvoice.id}
+                  </h3>
+                  <p className="text-sm text-slate-500 mt-1">Recibida el {new Date(selectedInvoice.fecha).toLocaleDateString()}</p>
+               </div>
+               {getStatusBadge(selectedInvoice.estado)}
+            </div>
+
+            <div className="grid grid-cols-2 gap-6 bg-slate-50 dark:bg-slate-800/50 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+               <div>
+                  <p className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Emisor</p>
+                  <p className="font-bold text-slate-800 dark:text-slate-200">{selectedInvoice.emisor}</p>
+               </div>
+               <div>
+                  <p className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">RUT</p>
+                  <p className="font-bold text-slate-800 dark:text-slate-200">{selectedInvoice.rut}</p>
+               </div>
+               <div>
+                  <p className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Orden de Compra</p>
+                  <div className="flex items-center gap-1.5">
+                     <Database className="w-4 h-4 text-slate-400" />
+                     <span className="font-bold text-slate-800 dark:text-slate-200">{selectedInvoice.oc}</span>
+                  </div>
+               </div>
+               <div>
+                  <p className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Monto Total</p>
+                  <p className="font-bold font-mono text-xl text-slate-800 dark:text-slate-200">${selectedInvoice.monto.toLocaleString('es-CL')}</p>
+               </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+               <Button onClick={() => setSelectedInvoice(null)} variant="outline">
+                  Cerrar
+               </Button>
+               {selectedInvoice.estado === 'PENDIENTE' && (
+                  <>
+                     <Button className="bg-rose-600 hover:bg-rose-700 text-white" onClick={() => {
+                        setInvoices(invoices.map(inv => inv.id === selectedInvoice.id ? {...inv, estado: 'RECHAZADA'} : inv));
+                        setSelectedInvoice(null);
+                        Swal.fire('Factura Rechazada', '', 'success');
+                     }}>
+                        Rechazar
+                     </Button>
+                     <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => {
+                        setInvoices(invoices.map(inv => inv.id === selectedInvoice.id ? {...inv, estado: 'APROBADA'} : inv));
+                        setSelectedInvoice(null);
+                        Swal.fire('Factura Aprobada', '', 'success');
+                     }}>
+                        Aprobar para Pago
+                     </Button>
+                  </>
+               )}
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );
