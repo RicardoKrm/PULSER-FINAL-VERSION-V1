@@ -12,18 +12,59 @@ export default function SuperAdminPerfiles() {
     { id: '2', name: 'Admin Flota', users: 24, type: 'Cliente' },
     { id: '3', name: 'Supervisor Terreno', users: 45, type: 'Cliente' },
     { id: '4', name: 'Jefe de Taller', users: 18, type: 'Cliente' },
+    { id: '5', name: 'Mecánico', users: 32, type: 'Cliente' },
+    { id: '6', name: 'Bodeguero / Logística', users: 12, type: 'Cliente' },
+    { id: '7', name: 'Conductor', users: 150, type: 'Cliente' },
   ];
 
-  // Initializing permissions state
   const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({
     'Super Administrador': navigation.flatMap(m => [m.title, ...(m.submodules || []).map(s => `${m.title}:${s.title}`)]),
+    
     'Admin Flota': navigation.flatMap(m => {
       if (m.title === 'Super Administrador') return [];
-      const subs = (m.submodules || []).filter(s => !s.title.includes('RR.HH')).map(s => `${m.title}:${s.title}`);
+      const subs = (m.submodules || []).map(s => `${m.title}:${s.title}`);
       return [m.title, ...subs];
     }),
-    'Supervisor Terreno': [],
-    'Jefe de Taller': []
+
+    'Supervisor Terreno': navigation.flatMap(m => {
+      if (!['Operaciones y Servicios', 'Soporte y Ayuda', 'Dashboard & Estrategia'].includes(m.title)) return [];
+      const allowedSubs = (m.submodules || []).filter(s => 
+        ['Dashboard', 'Crear Servicio', 'Reservas', 'Programación', 'GPS FleetSat', 'Alertas', 'Historial', 'Centro de Ayuda'].includes(s.title)
+      );
+      return allowedSubs.length > 0 ? [m.title, ...allowedSubs.map(s => `${m.title}:${s.title}`)] : [];
+    }),
+
+    'Jefe de Taller': navigation.flatMap(m => {
+      if (!['Gestión de Flota', 'Logística y Suministros', 'Soporte y Ayuda', 'Dashboard & Estrategia', 'Configuración y Herramientas'].includes(m.title)) return [];
+      const allowedSubs = (m.submodules || []).filter(s => 
+        ['Pizarra de Mantenimiento', 'Pizarra de Programación', 'Órdenes de Trabajo (OT)', 'Gestión de Neumáticos', 'Control de Combustible', 'Gestión de Suministros', 'Aprobaciones', 'Gestión de Pautas', 'Gestión de Tareas', 'Gestión de Fallas', 'Centro de Ayuda', 'Análisis de Fallas'].includes(s.title)
+      );
+      return allowedSubs.length > 0 ? [m.title, ...allowedSubs.map(s => `${m.title}:${s.title}`)] : [];
+    }),
+
+    'Mecánico': navigation.flatMap(m => {
+      if (!['Gestión de Flota', 'Soporte y Ayuda'].includes(m.title)) return [];
+      const allowedSubs = (m.submodules || []).filter(s => 
+        ['Pizarra de Mantenimiento', 'Órdenes de Trabajo (OT)', 'Centro de Ayuda'].includes(s.title)
+      );
+      return allowedSubs.length > 0 ? [m.title, ...allowedSubs.map(s => `${m.title}:${s.title}`)] : [];
+    }),
+
+    'Bodeguero / Logística': navigation.flatMap(m => {
+      if (!['Logística y Suministros', 'Soporte y Ayuda', 'Compras y Proveedores'].includes(m.title)) return [];
+      const allowedSubs = (m.submodules || []).filter(s => 
+        ['Gestión de Suministros', 'Gestión de Bodegas', 'Puerto de Escaneo', 'Auditorías', 'Órdenes de Compra', 'Proveedores', 'Centro de Ayuda'].includes(s.title)
+      );
+      return allowedSubs.length > 0 ? [m.title, ...allowedSubs.map(s => `${m.title}:${s.title}`)] : [];
+    }),
+
+    'Conductor': navigation.flatMap(m => {
+      if (!['Operaciones y Servicios', 'Soporte y Ayuda'].includes(m.title)) return [];
+      const allowedSubs = (m.submodules || []).filter(s => 
+        ['Centro de Ayuda', 'Manual de Uso'].includes(s.title)
+      );
+      return allowedSubs.length > 0 ? [m.title, ...allowedSubs.map(s => `${m.title}:${s.title}`)] : [];
+    })
   });
 
   const currentPerms = rolePermissions[selectedRole] || [];
