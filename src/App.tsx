@@ -45,7 +45,8 @@ import IngresoFacturas from './pages/compras/IngresoFacturas';
 import Cotizaciones from './pages/compras/Cotizaciones';
 import ContratosProveedores from './pages/compras/ContratosProveedores';
 import PrecioCombustible from './pages/configuracion/PrecioCombustible';
-import UsuariosCargos from './pages/configuracion/UsuariosCargos';
+import Personal from './pages/configuracion/Personal';
+import GestionCargos from './pages/configuracion/GestionCargos';
 import GestionFallas from './pages/configuracion/GestionFallas';
 import ConfiguracionEmpresa from './pages/configuracion/ConfiguracionEmpresa';
 import CargaMasiva from './pages/configuracion/CargaMasiva';
@@ -86,7 +87,8 @@ const router = createBrowserRouter([
       { path: "flota/neumaticos", element: <GestionNeumaticos /> },
       { path: "flota/combustible", element: <GestionCombustible /> },
       { path: "configuracion/pautas", element: <GestionPautas /> },
-      { path: "configuracion/usuarios", element: <UsuariosCargos /> },
+      { path: "configuracion/personal", element: <Personal /> },
+      { path: "configuracion/cargos", element: <GestionCargos /> },
       { path: "configuracion/fallas", element: <GestionFallas /> },
       { path: "configuracion/empresa", element: <ConfiguracionEmpresa /> },
       { path: "configuracion/tareas", element: <GestionTareas /> },

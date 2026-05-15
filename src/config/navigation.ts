@@ -117,8 +117,9 @@ export const navigation = [
     icon: Settings,
     href: '/configuracion',
     submodules: [
-      { title: 'Configuración Empresa', icon: Settings, href: '/configuracion/empresa' },
-      { title: 'Usuarios y Cargos', icon: Users, href: '/configuracion/usuarios' },
+      { title: 'Gestión de Empresa', icon: Settings, href: '/configuracion/empresa' },
+      { title: 'Personal', icon: Users, href: '/configuracion/personal' },
+      { title: 'Cargos y Roles', icon: Briefcase, href: '/configuracion/cargos' },
       { title: 'Precio de Combustible', icon: DollarSign, href: '/configuracion/precio-combustible' },
       { title: 'Gestión de Pautas', icon: FileText, href: '/configuracion/pautas' },
       { title: 'Gestión de Tareas', icon: ClipboardList, href: '/configuracion/tareas' },
