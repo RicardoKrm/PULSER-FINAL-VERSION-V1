@@ -93,6 +93,13 @@ const pathFaena: [number, number][] = [[-20.900, -68.650], [-20.940, -68.630], [
 const pathSubida: [number, number][] = [...pathIquiquePozo, ...pathPozoA65, ...pathA65Collahuasi, ...pathFaena];
 const pathBajada: [number, number][] = [...pathSubida].reverse();
 
+const pathPicaFaena: [number, number][] = [[-20.490, -69.330], [-20.600, -69.100], [-20.750, -68.900], [-20.850, -68.750], [-20.966, -68.616]];
+const pathCalamaFaena: [number, number][] = [[-22.450, -68.930], [-22.000, -68.800], [-21.500, -68.700], [-21.100, -68.650], [-20.966, -68.616]];
+const pathHuaraPozo: [number, number][] = [[-19.996, -69.771], [-20.100, -69.780], [-20.258, -69.785]];
+const pathHuaraFaena: [number, number][] = [...pathHuaraPozo, ...pathPozoA65, ...pathA65Collahuasi, ...pathFaena];
+
+const pathIquiqueCalama: [number, number][] = [[-20.213, -70.150], [-20.258, -69.785], [-20.800, -69.600], [-21.500, -69.400], [-21.900, -69.200], [-22.450, -68.930]];
+
 interface FallbackInfraction {
   tramo: string;
   duracion: string;
@@ -103,18 +110,18 @@ const initialVehicles = [
   {
     id: 'V1', patente: 'TT-RR-10', conductor: 'Julio Tapia',
     velocidad: 85, limite: 90, condicion: 'normal', estado: 'en_ruta',
-    ruta: 'Iquique -> Faena', path: pathSubida, progress: 0.15, speedStep: 0.003
+    ruta: 'Iquique -> Collahuasi', path: pathSubida, progress: 0.15, speedStep: 0.003
   },
   {
     id: 'V2', patente: 'CC-MM-22', conductor: 'Ana Rojas',
     velocidad: 115, limite: 90, condicion: 'exceso_velocidad', estado: 'en_ruta',
-    ruta: 'Iquique -> Faena', path: pathSubida, progress: 0.45, speedStep: 0.005,
+    ruta: 'Iquique -> Collahuasi', path: pathSubida, progress: 0.45, speedStep: 0.005,
     historialInfracciones: [] as FallbackInfraction[]
   },
   {
     id: 'V3', patente: 'FF-GG-88', conductor: 'Luis Medina',
     velocidad: 70, limite: 90, condicion: 'normal', estado: 'en_ruta',
-    ruta: 'Iquique -> Faena', path: pathSubida, progress: 0.70, speedStep: 0.0025,
+    ruta: 'Iquique -> Collahuasi', path: pathSubida, progress: 0.70, speedStep: 0.0025,
     historialInfracciones: [
       { tramo: 'Curva Peñon', duracion: '3 min', maxVel: 105 }
     ] as FallbackInfraction[]
@@ -122,17 +129,17 @@ const initialVehicles = [
   {
     id: 'V4', patente: 'XX-YY-99', conductor: 'Carmen Díaz',
     velocidad: 35, limite: 50, condicion: 'normal', estado: 'en_ruta',
-    ruta: 'Iquique -> Faena', path: pathSubida, progress: 0.95, speedStep: 0.001
+    ruta: 'Iquique -> Collahuasi', path: pathSubida, progress: 0.95, speedStep: 0.001
   },
   {
     id: 'V5', patente: 'BB-SV-55', conductor: 'Oscar Pizarro',
     velocidad: 80, limite: 90, condicion: 'normal', estado: 'en_ruta',
-    ruta: 'Faena -> Iquique', path: pathBajada, progress: 0.3, speedStep: 0.003
+    ruta: 'Collahuasi -> Iquique', path: pathBajada, progress: 0.3, speedStep: 0.003
   },
   {
     id: 'V6', patente: 'ZZ-XX-11', conductor: 'Raul Cardenas',
     velocidad: 0, limite: 90, condicion: 'detenido', estado: 'detenido',
-    ruta: 'Iquique -> Faena',
+    ruta: 'Iquique -> Collahuasi',
     incidencia: 'Fallo mecánico (Tracción). Requiere asistencia logística en ruta.',
     path: [[-20.650, -68.950]] as [number, number][], progress: 0, speedStep: 0
   },
@@ -141,6 +148,28 @@ const initialVehicles = [
     velocidad: 0, limite: 90, condicion: 'ralenti', estado: 'en_ruta',
     ruta: 'Pozo Almonte -> Interior',
     path: [[-20.350, -69.780]] as [number, number][], progress: 0, speedStep: 0
+  },
+  {
+    id: 'V8', patente: 'RT-UI-77', conductor: 'Pedro Ramirez',
+    velocidad: 60, limite: 90, condicion: 'normal', estado: 'en_ruta',
+    ruta: 'Pica -> Collahuasi', path: pathPicaFaena, progress: 0.20, speedStep: 0.004
+  },
+  {
+    id: 'V9', patente: 'OP-LK-33', conductor: 'Maria Gonzalez',
+    velocidad: 95, limite: 90, condicion: 'exceso_velocidad', estado: 'en_ruta',
+    ruta: 'Calama -> Collahuasi', path: pathCalamaFaena, progress: 0.60, speedStep: 0.006,
+    historialInfracciones: [] as FallbackInfraction[]
+  },
+  {
+    id: 'V10', patente: 'MN-BV-88', conductor: 'Juan Soto',
+    velocidad: 75, limite: 90, condicion: 'normal', estado: 'en_ruta',
+    ruta: 'Huara -> Collahuasi', path: pathHuaraFaena, progress: 0.35, speedStep: 0.003
+  },
+  {
+    id: 'V11', patente: 'AB-CD-12', conductor: 'Carlos Paz',
+    velocidad: 82, limite: 90, condicion: 'normal', estado: 'en_ruta',
+    ruta: 'Iquique -> Calama', path: pathIquiqueCalama, progress: 0.40, speedStep: 0.004
+
   }
 ];
 
@@ -150,6 +179,7 @@ export default function GPS() {
   }); 
 
   const [isGlobalMonitorOpen, setIsGlobalMonitorOpen] = useState(false);
+  const [isSimularRutaModalOpen, setIsSimularRutaModalOpen] = useState(false);
 
   const [vehiculosGPS, setVehiculosGPS] = useState(
     initialVehicles.map(v => {
@@ -190,6 +220,42 @@ export default function GPS() {
     exportToExcel(dataToExport, 'Monitoreo_GPS_Flota', 'GPS');
   };
 
+  const [simularPatente, setSimularPatente] = useState('');
+  const [simularRuta, setSimularRuta] = useState('Iquique -> Collahuasi');
+
+  const handleAddVehicle = () => {
+    if (!simularPatente) return;
+    
+    let path = pathSubida;
+    if (simularRuta === 'Collahuasi -> Iquique') path = pathBajada;
+    else if (simularRuta === 'Pica -> Collahuasi') path = pathPicaFaena;
+    else if (simularRuta === 'Calama -> Collahuasi') path = pathCalamaFaena;
+    else if (simularRuta === 'Huara -> Collahuasi') path = pathHuaraFaena;
+    else if (simularRuta === 'Iquique -> Calama') path = pathIquiqueCalama;
+
+    const [lat, lng] = getCoordinateAlongPath(path, 0);
+
+    const newVehicle = {
+      id: `V${Date.now()}`,
+      patente: simularPatente.toUpperCase(),
+      conductor: 'Conductor Nuevo',
+      velocidad: 80,
+      limite: 90,
+      condicion: 'normal',
+      estado: 'en_ruta',
+      ruta: simularRuta,
+      path: path,
+      progress: 0,
+      speedStep: 0.005,
+      lat,
+      lng
+    } as any;
+
+    setVehiculosGPS(prev => [...prev, newVehicle]);
+    setIsSimularRutaModalOpen(false);
+    setSimularPatente('');
+  };
+
   return (
     <div className="w-full flex flex-col h-full min-h-[calc(100vh-8rem)]">
       {/* Header */}
@@ -203,6 +269,13 @@ export default function GPS() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsSimularRutaModalOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-colors flex items-center justify-center gap-2 text-sm max-w-[fit-content]"
+          >
+            <Activity className="w-4 h-4" />
+            Simular Ruta
+          </button>
           <button
             onClick={() => setIsGlobalMonitorOpen(true)}
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-colors flex items-center justify-center gap-2 text-sm max-w-[fit-content]"
@@ -257,11 +330,33 @@ export default function GPS() {
               <Circle center={[-20.966, -68.616]} radius={15000} pathOptions={{ color: '#eab308', fillColor: '#eab308', fillOpacity: 0.1 }}>
                 <Popup>Geocerca Faena Collahuasi</Popup>
               </Circle>
+              <Circle center={[-20.258, -69.785]} radius={5000} pathOptions={{ color: '#10b981', fillColor: '#10b981', fillOpacity: 0.1 }}>
+                <Popup>Geocerca Pozo Almonte</Popup>
+              </Circle>
+              <Circle center={[-22.450, -68.930]} radius={8000} pathOptions={{ color: '#f97316', fillColor: '#f97316', fillOpacity: 0.1 }}>
+                <Popup>Geocerca Calama</Popup>
+              </Circle>
 
               {/* Rutas asignadas */}
               <Polyline 
                 positions={pathSubida} 
                 pathOptions={{ color: '#3b82f6', dashArray: '10, 10', weight: 4, opacity: 0.5 }} 
+              />
+              <Polyline 
+                positions={pathPicaFaena} 
+                pathOptions={{ color: '#8b5cf6', dashArray: '10, 10', weight: 4, opacity: 0.5 }} 
+              />
+              <Polyline 
+                positions={pathCalamaFaena} 
+                pathOptions={{ color: '#ec4899', dashArray: '10, 10', weight: 4, opacity: 0.5 }} 
+              />
+              <Polyline 
+                positions={pathHuaraFaena} 
+                pathOptions={{ color: '#14b8a6', dashArray: '10, 10', weight: 4, opacity: 0.5 }} 
+              />
+              <Polyline 
+                positions={pathIquiqueCalama} 
+                pathOptions={{ color: '#f97316', dashArray: '10, 10', weight: 4, opacity: 0.5 }} 
               />
 
               {/* Markers de Vehículos */}
@@ -509,6 +604,69 @@ export default function GPS() {
                 })}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Simular Ruta */}
+      {isSimularRutaModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-xl shadow-2xl overflow-hidden flex flex-col">
+            
+            <div className="px-6 py-5 flex justify-between items-center shrink-0 border-b border-slate-100 dark:border-slate-800">
+               <h2 className="font-bold text-slate-800 dark:text-white">Simular Nueva Ruta</h2>
+               <button 
+                 onClick={() => setIsSimularRutaModalOpen(false)}
+                 className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
+               >
+                 <X className="w-5 h-5" />
+               </button>
+            </div>
+            
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Patente</label>
+                <input 
+                  type="text" 
+                  value={simularPatente} 
+                  onChange={e => setSimularPatente(e.target.value)}
+                  placeholder="Ej: AB-CD-12"
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Ruta</label>
+                <select 
+                  value={simularRuta} 
+                  onChange={e => setSimularRuta(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                >
+                  <option value="Iquique -> Collahuasi">Iquique -&gt; Collahuasi</option>
+                  <option value="Collahuasi -> Iquique">Collahuasi -&gt; Iquique</option>
+                  <option value="Pica -> Collahuasi">Pica -&gt; Collahuasi</option>
+                  <option value="Calama -> Collahuasi">Calama -&gt; Collahuasi</option>
+                  <option value="Huara -> Collahuasi">Huara -&gt; Collahuasi</option>
+                  <option value="Iquique -> Calama">Iquique -&gt; Calama</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50">
+              <button 
+                onClick={() => setIsSimularRutaModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleAddVehicle}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm disabled:opacity-50"
+                disabled={!simularPatente}
+              >
+                Simular Vehículo
+              </button>
+            </div>
+
           </div>
         </div>
       )}

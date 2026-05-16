@@ -73,6 +73,7 @@ export const navigation = [
       { title: 'Control Documental', icon: FileCheck, href: '/operaciones/control-documental' },
       { title: 'Historial', icon: Activity, href: '/operaciones/historial' },
       { title: 'GPS FleetSat', icon: MapPin, href: '/operaciones/gps' },
+      { title: 'Portal Conductor', icon: UserCircle, href: '/operaciones/portal-conductor' },
       { title: 'Alertas', icon: AlertCircle, href: '/operaciones/alertas' },
     ],
   },

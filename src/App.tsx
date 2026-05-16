@@ -17,6 +17,7 @@ import CrearServicio from './pages/operaciones/CrearServicio';
 import Programacion from './pages/operaciones/Programacion';
 import Reservas from './pages/operaciones/Reservas';
 import GPS from './pages/operaciones/GPS';
+import PortalConductor from './pages/operaciones/PortalConductor';
 import ControlDocumental from './pages/operaciones/ControlDocumental';
 import Historial from './pages/operaciones/Historial';
 import KpiFlota from './pages/dashboard/KpiFlota';
@@ -72,6 +73,7 @@ const router = createBrowserRouter([
       { path: "operaciones/reservas", element: <Reservas /> },
       { path: "operaciones/programacion", element: <Programacion /> },
       { path: "operaciones/gps", element: <GPS /> },
+      { path: "operaciones/portal-conductor", element: <PortalConductor /> },
       { path: "operaciones/control-documental", element: <ControlDocumental /> },
       { path: "operaciones/historial", element: <Historial /> },
       { path: "super-admin/empresas", element: <SuperAdminEmpresas /> },
