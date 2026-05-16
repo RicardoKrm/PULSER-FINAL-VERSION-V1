@@ -1,6 +1,17 @@
 import React, { useState } from 'react';
-import { Calendar, MapPin, Clock, Truck, Play, CheckCircle2, AlertCircle, FileText, ChevronRight } from 'lucide-react';
+import { Calendar, MapPin, Clock, Truck, Play, CheckCircle2, AlertCircle, FileText, ChevronRight, Briefcase, Baby, Users, Map as MapIcon, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix typical Leaflet icon issues in React
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
 
 interface Viaje {
   id: string;
@@ -12,6 +23,10 @@ interface Viaje {
   vehiculo: string;
   estado: 'PROGRAMADO' | 'EN_CURSO' | 'FINALIZADO';
   pasajeros?: number;
+  maletas?: number;
+  sillaNino?: number;
+  latOrigen?: number;
+  lngOrigen?: number;
   tipoViaje: string;
 }
 
@@ -26,6 +41,10 @@ const misViajes: Viaje[] = [
     vehiculo: 'Minibus Sprinter (AB-CD-12)',
     estado: 'EN_CURSO',
     pasajeros: 12,
+    maletas: 12,
+    sillaNino: 0,
+    latOrigen: -20.213,
+    lngOrigen: -70.150,
     tipoViaje: 'Subida Personal',
   },
   {
@@ -37,6 +56,11 @@ const misViajes: Viaje[] = [
     destino: 'Pozo Almonte',
     vehiculo: 'Camioneta Hilux (XX-YY-99)',
     estado: 'PROGRAMADO',
+    pasajeros: 3,
+    maletas: 2,
+    sillaNino: 1,
+    latOrigen: -20.213,
+    lngOrigen: -70.150,
     tipoViaje: 'Traslado Equipamiento',
   },
   {
@@ -49,12 +73,17 @@ const misViajes: Viaje[] = [
     vehiculo: 'Minibus Sprinter (AB-CD-12)',
     estado: 'PROGRAMADO',
     pasajeros: 15,
+    maletas: 15,
+    sillaNino: 0,
+    latOrigen: -20.966,
+    lngOrigen: -68.616,
     tipoViaje: 'Bajada Personal',
   }
 ];
 
 export default function PortalConductor() {
   const [viajes, setViajes] = useState<Viaje[]>(misViajes);
+  const [mapModalData, setMapModalData] = useState<{ isOpen: boolean; lat?: number; lng?: number; label?: string }>({ isOpen: false });
 
   const activeViaje = viajes.find(v => v.estado === 'EN_CURSO');
   const proximosViajes = viajes.filter(v => v.estado === 'PROGRAMADO');
@@ -65,6 +94,12 @@ export default function PortalConductor() {
 
   const finalizarViaje = (id: string) => {
     setViajes(prev => prev.map(v => v.id === id ? { ...v, estado: 'FINALIZADO' } : v));
+  };
+
+  const handleOpenMap = (origen: string, lat?: number, lng?: number) => {
+    if (lat && lng) {
+      setMapModalData({ isOpen: true, lat, lng, label: origen });
+    }
   };
 
   return (
@@ -115,7 +150,18 @@ export default function PortalConductor() {
                       <div className="mt-0.5"><MapPin className="w-5 h-5 text-indigo-300" /></div>
                       <div>
                         <p className="text-xs text-indigo-300 uppercase tracking-wider font-semibold">Origen</p>
-                        <p className="font-medium text-lg leading-tight">{activeViaje.origen}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-lg leading-tight">{activeViaje.origen}</p>
+                          {activeViaje.latOrigen && (
+                            <button 
+                              onClick={() => handleOpenMap(activeViaje.origen, activeViaje.latOrigen, activeViaje.lngOrigen)}
+                              className="bg-indigo-500/30 hover:bg-indigo-500/50 p-1.5 rounded-full transition-colors"
+                              title="Ver en Mapa"
+                            >
+                              <MapIcon className="w-4 h-4 text-indigo-100" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
@@ -129,17 +175,29 @@ export default function PortalConductor() {
                   
                   <div className="space-y-4">
                     <div>
-                      <p className="text-xs text-indigo-300 uppercase tracking-wider font-semibold">Vehículo ASignado</p>
+                      <p className="text-xs text-indigo-300 uppercase tracking-wider font-semibold">Vehículo Asignado</p>
                       <p className="font-medium flex items-center gap-2 mt-1">
                         <Truck className="w-4 h-4" /> {activeViaje.vehiculo}
                       </p>
                     </div>
-                    {activeViaje.pasajeros && (
-                      <div>
-                        <p className="text-xs text-indigo-300 uppercase tracking-wider font-semibold">Pasajeros</p>
-                        <p className="font-medium text-lg mt-0.5">{activeViaje.pasajeros} PAX</p>
+                    
+                    <div className="flex bg-indigo-500/20 rounded-lg p-2 mt-2 divide-x divide-indigo-400/30">
+                      <div className="flex-1 px-3 text-center">
+                        <Users className="w-4 h-4 mx-auto mb-1 text-indigo-300" />
+                        <span className="block text-xl font-bold">{activeViaje.pasajeros || 0}</span>
+                        <span className="block text-[10px] uppercase tracking-wider text-indigo-300">Pax</span>
                       </div>
-                    )}
+                      <div className="flex-1 px-3 text-center">
+                        <Briefcase className="w-4 h-4 mx-auto mb-1 text-indigo-300" />
+                        <span className="block text-xl font-bold">{activeViaje.maletas || 0}</span>
+                        <span className="block text-[10px] uppercase tracking-wider text-indigo-300">Maletas</span>
+                      </div>
+                      <div className="flex-1 px-3 text-center">
+                        <Baby className="w-4 h-4 mx-auto mb-1 text-indigo-300" />
+                        <span className="block text-xl font-bold">{activeViaje.sillaNino || 0}</span>
+                        <span className="block text-[10px] uppercase tracking-wider text-indigo-300">Sillas</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -187,7 +245,18 @@ export default function PortalConductor() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2.5 border border-slate-100 dark:border-slate-800">
                           <p className="text-[10px] uppercase text-slate-500 font-bold mb-1">Ruta</p>
-                          <div className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{viaje.origen} <ChevronRight className="w-3 h-3 inline text-slate-400 relative -top-0.5" /> {viaje.destino}</div>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{viaje.origen} <ChevronRight className="w-3 h-3 inline text-slate-400 relative -top-0.5" /> {viaje.destino}</div>
+                            {viaje.latOrigen && (
+                               <button 
+                                 onClick={() => handleOpenMap(viaje.origen, viaje.latOrigen, viaje.lngOrigen)}
+                                 className="text-indigo-500 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 p-1.5 rounded-full shrink-0 transition-colors"
+                                 title="Ver en Mapa"
+                               >
+                                 <MapIcon className="w-4 h-4" />
+                               </button>
+                             )}
+                          </div>
                         </div>
                         <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2.5 border border-slate-100 dark:border-slate-800">
                           <p className="text-[10px] uppercase text-slate-500 font-bold mb-1">Vehículo Asignado</p>
@@ -224,6 +293,52 @@ export default function PortalConductor() {
         </div>
 
       </div>
+
+      {/* Map Modal */}
+      {mapModalData.isOpen && mapModalData.lat && mapModalData.lng && (
+        <div className="fixed inset-0 z-50 flex justify-center items-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="px-6 py-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-800">
+              <h2 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-indigo-500" />
+                Punto de Origen: {mapModalData.label}
+              </h2>
+              <button 
+                onClick={() => setMapModalData({ isOpen: false })}
+                className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-2 h-[400px] w-full bg-slate-100 dark:bg-slate-900">
+              <MapContainer 
+                center={[mapModalData.lat, mapModalData.lng]} 
+                zoom={14} 
+                scrollWheelZoom={true} 
+                className="w-full h-full rounded-lg z-0"
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                <Marker position={[mapModalData.lat, mapModalData.lng]}>
+                  <Popup>
+                    Origen: {mapModalData.label}
+                  </Popup>
+                </Marker>
+              </MapContainer>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 flex justify-end">
+               <button 
+                 onClick={() => setMapModalData({ isOpen: false })}
+                 className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-indigo-700 transition"
+               >
+                 Cerrar Mapa
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
