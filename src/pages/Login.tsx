@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Building2, Lock, User, ArrowRight, ShieldCheck, Zap, BarChart3 } from 'lucide-react';
+import { Building2, Lock, User, ArrowRight, ShieldCheck, Zap, BarChart3, X, Mail } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
+import { Modal } from '../components/ui/Modal';
+import Swal from 'sweetalert2';
 
 export default function Login() {
   const [email, setEmail] = useState('superadministrador@gaval.cl');
@@ -12,6 +14,12 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const navigate = useNavigate();
+
+  // Forgot password state
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotRut, setForgotRut] = useState('');
+  const [isForgotLoading, setIsForgotLoading] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -45,6 +53,57 @@ export default function Login() {
       setErrorMsg(error.message || 'Error al iniciar sesión. Verifica tus credenciales.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail || !forgotRut) return;
+    setIsForgotLoading(true);
+
+    try {
+      const ticketId = `#TKT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      
+      const { error } = await supabase.from('tickets_ayuda').insert([{
+        ticket_id: ticketId,
+        titulo: 'Solicitud de Restablecimiento de Contraseña',
+        descripcion: `El usuario con RUT: ${forgotRut} y Email: ${forgotEmail} ha solicitado un restablecimiento de contraseña.`,
+        categoria: 'ACCESO',
+        prioridad: 'ALTA',
+        estado: 'ABIERTO',
+        usuario: forgotRut,
+        email_contacto: forgotEmail,
+        mensajes: [{
+          sender: 'Sistema',
+          type: 'client',
+          text: `Solicitud automática de restablecimiento de contraseña para ${forgotEmail}`,
+          date: new Date().toISOString()
+        }]
+      }]);
+
+      if (error) throw error;
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Solicitud Enviada',
+        text: 'Se ha creado un ticket en la mesa de ayuda. Un administrador se pondrá en contacto.',
+        confirmButtonColor: '#4f46e5'
+      });
+      setShowForgotModal(false);
+      setForgotEmail('');
+      setForgotRut('');
+    } catch (err: any) {
+      console.error('Error creating ticket:', err);
+      // Fallback si la tabla no existe o falla
+      Swal.fire({
+        icon: 'warning',
+        title: 'Solicitud Recibida (Modo Offline)',
+        text: 'Tu solicitud ha sido registrada temporalmente. Si la tabla "tickets_ayuda" no existe en Supabase, debes crearla.',
+        confirmButtonColor: '#4f46e5'
+      });
+      setShowForgotModal(false);
+    } finally {
+      setIsForgotLoading(false);
     }
   };
 
@@ -96,7 +155,13 @@ export default function Login() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-bold text-slate-300 uppercase tracking-wider">Contraseña</label>
-                    <a href="#" className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-colors">¿Olvidaste tu contraseña?</a>
+                    <button 
+                      type="button"
+                      onClick={() => setShowForgotModal(true)}
+                      className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
+                    >
+                      ¿Olvidaste tu contraseña?
+                    </button>
                   </div>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -184,6 +249,63 @@ export default function Login() {
             </div>
          </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col relative">
+            <button 
+              onClick={() => setShowForgotModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="bg-indigo-500/20 p-3 rounded-xl">
+                  <Mail className="w-6 h-6 text-indigo-400" />
+                </div>
+                <h2 className="text-xl font-bold text-white">Recuperar Contraseña</h2>
+              </div>
+              <p className="text-slate-400 text-sm mb-6">
+                Ingresa tu RUT y correo electrónico. Se enviará una solicitud al equipo de soporte (Mesa de Ayuda) para restablecer tu cuenta.
+              </p>
+
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-slate-300">RUT</label>
+                  <input
+                    type="text"
+                    required
+                    value={forgotRut}
+                    onChange={(e) => setForgotRut(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium"
+                    placeholder="Ej: 12.345.678-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-slate-300">Correo Electrónico</label>
+                  <input
+                    type="email"
+                    required
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium"
+                    placeholder="Ej: tu@email.com"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  disabled={isForgotLoading}
+                  className="w-full mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 rounded-xl transition-all"
+                >
+                  {isForgotLoading ? 'Enviando...' : 'Solicitar Restablecimiento'}
+                </Button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

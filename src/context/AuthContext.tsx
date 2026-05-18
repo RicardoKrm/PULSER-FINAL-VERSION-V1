@@ -11,6 +11,7 @@ interface AuthProfile {
   rut: string;
   email: string;
   estado: string;
+  cambio_clave_pendiente?: boolean;
   rol?: {
     nombre: string;
     tipo: string;

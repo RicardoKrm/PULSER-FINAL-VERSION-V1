@@ -14,7 +14,8 @@ import {
   PanelLeftClose,
   User,
   LifeBuoy,
-  LogOut
+  LogOut,
+  Lock
 } from 'lucide-react';
 import { navigation } from '../config/navigation';
 import { cn } from '../lib/utils';
@@ -23,6 +24,8 @@ import { useCompany } from '../contexts/CompanyContext';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { ChatBot } from './chatbot/ChatBot';
+import { supabase } from '../lib/supabase';
+import Swal from 'sweetalert2';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -49,6 +52,53 @@ export default function Layout() {
 
   const markAllAsRead = () => {
     setAllNotifications(allNotifications.map(n => ({ ...n, read: true })));
+  };
+
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  
+  // Show prompt if profile exists and cambio_clave_pendiente is true
+  const showForcePasswordChange = profile?.cambio_clave_pendiente === true;
+
+  const handleForcePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      Swal.fire('Error', 'Las contraseñas no coinciden', 'error');
+      return;
+    }
+    if (newPassword.length < 6) {
+      Swal.fire('Error', 'La contraseña debe tener al menos 6 caracteres', 'error');
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+    try {
+      const { error: updateAuthError } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateAuthError) throw updateAuthError;
+
+      const { error: updateProfileError } = await supabase
+        .from('usuario_aplicacion')
+        .update({ cambio_clave_pendiente: false })
+        .eq('id', profile?.id);
+        
+      if (updateProfileError) throw updateProfileError;
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Contraseña Actualizada',
+        text: 'Tu contraseña ha sido cambiada correctamente.',
+        showConfirmButton: false,
+        timer: 1500
+      });
+      // reload or sync state by reloading 
+      window.location.reload();
+    } catch (err: any) {
+      console.error('Error changing password:', err);
+      Swal.fire('Error', err.message || 'No se pudo actualizar la contraseña', 'error');
+    } finally {
+      setIsUpdatingPassword(false);
+    }
   };
 
   useEffect(() => {
@@ -445,6 +495,55 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
+
+      {/* Force Password Change Modal */}
+      {showForcePasswordChange && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/95 backdrop-blur-md">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col relative px-8 py-10">
+            <div className="flex flex-col items-center mb-6 text-center">
+              <div className="bg-amber-500/20 p-4 rounded-full mb-4">
+                <Lock className="w-8 h-8 text-amber-400" />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Seguridad Requerida</h2>
+              <p className="text-slate-400 text-sm">
+                Por seguridad, debes cambiar tu contraseña predeterminada antes de continuar en el sistema.
+              </p>
+            </div>
+
+            <form onSubmit={handleForcePasswordChange} className="space-y-5">
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-slate-300">Nueva Contraseña</label>
+                <input
+                  type="password"
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium"
+                  placeholder="Mínimo 6 caracteres"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-slate-300">Confirmar Nueva Contraseña</label>
+                <input
+                  type="password"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium"
+                  placeholder="Repite tu contraseña"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isUpdatingPassword}
+                className="w-full mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg hover:shadow-indigo-500/25"
+              >
+                {isUpdatingPassword ? 'Actualizando...' : 'Actualizar Contraseña'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       <ChatBot />
     </div>

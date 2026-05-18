@@ -27,12 +27,62 @@ export default function SuperAdminPerfiles() {
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [bulkActionRole, setBulkActionRole] = useState('');
 
+  // Auto-generate email
+  const [newUserNombre, setNewUserNombre] = useState('');
+  const [newUserPaterno, setNewUserPaterno] = useState('');
+  const [newUserEmpresaId, setNewUserEmpresaId] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  
+  const generateEmail = (nombre: string, paterno: string, empresaId: string) => {
+    if (!nombre || !paterno || !empresaId) return '';
+    const empresa = empresas.find(e => e.id === empresaId);
+    if (!empresa) return '';
+    const n = nombre.charAt(0).toLowerCase();
+    const p = paterno.toLowerCase().replace(/[^a-z]/g, '');
+    const emp = empresa.nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return `${n}${p}@${emp}.cl`;
+  };
+
+  useEffect(() => {
+    if (newUserNombre && newUserPaterno && newUserEmpresaId && !newUserEmail) {
+      setNewUserEmail(generateEmail(newUserNombre, newUserPaterno, newUserEmpresaId));
+    }
+  }, [newUserNombre, newUserPaterno, newUserEmpresaId]);
+
+  const handleToggleEstadoUsuario = async (u: any) => {
+    try {
+      const nuevoEstado = u.estado?.toLowerCase() === 'activo' ? 'Inactivo' : 'Activo';
+      const { error } = await supabase.from('usuario_aplicacion').update({ estado: nuevoEstado }).eq('id', u.id);
+      if (error) throw error;
+      fetchUsuarios();
+      Swal.fire({
+        toast: true, position: 'top-end', icon: 'success', title: `Usuario ${nuevoEstado}`, showConfirmButton: false, timer: 1500
+      });
+    } catch (err) {
+      console.error(err);
+      Swal.fire('Error', 'No se pudo cambiar el estado del usuario', 'error');
+    }
+  };
+
   useEffect(() => {
     // If navigation state has an empresa_id, set it as managed
     if (location.state && location.state.empresaId) {
       setManagedEmpresaId(location.state.empresaId);
     }
   }, [location.state]);
+
+  useEffect(() => {
+    if (showNewUserModal) {
+      if (managedEmpresaId) {
+        setNewUserEmpresaId(managedEmpresaId);
+      }
+    } else {
+      setNewUserNombre('');
+      setNewUserPaterno('');
+      setNewUserEmpresaId('');
+      setNewUserEmail('');
+    }
+  }, [showNewUserModal, managedEmpresaId]);
 
   const fetchRoles = async () => {
     try {
@@ -466,6 +516,7 @@ export default function SuperAdminPerfiles() {
                   <th className="p-4 font-medium">Empresa</th>
                   <th className="p-4 font-medium">Perfil Asignado</th>
                   <th className="p-4 font-medium">Estado</th>
+                  <th className="p-4 font-medium text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -504,11 +555,24 @@ export default function SuperAdminPerfiles() {
                         {u.estado || 'Activo'}
                       </span>
                     </td>
+                    <td className="p-4 text-right">
+                      <button
+                        onClick={() => handleToggleEstadoUsuario(u)}
+                        className={cn(
+                          "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border",
+                          u.estado?.toLowerCase() === 'activo'
+                            ? "text-red-600 border-red-200 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/40"
+                            : "text-green-600 border-green-200 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-900/40"
+                        )}
+                      >
+                        {u.estado?.toLowerCase() === 'activo' ? 'Desactivar' : 'Activar'}
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 {filteredUsuarios.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-slate-500 dark:text-slate-400">
+                    <td colSpan={7} className="p-8 text-center text-slate-500 dark:text-slate-400">
                       No se encontraron usuarios.
                     </td>
                   </tr>
@@ -579,23 +643,23 @@ export default function SuperAdminPerfiles() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Nombre</label>
-                      <input name="nombre" required type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: Juan" />
+                      <input name="nombre" value={newUserNombre} onChange={(e) => setNewUserNombre(e.target.value)} required type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: Juan" />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">RUT</label>
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">RUT (Será la contraseña inicial)</label>
                       <input name="rut" required type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 12.345.678-9" />
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Apellido Paterno</label>
-                      <input name="apellido_p" required type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: Pérez" />
+                      <input name="apellido_p" value={newUserPaterno} onChange={(e) => setNewUserPaterno(e.target.value)} required type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: Pérez" />
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Apellido Materno</label>
                       <input name="apellido_m" type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: González" />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Correo Electrónico</label>
-                      <input name="email" type="email" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: correo@empresa.com" />
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Correo Electrónico (Auto-generado)</label>
+                      <input name="email" value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)} type="email" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: correo@empresa.com" />
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Sexo</label>
@@ -618,7 +682,8 @@ export default function SuperAdminPerfiles() {
                         name="empresa_id"
                         required
                         className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white"
-                        defaultValue={managedEmpresaId || ""}
+                        value={newUserEmpresaId}
+                        onChange={(e) => setNewUserEmpresaId(e.target.value)}
                       >
                         <option value="" disabled>Seleccionar empresa...</option>
                         {empresas.map(emp => (
