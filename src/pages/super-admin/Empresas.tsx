@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Building, Users, Truck, Plus, Shield, Calendar, Filter, X } from 'lucide-react';
+import { Building, Users, Truck, Plus, Shield, Calendar, Filter, X, Settings } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface Empresa {
   id: string;
@@ -15,6 +16,7 @@ interface Empresa {
 
 export default function SuperAdminEmpresas() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -171,6 +173,13 @@ export default function SuperAdminEmpresas() {
                           )}
                         >
                           {company.estado === 'Activo' ? 'Desactivar' : 'Activar'}
+                        </button>
+
+                        <button
+                          onClick={() => navigate('/super-admin/perfiles', { state: { empresaId: company.id } })}
+                          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 transition-colors border border-blue-200 dark:border-blue-800/50 flex items-center gap-1 inline-flex"
+                        >
+                          <Settings className="w-3.5 h-3.5" /> Gestionar
                         </button>
                         
                         {profile?.empresa_id === company.id ? (

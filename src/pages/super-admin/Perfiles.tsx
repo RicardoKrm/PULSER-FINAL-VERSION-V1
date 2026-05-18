@@ -1,14 +1,41 @@
-import React, { useState } from 'react';
-import { Shield, Key, Plus, Check, Search, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Shield, Key, Plus, Check, Search, X, Building } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { navigation } from '../../config/navigation';
+import { supabase } from '../../lib/supabase';
+import { useLocation } from 'react-router-dom';
 
 export default function SuperAdminPerfiles() {
+  const location = useLocation();
   const [selectedRole, setSelectedRole] = useState('Admin Flota');
   const [showNewUserModal, setShowNewUserModal] = useState(false);
   const [showNewRoleModal, setShowNewRoleModal] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
   const [newRoleType, setNewRoleType] = useState('Cliente');
+  
+  const [empresas, setEmpresas] = useState<{id: string, nombre: string}[]>([]);
+  const [managedEmpresaId, setManagedEmpresaId] = useState<string>('');
+
+  useEffect(() => {
+    // If navigation state has an empresa_id, set it as managed
+    if (location.state && location.state.empresaId) {
+      setManagedEmpresaId(location.state.empresaId);
+    }
+  }, [location.state]);
+
+  useEffect(() => {
+    const fetchEmpresas = async () => {
+      try {
+        const { data, error } = await supabase.from('empresa').select('id, nombre').order('nombre');
+        if (error) throw error;
+        setEmpresas(data || []);
+      } catch (error) {
+        console.error('Error fetching empresas:', error);
+      }
+    };
+    fetchEmpresas();
+  }, []);
+
 
   const [roles, setRoles] = useState([
     { id: '1', name: 'Super Administrador', users: 0, type: 'Sistema' },
@@ -136,6 +163,13 @@ export default function SuperAdminPerfiles() {
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
             Crea roles y asigna herramientas personalizadas a las empresas.
           </p>
+          {managedEmpresaId && (
+            <div className="mt-3 flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-3 py-1.5 rounded-lg w-fit border border-indigo-100 dark:border-indigo-800">
+              <Building className="h-4 w-4" />
+              <span className="font-medium">Gestionando roles para: </span>
+              <span className="font-bold">{empresas.find(e => e.id === managedEmpresaId)?.nombre || 'Cargando...'}</span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <button 
@@ -330,10 +364,14 @@ export default function SuperAdminPerfiles() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Empresa</label>
-                      <select className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
-                        <option value="">Seleccionar empresa...</option>
-                        <option value="1">Transportes del Norte</option>
-                        <option value="2">Logística Sur</option>
+                      <select 
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white"
+                        defaultValue={managedEmpresaId || ""}
+                      >
+                        <option value="" disabled>Seleccionar empresa...</option>
+                        {empresas.map(emp => (
+                          <option key={emp.id} value={emp.id}>{emp.nombre}</option>
+                        ))}
                       </select>
                     </div>
                     <div className="space-y-1.5">
