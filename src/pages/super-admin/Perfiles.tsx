@@ -34,87 +34,78 @@ export default function SuperAdminPerfiles() {
         console.error('Error fetching empresas:', error);
       }
     };
+    const fetchRoles = async () => {
+      try {
+        const { data, error } = await supabase.from('rol').select('*').order('created_at', { ascending: true });
+        if (error) throw error;
+        if (data) {
+          setRoles(data.map(r => ({ id: r.id, name: r.nombre, users: 0, type: r.tipo })));
+          const perms: Record<string, string[]> = {};
+          data.forEach(r => perms[r.nombre] = r.permisos || []);
+          setRolePermissions(perms);
+          if (data.length > 0 && !selectedRole) setSelectedRole(data[0].nombre);
+        }
+      } catch (error) {
+        console.error('Error fetching roles:', error);
+      }
+    };
     fetchEmpresas();
+    fetchRoles();
   }, []);
 
-
-  const [roles, setRoles] = useState([
-    { id: '1', name: 'Super Administrador', users: 0, type: 'Sistema' },
-    { id: '2', name: 'Admin Flota', users: 0, type: 'Cliente' },
-    { id: '3', name: 'Supervisor Terreno', users: 0, type: 'Cliente' },
-    { id: '4', name: 'Jefe de Taller', users: 0, type: 'Cliente' },
-    { id: '5', name: 'Mecánico', users: 0, type: 'Cliente' },
-    { id: '6', name: 'Bodeguero / Logística', users: 0, type: 'Cliente' },
-    { id: '7', name: 'Conductor', users: 0, type: 'Cliente' },
-  ]);
-
-  const handleCreateRole = (e: React.FormEvent) => {
+  const handleCreateRole = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRoleName.trim()) return;
     
-    const newRole = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: newRoleName,
-      users: 0,
-      type: newRoleType
-    };
-    
-    setRoles([...roles, newRole]);
-    setRolePermissions(prev => ({ ...prev, [newRoleName]: [] }));
-    setShowNewRoleModal(false);
-    setNewRoleName('');
-    setSelectedRole(newRoleName);
+    try {
+      const { data, error } = await supabase.from('rol').insert([{
+        nombre: newRoleName,
+        tipo: newRoleType,
+        permisos: []
+      }]).select().single();
+
+      if (error) throw error;
+
+      if (data) {
+        setRoles([...roles, { id: data.id, name: data.nombre, users: 0, type: data.tipo }]);
+        setRolePermissions(prev => ({ ...prev, [data.nombre]: [] }));
+        setShowNewRoleModal(false);
+        setNewRoleName('');
+        setSelectedRole(data.nombre);
+        Swal.fire('Éxito', 'Rol creado exitosamente', 'success');
+      }
+    } catch(err) {
+      console.error(err);
+      Swal.fire('Error', 'No se pudo crear el rol', 'error');
+    }
   };
 
-  const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({
-    'Super Administrador': navigation.flatMap(m => [m.title, ...(m.submodules || []).map(s => `${m.title}:${s.title}`)]),
-    
-    'Admin Flota': navigation.flatMap(m => {
-      if (m.title === 'Super Administrador') return [];
-      const subs = (m.submodules || []).map(s => `${m.title}:${s.title}`);
-      return [m.title, ...subs];
-    }),
+  const handleSavePermissions = async () => {
+    const roleId = roles.find(r => r.name === selectedRole)?.id;
+    if (!roleId) return;
 
-    'Supervisor Terreno': navigation.flatMap(m => {
-      if (!['Operaciones y Servicios', 'Soporte y Ayuda', 'Dashboard & Estrategia'].includes(m.title)) return [];
-      const allowedSubs = (m.submodules || []).filter(s => 
-        ['Dashboard', 'Crear Servicio', 'Reservas', 'Programación', 'GPS FleetSat', 'Alertas', 'Historial', 'Centro de Ayuda'].includes(s.title)
-      );
-      return allowedSubs.length > 0 ? [m.title, ...allowedSubs.map(s => `${m.title}:${s.title}`)] : [];
-    }),
+    try {
+      const { error } = await supabase
+        .from('rol')
+        .update({ permisos: currentPerms })
+        .eq('id', roleId);
+      
+      if (error) throw error;
+      Swal.fire({
+        icon: 'success',
+        title: 'Permisos actualizados correctamente',
+        showConfirmButton: false,
+        timer: 1500
+      });
+    } catch (err) {
+      console.error(err);
+      Swal.fire('Error', 'Hubo un error al guardar los permisos', 'error');
+    }
+  };
 
-    'Jefe de Taller': navigation.flatMap(m => {
-      if (!['Gestión de Flota', 'Logística y Suministros', 'Soporte y Ayuda', 'Dashboard & Estrategia', 'Configuración y Herramientas'].includes(m.title)) return [];
-      const allowedSubs = (m.submodules || []).filter(s => 
-        ['Pizarra de Mantenimiento', 'Pizarra de Programación', 'Órdenes de Trabajo (OT)', 'Gestión de Neumáticos', 'Control de Combustible', 'Gestión de Suministros', 'Aprobaciones', 'Gestión de Pautas', 'Gestión de Tareas', 'Gestión de Fallas', 'Centro de Ayuda', 'Análisis de Fallas'].includes(s.title)
-      );
-      return allowedSubs.length > 0 ? [m.title, ...allowedSubs.map(s => `${m.title}:${s.title}`)] : [];
-    }),
 
-    'Mecánico': navigation.flatMap(m => {
-      if (!['Gestión de Flota', 'Soporte y Ayuda'].includes(m.title)) return [];
-      const allowedSubs = (m.submodules || []).filter(s => 
-        ['Pizarra de Mantenimiento', 'Órdenes de Trabajo (OT)', 'Centro de Ayuda'].includes(s.title)
-      );
-      return allowedSubs.length > 0 ? [m.title, ...allowedSubs.map(s => `${m.title}:${s.title}`)] : [];
-    }),
-
-    'Bodeguero / Logística': navigation.flatMap(m => {
-      if (!['Logística y Suministros', 'Soporte y Ayuda', 'Compras y Proveedores'].includes(m.title)) return [];
-      const allowedSubs = (m.submodules || []).filter(s => 
-        ['Gestión de Suministros', 'Gestión de Bodegas', 'Puerto de Escaneo', 'Auditorías', 'Órdenes de Compra', 'Proveedores', 'Centro de Ayuda'].includes(s.title)
-      );
-      return allowedSubs.length > 0 ? [m.title, ...allowedSubs.map(s => `${m.title}:${s.title}`)] : [];
-    }),
-
-    'Conductor': navigation.flatMap(m => {
-      if (!['Operaciones y Servicios', 'Soporte y Ayuda'].includes(m.title)) return [];
-      const allowedSubs = (m.submodules || []).filter(s => 
-        ['Centro de Ayuda', 'Manual de Uso'].includes(s.title)
-      );
-      return allowedSubs.length > 0 ? [m.title, ...allowedSubs.map(s => `${m.title}:${s.title}`)] : [];
-    })
-  });
+  const [roles, setRoles] = useState<any[]>([]);
+  const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});
 
   const currentPerms = rolePermissions[selectedRole] || [];
 
@@ -304,7 +295,7 @@ export default function SuperAdminPerfiles() {
             <button className="px-5 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
               Cancelar
             </button>
-            <button className="px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm">
+            <button onClick={handleSavePermissions} className="px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm">
               Guardar Permisos
             </button>
           </div>
@@ -332,8 +323,17 @@ export default function SuperAdminPerfiles() {
                   const data = Object.fromEntries(formData.entries());
                   
                   try {
-                    // Si se quisiera insertar en supabase:
-                    // await supabase.from('usuario_aplicacion').insert([{ ... }])
+                    const fullName = `${data.nombre} ${data.apellido_p} ${data.apellido_m || ''}`.trim();
+
+                    const { error } = await supabase.from('usuario_aplicacion').insert([{ 
+                      nombre: fullName,
+                      rut: data.rut,
+                      empresa_id: data.empresa_id,
+                      rol_id: data.rol_id,
+                      estado: data.estado,
+                    }]);
+                    
+                    if (error) throw error;
                     
                     Swal.fire({
                       icon: 'success',
@@ -342,11 +342,11 @@ export default function SuperAdminPerfiles() {
                       timer: 1500
                     });
                     setShowNewUserModal(false);
-                  } catch(err) {
+                  } catch(err: any) {
                     Swal.fire({
                       icon: 'error',
                       title: 'Error al crear usuario',
-                      text: 'Inténtalo de nuevo'
+                      text: err?.message || 'Inténtalo de nuevo'
                     });
                   }
                 }} className="flex flex-col h-full">
@@ -358,23 +358,23 @@ export default function SuperAdminPerfiles() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Nombre</label>
-                          <input required type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: Juan" />
+                          <input name="nombre" required type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: Juan" />
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">RUT</label>
-                          <input required type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 12.345.678-9" />
+                          <input name="rut" required type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 12.345.678-9" />
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Apellido Paterno</label>
-                          <input required type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: Pérez" />
+                          <input name="apellido_p" required type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: Pérez" />
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Apellido Materno</label>
-                          <input type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: González" />
+                          <input name="apellido_m" type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: González" />
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Sexo</label>
-                          <select className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
+                          <select name="sexo" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
                             <option value="HOMBRE">Hombre</option>
                             <option value="MUJER">Mujer</option>
                             <option value="OTRO">Otro</option>
@@ -390,6 +390,7 @@ export default function SuperAdminPerfiles() {
                         <div className="space-y-1.5">
                           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Empresa</label>
                           <select 
+                            name="empresa_id"
                             required
                             className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white"
                             defaultValue={managedEmpresaId || ""}
@@ -402,7 +403,7 @@ export default function SuperAdminPerfiles() {
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cargo</label>
-                          <select required defaultValue="" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
+                          <select name="cargo" required defaultValue="" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
                             <option value="" disabled>Seleccionar cargo...</option>
                             <option value="1">Mecánico de Mantenimiento</option>
                             <option value="2">Conductor</option>
@@ -411,26 +412,25 @@ export default function SuperAdminPerfiles() {
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Rol en el Sistema</label>
-                          <select required defaultValue="ADMINISTRADOR" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
-                            <option value="ADMINISTRADOR">Administrador</option>
-                            <option value="SUPERVISOR">Supervisor</option>
-                            <option value="MECANICO">Mecánico</option>
-                            <option value="ASISTENTE">Asistente</option>
-                            <option value="BODEGUERO">Bodeguero</option>
+                          <select name="rol_id" required defaultValue="" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
+                            <option value="" disabled>Seleccionar rol...</option>
+                            {roles.map(r => (
+                              <option key={r.id} value={r.id}>{r.name}</option>
+                            ))}
                           </select>
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo Prestador</label>
-                          <select className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
+                          <select name="tipo_prestador" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
                             <option value="INTERNO">Interno</option>
                             <option value="EXTERNO">Externo</option>
                           </select>
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Estado</label>
-                          <select className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
-                            <option value="ACTIVO">Activo</option>
-                            <option value="INACTIVO">Inactivo</option>
+                          <select name="estado" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
+                            <option value="Activo">Activo</option>
+                            <option value="Inactivo">Inactivo</option>
                           </select>
                         </div>
                       </div>
