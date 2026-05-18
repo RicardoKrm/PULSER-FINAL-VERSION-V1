@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, AlertTriangle, AlertOctagon, MessageSquareWarning, Truck as TruckIcon, Navigation, FileSpreadsheet, Download, MapPin, X } from 'lucide-react';
 import { exportToExcel } from '../../lib/excelExport';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -58,54 +58,6 @@ function MapController({ center }: { center: {lat: number, lng: number, zoom: nu
   return null;
 }
 
-function getDistance(p1: [number, number], p2: [number, number]) {
-  const dx = p1[0] - p2[0];
-  const dy = p1[1] - p2[1];
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
-function getCoordinateAlongPath(path: [number, number][], progress: number): [number, number] {
-  if (path.length === 1) return path[0];
-  if (progress <= 0) return path[0];
-  if (progress >= 1) return path[path.length - 1];
-
-  let totalDist = 0;
-  const distances = [];
-  for (let i = 0; i < path.length - 1; i++) {
-    const d = getDistance(path[i], path[i+1]);
-    totalDist += d;
-    distances.push(d);
-  }
-
-  const targetDist = totalDist * progress;
-  let currDist = 0;
-
-  for (let i = 0; i < path.length - 1; i++) {
-    if (currDist + distances[i] >= targetDist) {
-      const segmentProgress = (targetDist - currDist) / distances[i];
-      const lat = path[i][0] + (path[i+1][0] - path[i][0]) * segmentProgress;
-      const lng = path[i][1] + (path[i+1][1] - path[i][1]) * segmentProgress;
-      return [lat, lng];
-    }
-    currDist += distances[i];
-  }
-  return path[path.length - 1];
-}
-
-const pathIquiquePozo: [number, number][] = [[-20.213, -70.150], [-20.264, -70.088], [-20.260, -69.950], [-20.245, -69.873], [-20.258, -69.785]];
-const pathPozoA65: [number, number][] = [[-20.258, -69.785], [-20.350, -69.780], [-20.448, -69.317]];
-const pathA65Collahuasi: [number, number][] = [[-20.448, -69.317], [-20.550, -69.150], [-20.650, -68.950], [-20.800, -68.750], [-20.900, -68.650]];
-const pathFaena: [number, number][] = [[-20.900, -68.650], [-20.940, -68.630], [-20.966, -68.616]];
-const pathSubida: [number, number][] = [...pathIquiquePozo, ...pathPozoA65, ...pathA65Collahuasi, ...pathFaena];
-const pathBajada: [number, number][] = [...pathSubida].reverse();
-
-const pathPicaFaena: [number, number][] = [[-20.490, -69.330], [-20.600, -69.100], [-20.750, -68.900], [-20.850, -68.750], [-20.966, -68.616]];
-const pathCalamaFaena: [number, number][] = [[-22.450, -68.930], [-22.000, -68.800], [-21.500, -68.700], [-21.100, -68.650], [-20.966, -68.616]];
-const pathHuaraPozo: [number, number][] = [[-19.996, -69.771], [-20.100, -69.780], [-20.258, -69.785]];
-const pathHuaraFaena: [number, number][] = [...pathHuaraPozo, ...pathPozoA65, ...pathA65Collahuasi, ...pathFaena];
-
-const pathIquiqueCalama: [number, number][] = [[-20.213, -70.150], [-20.258, -69.785], [-20.800, -69.600], [-21.500, -69.400], [-21.900, -69.200], [-22.450, -68.930]];
-
 interface FallbackInfraction {
   tramo: string;
   duracion: string;
@@ -120,29 +72,8 @@ export default function GPS() {
   }); 
 
   const [isGlobalMonitorOpen, setIsGlobalMonitorOpen] = useState(false);
-  const [isSimularRutaModalOpen, setIsSimularRutaModalOpen] = useState(false);
 
-  const [vehiculosGPS, setVehiculosGPS] = useState(
-    initialVehicles.map(v => {
-      const [lat, lng] = getCoordinateAlongPath(v.path, v.progress);
-      return { ...v, lat, lng };
-    })
-  );
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setVehiculosGPS(prev => prev.map(v => {
-        if (v.estado === 'en_ruta' && v.speedStep > 0) {
-          let newProgress = v.progress + v.speedStep;
-          if (newProgress > 1) newProgress = 0; 
-          const [lat, lng] = getCoordinateAlongPath(v.path, newProgress);
-          return { ...v, progress: newProgress, lat, lng };
-        }
-        return v;
-      }));
-    }, 1500); 
-    return () => clearInterval(timer);
-  }, []);
+  const [vehiculosGPS, setVehiculosGPS] = useState<any[]>(initialVehicles);
 
   const handleCenterMap = (lat: number, lng: number) => {
     setMapCenter({ lat, lng, zoom: 14, ts: Date.now() });
@@ -161,42 +92,6 @@ export default function GPS() {
     exportToExcel(dataToExport, 'Monitoreo_GPS_Flota', 'GPS');
   };
 
-  const [simularPatente, setSimularPatente] = useState('');
-  const [simularRuta, setSimularRuta] = useState('Iquique -> Collahuasi');
-
-  const handleAddVehicle = () => {
-    if (!simularPatente) return;
-    
-    let path = pathSubida;
-    if (simularRuta === 'Collahuasi -> Iquique') path = pathBajada;
-    else if (simularRuta === 'Pica -> Collahuasi') path = pathPicaFaena;
-    else if (simularRuta === 'Calama -> Collahuasi') path = pathCalamaFaena;
-    else if (simularRuta === 'Huara -> Collahuasi') path = pathHuaraFaena;
-    else if (simularRuta === 'Iquique -> Calama') path = pathIquiqueCalama;
-
-    const [lat, lng] = getCoordinateAlongPath(path, 0);
-
-    const newVehicle = {
-      id: `V${Date.now()}`,
-      patente: simularPatente.toUpperCase(),
-      conductor: 'Conductor Nuevo',
-      velocidad: 80,
-      limite: 90,
-      condicion: 'normal',
-      estado: 'en_ruta',
-      ruta: simularRuta,
-      path: path,
-      progress: 0,
-      speedStep: 0.005,
-      lat,
-      lng
-    } as any;
-
-    setVehiculosGPS(prev => [...prev, newVehicle]);
-    setIsSimularRutaModalOpen(false);
-    setSimularPatente('');
-  };
-
   return (
     <div className="w-full flex flex-col h-full min-h-[calc(100vh-8rem)]">
       {/* Header */}
@@ -206,17 +101,10 @@ export default function GPS() {
             Integración GPS: Iquique - Collahuasi
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm font-medium">
-            Monitoreo dinámico simulado con trazados en tiempo real e incidencias.
+            Monitoreo dinámico con visualización en tiempo real e incidencias.
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsSimularRutaModalOpen(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-colors flex items-center justify-center gap-2 text-sm max-w-[fit-content]"
-          >
-            <Activity className="w-4 h-4" />
-            Simular Ruta
-          </button>
           <button
             onClick={() => setIsGlobalMonitorOpen(true)}
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-colors flex items-center justify-center gap-2 text-sm max-w-[fit-content]"
@@ -264,42 +152,6 @@ export default function GPS() {
                 url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
               />
               
-              {/* Geocercas */}
-              <Circle center={[-20.213, -70.150]} radius={8000} pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.1 }}>
-                <Popup>Geocerca Matriz Iquique</Popup>
-              </Circle>
-              <Circle center={[-20.966, -68.616]} radius={15000} pathOptions={{ color: '#eab308', fillColor: '#eab308', fillOpacity: 0.1 }}>
-                <Popup>Geocerca Faena Collahuasi</Popup>
-              </Circle>
-              <Circle center={[-20.258, -69.785]} radius={5000} pathOptions={{ color: '#10b981', fillColor: '#10b981', fillOpacity: 0.1 }}>
-                <Popup>Geocerca Pozo Almonte</Popup>
-              </Circle>
-              <Circle center={[-22.450, -68.930]} radius={8000} pathOptions={{ color: '#f97316', fillColor: '#f97316', fillOpacity: 0.1 }}>
-                <Popup>Geocerca Calama</Popup>
-              </Circle>
-
-              {/* Rutas asignadas */}
-              <Polyline 
-                positions={pathSubida} 
-                pathOptions={{ color: '#3b82f6', dashArray: '10, 10', weight: 4, opacity: 0.5 }} 
-              />
-              <Polyline 
-                positions={pathPicaFaena} 
-                pathOptions={{ color: '#8b5cf6', dashArray: '10, 10', weight: 4, opacity: 0.5 }} 
-              />
-              <Polyline 
-                positions={pathCalamaFaena} 
-                pathOptions={{ color: '#ec4899', dashArray: '10, 10', weight: 4, opacity: 0.5 }} 
-              />
-              <Polyline 
-                positions={pathHuaraFaena} 
-                pathOptions={{ color: '#14b8a6', dashArray: '10, 10', weight: 4, opacity: 0.5 }} 
-              />
-              <Polyline 
-                positions={pathIquiqueCalama} 
-                pathOptions={{ color: '#f97316', dashArray: '10, 10', weight: 4, opacity: 0.5 }} 
-              />
-
               {/* Markers de Vehículos */}
               {vehiculosGPS.map((v) => (
                 <Marker 
@@ -563,69 +415,6 @@ export default function GPS() {
                 })}
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Simular Ruta */}
-      {isSimularRutaModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-xl shadow-2xl overflow-hidden flex flex-col">
-            
-            <div className="px-6 py-5 flex justify-between items-center shrink-0 border-b border-slate-100 dark:border-slate-800">
-               <h2 className="font-bold text-slate-800 dark:text-white">Simular Nueva Ruta</h2>
-               <button 
-                 onClick={() => setIsSimularRutaModalOpen(false)}
-                 className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
-               >
-                 <X className="w-5 h-5" />
-               </button>
-            </div>
-            
-            <div className="px-6 py-5 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Patente</label>
-                <input 
-                  type="text" 
-                  value={simularPatente} 
-                  onChange={e => setSimularPatente(e.target.value)}
-                  placeholder="Ej: AB-CD-12"
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Ruta</label>
-                <select 
-                  value={simularRuta} 
-                  onChange={e => setSimularRuta(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                >
-                  <option value="Iquique -> Collahuasi">Iquique -&gt; Collahuasi</option>
-                  <option value="Collahuasi -> Iquique">Collahuasi -&gt; Iquique</option>
-                  <option value="Pica -> Collahuasi">Pica -&gt; Collahuasi</option>
-                  <option value="Calama -> Collahuasi">Calama -&gt; Collahuasi</option>
-                  <option value="Huara -> Collahuasi">Huara -&gt; Collahuasi</option>
-                  <option value="Iquique -> Calama">Iquique -&gt; Calama</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50">
-              <button 
-                onClick={() => setIsSimularRutaModalOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md"
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={handleAddVehicle}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm disabled:opacity-50"
-                disabled={!simularPatente}
-              >
-                Simular Vehículo
-              </button>
-            </div>
-
           </div>
         </div>
       )}

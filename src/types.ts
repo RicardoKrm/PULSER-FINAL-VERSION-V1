@@ -1,3 +1,22 @@
+export interface Collaborator {
+  id: string | number;
+  initials: string;
+  name: string;
+  rut: string;
+  role: string;
+  roleBadgeText: string;
+  phone: string;
+  licencia?: string;
+  especialidad?: string;
+  status: 'ACTIVO' | 'LICENCIA' | 'VACACIONES';
+  isConductor: boolean;
+  isMecanico: boolean;
+  isSupervisor: boolean;
+  email?: string;
+  sueldoBase?: number;
+  valorHH?: number;
+}
+
 export interface ReservaTurismo {
   id: string;
   op: string;

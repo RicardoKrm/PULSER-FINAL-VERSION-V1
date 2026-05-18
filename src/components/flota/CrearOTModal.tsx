@@ -11,8 +11,8 @@ interface CrearOTModalProps {
 }
 
 export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, vehiculoPreseleccionadoId }) => {
-  const { crearOrdenTrabajo, vehiculos, tiposFalla, pautas, kitsRepuesto, usuarios } = useAppContext();
-  const mecanicos = usuarios.filter(u => u.cargo === 'Mecánico');
+  const { crearOrdenTrabajo, vehiculos, tiposFalla, pautas, kitsRepuesto, personal } = useAppContext();
+  const mecanicos = personal.filter(u => u.isMecanico || u.roleBadgeText === 'Mecánico');
   
   // State for all fields
   const [formData, setFormData] = useState<Partial<OrdenDeTrabajo>>({
@@ -194,7 +194,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
               <label className="block text-sm font-medium">Personal Operativo</label>
               <select name="personalOperativo" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} required>
                   <option value="">---------</option>
-                  {mecanicos.map(m => <option key={m.id} value={m.nombre}>{m.nombre}</option>)}
+                  {mecanicos.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
               </select>
             </div>
             <div>

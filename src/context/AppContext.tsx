@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
-import { ReservaTurismo, Conductor, Vehiculo, OrdenDeTrabajo, PautaMantenimiento, TareaEstandar, TipoFalla, KitRepuesto, Usuario, Proveedor } from '../types';
+import { ReservaTurismo, Conductor, Vehiculo, OrdenDeTrabajo, PautaMantenimiento, TareaEstandar, TipoFalla, KitRepuesto, Usuario, Proveedor, Collaborator } from '../types';
 
 interface AppContextType {
   reservasTurismo: ReservaTurismo[];
@@ -14,6 +14,8 @@ interface AppContextType {
   currentUser: Usuario;
   setCurrentUser: (usuario: Usuario) => void;
   proveedores: Proveedor[];
+  personal: Collaborator[];
+  setPersonal: (personal: Collaborator[]) => void;
   crearReservaTurismo: (reserva: ReservaTurismo) => void;
   crearOrdenTrabajo: (ot: OrdenDeTrabajo) => void;
   eliminarOrdenTrabajo: (id: string) => void;
@@ -40,6 +42,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [currentUser, setCurrentUser] = useState<Usuario>({ id: 'u4', nombre: 'Admin Usuario', cargo: 'Súper Administrador' });
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
+  const [personal, setPersonal] = useState<Collaborator[]>([]);
 
   const crearReservaTurismo = (reserva: ReservaTurismo) => {
     // Logic for adding a reservation
@@ -82,7 +85,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AppContext.Provider value={{ reservasTurismo, ordenesTrabajo, conductores, vehiculos, pautas, tareasEstandar, tiposFalla, kitsRepuesto, usuarios, currentUser, setCurrentUser, proveedores, crearReservaTurismo, crearOrdenTrabajo, eliminarOrdenTrabajo, actualizarOrdenTrabajo, crearTipoFalla, eliminarTipoFalla, crearKitRepuesto, eliminarKitRepuesto, crearProveedor, eliminarProveedor }}>
+    <AppContext.Provider value={{ reservasTurismo, ordenesTrabajo, conductores, vehiculos, pautas, tareasEstandar, tiposFalla, kitsRepuesto, usuarios, currentUser, setCurrentUser, proveedores, personal, setPersonal, crearReservaTurismo, crearOrdenTrabajo, eliminarOrdenTrabajo, actualizarOrdenTrabajo, crearTipoFalla, eliminarTipoFalla, crearKitRepuesto, eliminarKitRepuesto, crearProveedor, eliminarProveedor }}>
       {children}
     </AppContext.Provider>
   );

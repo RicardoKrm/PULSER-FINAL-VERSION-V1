@@ -22,27 +22,8 @@ import {
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import Swal from 'sweetalert2';
-
-interface Collaborator {
-  id: number;
-  initials: string;
-  name: string;
-  rut: string;
-  role: string;
-  roleBadgeText: string;
-  phone: string;
-  licencia?: string;
-  especialidad?: string;
-  status: 'ACTIVO' | 'LICENCIA' | 'VACACIONES';
-  isConductor: boolean;
-  isMecanico: boolean;
-  isSupervisor: boolean;
-  email?: string;
-  sueldoBase?: number;
-  valorHH?: number;
-}
-
-const MOCK_DATA: Collaborator[] = [];
+import { Collaborator } from '../../types';
+import { useAppContext } from '../../context/AppContext';
 
 const AVAILABLE_ROLES = [
   'Administrador',
@@ -54,12 +35,19 @@ const AVAILABLE_ROLES = [
 ];
 
 export default function Personal() {
-  const [users, setUsers] = useState<Collaborator[]>(MOCK_DATA);
+  const { personal: users, setPersonal: setUsers } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalColaboradorOpen, setIsModalColaboradorOpen] = useState(false);
   const [isAssignRoleModalOpen, setIsAssignRoleModalOpen] = useState(false);
   const [selectedUserForRole, setSelectedUserForRole] = useState<Collaborator | null>(null);
   const [selectedNewRole, setSelectedNewRole] = useState('');
+
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserLastName, setNewUserLastName] = useState('');
+  const [newUserRUT, setNewUserRUT] = useState('');
+  const [newUserRole, setNewUserRole] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPhone, setNewUserPhone] = useState('');
 
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [selectedUserForProfile, setSelectedUserForProfile] = useState<Collaborator | null>(null);
@@ -121,6 +109,54 @@ export default function Personal() {
         confirmButtonColor: '#4f46e5'
       });
     }
+  };
+
+  const handleSaveNewUser = () => {
+    if (!newUserName || !newUserRUT) {
+      Swal.fire({
+        title: 'Error',
+        text: 'Por favor complete los campos obligatorios (Nombres y RUT).',
+        icon: 'error'
+      });
+      return;
+    }
+    const fullName = `${newUserName} ${newUserLastName}`.trim();
+    const isMec = newUserRole.includes('Mecánic');
+    const isCond = newUserRole.includes('Conductor');
+    const isSup = newUserRole.includes('Supervisor') || newUserRole === 'Administrador';
+
+    const newUser: Collaborator = {
+      id: Math.random().toString(36).substr(2, 9),
+      initials: fullName.substring(0,2).toUpperCase(),
+      name: fullName,
+      rut: newUserRUT,
+      role: newUserRole || 'Empleado',
+      roleBadgeText: newUserRole || 'Empleado',
+      phone: newUserPhone,
+      email: newUserEmail,
+      status: 'ACTIVO',
+      isConductor: isCond,
+      isMecanico: isMec,
+      isSupervisor: isSup
+    };
+
+    setUsers([...users, newUser]);
+    setIsModalColaboradorOpen(false);
+    
+    // Reset form
+    setNewUserName('');
+    setNewUserLastName('');
+    setNewUserRUT('');
+    setNewUserRole('');
+    setNewUserEmail('');
+    setNewUserPhone('');
+
+    Swal.fire({
+      title: '¡Colaborador Creado!',
+      text: 'El nuevo colaborador ha sido registrado.',
+      icon: 'success',
+      confirmButtonColor: '#4f46e5'
+    });
   };
 
   const handleChangeStatusClick = (user: Collaborator, newStatus: Collaborator['status']) => {
@@ -365,11 +401,11 @@ export default function Personal() {
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
                  <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Nombres *</label>
-                 <input type="text" className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" placeholder="Ej. Juan Andrés" />
+                 <input value={newUserName} onChange={e => setNewUserName(e.target.value)} type="text" className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" placeholder="Ej. Juan Andrés" />
               </div>
               <div>
                  <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Apellido Paterno *</label>
-                 <input type="text" className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" placeholder="Ej. Pérez" />
+                 <input value={newUserLastName} onChange={e => setNewUserLastName(e.target.value)} type="text" className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" placeholder="Ej. Pérez" />
               </div>
               <div>
                  <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Apellido Materno</label>
@@ -380,7 +416,7 @@ export default function Personal() {
            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                  <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">RUT *</label>
-                 <input type="text" className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" placeholder="Ej. 12.345.678-9" />
+                 <input value={newUserRUT} onChange={e => setNewUserRUT(e.target.value)} type="text" className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" placeholder="Ej. 12.345.678-9" />
               </div>
               <div>
                  <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Sexo</label>
@@ -417,7 +453,12 @@ export default function Personal() {
               </div>
               <div>
                  <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Cargo / Rol</label>
-                 <input type="text" className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" placeholder="Ej. Conductor, Mecánico" />
+                 <select value={newUserRole} onChange={e => setNewUserRole(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100">
+                    <option value="">Seleccione un rol...</option>
+                    {AVAILABLE_ROLES.map(role => (
+                       <option key={role} value={role}>{role}</option>
+                    ))}
+                 </select>
               </div>
               <div>
                  <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Prestador de servicio</label>
@@ -463,15 +504,7 @@ export default function Personal() {
              <Button variant="outline" onClick={() => setIsModalColaboradorOpen(false)}>Cancelar</Button>
              <Button 
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-10 px-8 rounded-xl shadow-sm"
-                onClick={() => {
-                  Swal.fire({
-                    title: '¡Colaborador Creado!',
-                    text: 'El nuevo colaborador ha sido registrado y su cuenta de usuario ha sido generada con su RUT como contraseña predeterminada.',
-                    icon: 'success',
-                    confirmButtonColor: '#4f46e5'
-                  });
-                  setIsModalColaboradorOpen(false);
-                }}
+                onClick={handleSaveNewUser}
              >
                Guardar Empleado
              </Button>

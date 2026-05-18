@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { ChevronLeft, ChevronRight, Clock, GripVertical, Search, AlertCircle, Plus, Calendar as CalendarIcon, Check, MoreHorizontal } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useNavigate } from 'react-router-dom';
+import { CrearOTModal } from '../../components/flota/CrearOTModal';
+import { useAppContext } from '../../context/AppContext';
 
 type OTTipo = 'Preventiva' | 'Correctiva' | 'Evaluativa' | 'Preventiva Neumático' | 'Correctiva Neumático' | 'Evaluativa Neumático' | 'Inspección';
 
@@ -48,6 +50,8 @@ const getTipoColor = (tipo: string) => {
 
 export default function PizarraProgramacion() {
   const navigate = useNavigate();
+  const { personal } = useAppContext();
+  
   const [viewMode, setViewMode] = useState<'Día' | 'Semana' | 'Mes'>('Mes');
   const [currentDate, setCurrentDate] = useState(new Date('2026-05-14T12:00:00'));
   const [draggedOt, setDraggedOt] = useState<string | null>(null);
@@ -57,55 +61,37 @@ export default function PizarraProgramacion() {
   
   const hours = Array.from({length: 11}, (_, i) => i + 8); // 8 to 18
 
-  const [pendingOts, setPendingOts] = useState<OtMock[]>([
-    { id: 'ot4', folio: 'OT-004', tipo: 'Preventiva', patente: 'EF-GH-34', actividad: 'Revisión técnica', estado: 'PROGRAMADA' },
-    { id: 'ot5', folio: 'OT-005', tipo: 'Correctiva', patente: 'AB-CD-12', actividad: 'Cambio de transmisión', estado: 'PROGRAMADA' },
-    { id: 'ot6', folio: 'OT-006', tipo: 'Evaluativa', patente: 'XY-ZW-99', actividad: 'Evaluación de daños', estado: 'PROGRAMADA' },
-    { id: 'ot7', folio: 'OT-007', tipo: 'Inspección', patente: 'KL-NM-11', actividad: 'Inspección técnica', estado: 'PROGRAMADA' },
-    { id: 'ot20', folio: 'OT-020', tipo: 'Preventiva Neumático', patente: 'TR-CK-55', actividad: 'Rotación de neumáticos', estado: 'PROGRAMADA' },
-    { id: 'ot21', folio: 'OT-021', tipo: 'Correctiva Neumático', patente: 'ZZ-WW-02', actividad: 'Cambio de neumático pinchado', estado: 'PROGRAMADA' },
-    { id: 'ot22', folio: 'OT-022', tipo: 'Evaluativa Neumático', patente: 'UU-YY-11', actividad: 'Evaluación de desgaste', estado: 'PROGRAMADA' },
-  ]);
+  const [pendingOts, setPendingOts] = useState<OtMock[]>([]);
 
-  const [mecanicos, setMecanicos] = useState<MecanicoMock[]>([
-    {
-      id: 'm1', nombre: 'Carlos Ruiz', especialidad: 'Mecánico General', selected: true,
-      ots: [
-        { id: 'ot1', folio: 'OT-001', tipo: 'Preventiva', patente: 'AB-CD-12', actividad: 'Mantenimiento preventivo.', startHour: 8, duration: 2, dayOffset: 0, estado: 'EN_PROCESO', tiempoAplicacion: '01:30:00', tiempoAtraso: '+ 30 min', isOverdue: true, progress: 100, startedLate: true },
-        { id: 'ot8', folio: 'OT-008', tipo: 'Correctiva', patente: 'EF-GH-34', actividad: 'Cambio pastillas freno.', startHour: 10.5, duration: 1.5, dayOffset: 0, estado: 'PROGRAMADA' },
-        { id: 'ot9', folio: 'OT-009', tipo: 'Preventiva', patente: 'XX-YY-01', actividad: 'Pauta Mantenimiento 10K', startHour: 14, duration: 2, dayOffset: -1, estado: 'TERMINADA', tiempoAplicacion: '01:50:00', progress: 100, finishedLate: false, startedLate: false },
-        { id: 'ot10', folio: 'OT-010', tipo: 'Correctiva', patente: 'ZZ-WW-02', actividad: 'Reparación motor', startHour: 8, duration: 4, dayOffset: 1, estado: 'PAUSADA_MECANICO', tiempoAplicacion: '02:00:00', tiempoAtraso: '+ 1 hr', progress: 50 },
-        { id: 'ot11', folio: 'OT-011', tipo: 'Preventiva', patente: 'ZZ-WW-02', actividad: 'Revisión fluidos', startHour: 14, duration: 1, dayOffset: 1, estado: 'PROGRAMADA' }
-      ]
-    },
-    {
-      id: 'm2', nombre: 'Pedro Gómez', especialidad: 'Electricista', selected: true,
-      ots: [
-        { id: 'ot2', folio: 'OT-002', tipo: 'Preventiva', patente: 'AB-CD-12', actividad: 'Revisión sist. eléctrico.', startHour: 9, duration: 2, dayOffset: 0, estado: 'EN_PROCESO', tiempoAplicacion: '00:45:00', progress: 37, startedLate: false },
-        { id: 'ot12', folio: 'OT-012', tipo: 'Correctiva', patente: 'XY-AA-10', actividad: 'Cambio de alternador', startHour: 12, duration: 2.5, dayOffset: 0, estado: 'PAUSADA', tiempoAplicacion: '01:10:00', isOverdue: true, progress: 46, startedLate: true },
-        { id: 'ot13', folio: 'OT-013', tipo: 'Preventiva', patente: 'AB-CD-12', actividad: 'Chequeo baterías', startHour: 15, duration: 1, dayOffset: -1, estado: 'TERMINADA', tiempoAplicacion: '00:55:00', progress: 100, finishedLate: false },
-        { id: 'ot14', folio: 'OT-014', tipo: 'Preventiva', patente: 'ZZ-KK-88', actividad: 'Revisión luces', startHour: 10, duration: 1, dayOffset: 1, estado: 'PROGRAMADA' },
-        { id: 'ot15', folio: 'OT-015', tipo: 'Correctiva', patente: 'XY-AA-11', actividad: 'Diagnóstico escáner', startHour: 12, duration: 1.5, dayOffset: 1, estado: 'PROGRAMADA' }
-      ]
-    },
-    {
-      id: 'm3', nombre: 'Luis Silva', especialidad: 'Lubricador', selected: true,
-      ots: [
-        { id: 'ot3', folio: 'OT-003', tipo: 'Correctiva', patente: 'EF-GH-34', actividad: 'Cambio aceite motor', startHour: 8, duration: 1.5, dayOffset: -1, estado: 'TERMINADA', tiempoAplicacion: '01:20:00', progress: 100, finishedLate: false, startedLate: false },
-        { id: 'ot16', folio: 'OT-016', tipo: 'Preventiva', patente: 'AB-CD-12', actividad: 'Engrase general', startHour: 8, duration: 2, dayOffset: 0, estado: 'EN_PROCESO', tiempoAplicacion: '00:30:00', progress: 25, startedLate: false },
-        { id: 'ot17', folio: 'OT-017', tipo: 'Preventiva', patente: 'EF-GH-34', actividad: 'Revisión niveles', startHour: 11, duration: 1, dayOffset: 0, estado: 'PROGRAMADA' },
-        { id: 'ot18', folio: 'OT-018', tipo: 'Correctiva', patente: 'KL-NM-11', actividad: 'Cambio filtro aire', startHour: 14, duration: 1.5, dayOffset: 0, estado: 'PAUSADA', tiempoAplicacion: '00:20:00', progress: 22 },
-      ]
-    },
-    {
-      id: 'm4', nombre: 'M. Santibáñez', especialidad: 'Esp. Diésel', selected: true,
-      ots: [
-        { id: 'ot19', folio: 'OT-019', tipo: 'Correctiva', patente: 'TR-CK-55', actividad: 'Reparación inyectores', startHour: 9, duration: 3, dayOffset: 0, estado: 'EN_PROCESO', tiempoAplicacion: '02:15:00', isOverdue: true, tiempoAtraso: '+ 45 min', progress: 100, startedLate: true },
-        { id: 'ot20', folio: 'OT-020', tipo: 'Preventiva', patente: 'TR-CK-99', actividad: 'Afinamiento diésel', startHour: 14, duration: 2.5, dayOffset: -1, estado: 'TERMINADA', tiempoAplicacion: '03:30:00', progress: 100, finishedLate: true, startedLate: false },
-        { id: 'ot21', folio: 'OT-021', tipo: 'Correctiva', patente: 'TR-CK-55', actividad: 'Cambio turbo', startHour: 10, duration: 4, dayOffset: 1, estado: 'PROGRAMADA' }
-      ]
-    }
-  ]);
+  const [mecanicos, setMecanicos] = useState<MecanicoMock[]>([]);
+
+  useEffect(() => {
+    // Sincronizar mecánicos desde personal
+    const personalMecanicos = personal.filter(p => p.isMecanico || p.roleBadgeText === 'Mecánico');
+    
+    setMecanicos(currentMecanicos => {
+      const currentMap = new Map(currentMecanicos.map(m => [m.id, m]));
+      const newMecanicos: MecanicoMock[] = [];
+      
+      // Mantenemos mecánicos existentes con sus OTs
+      personalMecanicos.forEach(p => {
+        const idStr = p.id.toString();
+        if (currentMap.has(idStr)) {
+          newMecanicos.push(currentMap.get(idStr)!);
+        } else {
+          newMecanicos.push({
+            id: idStr,
+            nombre: p.name,
+            especialidad: p.especialidad || 'Mecánico General',
+            selected: true,
+            ots: []
+          });
+        }
+      });
+      
+      return newMecanicos;
+    });
+  }, [personal]);
 
   const toggleMechanic = (id: string) => {
     setMecanicos(mecanicos.map(m => m.id === id ? { ...m, selected: !m.selected } : m));
@@ -686,45 +672,7 @@ export default function PizarraProgramacion() {
       </div>
 
       {/* Modals */}
-      <Modal isOpen={isNewOtModalOpen} onClose={() => setIsNewOtModalOpen(false)} title="Crear Orden de Trabajo">
-        <div className="space-y-4">
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Crea una nueva Orden de Trabajo para programarla en la pizarra.
-          </p>
-          <div className="space-y-3">
-             <div className="space-y-1">
-               <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Vehículo</label>
-               <select className="w-full text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500">
-                 <option>LDPJ-99 (MB Sprinter)</option>
-                 <option>KHYT-22 (Ford Transit)</option>
-                 <option>MNQP-15 (Peugeot Boxer)</option>
-               </select>
-             </div>
-             <div className="grid grid-cols-2 gap-4">
-               <div className="space-y-1">
-                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Fecha Programada</label>
-                 <input type="date" className="w-full text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500" />
-               </div>
-               <div className="space-y-1">
-                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Tipo Mantenimiento</label>
-                 <select className="w-full text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500">
-                   <option>Preventiva</option>
-                   <option>Correctiva</option>
-                   <option>Evaluativa</option>
-                   <option>Preventiva Neumático</option>
-                   <option>Correctiva Neumático</option>
-                   <option>Evaluativa Neumático</option>
-                   <option>Inspección</option>
-                 </select>
-               </div>
-             </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={() => setIsNewOtModalOpen(false)}>Cancelar</Button>
-            <Button className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => setIsNewOtModalOpen(false)}>Crear OT</Button>
-          </div>
-        </div>
-      </Modal>
+      <CrearOTModal isOpen={isNewOtModalOpen} onClose={() => setIsNewOtModalOpen(false)} />
 
       <Modal isOpen={dayEventsModal.isOpen} onClose={() => setDayEventsModal({ isOpen: false, date: null, events: [] })} title={`Programación del ${dayEventsModal.date} de Mayo`}>
          <div className="space-y-2">
