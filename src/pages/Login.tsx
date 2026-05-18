@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Building2, Lock, User, ArrowRight, ShieldCheck, Zap, BarChart3 } from 'lucide-react';

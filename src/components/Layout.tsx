@@ -279,27 +279,6 @@ export default function Layout() {
               />
             </div>
 
-            {/* Selector de Empresa - Solo Super Administrador */}
-            <div className="flex items-center sm:ml-2 border-l border-slate-200 dark:border-slate-700 pl-2 lg:ml-4 lg:pl-4">
-              <Building className="hidden sm:block h-4 w-4 text-slate-500 dark:text-slate-400 mr-2 shrink-0" />
-              <select
-                value={activeCompanyId}
-                onChange={(e) => setActiveCompanyId(e.target.value)}
-                className="bg-transparent text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-0 cursor-pointer appearance-none pr-6 sm:pr-8 py-1 truncate max-w-[120px] sm:max-w-[200px] xl:max-w-[300px]"
-                style={{ 
-                  backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, 
-                  backgroundRepeat: 'no-repeat', 
-                  backgroundPosition: 'right center', 
-                  backgroundSize: '16px' 
-                }}
-              >
-                {companies.map(company => (
-                  <option key={company.id} value={company.id} className="text-slate-900 bg-white dark:bg-slate-800 dark:text-slate-100">
-                    {company.name} {company.id !== 'GLOBAL' && `(${company.fleetSize} vehiculos)`}
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
