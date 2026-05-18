@@ -3,6 +3,7 @@ import { Shield, Key, Plus, Check, Search, X, Building } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { navigation } from '../../config/navigation';
 import { supabase } from '../../lib/supabase';
+import Swal from 'sweetalert2';
 import { useLocation } from 'react-router-dom';
 
 export default function SuperAdminPerfiles() {
@@ -324,18 +325,30 @@ export default function SuperAdminPerfiles() {
               </button>
             </div>
             
-                <form onSubmit={(e) => {
+                <form onSubmit={async (e) => {
                   e.preventDefault();
-                  // Simulate save
-                  import('sweetalert2').then(Swal => {
-                    Swal.default.fire({
+                  
+                  const formData = new FormData(e.currentTarget);
+                  const data = Object.fromEntries(formData.entries());
+                  
+                  try {
+                    // Si se quisiera insertar en supabase:
+                    // await supabase.from('usuario_aplicacion').insert([{ ... }])
+                    
+                    Swal.fire({
                       icon: 'success',
                       title: 'Usuario creado exitosamente',
                       showConfirmButton: false,
                       timer: 1500
                     });
                     setShowNewUserModal(false);
-                  });
+                  } catch(err) {
+                    Swal.fire({
+                      icon: 'error',
+                      title: 'Error al crear usuario',
+                      text: 'Inténtalo de nuevo'
+                    });
+                  }
                 }} className="flex flex-col h-full">
                   <div className="p-6 overflow-y-auto flex-1 space-y-6">
                     
@@ -389,8 +402,8 @@ export default function SuperAdminPerfiles() {
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cargo</label>
-                          <select required className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
-                            <option value="">Seleccionar cargo...</option>
+                          <select required defaultValue="" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
+                            <option value="" disabled>Seleccionar cargo...</option>
                             <option value="1">Mecánico de Mantenimiento</option>
                             <option value="2">Conductor</option>
                             <option value="3">Jefe de Taller</option>
@@ -398,7 +411,7 @@ export default function SuperAdminPerfiles() {
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Rol en el Sistema</label>
-                          <select required className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
+                          <select required defaultValue="ADMINISTRADOR" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
                             <option value="ADMINISTRADOR">Administrador</option>
                             <option value="SUPERVISOR">Supervisor</option>
                             <option value="MECANICO">Mecánico</option>
