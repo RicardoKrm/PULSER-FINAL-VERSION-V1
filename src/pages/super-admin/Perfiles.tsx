@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Key, Plus, Check, Search, X, Building } from 'lucide-react';
+import { Shield, Key, Plus, Check, Search, X, Building, Users } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { navigation } from '../../config/navigation';
 import { supabase } from '../../lib/supabase';
@@ -8,6 +8,7 @@ import { useLocation } from 'react-router-dom';
 
 export default function SuperAdminPerfiles() {
   const location = useLocation();
+  const [activeTab, setActiveTab] = useState<'perfiles' | 'usuarios'>('perfiles');
   const [selectedRole, setSelectedRole] = useState('Admin Flota');
   const [showNewUserModal, setShowNewUserModal] = useState(false);
   const [showNewRoleModal, setShowNewRoleModal] = useState(false);
@@ -17,12 +18,52 @@ export default function SuperAdminPerfiles() {
   const [empresas, setEmpresas] = useState<{id: string, nombre: string}[]>([]);
   const [managedEmpresaId, setManagedEmpresaId] = useState<string>('');
 
+  const [roles, setRoles] = useState<any[]>([]);
+  const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});
+  
+  // User management state
+  const [usuarios, setUsuarios] = useState<any[]>([]);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [bulkActionRole, setBulkActionRole] = useState('');
+
   useEffect(() => {
     // If navigation state has an empresa_id, set it as managed
     if (location.state && location.state.empresaId) {
       setManagedEmpresaId(location.state.empresaId);
     }
   }, [location.state]);
+
+  const fetchRoles = async () => {
+    try {
+      const { data, error } = await supabase.from('rol').select('*').order('created_at', { ascending: true });
+      if (error) throw error;
+      if (data) {
+        setRoles(data.map(r => ({ id: r.id, name: r.nombre, users: 0, type: r.tipo })));
+        const perms: Record<string, string[]> = {};
+        data.forEach(r => perms[r.nombre] = r.permisos || []);
+        setRolePermissions(perms);
+        if (data.length > 0 && !selectedRole) setSelectedRole(data[0].nombre);
+      }
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+    }
+  };
+
+  const fetchUsuarios = async () => {
+    try {
+      let query = supabase.from('usuario_aplicacion')
+        .select('*, rol(nombre), empresa(nombre)');
+      if (managedEmpresaId) {
+        query = query.eq('empresa_id', managedEmpresaId);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      if (data) setUsuarios(data);
+    } catch (error) {
+      console.error('Error fetching usuarios:', error);
+    }
+  };
 
   useEffect(() => {
     const fetchEmpresas = async () => {
@@ -34,24 +75,16 @@ export default function SuperAdminPerfiles() {
         console.error('Error fetching empresas:', error);
       }
     };
-    const fetchRoles = async () => {
-      try {
-        const { data, error } = await supabase.from('rol').select('*').order('created_at', { ascending: true });
-        if (error) throw error;
-        if (data) {
-          setRoles(data.map(r => ({ id: r.id, name: r.nombre, users: 0, type: r.tipo })));
-          const perms: Record<string, string[]> = {};
-          data.forEach(r => perms[r.nombre] = r.permisos || []);
-          setRolePermissions(perms);
-          if (data.length > 0 && !selectedRole) setSelectedRole(data[0].nombre);
-        }
-      } catch (error) {
-        console.error('Error fetching roles:', error);
-      }
-    };
+    
     fetchEmpresas();
     fetchRoles();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'usuarios') {
+      fetchUsuarios();
+    }
+  }, [activeTab, managedEmpresaId]);
 
   const handleCreateRole = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,9 +136,38 @@ export default function SuperAdminPerfiles() {
     }
   };
 
+  const handleAssignRoleToUsers = async () => {
+    if (!bulkActionRole) {
+      Swal.fire('Atención', 'Selecciona un rol a asignar', 'warning');
+      return;
+    }
+    if (selectedUserIds.length === 0) {
+      Swal.fire('Atención', 'Selecciona al menos un usuario', 'warning');
+      return;
+    }
 
-  const [roles, setRoles] = useState<any[]>([]);
-  const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});
+    try {
+      const { error } = await supabase
+        .from('usuario_aplicacion')
+        .update({ rol_id: bulkActionRole })
+        .in('id', selectedUserIds);
+
+      if (error) throw error;
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Rol asignado correctamente',
+        showConfirmButton: false,
+        timer: 1500
+      });
+      setSelectedUserIds([]);
+      setBulkActionRole('');
+      fetchUsuarios();
+    } catch (err) {
+      console.error(err);
+      Swal.fire('Error', 'No se pudo asignar el rol', 'error');
+    }
+  };
 
   const currentPerms = rolePermissions[selectedRole] || [];
 
@@ -143,6 +205,31 @@ export default function SuperAdminPerfiles() {
     });
   };
 
+  const toggleSelectAllUsers = () => {
+    if (selectedUserIds.length === filteredUsuarios.length && filteredUsuarios.length > 0) {
+      setSelectedUserIds([]);
+    } else {
+      setSelectedUserIds(filteredUsuarios.map(u => u.id));
+    }
+  };
+
+  const toggleSelectUser = (id: string) => {
+    if (selectedUserIds.includes(id)) {
+      setSelectedUserIds(selectedUserIds.filter(userId => userId !== id));
+    } else {
+      setSelectedUserIds([...selectedUserIds, id]);
+    }
+  };
+
+  const filteredUsuarios = usuarios.filter(u => {
+    const term = userSearchTerm.toLowerCase();
+    return (
+      (u.nombre || '').toLowerCase().includes(term) ||
+      (u.rut || '').toLowerCase().includes(term) ||
+      (u.email || '').toLowerCase().includes(term)
+    );
+  });
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -153,12 +240,12 @@ export default function SuperAdminPerfiles() {
             Gestor de Perfiles y Permisos
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-            Crea roles y asigna herramientas personalizadas a las empresas.
+            Crea roles, asigna herramientas y gestiona los permisos de los usuarios.
           </p>
           {managedEmpresaId && (
             <div className="mt-3 flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-3 py-1.5 rounded-lg w-fit border border-indigo-100 dark:border-indigo-800">
               <Building className="h-4 w-4" />
-              <span className="font-medium">Gestionando roles para: </span>
+              <span className="font-medium">Gestionando roles/usuarios para: </span>
               <span className="font-bold">{empresas.find(e => e.id === managedEmpresaId)?.nombre || 'Cargando...'}</span>
             </div>
           )}
@@ -179,132 +266,262 @@ export default function SuperAdminPerfiles() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Roles List */}
+      {/* Tabs */}
+      <div className="flex space-x-2 border-b border-slate-200 dark:border-slate-800">
+        <button
+          onClick={() => setActiveTab('perfiles')}
+          className={cn(
+            "px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2",
+            activeTab === 'perfiles'
+              ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+              : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300 dark:hover:border-slate-700"
+          )}
+        >
+          <Shield className="h-4 w-4" />
+          Perfiles y Módulos
+        </button>
+        <button
+          onClick={() => setActiveTab('usuarios')}
+          className={cn(
+            "px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2",
+            activeTab === 'usuarios'
+              ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+              : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300 dark:hover:border-slate-700"
+          )}
+        >
+          <Users className="h-4 w-4" />
+          Asignación a Usuarios
+        </button>
+      </div>
+
+      {activeTab === 'perfiles' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Roles List */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden flex flex-col transition-colors">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800">
+              <div className="relative">
+                <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input 
+                  type="text" 
+                  placeholder="Buscar perfil..." 
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-slate-700 dark:text-slate-200"
+                />
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {roles.map((role) => (
+                <button
+                  key={role.id}
+                  onClick={() => setSelectedRole(role.name)}
+                  className={cn(
+                    "w-full text-left px-3 py-3 rounded-lg transition-all border",
+                    selectedRole === role.name 
+                      ? "bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300" 
+                      : "bg-transparent border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300"
+                  )}
+                >
+                  <div className="font-semibold text-sm flex items-center justify-between">
+                    {role.name}
+                    {role.type === 'Sistema' && <Shield className="h-4 w-4 text-amber-500" />}
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex justify-between">
+                    <span>{role.type}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Permissions Editor */}
+          <div className="lg:col-span-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm flex flex-col transition-colors">
+            <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-start">
+              <div>
+                <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                  Configurando: {selectedRole}
+                </h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Selecciona qué módulos y herramientas estarán disponibles para este perfil.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+              {navigation.map((module) => {
+                const isModuleEnabled = currentPerms.includes(module.title);
+                
+                return (
+                  <div key={module.href} className="space-y-3">
+                    <label className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors">
+                      <input 
+                        type="checkbox" 
+                        className="hidden" 
+                        checked={isModuleEnabled} 
+                        onChange={() => toggleModule(module.title)}
+                      />
+                      <div className={cn(
+                        "flex items-center justify-center w-5 h-5 rounded border",
+                        isModuleEnabled ? "bg-indigo-500 border-indigo-500 text-white" : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
+                      )}>
+                        {isModuleEnabled && <Check className="h-3.5 w-3.5" />}
+                      </div>
+                      <div className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-200 text-sm">
+                        <module.icon className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                        {module.title}
+                      </div>
+                    </label>
+                    
+                    {module.submodules && module.submodules.length > 0 && (
+                      <div className="pl-6 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 ml-5">
+                        {module.submodules.map((sub) => {
+                          const isSubEnabled = currentPerms.includes(`${module.title}:${sub.title}`);
+                          
+                          return (
+                            <label key={sub.href} className="flex items-center gap-3 cursor-pointer group">
+                              <input 
+                                type="checkbox" 
+                                className="hidden" 
+                                checked={isSubEnabled}
+                                onChange={() => toggleSubmodule(module.title, sub.title)}
+                              />
+                              <div className={cn(
+                                "flex items-center justify-center w-4 h-4 rounded border transition-colors",
+                                isSubEnabled ? "bg-indigo-500 border-indigo-500 text-white" : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 group-hover:border-indigo-300"
+                              )}>
+                                {isSubEnabled && <Check className="h-3 w-3" />}
+                              </div>
+                              <span className={cn(
+                                "text-sm transition-colors",
+                                isSubEnabled ? "text-slate-700 dark:text-slate-300 font-medium" : "text-slate-500 dark:text-slate-500"
+                              )}>
+                                {sub.title}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="p-6 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 flex justify-end gap-3 mt-auto rounded-b-xl">
+              <button className="px-5 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+                Cancelar
+              </button>
+              <button onClick={handleSavePermissions} className="px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm">
+                Guardar Permisos
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden flex flex-col transition-colors">
-          <div className="p-4 border-b border-slate-200 dark:border-slate-800">
-            <div className="relative">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row gap-4 items-center justify-between">
+            <div className="relative w-full sm:w-80">
               <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input 
                 type="text" 
-                placeholder="Buscar perfil..." 
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-slate-700 dark:text-slate-200"
+                placeholder="Buscar por nombre, RUT o email..." 
+                value={userSearchTerm}
+                onChange={(e) => setUserSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
               />
             </div>
-          </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {roles.map((role) => (
-              <button
-                key={role.id}
-                onClick={() => setSelectedRole(role.name)}
-                className={cn(
-                  "w-full text-left px-3 py-3 rounded-lg transition-all border",
-                  selectedRole === role.name 
-                    ? "bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300" 
-                    : "bg-transparent border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300"
-                )}
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <select 
+                value={bulkActionRole}
+                onChange={(e) => setBulkActionRole(e.target.value)}
+                className="px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
               >
-                <div className="font-semibold text-sm flex items-center justify-between">
-                  {role.name}
-                  {role.type === 'Sistema' && <Shield className="h-4 w-4 text-amber-500" />}
-                </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex justify-between">
-                  <span>{role.users} usuarios</span>
-                  <span className="opacity-70">{role.type}</span>
-                </div>
+                <option value="">Seleccionar Perfil a Asignar...</option>
+                {roles.map(r => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
+              <button 
+                onClick={handleAssignRoleToUsers}
+                disabled={selectedUserIds.length === 0 || !bulkActionRole}
+                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+              >
+                Aplicar Perfil
               </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Permissions Editor */}
-        <div className="lg:col-span-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm flex flex-col transition-colors">
-          <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-start">
-            <div>
-              <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                Configurando: {selectedRole}
-              </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                Selecciona qué módulos y herramientas estarán disponibles para este perfil.
-              </p>
             </div>
-            {/* Removed Edit2 and Trash2 icons */}
           </div>
-
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-            {navigation.map((module) => {
-              const isModuleEnabled = currentPerms.includes(module.title);
-              
-              return (
-                <div key={module.href} className="space-y-3">
-                  <label className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors">
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="p-4 w-12 text-center">
                     <input 
                       type="checkbox" 
-                      className="hidden" 
-                      checked={isModuleEnabled} 
-                      onChange={() => toggleModule(module.title)}
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      checked={selectedUserIds.length === filteredUsuarios.length && filteredUsuarios.length > 0}
+                      onChange={toggleSelectAllUsers}
                     />
-                    <div className={cn(
-                      "flex items-center justify-center w-5 h-5 rounded border",
-                      isModuleEnabled ? "bg-indigo-500 border-indigo-500 text-white" : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
-                    )}>
-                      {isModuleEnabled && <Check className="h-3.5 w-3.5" />}
-                    </div>
-                    <div className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-200 text-sm">
-                      <module.icon className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                      {module.title}
-                    </div>
-                  </label>
-                  
-                  {module.submodules && module.submodules.length > 0 && (
-                    <div className="pl-6 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 ml-5">
-                      {module.submodules.map((sub) => {
-                        const isSubEnabled = currentPerms.includes(`${module.title}:${sub.title}`);
-                        
-                        return (
-                          <label key={sub.href} className="flex items-center gap-3 cursor-pointer group">
-                            <input 
-                              type="checkbox" 
-                              className="hidden" 
-                              checked={isSubEnabled}
-                              onChange={() => toggleSubmodule(module.title, sub.title)}
-                            />
-                            <div className={cn(
-                              "flex items-center justify-center w-4 h-4 rounded border transition-colors",
-                              isSubEnabled ? "bg-indigo-500 border-indigo-500 text-white" : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 group-hover:border-indigo-300"
-                            )}>
-                              {isSubEnabled && <Check className="h-3 w-3" />}
-                            </div>
-                            <span className={cn(
-                              "text-sm transition-colors",
-                              isSubEnabled ? "text-slate-700 dark:text-slate-300 font-medium" : "text-slate-500 dark:text-slate-500"
-                            )}>
-                              {sub.title}
-                            </span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="p-6 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 flex justify-end gap-3 mt-auto rounded-b-xl">
-            <button className="px-5 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
-              Cancelar
-            </button>
-            <button onClick={handleSavePermissions} className="px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm">
-              Guardar Permisos
-            </button>
+                  </th>
+                  <th className="p-4 font-medium">Usuario</th>
+                  <th className="p-4 font-medium">RUT</th>
+                  <th className="p-4 font-medium">Empresa</th>
+                  <th className="p-4 font-medium">Perfil Asignado</th>
+                  <th className="p-4 font-medium">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                {filteredUsuarios.map((u) => (
+                  <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <td className="p-4 text-center">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        checked={selectedUserIds.includes(u.id)}
+                        onChange={() => toggleSelectUser(u.id)}
+                      />
+                    </td>
+                    <td className="p-4">
+                      <div className="font-semibold text-slate-800 dark:text-slate-200">{u.nombre}</div>
+                      {u.email && <div className="text-xs text-slate-500">{u.email}</div>}
+                    </td>
+                    <td className="p-4 text-sm text-slate-600 dark:text-slate-400">{u.rut}</td>
+                    <td className="p-4 text-sm text-slate-600 dark:text-slate-400">{u.empresa?.nombre || '-'}</td>
+                    <td className="p-4">
+                      {u.rol?.nombre ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                          {u.rol.nombre}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-slate-400 italic">Sin asignar</span>
+                      )}
+                    </td>
+                    <td className="p-4">
+                      <span className={cn(
+                        "px-2.5 py-1 rounded-full text-xs font-medium",
+                        u.estado?.toLowerCase() === 'activo' 
+                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" 
+                          : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400"
+                      )}>
+                        {u.estado || 'Activo'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {filteredUsuarios.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-slate-500 dark:text-slate-400">
+                      No se encontraron usuarios.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Modal Nuevo Usuario */}
       {showNewUserModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm shadow-2xl">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-4 md:p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
               <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">Nuevo Usuario (Personal)</h2>
@@ -316,159 +533,167 @@ export default function SuperAdminPerfiles() {
               </button>
             </div>
             
-                <form onSubmit={async (e) => {
-                  e.preventDefault();
-                  
-                  const formData = new FormData(e.currentTarget);
-                  const data = Object.fromEntries(formData.entries());
-                  
-                  try {
-                    const fullName = `${data.nombre} ${data.apellido_p} ${data.apellido_m || ''}`.trim();
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              
+              const formData = new FormData(e.currentTarget);
+              const data = Object.fromEntries(formData.entries());
+              
+              try {
+                const fullName = `${data.nombre} ${data.apellido_p} ${data.apellido_m || ''}`.trim();
 
-                    const { error } = await supabase.from('usuario_aplicacion').insert([{ 
-                      nombre: fullName,
-                      rut: data.rut,
-                      empresa_id: data.empresa_id,
-                      rol_id: data.rol_id,
-                      estado: data.estado,
-                    }]);
-                    
-                    if (error) throw error;
-                    
-                    Swal.fire({
-                      icon: 'success',
-                      title: 'Usuario creado exitosamente',
-                      showConfirmButton: false,
-                      timer: 1500
-                    });
-                    setShowNewUserModal(false);
-                  } catch(err: any) {
-                    Swal.fire({
-                      icon: 'error',
-                      title: 'Error al crear usuario',
-                      text: err?.message || 'Inténtalo de nuevo'
-                    });
-                  }
-                }} className="flex flex-col h-full">
-                  <div className="p-6 overflow-y-auto flex-1 space-y-6">
-                    
-                    {/* Datos Personales */}
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Datos Personales</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Nombre</label>
-                          <input name="nombre" required type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: Juan" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">RUT</label>
-                          <input name="rut" required type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 12.345.678-9" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Apellido Paterno</label>
-                          <input name="apellido_p" required type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: Pérez" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Apellido Materno</label>
-                          <input name="apellido_m" type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: González" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Sexo</label>
-                          <select name="sexo" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
-                            <option value="HOMBRE">Hombre</option>
-                            <option value="MUJER">Mujer</option>
-                            <option value="OTRO">Otro</option>
-                          </select>
-                        </div>
-                      </div>
+                const { error } = await supabase.from('usuario_aplicacion').insert([{ 
+                  nombre: fullName,
+                  rut: data.rut,
+                  empresa_id: data.empresa_id,
+                  rol_id: data.rol_id,
+                  estado: data.estado,
+                  email: data.email || null
+                }]);
+                
+                if (error) throw error;
+                
+                Swal.fire({
+                  icon: 'success',
+                  title: 'Usuario creado exitosamente',
+                  showConfirmButton: false,
+                  timer: 1500
+                });
+                setShowNewUserModal(false);
+                if (activeTab === 'usuarios') {
+                  fetchUsuarios();
+                }
+              } catch(err: any) {
+                Swal.fire({
+                  icon: 'error',
+                  title: 'Error al crear usuario',
+                  text: err?.message || 'Inténtalo de nuevo'
+                });
+              }
+            }} className="flex flex-col h-full">
+              <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                
+                {/* Datos Personales */}
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Datos Personales</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Nombre</label>
+                      <input name="nombre" required type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: Juan" />
                     </div>
-
-                    {/* Datos Laborales */}
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Datos Laborales</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Empresa</label>
-                          <select 
-                            name="empresa_id"
-                            required
-                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white"
-                            defaultValue={managedEmpresaId || ""}
-                          >
-                            <option value="" disabled>Seleccionar empresa...</option>
-                            {empresas.map(emp => (
-                              <option key={emp.id} value={emp.id}>{emp.nombre}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cargo</label>
-                          <select name="cargo" required defaultValue="" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
-                            <option value="" disabled>Seleccionar cargo...</option>
-                            <option value="1">Mecánico de Mantenimiento</option>
-                            <option value="2">Conductor</option>
-                            <option value="3">Jefe de Taller</option>
-                          </select>
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Rol en el Sistema</label>
-                          <select name="rol_id" required defaultValue="" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
-                            <option value="" disabled>Seleccionar rol...</option>
-                            {roles.map(r => (
-                              <option key={r.id} value={r.id}>{r.name}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo Prestador</label>
-                          <select name="tipo_prestador" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
-                            <option value="INTERNO">Interno</option>
-                            <option value="EXTERNO">Externo</option>
-                          </select>
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Estado</label>
-                          <select name="estado" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
-                            <option value="Activo">Activo</option>
-                            <option value="Inactivo">Inactivo</option>
-                          </select>
-                        </div>
-                      </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">RUT</label>
+                      <input name="rut" required type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 12.345.678-9" />
                     </div>
-
-                    {/* Datos Económicos */}
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Datos Económicos</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Sueldo Base ($)</label>
-                          <input type="number" min="0" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 500000" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Valor Hora Normal ($)</label>
-                          <input type="number" min="0" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 5000" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Valor Hora Extra ($)</label>
-                          <input type="number" min="0" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 7500" />
-                        </div>
-                      </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Apellido Paterno</label>
+                      <input name="apellido_p" required type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: Pérez" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Apellido Materno</label>
+                      <input name="apellido_m" type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: González" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Correo Electrónico</label>
+                      <input name="email" type="email" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: correo@empresa.com" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Sexo</label>
+                      <select name="sexo" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
+                        <option value="HOMBRE">Hombre</option>
+                        <option value="MUJER">Mujer</option>
+                        <option value="OTRO">Otro</option>
+                      </select>
                     </div>
                   </div>
-                  
-                  <div className="p-4 md:p-6 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-800/50">
-                    <button 
-                      type="button"
-                      onClick={() => setShowNewUserModal(false)} 
-                      className="px-5 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors border border-slate-200 dark:border-slate-700"
-                    >
-                      Cancelar
-                    </button>
-                    <button type="submit" className="px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm">
-                      Guardar Usuario
-                    </button>
+                </div>
+
+                {/* Datos Laborales */}
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Datos Laborales</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Empresa</label>
+                      <select 
+                        name="empresa_id"
+                        required
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white"
+                        defaultValue={managedEmpresaId || ""}
+                      >
+                        <option value="" disabled>Seleccionar empresa...</option>
+                        {empresas.map(emp => (
+                          <option key={emp.id} value={emp.id}>{emp.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cargo</label>
+                      <select name="cargo" required defaultValue="" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
+                        <option value="" disabled>Seleccionar cargo...</option>
+                        <option value="1">Mecánico de Mantenimiento</option>
+                        <option value="2">Conductor</option>
+                        <option value="3">Jefe de Taller</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Rol en el Sistema</label>
+                      <select name="rol_id" required defaultValue="" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
+                        <option value="" disabled>Seleccionar rol...</option>
+                        {roles.map(r => (
+                          <option key={r.id} value={r.id}>{r.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo Prestador</label>
+                      <select name="tipo_prestador" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
+                        <option value="INTERNO">Interno</option>
+                        <option value="EXTERNO">Externo</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Estado</label>
+                      <select name="estado" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
+                        <option value="Activo">Activo</option>
+                        <option value="Inactivo">Inactivo</option>
+                      </select>
+                    </div>
                   </div>
-                </form>
+                </div>
+
+                {/* Datos Económicos */}
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Datos Económicos</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Sueldo Base ($)</label>
+                      <input type="number" min="0" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 500000" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Valor Hora Normal ($)</label>
+                      <input type="number" min="0" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 5000" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Valor Hora Extra ($)</label>
+                      <input type="number" min="0" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 7500" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="p-4 md:p-6 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-800/50">
+                <button 
+                  type="button"
+                  onClick={() => setShowNewUserModal(false)} 
+                  className="px-5 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors border border-slate-200 dark:border-slate-700"
+                >
+                  Cancelar
+                </button>
+                <button type="submit" className="px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm">
+                  Guardar Usuario
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -537,4 +762,5 @@ export default function SuperAdminPerfiles() {
     </div>
   );
 }
+
 
