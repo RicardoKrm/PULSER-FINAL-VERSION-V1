@@ -34,20 +34,26 @@ export default function SuperAdminPerfiles() {
   const [newUserEmail, setNewUserEmail] = useState('');
   
   const generateEmail = (nombre: string, paterno: string, empresaId: string) => {
-    if (!nombre || !paterno || !empresaId) return '';
-    const empresa = empresas.find(e => e.id === empresaId);
-    if (!empresa) return '';
+    if (!nombre || !paterno) return '';
     const n = nombre.charAt(0).toLowerCase();
     const p = paterno.toLowerCase().replace(/[^a-z]/g, '');
-    const emp = empresa.nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+    let emp = 'empresa';
+    if (empresaId) {
+      const empresa = empresas.find(e => e.id === empresaId);
+      if (empresa) {
+        emp = empresa.nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+      }
+    }
     return `${n}${p}@${emp}.cl`;
   };
 
   useEffect(() => {
-    if (newUserNombre && newUserPaterno && newUserEmpresaId && !newUserEmail) {
+    if (newUserNombre && newUserPaterno) {
       setNewUserEmail(generateEmail(newUserNombre, newUserPaterno, newUserEmpresaId));
+    } else {
+      setNewUserEmail('');
     }
-  }, [newUserNombre, newUserPaterno, newUserEmpresaId]);
+  }, [newUserNombre, newUserPaterno, newUserEmpresaId, empresas]);
 
   const handleToggleEstadoUsuario = async (u: any) => {
     try {
