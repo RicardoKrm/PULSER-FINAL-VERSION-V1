@@ -70,7 +70,7 @@ export default function PizarraProgramacion() {
     const personalMecanicos = personal.filter(p => p.isMecanico || p.roleBadgeText === 'Mecánico');
     
     setMecanicos(currentMecanicos => {
-      const currentMap = new Map(currentMecanicos.map(m => [m.id, m]));
+      const currentMap = new Map<string, MecanicoMock>(currentMecanicos.map(m => [m.id, m]));
       const newMecanicos: MecanicoMock[] = [];
       
       // Mantenemos mecánicos existentes con sus OTs

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Archive, Undo2, Info, Search, Filter, AlertCircle, FileText, Calendar, Hash, Truck } from 'lucide-react';
+import { Archive, Undo2, Info, Search, Filter, AlertCircle, FileText, Calendar, Hash, Truck, CheckCircle } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import Swal from 'sweetalert2';
@@ -115,7 +115,7 @@ export default function VehiculosArchivados() {
       {archivados.length === 0 ? (
          <div className="bg-emerald-50 dark:bg-emerald-900/10 border-2 border-dashed border-emerald-200 dark:border-emerald-800 rounded-2xl p-8 flex flex-col items-center justify-center text-center">
             <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/40 rounded-full flex items-center justify-center mb-4">
-               <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+               <CheckCircle className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
             </div>
             <h3 className="text-lg font-black text-emerald-800 dark:text-emerald-400 tracking-tight mb-2">No hay vehículos archivados</h3>
             <p className="text-sm font-medium text-emerald-600 dark:text-emerald-500 max-w-sm">
