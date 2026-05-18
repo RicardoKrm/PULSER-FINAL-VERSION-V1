@@ -21,6 +21,7 @@ import { cn } from '../lib/utils';
 import { useTheme } from './ThemeProvider';
 import { useCompany } from '../contexts/CompanyContext';
 import { useAppContext } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { ChatBot } from './chatbot/ChatBot';
 
 export default function Layout() {
@@ -30,6 +31,7 @@ export default function Layout() {
   const { theme, toggleTheme } = useTheme();
   const { companies, activeCompanyId, setActiveCompanyId } = useCompany();
   const { currentUser, usuarios, setCurrentUser } = useAppContext();
+  const { signOut, user, profile } = useAuth();
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -241,8 +243,9 @@ export default function Layout() {
             <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-slate-800 dark:bg-slate-900/50 border border-slate-700 dark:border-slate-800">
               <UserCircle className="h-8 w-8 text-slate-400" />
               <div className="flex flex-col">
-                <span className="text-sm font-medium text-white">{currentUser.nombre}</span>
-                <span className="text-xs text-slate-500 text-blue-400 dark:text-slate-400">{currentUser.cargo}</span>
+                <span className="text-sm font-medium text-white">{profile?.nombre || user?.email}</span>
+                <span className="text-xs text-blue-400 dark:text-slate-400">{profile?.rol?.nombre || 'Súper Administrador'}</span>
+                <span className="text-[10px] text-slate-500">{profile?.empresa?.nombre || ''}</span>
               </div>
             </div>
           </div>
@@ -343,7 +346,7 @@ export default function Layout() {
                             !notification.read ? "bg-blue-50/50 dark:bg-blue-900/10" : ""
                           )}
                           onClick={() => {
-                            setNotifications(notifications.map(n => n.id === notification.id ? { ...n, read: true } : n));
+                            setAllNotifications(allNotifications.map(n => n.id === notification.id ? { ...n, read: true } : n));
                           }}
                         >
                           <div className="flex items-start gap-3">
@@ -408,8 +411,9 @@ export default function Layout() {
               {profileOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                   <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
-                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{currentUser.nombre}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">{currentUser.cargo}</p>
+                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{profile?.nombre || user?.email}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">{profile?.rol?.nombre || 'Súper Administrador'}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{profile?.empresa?.nombre || ''}</p>
                   </div>
                   
                   <div className="p-1 border-b border-slate-200 dark:border-slate-700">
@@ -442,7 +446,12 @@ export default function Layout() {
                   </div>
 
                   <div className="p-1 border-t border-slate-200 dark:border-slate-700">
-                    <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors">
+                    <button 
+                      onClick={async () => {
+                        await signOut();
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                    >
                       <LogOut className="h-4 w-4" /> Cerrar Sesión
                     </button>
                   </div>

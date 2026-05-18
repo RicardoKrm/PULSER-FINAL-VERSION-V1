@@ -6,6 +6,7 @@
 import { StrictMode } from 'react';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
 import GenericPage from './pages/GenericPage';
 import Dashboard from './pages/Dashboard';
 import SuperAdminEmpresas from './pages/super-admin/Empresas';
@@ -62,10 +63,10 @@ import Trazabilidad from './pages/finanzas/Trazabilidad';
 import EvaluacionEmpresa from './pages/finanzas/EvaluacionEmpresa';
 import CostosOperacionales from './pages/finanzas/CostosOperacionales';
 import Presupuestos from './pages/finanzas/Presupuestos';
-import CentroRentabilidad from './pages/finanzas/CentroRentabilidad';
 import { ThemeProvider } from './components/ThemeProvider';
 import { CompanyProvider } from './contexts/CompanyContext';
 import { AppProvider } from './context/AppContext';
+import { AuthProvider } from './context/AuthContext';
 
 import Login from './pages/Login';
 
@@ -76,10 +77,13 @@ const router = createBrowserRouter([
   },
   {
     path: "/",
-    element: <Layout />,
+    element: <ProtectedRoute />,
     children: [
-      { index: true, element: <Navigate to="/login" replace /> },
-      { path: "dashboard", element: <Dashboard /> },
+      {
+        element: <Layout />,
+        children: [
+          { index: true, element: <Navigate to="/dashboard" replace /> },
+          { path: "dashboard", element: <Dashboard /> },
       { path: "operaciones/alertas", element: <OperacionesAlertas /> },
       { path: "operaciones/contratos", element: <Contratos /> },
       { path: "operaciones/servicios", element: <CrearServicio /> },
@@ -134,7 +138,9 @@ const router = createBrowserRouter([
       { path: "soporte/integraciones", element: <Integraciones /> },
       { path: "soporte/tickets", element: <CentroAyuda /> },
       { path: "soporte/manual", element: <ManualUso /> },
-      { path: "*", element: <GenericPage /> },
+          { path: "*", element: <GenericPage /> },
+        ]
+      }
     ]
   }
 ]);
@@ -142,11 +148,13 @@ const router = createBrowserRouter([
 export default function App() {
   return (
     <ThemeProvider>
-      <CompanyProvider>
-        <AppProvider>
-          <RouterProvider router={router} />
-        </AppProvider>
-      </CompanyProvider>
+      <AuthProvider>
+        <CompanyProvider>
+          <AppProvider>
+            <RouterProvider router={router} />
+          </AppProvider>
+        </CompanyProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

@@ -1,24 +1,51 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import { Building2, Lock, User, ArrowRight, ShieldCheck, Zap, BarChart3 } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 
 export default function Login() {
-  const [rut, setRut] = useState('');
+  const [email, setEmail] = useState('superadministrador@gaval.cl');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        navigate('/dashboard');
+      }
+    });
+  }, [navigate]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Simular autenticación
-    setTimeout(() => {
+    setErrorMsg('');
+    
+    // Autenticación con Supabase
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.session) {
+        navigate('/dashboard');
+      }
+    } catch (error: any) {
+      console.error('Error en login:', error);
+      setErrorMsg(error.message || 'Error al iniciar sesión. Verifica tus credenciales.');
+    } finally {
       setIsLoading(false);
-      navigate('/dashboard');
-    }, 1000);
+    }
   };
 
   return (
@@ -44,17 +71,22 @@ export default function Login() {
           <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 shadow-2xl rounded-2xl">
             <div className="p-8">
               <form onSubmit={handleLogin} className="space-y-6">
+                {errorMsg && (
+                  <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/50 text-red-100 text-sm font-medium">
+                    {errorMsg}
+                  </div>
+                )}
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-300 uppercase tracking-wider">RUT de Empresa o Usuario</label>
+                  <label className="text-sm font-bold text-slate-300 uppercase tracking-wider">Email de Usuario</label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <User className="h-5 w-5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
                     </div>
                     <input
-                      type="text"
-                      value={rut}
-                      onChange={(e) => setRut(e.target.value)}
-                      placeholder="Ej: 76.123.456-7"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Ej: tu@email.com"
                       className="block w-full pl-10 pr-3 py-3 border border-slate-600 rounded-xl bg-slate-900/50 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-medium"
                       required
                     />
