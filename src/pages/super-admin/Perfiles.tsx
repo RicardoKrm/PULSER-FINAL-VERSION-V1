@@ -324,124 +324,138 @@ export default function SuperAdminPerfiles() {
               </button>
             </div>
             
-            <div className="p-6 overflow-y-auto">
-              <form className="space-y-6">
-                
-                {/* Datos Personales */}
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Datos Personales</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Nombre</label>
-                      <input type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: Juan" />
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  // Simulate save
+                  import('sweetalert2').then(Swal => {
+                    Swal.default.fire({
+                      icon: 'success',
+                      title: 'Usuario creado exitosamente',
+                      showConfirmButton: false,
+                      timer: 1500
+                    });
+                    setShowNewUserModal(false);
+                  });
+                }} className="flex flex-col h-full">
+                  <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                    
+                    {/* Datos Personales */}
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Datos Personales</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Nombre</label>
+                          <input required type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: Juan" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">RUT</label>
+                          <input required type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 12.345.678-9" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Apellido Paterno</label>
+                          <input required type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: Pérez" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Apellido Materno</label>
+                          <input type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: González" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Sexo</label>
+                          <select className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
+                            <option value="HOMBRE">Hombre</option>
+                            <option value="MUJER">Mujer</option>
+                            <option value="OTRO">Otro</option>
+                          </select>
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">RUT</label>
-                      <input type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 12.345.678-9" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Apellido Paterno</label>
-                      <input type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: Pérez" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Apellido Materno</label>
-                      <input type="text" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: González" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Sexo</label>
-                      <select className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
-                        <option value="HOMBRE">Hombre</option>
-                        <option value="MUJER">Mujer</option>
-                        <option value="OTRO">Otro</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Datos Laborales */}
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Datos Laborales</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Empresa</label>
-                      <select 
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white"
-                        defaultValue={managedEmpresaId || ""}
-                      >
-                        <option value="" disabled>Seleccionar empresa...</option>
-                        {empresas.map(emp => (
-                          <option key={emp.id} value={emp.id}>{emp.nombre}</option>
-                        ))}
-                      </select>
+                    {/* Datos Laborales */}
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Datos Laborales</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Empresa</label>
+                          <select 
+                            required
+                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white"
+                            defaultValue={managedEmpresaId || ""}
+                          >
+                            <option value="" disabled>Seleccionar empresa...</option>
+                            {empresas.map(emp => (
+                              <option key={emp.id} value={emp.id}>{emp.nombre}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cargo</label>
+                          <select required className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
+                            <option value="">Seleccionar cargo...</option>
+                            <option value="1">Mecánico de Mantenimiento</option>
+                            <option value="2">Conductor</option>
+                            <option value="3">Jefe de Taller</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Rol en el Sistema</label>
+                          <select required className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
+                            <option value="ADMINISTRADOR">Administrador</option>
+                            <option value="SUPERVISOR">Supervisor</option>
+                            <option value="MECANICO">Mecánico</option>
+                            <option value="ASISTENTE">Asistente</option>
+                            <option value="BODEGUERO">Bodeguero</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo Prestador</label>
+                          <select className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
+                            <option value="INTERNO">Interno</option>
+                            <option value="EXTERNO">Externo</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Estado</label>
+                          <select className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
+                            <option value="ACTIVO">Activo</option>
+                            <option value="INACTIVO">Inactivo</option>
+                          </select>
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Cargo</label>
-                      <select className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
-                        <option value="">Seleccionar cargo...</option>
-                        <option value="1">Mecánico de Mantenimiento</option>
-                        <option value="2">Conductor</option>
-                        <option value="3">Jefe de Taller</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Rol en el Sistema</label>
-                      <select className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
-                        <option value="ADMINISTRADOR">Administrador</option>
-                        <option value="SUPERVISOR">Supervisor</option>
-                        <option value="MECANICO">Mecánico</option>
-                        <option value="ASISTENTE">Asistente</option>
-                        <option value="BODEGUERO">Bodeguero</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo Prestador</label>
-                      <select className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
-                        <option value="INTERNO">Interno</option>
-                        <option value="EXTERNO">Externo</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Estado</label>
-                      <select className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
-                        <option value="ACTIVO">Activo</option>
-                        <option value="INACTIVO">Inactivo</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Datos Económicos */}
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Datos Económicos</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Sueldo Base ($)</label>
-                      <input type="number" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 500000" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Valor Hora Normal ($)</label>
-                      <input type="number" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 5000" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Valor Hora Extra ($)</label>
-                      <input type="number" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 7500" />
+                    {/* Datos Económicos */}
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Datos Económicos</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Sueldo Base ($)</label>
+                          <input type="number" min="0" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 500000" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Valor Hora Normal ($)</label>
+                          <input type="number" min="0" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 5000" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Valor Hora Extra ($)</label>
+                          <input type="number" min="0" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 7500" />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </form>
-            </div>
-            
-            <div className="p-4 md:p-6 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-800/50">
-              <button 
-                onClick={() => setShowNewUserModal(false)} 
-                className="px-5 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors border border-slate-200 dark:border-slate-700"
-              >
-                Cancelar
-              </button>
-              <button className="px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm">
-                Guardar Usuario
-              </button>
-            </div>
+                  
+                  <div className="p-4 md:p-6 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-800/50">
+                    <button 
+                      type="button"
+                      onClick={() => setShowNewUserModal(false)} 
+                      className="px-5 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors border border-slate-200 dark:border-slate-700"
+                    >
+                      Cancelar
+                    </button>
+                    <button type="submit" className="px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm">
+                      Guardar Usuario
+                    </button>
+                  </div>
+                </form>
           </div>
         </div>
       )}
