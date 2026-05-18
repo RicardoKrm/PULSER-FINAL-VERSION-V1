@@ -8,41 +8,21 @@ import {
 
 // Mock Data
 const kpisObj = {
-  productividad: 92.4, // porcentaje
-  cumplimiento: 88.5, // porcentaje
-  utilizacion: 76.2, // porcentaje
-  tecnicos_activos: 14,
-  horas_registradas: 1240.5,
-  horas_estandar: 1146.2,
-  ots_finalizadas: 342,
-  ots_atraso: 39
+  productividad: 0,
+  cumplimiento: 0,
+  utilizacion: 0,
+  tecnicos_activos: 0,
+  horas_registradas: 0,
+  horas_estandar: 0,
+  ots_finalizadas: 0,
+  ots_atraso: 0
 };
 
-const productividadTecnicosData = [
-  { name: 'Juan Pérez', prod: 95.2 },
-  { name: 'María Gómez', prod: 102.1 },
-  { name: 'Carlos Ruiz', prod: 88.4 },
-  { name: 'Ana Silva', prod: 91.0 },
-  { name: 'Luis Torres', prod: 85.5 },
-  { name: 'Roberto Díaz', prod: 105.3 },
-];
+const productividadTecnicosData: any[] = [];
 
-const cargaTrabajoTecnicosData = [
-  { name: 'Juan Pérez', horas: 120.5 },
-  { name: 'María Gómez', horas: 135.2 },
-  { name: 'Carlos Ruiz', horas: 110.4 },
-  { name: 'Ana Silva', horas: 142.0 },
-  { name: 'Luis Torres', horas: 98.5 },
-  { name: 'Roberto Díaz', horas: 155.3 },
-];
+const cargaTrabajoTecnicosData: any[] = [];
 
-const horasEvolucionData = [
-  { month: 'Ene 2026', reales: 1100, estandar: 950, disponibles: 1400 },
-  { month: 'Feb 2026', reales: 1150, estandar: 1020, disponibles: 1400 },
-  { month: 'Mar 2026', reales: 1200, estandar: 1100, disponibles: 1400 },
-  { month: 'Abr 2026', reales: 1250, estandar: 1180, disponibles: 1400 },
-  { month: 'May 2026', reales: 1240, estandar: 1146, disponibles: 1400 },
-];
+const horasEvolucionData: any[] = [];
 
 export default function KpiRRHH() {
   const [activeDetail, setActiveDetail] = useState<string | null>(null);
@@ -85,13 +65,19 @@ export default function KpiRRHH() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {productividadTecnicosData.map((row, idx) => (
-                    <tr key={idx} onClick={() => setSelectedWorker(row.name)} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                      <td className="py-3 px-2 font-bold text-slate-700 dark:text-slate-300">{row.name}</td>
-                      <td className="py-3 px-2 text-right font-medium text-slate-600 dark:text-slate-400">{(row.prod * 1.1).toFixed(1)}h</td>
-                      <td className="py-3 px-2 text-right font-bold text-emerald-500">{row.prod}%</td>
+                  {productividadTecnicosData.length > 0 ? (
+                    productividadTecnicosData.map((row, idx) => (
+                      <tr key={idx} onClick={() => setSelectedWorker(row.name)} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <td className="py-3 px-2 font-bold text-slate-700 dark:text-slate-300">{row.name}</td>
+                        <td className="py-3 px-2 text-right font-medium text-slate-600 dark:text-slate-400">{(row.prod * 1.1).toFixed(1)}h</td>
+                        <td className="py-3 px-2 text-right font-bold text-emerald-500">{row.prod}%</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={3} className="py-6 text-center text-slate-500 text-xs font-medium">Sin datos registrados</td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
@@ -122,16 +108,7 @@ export default function KpiRRHH() {
               </div>
               <div className="flex flex-col gap-4 mt-4">
                   <div className="flex justify-between items-center p-4 border border-slate-100 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900/50">
-                    <span className="text-sm font-bold text-slate-600 dark:text-slate-300">OTs Programadas en Período</span>
-                    <span className="text-lg font-black text-blue-600 dark:text-blue-400">{kpisObj.ots_finalizadas + kpisObj.ots_atraso}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-4 border border-slate-100 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900/50">
-                    <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Completadas a Tiempo</span>
-                    <span className="text-lg font-black text-emerald-500 dark:text-emerald-400">{kpisObj.ots_finalizadas - kpisObj.ots_atraso}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-4 border border-slate-100 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900/50">
-                    <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Completadas Atrasadas</span>
-                    <span className="text-lg font-black text-rose-500 dark:text-rose-400">{kpisObj.ots_atraso}</span>
+                    <span className="text-sm font-medium text-slate-500">Sin datos registrados en el periodo</span>
                   </div>
               </div>
             </div>
@@ -162,16 +139,7 @@ export default function KpiRRHH() {
               </div>
               <div className="flex flex-col gap-4 mt-4">
                   <div className="flex justify-between items-center p-4 border border-slate-100 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900/50">
-                    <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Técnicos Activos</span>
-                    <span className="text-lg font-black text-slate-800 dark:text-slate-100">{kpisObj.tecnicos_activos}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-4 border border-slate-100 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900/50">
-                    <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Horas Reales Trabajadas</span>
-                    <span className="text-lg font-black text-blue-600 dark:text-blue-400">{kpisObj.horas_registradas} Hrs</span>
-                  </div>
-                  <div className="flex justify-between items-center p-4 border border-slate-100 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900/50">
-                    <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Horas Disponibles Totales</span>
-                    <span className="text-lg font-black text-purple-600 dark:text-purple-400">{Math.round(kpisObj.horas_registradas / (kpisObj.utilizacion/100))} Hrs</span>
+                    <span className="text-sm font-medium text-slate-500">Sin datos registrados en el periodo</span>
                   </div>
               </div>
             </div>
@@ -214,12 +182,9 @@ export default function KpiRRHH() {
               
               <div className="space-y-3">
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 mt-6">Desglose de Datos</h4>
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="flex justify-between items-center p-3 border border-slate-100 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900/50">
-                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Segmento de Análisis {3 - i}</span>
-                    <span className="text-xs font-black text-blue-600 dark:text-blue-400">{Math.floor(Math.random() * 100)} %</span>
-                  </div>
-                ))}
+                <div className="p-4 text-center border border-slate-100 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900/50">
+                  <span className="text-xs font-medium text-slate-500">Sin datos reportados en este periodo</span>
+                </div>
               </div>
             </div>
           </>
@@ -477,12 +442,12 @@ export default function KpiRRHH() {
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm relative overflow-hidden">
                 <div className="flex justify-between items-center mb-4 relative z-10">
                   <h3 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Score Confiabilidad</h3>
-                  <span className="text-3xl font-black text-emerald-500 dark:text-emerald-400">100%</span>
+                  <span className="text-3xl font-black text-slate-400 dark:text-slate-500">0%</span>
                 </div>
                 <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full mb-4 relative z-10">
-                  <div className="h-full bg-emerald-500 dark:bg-emerald-400 rounded-full" style={{ width: '100%' }}></div>
+                  <div className="h-full bg-slate-300 dark:bg-slate-700 rounded-full" style={{ width: '0%' }}></div>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 text-center italic relative z-10">Sin fallas repetitivas detectadas.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 text-center italic relative z-10">Sin datos registrados.</p>
               </div>
 
               {/* Análises */}
@@ -491,7 +456,7 @@ export default function KpiRRHH() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center p-4 border border-slate-200 dark:border-slate-700/50 dark:bg-slate-800/50 rounded-xl bg-slate-50">
                     <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Valor Producido (HH)</span>
-                    <span className="text-sm font-black text-emerald-600 dark:text-emerald-500">$ 26,136</span>
+                    <span className="text-sm font-black text-emerald-600 dark:text-emerald-500">$ 0</span>
                   </div>
                   <div className="flex justify-between items-center p-4 border border-slate-200 dark:border-slate-700/50 dark:bg-slate-800/50 rounded-xl bg-slate-50">
                     <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Costo Real Pagado</span>
@@ -520,17 +485,8 @@ export default function KpiRRHH() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    <tr className="bg-white dark:bg-slate-900">
-                      <td className="py-3 px-4 font-bold text-blue-600 dark:text-blue-400">#OT-0345</td>
-                      <td className="py-3 px-4 font-bold text-slate-700 dark:text-slate-300">30</td>
-                      <td className="py-3 px-4">
-                        <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold px-2 py-1 rounded">0%</span>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex justify-end">
-                           <Check className="w-4 h-4 text-emerald-500" />
-                        </div>
-                      </td>
+                    <tr>
+                      <td colSpan={4} className="py-6 px-4 text-center text-slate-500 text-xs font-medium">Sin registros recientes</td>
                     </tr>
                   </tbody>
                 </table>

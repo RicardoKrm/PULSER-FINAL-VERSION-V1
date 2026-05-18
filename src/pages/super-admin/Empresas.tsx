@@ -106,79 +106,89 @@ export default function SuperAdminEmpresas() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-              {managedCompanies.map((company) => {
-                return (
-                  <tr 
-                    key={company.id} 
-                    className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30"
-                  >
-                    <td className="px-6 py-4">
-                      <p className="font-semibold text-slate-800 dark:text-slate-100">{company.name}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">{company.id}</p>
-                    </td>
-                    <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                        {company.joinDate}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-200 font-medium">
-                        <Users className="h-3.5 w-3.5 text-slate-400" />
-                        {company.usersCount}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-200 font-medium">
-                        <Truck className="h-3.5 w-3.5 text-slate-400" />
-                        {company.fleetSize}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={cn(
-                        "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border",
-                        company.status === 'Activo' 
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800/50" 
-                          : "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50"
-                      )}>
-                        {company.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      <button
-                        onClick={() => toggleCompanyStatus(company.id)}
-                        className={cn(
-                          "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border",
-                          company.status === 'Activo'
-                            ? "bg-white border-red-200 text-red-600 hover:bg-red-50 dark:bg-slate-800 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20"
-                            : "bg-white border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:bg-slate-800 dark:border-emerald-900/50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
-                        )}
-                      >
-                        {company.status === 'Activo' ? 'Desactivar' : 'Activar'}
-                      </button>
-                      
-                      {activeCompanyId === company.id ? (
-                        <span className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed">
-                          Sesión Activa
+              {managedCompanies.length > 0 ? (
+                managedCompanies.map((company) => {
+                  return (
+                    <tr 
+                      key={company.id} 
+                      className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30"
+                    >
+                      <td className="px-6 py-4">
+                        <p className="font-semibold text-slate-800 dark:text-slate-100">{company.name}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">{company.id}</p>
+                      </td>
+                      <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                          {company.joinDate}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-200 font-medium">
+                          <Users className="h-3.5 w-3.5 text-slate-400" />
+                          {company.usersCount}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-200 font-medium">
+                          <Truck className="h-3.5 w-3.5 text-slate-400" />
+                          {company.fleetSize}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={cn(
+                          "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border",
+                          company.status === 'Activo' 
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800/50" 
+                            : "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50"
+                        )}>
+                          {company.status}
                         </span>
-                      ) : (
-                        <button 
-                          onClick={() => setActiveCompanyId(company.id)}
-                          disabled={company.status === 'Inactivo'}
+                      </td>
+                      <td className="px-6 py-4 text-right space-x-2">
+                        <button
+                          onClick={() => toggleCompanyStatus(company.id)}
                           className={cn(
-                            "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
-                            company.status === 'Inactivo'
-                              ? "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed"
-                              : "bg-slate-800 text-white hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white"
+                            "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border",
+                            company.status === 'Activo'
+                              ? "bg-white border-red-200 text-red-600 hover:bg-red-50 dark:bg-slate-800 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20"
+                              : "bg-white border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:bg-slate-800 dark:border-emerald-900/50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
                           )}
                         >
-                          Entrar
+                          {company.status === 'Activo' ? 'Desactivar' : 'Activar'}
                         </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                        
+                        {activeCompanyId === company.id ? (
+                          <span className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed">
+                            Sesión Activa
+                          </span>
+                        ) : (
+                          <button 
+                            onClick={() => setActiveCompanyId(company.id)}
+                            disabled={company.status === 'Inactivo'}
+                            className={cn(
+                              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                              company.status === 'Inactivo'
+                                ? "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed"
+                                : "bg-slate-800 text-white hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white"
+                            )}
+                          >
+                            Entrar
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center">
+                    <Building className="h-12 w-12 text-slate-300 dark:text-slate-700 mx-auto mb-4" />
+                    <p className="text-slate-500 dark:text-slate-400 font-medium">No hay empresas registradas aún.</p>
+                    <p className="text-sm text-slate-400 dark:text-slate-500">Haz clic en "Nueva Empresa" para agregar una.</p>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

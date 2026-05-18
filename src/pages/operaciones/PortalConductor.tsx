@@ -30,56 +30,7 @@ interface Viaje {
   tipoViaje: string;
 }
 
-const misViajes: Viaje[] = [
-  {
-    id: 'V-1020',
-    fecha: '16 May 2026',
-    horaInicio: '08:00',
-    horaFin: '12:30',
-    origen: 'Iquique (Terminal)',
-    destino: 'Faena Collahuasi',
-    vehiculo: 'Minibus Sprinter (AB-CD-12)',
-    estado: 'EN_CURSO',
-    pasajeros: 12,
-    maletas: 12,
-    sillaNino: 0,
-    latOrigen: -20.213,
-    lngOrigen: -70.150,
-    tipoViaje: 'Subida Personal',
-  },
-  {
-    id: 'V-1025',
-    fecha: '17 May 2026',
-    horaInicio: '07:30',
-    horaFin: '09:00',
-    origen: 'Iquique',
-    destino: 'Pozo Almonte',
-    vehiculo: 'Camioneta Hilux (XX-YY-99)',
-    estado: 'PROGRAMADO',
-    pasajeros: 3,
-    maletas: 2,
-    sillaNino: 1,
-    latOrigen: -20.213,
-    lngOrigen: -70.150,
-    tipoViaje: 'Traslado Equipamiento',
-  },
-  {
-    id: 'V-1026',
-    fecha: '18 May 2026',
-    horaInicio: '15:00',
-    horaFin: '19:30',
-    origen: 'Faena Collahuasi',
-    destino: 'Iquique',
-    vehiculo: 'Minibus Sprinter (AB-CD-12)',
-    estado: 'PROGRAMADO',
-    pasajeros: 15,
-    maletas: 15,
-    sillaNino: 0,
-    latOrigen: -20.966,
-    lngOrigen: -68.616,
-    tipoViaje: 'Bajada Personal',
-  }
-];
+const misViajes: Viaje[] = [];
 
 export default function PortalConductor() {
   const [viajes, setViajes] = useState<Viaje[]>(misViajes);

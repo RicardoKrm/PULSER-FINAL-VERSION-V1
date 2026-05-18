@@ -33,31 +33,7 @@ const moduleColumns = {
 
 // Mock Previews
 const generateMockData = (moduleId: string) => {
-  switch (moduleId) {
-    case 'mantenimiento':
-      return Array.from({ length: 8 }).map((_, i) => [
-        `OT-${4000 + i}`, `Camión 0${i + 1}`, `AB-CD-${10 + i}`, `2026-05-0${i + 1}`, `2026-05-0${i + 3}`, 
-        ['FINALIZADA', 'EN PROCESO'][i % 2], ['PREVENTIVA', 'CORRECTIVA'][Math.floor(Math.random() * 2)], 
-        ['Falla Motor', '-', 'Frenos'][Math.floor(Math.random() * 3)], 'Juan Pérez', 
-        formatCurrency(45000 + (i * 5000)), formatCurrency(120000 + (i * 10000)), formatCurrency(165000 + (i * 15000)),
-        (120 + i * 20).toString()
-      ]);
-    case 'inventario':
-      return Array.from({ length: 8 }).map((_, i) => [
-        `SKU-100${i}`, `Filtro Neumático V${i}`, ['Genuino', 'OEM', 'Alternativo'][Math.floor(Math.random() * 3)],
-        (15 + i).toString(), '5', formatCurrency(15000 + (i * 2000)), formatCurrency((15 + i) * (15000 + (i * 2000))),
-        'Bodega Central', 'Proveedor XYZ Cía.', ['ALTA', 'MEDIA', 'BAJA'][Math.floor(Math.random() * 3)], `2026-05-1${i}`
-      ]);
-    case 'comercial':
-      return Array.from({ length: 8 }).map((_, i) => [
-        `Mayo 2026`, `FCT-${8000 + i}`, 'Minería Norte S.A.', `Camión 0${i + 1}`, 'INGRESO', 'Servicio Ruta', 
-        formatCurrency(2000000), formatCurrency(450000 + (i * 20000)), formatCurrency(1800000 + (i * 50000)), 
-        ((1800000 / (450000 + (i * 20000))) * 100).toFixed(1) + '%'
-      ]);
-    // default basic mock
-    default:
-      return Array.from({ length: 8 }).map((_, i) => moduleColumns[moduleId as keyof typeof moduleColumns].map((col, j) => `Dato ${j + 1}`));
-  }
+  return [];
 };
 
 
@@ -324,7 +300,7 @@ export default function ReporteMaestro() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                    {currentMockData.map((row, rowIdx) => (
+                    {currentMockData.length > 0 ? currentMockData.map((row, rowIdx) => (
                       <tr key={rowIdx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group">
                         {selectedColumns.map((col, colIdx) => {
                           const originalIdx = currentColumns.indexOf(col);
@@ -336,7 +312,7 @@ export default function ReporteMaestro() {
                                 <span className="bg-emerald-100/50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-2 py-1 rounded-md text-xs font-bold">{val}</span>
                               ) : val === 'EN PROCESO' || val === 'CORRECTIVA' ? (
                                 <span className="bg-amber-100/50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-1 rounded-md text-xs font-bold">{val}</span>
-                              ) : col.includes('($)') || col.includes('Costo') ? (
+                              ) : typeof col === 'string' && (col.includes('($)') || col.includes('Costo')) ? (
                                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{val}</span>
                               ) : (
                                 val
@@ -345,7 +321,11 @@ export default function ReporteMaestro() {
                           );
                         })}
                       </tr>
-                    ))}
+                    )) : (
+                      <tr>
+                        <td colSpan={selectedColumns.length} className="p-8 text-center text-slate-500 font-medium">Sin registros disponibles para el período</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
                 

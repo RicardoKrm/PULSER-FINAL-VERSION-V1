@@ -2,12 +2,23 @@ import React, { useState, useMemo } from 'react';
 import { Calendar as CalendarIcon, CheckCircle2, AlertCircle, Plus, Search, MapPin, Truck, User, FileText, X, Activity, Download, ChevronRight, DollarSign, Clock, FileWarning, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-const mockServicios = [
-  { id: '1', codigo: 'SRV-001', contrato: 'Minera Escondida - CT1', tipo: 'Minero', subtipo: 'Interno Mina', origen: 'Campamento', destino: 'Rajo', fecha: '2026-05-15T08:00', conductor: 'Juan Pérez', unidad: 'Minibus M-04', estado: 'Programado', ingreso: 150000, costo: 45000 },
-  { id: '2', codigo: 'SRV-002', contrato: 'BHP Billiton - CT2', tipo: 'Sobredimensionada', subtipo: 'Interprovincial', origen: 'Antofagasta', destino: 'Iquique', fecha: '2026-05-16T10:00', conductor: 'Carlos Silva', unidad: 'Tractocamión T-01', estado: 'En Ruta', ingreso: 850000, costo: 320000 },
-  { id: '3', codigo: 'SRV-003', contrato: 'Sin contrato', tipo: 'General', subtipo: 'Urbano', origen: 'Bodega Central', destino: 'Puerto', fecha: '2026-05-14T15:00', conductor: 'Ana Gómez', unidad: 'Camión C-10', estado: 'Completado', ingreso: 120000, costo: 35000 },
-  { id: '4', codigo: 'SRV-004', contrato: 'Codelco - CT3', tipo: 'Peligrosa / MATPEL', subtipo: 'Interprovincial', origen: 'Calama', destino: 'Antofagasta', fecha: '2026-05-17T09:00', conductor: 'Luis Martínez', unidad: 'Camión C-11', estado: 'Programado', ingreso: 600000, costo: 180000 },
-];
+type Servicio = {
+  id: string;
+  codigo: string;
+  contrato: string;
+  tipo: string;
+  subtipo: string;
+  origen: string;
+  destino: string;
+  fecha: string;
+  conductor: string;
+  unidad: string;
+  estado: string;
+  ingreso: number;
+  costo: number;
+};
+
+const mockServicios: Servicio[] = [];
 
 export default function CrearServicio() {
   const [isModalOpen, setIsModalOpen] = useState(false);

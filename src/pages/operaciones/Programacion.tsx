@@ -41,62 +41,33 @@ const DAYS_ES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'
 const MONTHS_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 // Mock Data
-const PENDING_SERVICES = [
-  { id: 'p1', tipo: 'Interprovincial', origen: 'Santiago', destino: 'Calama', bgColor: 'bg-white dark:bg-slate-800' },
-  { id: 'p2', tipo: 'Personal', origen: 'Antofagasta', destino: 'Valparaíso', bgColor: 'bg-white dark:bg-slate-800' },
-  { id: 'p3', tipo: 'Carga Peligrosa', origen: 'Santiago', destino: 'Calama', bgColor: 'bg-white dark:bg-slate-800' },
-  { id: 'p4', tipo: 'Interprovincial', origen: 'Antofagasta', destino: 'Valparaíso', bgColor: 'bg-white dark:bg-slate-800' },
-  { id: 'p5', tipo: 'Personal', origen: 'Santiago', destino: 'Calama', bgColor: 'bg-white dark:bg-slate-800' },
-  { id: 'p6', tipo: 'Carga Peligrosa', origen: 'Antofagasta', destino: 'Valparaíso', bgColor: 'bg-white dark:bg-slate-800' },
-  { id: 'p7', tipo: 'Interprovincial', origen: 'Santiago', destino: 'Calama', bgColor: 'bg-white dark:bg-slate-800' },
-];
+const PENDING_SERVICES: any[] = [];
 
 const INIT_DATE = new Date(2026, 3, 6); // 6 Abril 2026
 
-const SCHEDULED_BLOCKS = [
-  { id: 's1', dateStr: '2026-04-07', hour: 10, duration: 2, tipo: 'Interprovincial', origen: 'Antofagasta', destino: 'Valparaíso', timeStr: '10:00 AM', colorClass: 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-300' },
-  { id: 's2', dateStr: '2026-04-08', hour: 11, duration: 2, tipo: 'Carga Peligrosa', origen: 'Santiago', destino: 'Calama', timeStr: '11:00 AM', colorClass: 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-300' },
-  { id: 's3', dateStr: '2026-04-09', hour: 13, duration: 2, tipo: 'Personal', origen: 'Antofagasta', destino: 'Valparaíso', timeStr: '01:00 PM', colorClass: 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-500/10 dark:border-blue-500/20 dark:text-blue-300' },
-  { id: 's4', dateStr: '2026-04-10', hour: 14, duration: 2, tipo: 'Interprovincial', origen: 'Santiago', destino: 'Calama', timeStr: '02:00 PM', colorClass: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-300' },
-  { id: 's5', dateStr: '2026-04-12', hour: 15, duration: 2, tipo: 'Personal', origen: 'Santiago', destino: 'Calama', timeStr: '03:00 PM', colorClass: 'bg-slate-50 border-slate-200 text-slate-800 dark:bg-slate-500/10 dark:border-slate-500/20 dark:text-slate-300' },
-  { id: 's6', dateStr: '2026-04-13', hour: 8, duration: 4, tipo: 'Interprovincial', origen: 'Iquique', destino: 'Arica', timeStr: '08:00 AM', colorClass: 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-300' },
-  { id: 's7', dateStr: '2026-04-13', hour: 9, duration: 2, tipo: 'Carga Peligrosa', origen: 'Calama', destino: 'Antofagasta', timeStr: '09:00 AM', colorClass: 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-300' },
-  { id: 's8', dateStr: '2026-04-13', hour: 11, duration: 3, tipo: 'Personal', origen: 'Valparaíso', destino: 'Santiago', timeStr: '11:00 AM', colorClass: 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-500/10 dark:border-blue-500/20 dark:text-blue-300' },
-  { id: 's9', dateStr: '2026-04-13', hour: 14, duration: 2, tipo: 'Interprovincial', origen: 'Concepción', destino: 'Chillán', timeStr: '02:00 PM', colorClass: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-300' },
-  { id: 's10', dateStr: '2026-04-13', hour: 16, duration: 3, tipo: 'Personal', origen: 'Temuco', destino: 'Valdivia', timeStr: '04:00 PM', colorClass: 'bg-slate-50 border-slate-200 text-slate-800 dark:bg-slate-500/10 dark:border-slate-500/20 dark:text-slate-300' },
-  { id: 's11', dateStr: '2026-04-13', hour: 17, duration: 2, tipo: 'Carga Peligrosa', origen: 'Punta Arenas', destino: 'Natales', timeStr: '05:00 PM', colorClass: 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-300' },
-  { id: 's12', dateStr: '2026-04-14', hour: 10, duration: 2, tipo: 'Interprovincial', origen: 'Santiago', destino: 'Valparaíso', timeStr: '10:00 AM', colorClass: 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-300' },
-  { id: 's13', dateStr: '2026-04-14', hour: 12, duration: 3, tipo: 'Personal', origen: 'Santiago', destino: 'Rancagua', timeStr: '12:00 PM', colorClass: 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-500/10 dark:border-blue-500/20 dark:text-blue-300' },
-  { id: 's14', dateStr: '2026-04-15', hour: 9, duration: 4, tipo: 'Carga Peligrosa', origen: 'San Antonio', destino: 'Santiago', timeStr: '09:00 AM', colorClass: 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-300' },
-  { id: 's15', dateStr: '2026-04-15', hour: 14, duration: 2, tipo: 'Interprovincial', origen: 'Copiapó', destino: 'Vallenar', timeStr: '02:00 PM', colorClass: 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-300' },
-  { id: 's16', dateStr: '2026-04-15', hour: 16, duration: 3, tipo: 'Personal', origen: 'La Serena', destino: 'Coquimbo', timeStr: '04:00 PM', colorClass: 'bg-slate-50 border-slate-200 text-slate-800 dark:bg-slate-500/10 dark:border-slate-500/20 dark:text-slate-300' },
-  { id: 's17', dateStr: '2026-04-16', hour: 8, duration: 2, tipo: 'Interprovincial', origen: 'Arica', destino: 'Iquique', timeStr: '08:00 AM', colorClass: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-300' },
-  { id: 's18', dateStr: '2026-04-16', hour: 11, duration: 4, tipo: 'Carga Peligrosa', origen: 'Tocopilla', destino: 'Antofagasta', timeStr: '11:00 AM', colorClass: 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-300' },
-  { id: 's19', dateStr: '2026-04-17', hour: 10, duration: 2, tipo: 'Personal', origen: 'Santiago', destino: 'Talagante', timeStr: '10:00 AM', colorClass: 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-500/10 dark:border-blue-500/20 dark:text-blue-300' },
-  { id: 's20', dateStr: '2026-04-17', hour: 13, duration: 3, tipo: 'Interprovincial', origen: 'Curicó', destino: 'Talca', timeStr: '01:00 PM', colorClass: 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-300' },
-  { id: 's21', dateStr: '2026-04-18', hour: 9, duration: 2, tipo: 'Carga Peligrosa', origen: 'Los Andes', destino: 'Santiago', timeStr: '09:00 AM', colorClass: 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-300' },
-  { id: 's22', dateStr: '2026-04-18', hour: 12, duration: 4, tipo: 'Personal', origen: 'Linares', destino: 'Chillán', timeStr: '12:00 PM', colorClass: 'bg-slate-50 border-slate-200 text-slate-800 dark:bg-slate-500/10 dark:border-slate-500/20 dark:text-slate-300' },
-  { id: 's23', dateStr: '2026-04-18', hour: 16, duration: 2, tipo: 'Interprovincial', origen: 'San Fernando', destino: 'Rancagua', timeStr: '04:00 PM', colorClass: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-300' },
-  { id: 's24', dateStr: '2026-04-19', hour: 8, duration: 3, tipo: 'Personal', origen: 'Puerto Montt', destino: 'Osorno', timeStr: '08:00 AM', colorClass: 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-500/10 dark:border-blue-500/20 dark:text-blue-300' },
-  { id: 's25', dateStr: '2026-04-19', hour: 13, duration: 2, tipo: 'Carga Peligrosa', origen: 'Castro', destino: 'Quellón', timeStr: '01:00 PM', colorClass: 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-300' }
-];
+const SCHEDULED_BLOCKS: any[] = [];
 
 const HOURS = Array.from({ length: 12 }, (_, i) => i + 8); // 8 to 19
 
 export default function Programacion() {
-  const [viewMode, setViewMode] = useState<'Día' | 'Semana' | 'Mes'>('Semana');
+  const [viewMode, setViewMode] = useState<'Día' | 'Semana' | 'Mes' | 'Tabla'>('Semana');
   const [currentDate, setCurrentDate] = useState<Date>(INIT_DATE);
   const [draggedItem, setDraggedItem] = useState<any>(null);
   const [scheduled, setScheduled] = useState([...SCHEDULED_BLOCKS]);
   const [pendings, setPendings] = useState([...PENDING_SERVICES]);
-  const [conductores, setConductores] = useState([
-    { id: 'c1', nombre: 'Juan Pérez', vehiculo: 'LDPJ-99', selected: true },
-    { id: 'c2', nombre: 'Miguel Sánchez', vehiculo: 'KHYT-22', selected: true },
-    { id: 'c3', nombre: 'Carlos Ruiz', vehiculo: 'MNQP-15', selected: true },
-    { id: 'c4', nombre: 'Roberto Gómez', vehiculo: 'FRTY-11', selected: true },
-    { id: 'c5', nombre: 'Andrés Soto', vehiculo: 'HTYK-88', selected: true },
-    { id: 'c6', nombre: 'Luis Vargas', vehiculo: 'PRTZ-45', selected: true },
-  ]);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success'>('idle');
+
+  const [dateFilterStart, setDateFilterStart] = useState('2026-04-01');
+  const [dateFilterEnd, setDateFilterEnd] = useState('2026-04-30');
+
+  const handleSyncDrive = () => {
+    setSyncStatus('syncing');
+    setTimeout(() => {
+       setSyncStatus('success');
+       setTimeout(() => setSyncStatus('idle'), 3000);
+    }, 2000);
+  };
+  const [conductores, setConductores] = useState<any[]>([]);
 
   const toggleConductor = (id: string) => {
     setConductores(conductores.map(c => c.id === id ? { ...c, selected: !c.selected } : c));
@@ -371,7 +342,12 @@ export default function Programacion() {
                  <option value="Día">Día</option>
                  <option value="Semana">Semana</option>
                  <option value="Mes">Mes</option>
+                 <option value="Tabla">Tabla Listado</option>
                </select>
+
+               <button disabled={syncStatus === 'syncing'} onClick={handleSyncDrive} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors flex items-center justify-center gap-2 text-sm text-nowrap whitespace-nowrap disabled:opacity-50">
+                  <span className="hidden sm:inline">{syncStatus === 'syncing' ? 'Sincronizando...' : syncStatus === 'success' ? '✓ Drive Sincronizado' : '⇄ Sync Bidireccional Drive'}</span>
+               </button>
 
                <button className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors flex items-center justify-center gap-2 text-sm text-nowrap whitespace-nowrap">
                   <Download className="w-4 h-4" />
@@ -447,7 +423,7 @@ export default function Programacion() {
                               const heightOffset = block.duration * 80;
                               
                               // Check if we need to assign a driver to display 
-                              const pseudoDriver = conductores[Math.floor(Math.random() * conductores.length)];
+                              const pseudoDriver = conductores.length > 0 ? conductores[Math.floor(Math.random() * conductores.length)] : null;
 
                               return (
                                 <div 
@@ -616,6 +592,71 @@ export default function Programacion() {
                       )
                     })}
                   </div>
+               </div>
+             )}
+
+             {/* VISTA TABLA (Grilla con Filtros) */}
+             {viewMode === 'Tabla' && (
+               <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 p-6 overflow-hidden">
+                 {/* Filtros de Tabla */}
+                 <div className="flex items-center gap-4 mb-4 pb-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
+                    <div className="flex items-center gap-2">
+                       <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Desde:</label>
+                       <input type="date" value={dateFilterStart} onChange={e => setDateFilterStart(e.target.value)} className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-md p-2 text-sm outline-none focus:ring-1 focus:ring-blue-500" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                       <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Hasta:</label>
+                       <input type="date" value={dateFilterEnd} onChange={e => setDateFilterEnd(e.target.value)} className="bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-md p-2 text-sm outline-none focus:ring-1 focus:ring-blue-500" />
+                    </div>
+                    <button className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-4 py-2 flex items-center justify-center gap-2 text-sm font-medium rounded-md ml-auto transition-colors">
+                       <Filter className="w-4 h-4" /> Filtros Avanzados
+                    </button>
+                    <button className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 flex items-center justify-center gap-2 text-sm font-bold rounded-md transition-colors" onClick={() => alert('Generando archivo Excel con los datos filtrados...')}>
+                       <Download className="w-4 h-4" /> Exportar Filtrados a Excel
+                    </button>
+                 </div>
+
+                 {/* Tabla */}
+                 <div className="flex-1 overflow-auto rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <table className="w-full text-left text-sm whitespace-nowrap">
+                       <thead className="bg-slate-50 dark:bg-slate-800/50 sticky top-0 z-10 border-b border-slate-200 dark:border-slate-700">
+                         <tr>
+                            <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">ID / OT</th>
+                            <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Fecha</th>
+                            <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Horario</th>
+                            <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Tipo de Servicio</th>
+                            <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Ruta (Origen - Destino)</th>
+                            <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Vehículo / Conductor Asignado</th>
+                         </tr>
+                       </thead>
+                       <tbody className="divide-y divide-slate-200 dark:divide-slate-800/50 bg-white dark:bg-slate-900">
+                         {scheduled.filter(s => s.dateStr >= dateFilterStart && s.dateStr <= dateFilterEnd).map((block, idx) => {
+                            const pseudoDriver = conductores.length > 0 ? conductores[idx % conductores.length] : null;
+                            return (
+                               <tr key={`tbl-${block.id}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                 <td className="px-4 py-3 font-medium text-blue-600 dark:text-blue-400">SRV-{block.id.replace('s','')}{(block.id.charCodeAt(block.id.length-1)*7).toString().padStart(3,'0')}</td>
+                                 <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{block.dateStr}</td>
+                                 <td className="px-4 py-3 text-slate-700 dark:text-slate-300 font-mono text-xs">{block.timeStr} - {block.hour + block.duration}:00</td>
+                                 <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                                   <span className={`px-2 py-1 rounded text-xs font-semibold ${block.colorClass}`}>
+                                      {block.tipo}
+                                   </span>
+                                 </td>
+                                 <td className="px-4 py-3 text-slate-600 dark:text-slate-400 font-medium">
+                                   {block.origen} → {block.destino}
+                                 </td>
+                                 <td className="px-4 py-3">
+                                   <div className="flex flex-col">
+                                     <span className="font-bold text-slate-800 dark:text-slate-200 tracking-wider">{pseudoDriver.vehiculo}</span>
+                                     <span className="text-[11px] text-slate-500">{pseudoDriver.nombre}</span>
+                                   </div>
+                                 </td>
+                               </tr>
+                            )
+                         })}
+                       </tbody>
+                    </table>
+                 </div>
                </div>
              )}
 

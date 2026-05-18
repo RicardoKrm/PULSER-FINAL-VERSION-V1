@@ -114,6 +114,19 @@ export const navigation = [
     ],
   },
   {
+    title: 'Finanzas',
+    icon: DollarSign,
+    href: '/finanzas',
+    submodules: [
+      { title: 'Estado de Pago', icon: ClipboardList, href: '/finanzas/estado-pago' },
+      { title: 'Historial Facturación', icon: FileText, href: '/finanzas/historial-facturacion' },
+      { title: 'Costos Operacionales', icon: DollarSign, href: '/finanzas/costos' },
+      { title: 'Presupuestos', icon: Activity, href: '/finanzas/presupuestos' },
+      { title: 'Trazabilidad', icon: Activity, href: '/finanzas/trazabilidad' },
+      { title: 'Evaluación Empresa', icon: Briefcase, href: '/finanzas/evaluacion-empresa' },
+    ],
+  },
+  {
     title: 'Configuración y Herramientas',
     icon: Settings,
     href: '/configuracion',

@@ -4,15 +4,28 @@ import { useAppContext } from '../../context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { ArrowLeft, Edit, Printer, Clock, Wrench, Boxes, History, ChevronDown, ChevronUp, Save, Trash2, Plus, FileText, CheckCircle, FileDown } from 'lucide-react';
+import { Modal } from '../../components/ui/Modal';
+import { ArrowLeft, Edit, Printer, Clock, Wrench, Boxes, History, ChevronDown, ChevronUp, Save, Trash2, Plus, FileText, CheckCircle, FileDown, Search } from 'lucide-react';
+
+const sumInsumosData = [
+  { id: 1, nombre: "Filtro Aceite Dirección Hidráulica Scania", sku: "38377546", stock: 96 },
+  { id: 2, nombre: "Filtro Aceite E III", sku: "A 457 180 11 09:MBB", stock: 99 },
+  { id: 3, nombre: "Filtro Aceite E V", sku: "A 457 180 00 09:MBB", stock: 100 },
+  { id: 4, nombre: "Filtro Aceite E V", sku: "A 457 180 00 09:HENGST", stock: 95 },
+  { id: 5, nombre: "Filtro Aire NCV3", sku: "A 0000903751:HENGST", stock: 20 },
+];
 
 export default function OrdenesTrabajoDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { ordenesTrabajo, vehiculos, kitsRepuesto, actualizarOrdenTrabajo } = useAppContext();
+  const { ordenesTrabajo, vehiculos, kitsRepuesto, tareasEstandar, actualizarOrdenTrabajo } = useAppContext();
   const [activeTab, setActiveTab] = useState<'tareas' | 'insumos' | 'historial'>('tareas');
   const [activePanels, setActivePanels] = useState<Record<string, boolean>>({ diagnostico: false, pauta: false, personal: false, estado: false });
   const [selectedKitToAdd, setSelectedKitToAdd] = useState('');
+  
+  const [isTareaModalOpen, setIsTareaModalOpen] = useState(false);
+  const [isInsumoModalOpen, setIsInsumoModalOpen] = useState(false);
+  const [insumoSearch, setInsumoSearch] = useState('');
   
   const ot = ordenesTrabajo.find(o => o.id === id || o.folio === id);
   const vehiculo = vehiculos.find(v => v.id === ot?.vehiculoId);
@@ -49,6 +62,39 @@ export default function OrdenesTrabajoDetail() {
     });
     setSelectedKitToAdd('');
   };
+
+  const agregarTarea = (tarea: any) => {
+    if (!ot) return;
+    actualizarOrdenTrabajo({
+      ...ot,
+      tareasRealizadas: [
+        ...ot.tareasRealizadas,
+        { id: Math.random().toString(36).substr(2, 9), descripcion: tarea.descripcion, costoBase: tarea.costoManoObra }
+      ],
+      costoManoObraTareas: ot.costoManoObraTareas + tarea.costoManoObra
+    });
+    setIsTareaModalOpen(false);
+  };
+
+  const agregarInsumo = (repuesto: any) => {
+    if (!ot) return;
+    const existe = ot.insumos.find(i => i.nombre === repuesto.nombre);
+    
+    let nuevosInsumos = [];
+    if (existe) {
+      nuevosInsumos = ot.insumos.map(i => i.nombre === repuesto.nombre ? { ...i, cantidad: i.cantidad + 1 } : i);
+    } else {
+      nuevosInsumos = [...ot.insumos, { id: Math.random().toString(36).substr(2, 9), nombre: repuesto.nombre, cantidad: 1, precioUnitario: 15000 }];
+    }
+
+    actualizarOrdenTrabajo({
+      ...ot,
+      insumos: nuevosInsumos,
+      costoInsumos: ot.costoInsumos + 15000
+    });
+  };
+
+  const filteredInsumos = sumInsumosData.filter(i => i.nombre.toLowerCase().includes(insumoSearch.toLowerCase()) || i.sku.toLowerCase().includes(insumoSearch.toLowerCase()));
 
   return (
     <div className="space-y-6 p-6">
@@ -106,7 +152,7 @@ export default function OrdenesTrabajoDetail() {
                 <CardContent className="pt-6">
                     {activeTab === 'tareas' && (
                         <div>
-                            <div className="flex justify-between items-center mb-4"><h3 className="font-bold">Tareas</h3><Button size="sm"><Plus className="w-4 h-4 mr-2"/>añadir tarea</Button></div>
+                            <div className="flex justify-between items-center mb-4"><h3 className="font-bold">Tareas</h3><Button size="sm" onClick={() => setIsTareaModalOpen(true)}><Plus className="w-4 h-4 mr-2"/>añadir tarea</Button></div>
                             {ot.tareasRealizadas.map(t => <div key={t.id} className="flex justify-between p-2 border-b last:border border-0 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:bg-slate-900/50"><span>{t.descripcion}</span><span className="font-mono text-slate-600 dark:text-slate-400">${t.costoBase.toLocaleString()}</span></div>)}
                         </div>
                     )}
@@ -130,7 +176,7 @@ export default function OrdenesTrabajoDetail() {
                                             Cargar Kit
                                         </Button>
                                     </div>
-                                    <Button size="sm"><Plus className="w-4 h-4 mr-2"/>añadir insumo</Button>
+                                    <Button size="sm" onClick={() => setIsInsumoModalOpen(true)}><Plus className="w-4 h-4 mr-2"/>añadir insumo</Button>
                                 </div>
                             </div>
                             {ot.insumos.length === 0 && (
@@ -189,6 +235,53 @@ export default function OrdenesTrabajoDetail() {
             </AccordionPanel>
         </div>
       </div>
+
+      <Modal isOpen={isTareaModalOpen} onClose={() => setIsTareaModalOpen(false)} title="Seleccionar Tarea Estándar">
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 mt-4">
+          {tareasEstandar.map(t => (
+            <div key={t.id} className="flex justify-between items-center p-3 border rounded-lg dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+               <div>
+                  <p className="font-semibold text-sm">{t.descripcion}</p>
+                  <p className="text-xs text-slate-500">{t.tiempoEstandarMinutos} min | Valor: ${t.costoManoObra.toLocaleString()}</p>
+               </div>
+               <Button size="sm" onClick={() => agregarTarea(t)} className="bg-cyan-600">Añadir</Button>
+            </div>
+          ))}
+        </div>
+      </Modal>
+
+      <Modal isOpen={isInsumoModalOpen} onClose={() => setIsInsumoModalOpen(false)} title="Buscar Repuesto en Inventario">
+        <div className="mt-4">
+          <div className="relative mb-4">
+            <input 
+              type="text" 
+              placeholder="Buscar por nombre o número de parte..." 
+              value={insumoSearch}
+              onChange={(e) => setInsumoSearch(e.target.value)}
+              className="w-full border rounded-lg p-2 pl-3 dark:bg-slate-800 dark:border-slate-700 outline-none focus:ring-1 focus:ring-cyan-500" 
+            />
+          </div>
+          <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
+            {filteredInsumos.length > 0 ? filteredInsumos.map(i => (
+               <div key={i.id} className="flex justify-between items-center p-3 border rounded-lg dark:border-slate-700">
+                  <div>
+                    <p className="font-bold text-sm uppercase">{i.nombre}</p>
+                    <p className="text-xs text-slate-500">SKU: {i.sku} | Stock: <span className="text-emerald-500 font-semibold">{i.stock} disponibles ✓</span></p>
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <input type="number" defaultValue={1} min={1} className="w-16 border rounded p-1 text-center text-sm dark:bg-slate-800 dark:border-slate-700" />
+                    <Button size="sm" className="bg-[#0cf]" onClick={() => agregarInsumo(i)}>Añadir</Button>
+                  </div>
+               </div>
+            )) : (
+              <p className="text-center text-slate-500 text-sm mt-8">Los resultados aparecerán aquí.</p>
+            )}
+          </div>
+          <div className="flex justify-end mt-4">
+             <Button variant="ghost" onClick={() => setIsInsumoModalOpen(false)}>Cerrar</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

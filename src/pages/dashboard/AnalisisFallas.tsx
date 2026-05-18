@@ -20,24 +20,9 @@ export default function AnalisisFallas() {
   const [activeDetail, setActiveDetail] = useState<string | null>(null);
   
   // Simulated Pareto Data
-  const paretoData = [
-    { name: 'Falla Eléctrica Motor', count: 45, cumulative: 25.7, impacto: 25.7, tfs: 270, causa: 'Cortocircuito en alternador', criticidad: 'Crítica', color: 'text-rose-500' },
-    { name: 'Desgaste Frenos', count: 35, cumulative: 45.7, impacto: 20.0, tfs: 210, causa: 'Fricción excesiva / Balatas', criticidad: 'Alta', color: 'text-orange-500' },
-    { name: 'Fuga Neumática', count: 28, cumulative: 61.7, impacto: 16.0, tfs: 168, causa: 'Manguera perforada', criticidad: 'Media', color: 'text-amber-500' },
-    { name: 'Sistema Hidráulico', count: 20, cumulative: 73.1, impacto: 11.4, tfs: 120, causa: 'Sello de bomba dañado', criticidad: 'Alta', color: 'text-orange-500' },
-    { name: 'Transmisión', count: 18, cumulative: 83.4, impacto: 10.3, tfs: 108, causa: 'Sincronizador trabado', criticidad: 'Crítica', color: 'text-rose-500' },
-    { name: 'Suspensión', count: 12, cumulative: 90.3, impacto: 6.9, tfs: 72, causa: 'Amortiguador reventado', criticidad: 'Media', color: 'text-amber-500' },
-    { name: 'Refrigeración', count: 9, cumulative: 95.4, impacto: 5.1, tfs: 54, causa: 'Fuga en radiador', criticidad: 'Media', color: 'text-amber-500' },
-    { name: 'Otros', count: 8, cumulative: 100, impacto: 4.6, tfs: 48, causa: 'Múltiples causas menores', criticidad: 'Baja', color: 'text-emerald-500' },
-  ];
+  const paretoData: any[] = [];
 
-  const failureDetails = [
-    { id: 1, type: 'Falla Eléctrica Motor', count: 45, mttr: '4.5h', cost: '$12,400', severity: 'Alta', color: 'text-rose-500' },
-    { id: 2, type: 'Desgaste Frenos', count: 35, mttr: '2.1h', cost: '$4,200', severity: 'Media', color: 'text-amber-500' },
-    { id: 3, type: 'Fuga Neumática', count: 28, mttr: '1.8h', cost: '$1,800', severity: 'Baja', color: 'text-emerald-500' },
-    { id: 4, type: 'Sistema Hidráulico', count: 20, mttr: '5.2h', cost: '$8,900', severity: 'Alta', color: 'text-rose-500' },
-    { id: 5, type: 'Transmisión', count: 18, mttr: '8.5h', cost: '$15,000', severity: 'Crítica', color: 'text-purple-500' },
-  ];
+  const failureDetails: any[] = [];
 
   const renderSidebarContent = () => {
     if (!activeDetail) return null;
@@ -70,24 +55,7 @@ export default function AnalisisFallas() {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
               <tr>
-                <td className="p-3 font-bold text-slate-700 dark:text-slate-300">Tiempo de Detención Total</td>
-                <td className="p-3 text-right font-black text-rose-500">270 mins</td>
-              </tr>
-              <tr>
-                <td className="p-3 font-bold text-slate-700 dark:text-slate-300">Costo Estimado de Reparación</td>
-                <td className="p-3 text-right font-black text-rose-500">$ 4,500</td>
-              </tr>
-              <tr>
-                <td className="p-3 font-bold text-slate-700 dark:text-slate-300">Vehículos Afectados</td>
-                <td className="p-3 text-right font-black text-slate-600 dark:text-slate-400">12 unidades</td>
-              </tr>
-              <tr>
-                <td className="p-3 font-bold text-slate-700 dark:text-slate-300">Mano de Obra (Horas)</td>
-                <td className="p-3 text-right font-black text-slate-600 dark:text-slate-400">45 hrs</td>
-              </tr>
-              <tr>
-                <td className="p-3 font-bold text-slate-700 dark:text-slate-300">Impacto a Flota (%)</td>
-                <td className="p-3 text-right font-black text-blue-500">25.7%</td>
+                <td colSpan={2} className="p-6 text-center text-slate-500 font-medium">Sin datos para analizar</td>
               </tr>
             </tbody>
           </table>
@@ -184,10 +152,10 @@ export default function AnalisisFallas() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
-          { icon: ShieldAlert, label: 'Fallas Reportadas', value: '175', trend: '+12%', trendUp: true, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-900/20' },
-          { icon: Activity, label: 'MTTR Promedio', value: '4.2h', trend: '-8%', trendUp: false, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-          { icon: TrendingUp, label: 'Falla Principal', value: 'Eléctrica', subValue: '25% del total', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-          { icon: Wrench, label: 'Costo Correctivos', value: '$42.3k', trend: '+5%', trendUp: true, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
+          { icon: ShieldAlert, label: 'Fallas Reportadas', value: '0', trend: '0%', trendUp: false, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-900/20' },
+          { icon: Activity, label: 'MTTR Promedio', value: '0h', trend: '0%', trendUp: false, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+          { icon: TrendingUp, label: 'Falla Principal', value: 'S/I', subValue: '0% del total', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+          { icon: Wrench, label: 'Costo Correctivos', value: '$0', trend: '0%', trendUp: false, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
         ].map((kpi, i) => (
           <div 
             key={i} 
@@ -247,69 +215,75 @@ export default function AnalisisFallas() {
         </div>
         
         <div className="p-6">
-          <div className="h-[400px] w-full cursor-pointer">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart
-                data={paretoData}
-                margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
-                onClick={(e) => setActiveDetail(e?.activeLabel ? `Detalle: ${e.activeLabel}` : 'pareto')}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }}
-                  dy={10}
-                />
-                <YAxis 
-                  yAxisId="left" 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }}
-                />
-                <YAxis 
-                  yAxisId="right" 
-                  orientation="right" 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }}
-                  tickFormatter={(val) => `${val}%`}
-                />
-                <Tooltip 
-                  cursor={{ fill: '#f1f5f9', opacity: 0.1 }}
-                  contentStyle={{ 
-                    backgroundColor: '#0f172a', 
-                    borderRadius: '12px',
-                    border: '1px solid #1e293b',
-                    color: '#fff',
-                    fontWeight: 'bold',
-                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
-                  }}
-                  itemStyle={{ fontSize: '12px' }}
-                  formatter={(value, name) => {
-                    if (name === 'count') return [value, 'Frecuencia'];
-                    if (name === 'cumulative') return [`${value}%`, 'Acumulado'];
-                    return [value, name];
-                  }}
-                />
-                <Bar yAxisId="left" dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={50}>
-                  {paretoData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.cumulative <= paretoLimit ? '#ef4444' : '#3b82f6'} />
-                  ))}
-                </Bar>
-                <Line 
-                  yAxisId="right" 
-                  type="monotone" 
-                  dataKey="cumulative" 
-                  stroke="#10b981" 
-                  strokeWidth={3}
-                  dot={{ r: 4, strokeWidth: 2, fill: '#0f172a' }}
-                  activeDot={{ r: 6, strokeWidth: 0, fill: '#10b981' }}
-                />
-                <ReferenceLine yAxisId="right" y={paretoLimit} stroke="#f59e0b" strokeDasharray="3 3" strokeWidth={2} label={{ position: 'top', value: `Límite ${paretoLimit}%`, fill: '#f59e0b', fontSize: 11, fontWeight: 'bold' }} />
-              </ComposedChart>
-            </ResponsiveContainer>
+          <div className="h-[400px] w-full cursor-pointer relative">
+            {paretoData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart
+                  data={paretoData}
+                  margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+                  onClick={(e) => setActiveDetail(e?.activeLabel ? `Detalle: ${e.activeLabel}` : 'pareto')}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }}
+                    dy={10}
+                  />
+                  <YAxis 
+                    yAxisId="left" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }}
+                  />
+                  <YAxis 
+                    yAxisId="right" 
+                    orientation="right" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }}
+                    tickFormatter={(val) => `${val}%`}
+                  />
+                  <Tooltip 
+                    cursor={{ fill: '#f1f5f9', opacity: 0.1 }}
+                    contentStyle={{ 
+                      backgroundColor: '#0f172a', 
+                      borderRadius: '12px',
+                      border: '1px solid #1e293b',
+                      color: '#fff',
+                      fontWeight: 'bold',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
+                    }}
+                    itemStyle={{ fontSize: '12px' }}
+                    formatter={(value, name) => {
+                      if (name === 'count') return [value, 'Frecuencia'];
+                      if (name === 'cumulative') return [`${value}%`, 'Acumulado'];
+                      return [value, name];
+                    }}
+                  />
+                  <Bar yAxisId="left" dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={50}>
+                    {paretoData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.cumulative <= paretoLimit ? '#ef4444' : '#3b82f6'} />
+                    ))}
+                  </Bar>
+                  <Line 
+                    yAxisId="right" 
+                    type="monotone" 
+                    dataKey="cumulative" 
+                    stroke="#10b981" 
+                    strokeWidth={3}
+                    dot={{ r: 4, strokeWidth: 2, fill: '#0f172a' }}
+                    activeDot={{ r: 6, strokeWidth: 0, fill: '#10b981' }}
+                  />
+                  <ReferenceLine yAxisId="right" y={paretoLimit} stroke="#f59e0b" strokeDasharray="3 3" strokeWidth={2} label={{ position: 'top', value: `Límite ${paretoLimit}%`, fill: '#f59e0b', fontSize: 11, fontWeight: 'bold' }} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-sm font-bold text-slate-400">Sin datos de fallas para graficar</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -344,30 +318,36 @@ export default function AnalisisFallas() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-              {paretoData.map((row, index) => (
-                <tr 
-                  key={index} 
-                  className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
-                  onClick={() => setActiveDetail(`Detalle: ${row.name}`)}
-                >
-                  <td className="py-4 px-6 text-center">
-                    <span className={`text-[10px] uppercase tracking-wider font-black px-2.5 py-1 rounded-md ${row.color} bg-current/10 border border-current/20`}>
-                      {row.criticidad}
-                    </span>
-                  </td>
-                  <td className="py-4 px-6 font-bold text-slate-800 dark:text-slate-200">{row.causa}</td>
-                  <td className="py-4 px-6 font-medium text-slate-600 dark:text-slate-400">{row.name}</td>
-                  <td className="py-4 px-6">
-                    <span className="font-bold text-slate-600 dark:text-slate-300">{row.tfs}</span>
-                  </td>
-                  <td className="py-4 px-6">
-                    <span className="font-black text-rose-500 dark:text-rose-400">{row.impacto}%</span>
-                  </td>
-                  <td className="py-4 px-6">
-                    <span className="font-black text-blue-600 dark:text-blue-400">{row.cumulative}%</span>
-                  </td>
+              {paretoData.length > 0 ? (
+                paretoData.map((row, index) => (
+                  <tr 
+                    key={index} 
+                    className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                    onClick={() => setActiveDetail(`Detalle: ${row.name}`)}
+                  >
+                    <td className="py-4 px-6 text-center">
+                      <span className={`text-[10px] uppercase tracking-wider font-black px-2.5 py-1 rounded-md ${row.color} bg-current/10 border border-current/20`}>
+                        {row.criticidad}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6 font-bold text-slate-800 dark:text-slate-200">{row.causa}</td>
+                    <td className="py-4 px-6 font-medium text-slate-600 dark:text-slate-400">{row.name}</td>
+                    <td className="py-4 px-6">
+                      <span className="font-bold text-slate-600 dark:text-slate-300">{row.tfs}</span>
+                    </td>
+                    <td className="py-4 px-6">
+                      <span className="font-black text-rose-500 dark:text-rose-400">{row.impacto}%</span>
+                    </td>
+                    <td className="py-4 px-6">
+                      <span className="font-black text-blue-600 dark:text-blue-400">{row.cumulative}%</span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="py-8 px-6 text-center text-slate-500 dark:text-slate-400 font-medium">Aún no hay fallas registradas en este periodo.</td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

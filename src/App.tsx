@@ -56,16 +56,29 @@ import GestionPausas from './pages/configuracion/GestionPausas';
 import Integraciones from './pages/soporte/Integraciones';
 import CentroAyuda from './pages/soporte/CentroAyuda';
 import ManualUso from './pages/soporte/ManualUso';
+import EstadoPago from './pages/finanzas/EstadoPago';
+import HistorialFacturacion from './pages/finanzas/HistorialFacturacion';
+import Trazabilidad from './pages/finanzas/Trazabilidad';
+import EvaluacionEmpresa from './pages/finanzas/EvaluacionEmpresa';
+import CostosOperacionales from './pages/finanzas/CostosOperacionales';
+import Presupuestos from './pages/finanzas/Presupuestos';
+import CentroRentabilidad from './pages/finanzas/CentroRentabilidad';
 import { ThemeProvider } from './components/ThemeProvider';
 import { CompanyProvider } from './contexts/CompanyContext';
 import { AppProvider } from './context/AppContext';
 
+import Login from './pages/Login';
+
 const router = createBrowserRouter([
+  {
+    path: "/login",
+    element: <Login />
+  },
   {
     path: "/",
     element: <Layout />,
     children: [
-      { index: true, element: <Navigate to="/dashboard" replace /> },
+      { index: true, element: <Navigate to="/login" replace /> },
       { path: "dashboard", element: <Dashboard /> },
       { path: "operaciones/alertas", element: <OperacionesAlertas /> },
       { path: "operaciones/contratos", element: <Contratos /> },
@@ -105,6 +118,12 @@ const router = createBrowserRouter([
       { path: "compras/proveedores", element: <GestionProveedores /> },
       { path: "compras/cotizaciones", element: <Cotizaciones /> },
       { path: "compras/contratos", element: <ContratosProveedores /> },
+      { path: "finanzas/estado-pago", element: <EstadoPago /> },
+      { path: "finanzas/historial-facturacion", element: <HistorialFacturacion /> },
+      { path: "finanzas/costos", element: <CostosOperacionales /> },
+      { path: "finanzas/presupuestos", element: <Presupuestos /> },
+      { path: "finanzas/trazabilidad", element: <Trazabilidad /> },
+      { path: "finanzas/evaluacion-empresa", element: <EvaluacionEmpresa /> },
       { path: "configuracion/precio-combustible", element: <PrecioCombustible /> },
       { path: "logistica/suministros", element: <GestionSuministros /> },
       { path: "logistica/bodegas", element: <GestionBodegas /> },

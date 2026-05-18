@@ -131,10 +131,10 @@ export default function PanelTco() {
 
   // Mock Data
   const kpis = {
-    ingresosTotales: 1547370000,
-    costosTotales: 701243472,
-    utilidadBruta: 846126528,
-    margen: 54.7
+    ingresosTotales: 0,
+    costosTotales: 0,
+    utilidadBruta: 0,
+    margen: 0
   };
 
   const formatCurrency = (value: number) => {
@@ -153,128 +153,15 @@ export default function PanelTco() {
     setTimeout(() => setIsFiltering(false), 600);
   };
 
-  // 1. Desglose Ingresos y Costos
-  const desgloseData = [
-    { name: 'Costos', combustible: 350000000, mantenimiento: 150000000, salarios: 101243472, peajes: 100000000, ingresoContrato: 0, ingresoVariable: 0 },
-    { name: 'Ingresos', combustible: 0, mantenimiento: 0, salarios: 0, peajes: 0, ingresoContrato: 900000000, ingresoVariable: 647370000 },
-  ];
-
-  // 2. Rentabilidad por Vehículo (Top 30 con Brush)
-  const rentabilidadVehiculo = Array.from({ length: 30 }, (_, i) => {
-    const id = i + 1;
-    let ingresoContrato = Math.floor(Math.random() * 4000000) + 1000000;
-    
-    let costoFijo = Math.floor(Math.random() * 800000) + 200000;
-    let combustible = Math.floor(Math.random() * 1500000) + 500000;
-    let neumaticos = Math.floor(Math.random() * 200000) + 50000;
-    let peajes = Math.floor(Math.random() * 300000) + 50000;
-    let lubricantes = Math.floor(Math.random() * 100000) + 20000;
-    let extraordinario = Math.random() > 0.8 ? Math.floor(Math.random() * 200000) : 0;
-    
-    let mttoPreventivo = Math.floor(Math.random() * 400000) + 100000;
-    let mttoCorrectivo = Math.random() > 0.6 ? Math.floor(Math.random() * 600000) : 0;
-    let mttoEvaluativo = Math.random() > 0.7 ? Math.floor(Math.random() * 300000) : 0;
-    
-    // Simulate some huge outliers like the screenshot for realism
-    if (id >= 27 && id <= 30) {
-      ingresoContrato = 16000000000; 
-      combustible = 6000000000;
-      mttoPreventivo = 2000000000;
-    }
-    if (id >= 12 && id <= 26) {
-      ingresoContrato = 4000000000; 
-      combustible = 1500000000;
-      peajes = 500000000;
-      mttoCorrectivo = 0;
-    }
-    if (id >= 5 && id <= 8) {
-      ingresoContrato = 2500000000;
-      mttoEvaluativo = 500000000;
-    }
-    
-    return {
-      name: `${id}`,
-      ingresoContrato,
-      costoFijo,
-      combustible,
-      neumaticos,
-      peajes,
-      lubricantes,
-      extraordinario,
-      mttoPreventivo,
-      mttoCorrectivo,
-      mttoEvaluativo
-    };
-  });
-
-  // 3. Distribución de Costos (Pie)
-  const distribucionCostos = [
-    { name: 'Combustible', value: 350000000, color: '#f59e0b' },
-    { name: 'Mtto. Preventivo', value: 90000000, color: '#10b981' },
-    { name: 'Mtto. Correctivo', value: 60000000, color: '#ef4444' },
-    { name: 'Seguros y Salarios', value: 101243472, color: '#6366f1' },
-    { name: 'Peajes', value: 100000000, color: '#3b82f6' },
-  ];
-
-  // 4. Evolución Mensual
-  const evolucionMensual = [
-    { month: 'Ene', ingresos: 120000000, costos: 55000000 },
-    { month: 'Feb', ingresos: 125000000, costos: 58000000 },
-    { month: 'Mar', ingresos: 135000000, costos: 61000000 },
-    { month: 'Abr', ingresos: 130000000, costos: 59000000 },
-    { month: 'May', ingresos: 140000000, costos: 63000000 },
-    { month: 'Jun', ingresos: 145000000, costos: 60000000 },
-  ];
-
-  // 5. Mantenimiento por Tipo
-  const mantenimientoTipo = [
-    { name: 'Preventivo', value: 90000000, color: '#10b981' },
-    { name: 'Correctivo', value: 60000000, color: '#ef4444' },
-    { name: 'Evaluativo', value: 20000000, color: '#f59e0b' },
-  ];
-
-  // 6. Costo por Km (Promedio Flota) Mensual
-  const costoPorKm = [
-    { month: 'Ene', costo: 850 },
-    { month: 'Feb', costo: 870 },
-    { month: 'Mar', costo: 840 },
-    { month: 'Abr', costo: 890 },
-    { month: 'May', costo: 910 },
-    { month: 'Jun', costo: 880 },
-  ];
-
-  // 7. Margen por Marca
-  const margenMarca = [
-    { name: 'Volvo', margen: 58 },
-    { name: 'Mercedes', margen: 52 },
-    { name: 'Scania', margen: 55 },
-    { name: 'Freightliner', margen: 48 },
-  ];
-
-  // 8. Costos por Ruta
-  const costosRuta = [
-    { name: 'Stgo-Antof', costo: 150000000 },
-    { name: 'Stgo-Conce', costo: 85000000 },
-    { name: 'Valpo-Mdz', costo: 120000000 },
-    { name: 'Arica-Iqq', costo: 45000000 },
-    { name: 'PM-PtaArenas', costo: 95000000 },
-  ];
-
-  // 9. Proyección vs Presupuesto Mensual
-  const proyeccionPresupuesto = [
-    { month: 'Ene', real: 55000000, presupuesto: 50000000 },
-    { month: 'Feb', real: 58000000, presupuesto: 52000000 },
-    { month: 'Mar', real: 61000000, presupuesto: 60000000 },
-    { month: 'Abr', real: 59000000, presupuesto: 60000000 },
-    { month: 'May', real: 63000000, presupuesto: 61000000 },
-    { month: 'Jun', real: 60000000, presupuesto: 62000000 },
-    { month: 'Jul', real: 0, presupuesto: 62000000 },
-    { month: 'Ago', real: 0, presupuesto: 64000000 },
-    { month: 'Sep', real: 0, presupuesto: 65000000 },
-    { month: 'Oct', real: 0, presupuesto: 63000000 },
-    { month: 'Nov', real: 0, presupuesto: 65000000 },
-    { month: 'Dic', real: 0, presupuesto: 68000000 },
-  ];
+  const desgloseData: any[] = [];
+  const rentabilidadVehiculo: any[] = [];
+  const distribucionCostos: any[] = [];
+  const evolucionMensual: any[] = [];
+  const mantenimientoTipo: any[] = [];
+  const costoPorKm: any[] = [];
+  const margenMarca: any[] = [];
+  const costosRuta: any[] = [];
+  const proyeccionPresupuesto: any[] = [];
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {

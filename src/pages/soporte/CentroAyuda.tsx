@@ -4,53 +4,7 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import Swal from 'sweetalert2';
 
-const MOCK_TICKETS = [
-  {
-    id: '#TKT-2026-1024',
-    title: 'Error al sincronizar datos de GPS',
-    description: 'El kilometraje del vehículo 101 no se actualiza en el panel de control desde ayer.',
-    status: 'ABIERTO',
-    priority: 'ALTA',
-    category: 'INTEGRACIÓN',
-    user: 'Juan Perez',
-    empresa: 'Minera Norte S.A.',
-    date: '2026-05-15T09:15:00',
-    messages: [
-      { sender: 'Juan Perez', type: 'client', text: 'El kilometraje del vehículo 101 no se actualiza en el panel de control desde ayer.', date: '2026-05-15T09:15:00' }
-    ]
-  },
-  {
-    id: '#TKT-2026-1022',
-    title: 'Solicitud para nuevo contrato',
-    description: 'Necesitamos habilitar el módulo de contratos para el proyecto Alpha.',
-    status: 'EN PROCESO',
-    priority: 'MEDIA',
-    category: 'ADMINISTRATIVO',
-    user: 'Maria Vega',
-    empresa: 'Constructora Beta',
-    date: '2026-05-14T10:00:00',
-    messages: [
-      { sender: 'Maria Vega', type: 'client', text: 'Necesitamos habilitar el módulo de contratos para el proyecto Alpha. Quedo atenta.', date: '2026-05-14T10:00:00' },
-      { sender: 'Soporte', type: 'agent', text: 'Hola Maria, hemos recibido su solicitud y la estamos derivando al área comercial.', date: '2026-05-14T11:30:00' }
-    ]
-  },
-  {
-    id: '#TKT-2026-1015',
-    title: 'Error al descargar reportes PDF',
-    description: 'Al intentar descargar el reporte de mantenimiento la página se queda cargando.',
-    status: 'RESUELTO',
-    priority: 'CRITICA',
-    category: 'FALLA TÉCNICA',
-    user: 'Carlos Ruiz',
-    empresa: 'Transportes Gamma',
-    date: '2026-05-10T16:45:00',
-    messages: [
-      { sender: 'Carlos Ruiz', type: 'client', text: 'Al intentar descargar el reporte de mantenimiento la página se queda cargando y lanza error 500.', date: '2026-05-10T16:45:00' },
-      { sender: 'Soporte', type: 'agent', text: 'Hola Carlos. Hemos aplicado un parche al módulo de generación de PDFs. Por favor intente nuevamente.', date: '2026-05-11T09:20:00' },
-      { sender: 'Carlos Ruiz', type: 'client', text: 'Confirmado, el problema está solucionado. Gracias.', date: '2026-05-11T10:05:00' }
-    ]
-  },
-];
+const MOCK_TICKETS: any[] = [];
 
 const EMPRESAS_MOCK = ['Todas', 'Minera Norte S.A.', 'Constructora Beta', 'Transportes Gamma'];
 

@@ -16,37 +16,14 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, Legend
 } from 'recharts';
 
-const dataTendencia = [
-  { name: 'Ene', value: 88 },
-  { name: 'Feb', value: 92 },
-  { name: 'Mar', value: 90 },
-  { name: 'Abr', value: 95 },
-  { name: 'May', value: 93 },
-  { name: 'Jun', value: 94 },
-];
+const dataTendencia: any[] = [];
 
-const dataEstrategia = [
-  { name: 'Preventivo', value: 72 },
-  { name: 'Correctivo', value: 28 },
-];
+const dataEstrategia: any[] = [];
 const COLORS = ['#3b82f6', '#ef4444']; 
 
-const dataCostos = [
-  { name: 'Ene', corr: 2500, prev: 4100 },
-  { name: 'Feb', corr: 1500, prev: 3000 },
-  { name: 'Mar', corr: 5000, prev: 2400 },
-  { name: 'Abr', corr: 4000, prev: 2800 },
-  { name: 'May', corr: 5000, prev: 2000 },
-  { name: 'Jun', corr: 2800, prev: 3400 },
-];
+const dataCostos: any[] = [];
 
-const dataCuellos = [
-  { name: 'Otros', value: 10 },
-  { name: 'Aprobación Ppto', value: 15 },
-  { name: 'Falta Mano Obra', value: 35 },
-  { name: 'Taller Externo', value: 65 },
-  { name: 'Falta Repuestos', value: 95 },
-];
+const dataCuellos: any[] = [];
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -60,13 +37,7 @@ export default function Dashboard() {
   const [cuellosData, setCuellosData] = useState(dataCuellos);
 
   const handleFilter = () => {
-    // Simulate filtering by randomly slightly modifying values 
-    // to give feedback that filtering worked.
-    const factor = Math.random() * 0.2 + 0.9; // 0.9 - 1.1
-    setTendenciaData(dataTendencia.map(d => ({ ...d, value: Math.min(100, Math.round(d.value * factor)) })));
-    setCostosData(dataCostos.map(d => ({ ...d, corr: Math.round(d.corr * factor), prev: Math.round(d.prev * (2 - factor)) })));
-    setEstrategiaData(dataEstrategia.map(d => ({ ...d, value: Math.round(d.value * (Math.random() * 0.4 + 0.8)) })));
-    setCuellosData(dataCuellos.map(d => ({ ...d, value: Math.round(d.value * (Math.random() * 0.5 + 0.7)) })));
+    // Implementar lógica de filtrado real aquí
   };
 
   const currentHour = new Date().getHours();
@@ -131,15 +102,14 @@ export default function Dashboard() {
           <div className="flex justify-between items-start">
             <div className="flex flex-col">
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Disponibilidad Flota</span>
-              <span className="text-2xl font-bold text-slate-800 dark:text-white mt-1">94.2%</span>
+              <span className="text-2xl font-bold text-slate-800 dark:text-white mt-1">0.0%</span>
             </div>
             <div className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 p-2 rounded-lg">
               <CheckCircle2 className="w-5 h-5" />
             </div>
           </div>
-          <div className="flex items-center text-xs font-medium text-emerald-600 dark:text-emerald-400">
-            <ArrowUpRight className="w-3.5 h-3.5 mr-1" />
-            2.1% <span className="text-slate-400 dark:text-slate-500 font-normal ml-1">vs mes anterior</span>
+          <div className="flex items-center text-xs font-medium text-slate-400 dark:text-slate-500">
+            <span className="font-normal ml-1">Sin datos históricos</span>
           </div>
         </div>
 
@@ -151,15 +121,14 @@ export default function Dashboard() {
           <div className="flex justify-between items-start">
             <div className="flex flex-col">
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Cumplimiento Prev.</span>
-              <span className="text-2xl font-bold text-slate-800 dark:text-white mt-1">87.5%</span>
+              <span className="text-2xl font-bold text-slate-800 dark:text-white mt-1">0.0%</span>
             </div>
             <div className="bg-blue-50 dark:bg-blue-500/10 text-blue-500 dark:text-blue-400 p-2 rounded-lg">
               <ClipboardCheck className="w-5 h-5" />
             </div>
           </div>
-          <div className="flex items-center text-xs font-medium text-emerald-600 dark:text-emerald-400">
-            <ArrowUpRight className="w-3.5 h-3.5 mr-1" />
-            1.5% <span className="text-slate-400 dark:text-slate-500 font-normal ml-1">vs mes anterior</span>
+          <div className="flex items-center text-xs font-medium text-slate-400 dark:text-slate-500">
+            <span className="font-normal ml-1">Sin datos recientes</span>
           </div>
         </div>
 
@@ -171,15 +140,14 @@ export default function Dashboard() {
           <div className="flex justify-between items-start">
             <div className="flex flex-col">
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Gasto Mensual</span>
-              <span className="text-2xl font-bold text-slate-800 dark:text-white mt-1">$ 8.4M</span>
+              <span className="text-2xl font-bold text-slate-800 dark:text-white mt-1">$ 0</span>
             </div>
             <div className="bg-amber-50 dark:bg-amber-500/10 text-amber-500 dark:text-amber-400 p-2 rounded-lg">
               <DollarSign className="w-5 h-5" />
             </div>
           </div>
-          <div className="flex items-center text-xs font-medium text-rose-500 dark:text-rose-400">
-            <ArrowDownRight className="w-3.5 h-3.5 mr-1" />
-            5.4% <span className="text-slate-400 dark:text-slate-500 font-normal ml-1">vs mes anterior</span>
+          <div className="flex items-center text-xs font-medium text-slate-400 dark:text-slate-500">
+            <span className="font-normal ml-1">Esperando registros</span>
           </div>
         </div>
 
@@ -191,15 +159,14 @@ export default function Dashboard() {
           <div className="flex justify-between items-start">
             <div className="flex flex-col">
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Alertas Críticas</span>
-              <span className="text-2xl font-bold text-slate-800 dark:text-white mt-1">2</span>
+              <span className="text-2xl font-bold text-slate-800 dark:text-white mt-1">0</span>
             </div>
             <div className="bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400 p-2 rounded-lg">
               <AlertTriangle className="w-5 h-5" />
             </div>
           </div>
-          <div className="flex items-center text-xs font-medium text-rose-500 dark:text-rose-400">
-            <ArrowDownRight className="w-3.5 h-3.5 mr-1" />
-            2 veh <span className="text-slate-400 dark:text-slate-500 font-normal ml-1">vs mes anterior</span>
+          <div className="flex items-center text-xs font-medium text-slate-400 dark:text-slate-500">
+            <span className="font-normal ml-1">Todo en orden normal</span>
           </div>
         </div>
       </div>
@@ -261,7 +228,7 @@ export default function Dashboard() {
                 <div className="w-2.5 h-2.5 rounded-full bg-rose-400 dark:bg-rose-500"></div>
                 <span className="font-semibold text-rose-700 dark:text-rose-400">Vencidos</span>
               </div>
-              <span className="text-xl font-bold text-rose-700 dark:text-rose-400">3</span>
+              <span className="text-xl font-bold text-rose-700 dark:text-rose-400">0</span>
             </div>
             
             <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20 rounded-lg p-4 flex justify-between items-center">
@@ -277,7 +244,7 @@ export default function Dashboard() {
                 <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 dark:bg-emerald-500"></div>
                 <span className="font-semibold text-emerald-700 dark:text-emerald-400">Al Día</span>
               </div>
-              <span className="text-xl font-bold text-emerald-700 dark:text-emerald-400">19</span>
+              <span className="text-xl font-bold text-emerald-700 dark:text-emerald-400">0</span>
             </div>
           </div>
         </div>
@@ -313,8 +280,14 @@ export default function Dashboard() {
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-2xl font-bold text-slate-800 dark:text-white">{Math.round((estrategiaData[0].value / (estrategiaData[0].value + estrategiaData[1].value)) * 100)}%</span>
-              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{estrategiaData[0].name}</span>
+              {estrategiaData.length > 0 ? (
+                <>
+                  <span className="text-2xl font-bold text-slate-800 dark:text-white">{Math.round((estrategiaData[0].value / (estrategiaData[0].value + estrategiaData[1].value)) * 100)}%</span>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{estrategiaData[0].name}</span>
+                </>
+              ) : (
+                <span className="text-sm font-bold text-slate-400">Sin datos</span>
+              )}
             </div>
           </div>
           <div className="flex justify-center gap-6 mt-2">

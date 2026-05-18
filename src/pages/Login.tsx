@@ -1,0 +1,157 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Building2, Lock, User, ArrowRight, ShieldCheck, Zap, BarChart3 } from 'lucide-react';
+import { Card, CardContent } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Badge } from '../components/ui/Badge';
+
+export default function Login() {
+  const [rut, setRut] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    // Simular autenticación
+    setTimeout(() => {
+      setIsLoading(false);
+      navigate('/dashboard');
+    }, 1000);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-900 flex">
+      {/* Columna Izquierda: Formulario de Login */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 relative overflow-hidden">
+        {/* Adornos sutiles */}
+        <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-500/20 blur-[100px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-fuchsia-500/10 blur-[100px] rounded-full pointer-events-none" />
+
+        <div className="w-full max-w-md relative z-10">
+          <div className="mb-10">
+            <div className="flex items-center gap-3 mb-8">
+              <div className="bg-indigo-600 p-2.5 rounded-xl shadow-lg shadow-indigo-500/30">
+                <Building2 className="w-8 h-8 text-white" />
+              </div>
+              <span className="text-3xl font-black text-white tracking-tight">PULSER<span className="text-indigo-400">.</span></span>
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-2">Ingresa a tu cuenta</h1>
+            <p className="text-slate-400 text-lg">La plataforma todo-en-uno para gestionar y escalar tu empresa de transporte.</p>
+          </div>
+
+          <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 shadow-2xl rounded-2xl">
+            <div className="p-8">
+              <form onSubmit={handleLogin} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-300 uppercase tracking-wider">RUT de Empresa o Usuario</label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <User className="h-5 w-5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                    </div>
+                    <input
+                      type="text"
+                      value={rut}
+                      onChange={(e) => setRut(e.target.value)}
+                      placeholder="Ej: 76.123.456-7"
+                      className="block w-full pl-10 pr-3 py-3 border border-slate-600 rounded-xl bg-slate-900/50 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-medium"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-bold text-slate-300 uppercase tracking-wider">Contraseña</label>
+                    <a href="#" className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-colors">¿Olvidaste tu contraseña?</a>
+                  </div>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                    </div>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="block w-full pl-10 pr-3 py-3 border border-slate-600 rounded-xl bg-slate-900/50 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-medium"
+                      placeholder="••••••••"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-indigo-600/30 group text-lg mt-4"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <span className="flex items-center justify-center">
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                      Validando credenciales...
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center">
+                      Iniciar Sesión <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </span>
+                  )}
+                </Button>
+              </form>
+            </div>
+          </div>
+          
+          <div className="mt-8 text-center bg-slate-800/30 p-4 rounded-xl border border-slate-700/30">
+            <p className="text-sm text-slate-400">¿Tienes problemas para ingresar? <br/>Contacta a <a href="mailto:gavalos@gavalconsultora.cl" className="text-indigo-400 font-medium hover:underline">gavalos@gavalconsultora.cl</a> o habla con tu administrador.</p>
+          </div>
+        </div>
+      </div>
+      
+      {/* Columna Derecha: Hero Area */}
+      <div className="hidden lg:flex w-1/2 bg-slate-800 relative items-center justify-center overflow-hidden">
+         {/* Fondo animado/decorativo */}
+         <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-slate-800 to-indigo-950 opacity-90" />
+         <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.05) 1px, transparent 0)', backgroundSize: '24px 24px' }}></div>
+         
+         <div className="relative z-10 w-full max-w-lg p-12 text-white">
+            <Badge className="bg-indigo-500/20 text-indigo-300 border-indigo-500/30 px-3 py-1 text-sm mb-6 inline-flex items-center gap-2">
+               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Sistema En Línea
+            </Badge>
+            <h2 className="text-4xl w-full font-black mb-6 leading-tight">El control total de tu flota y rentabilidad en tiempo real.</h2>
+            
+            <div className="space-y-6 mt-10">
+               <div className="flex gap-4 items-start">
+                  <div className="bg-emerald-500/20 p-3 rounded-lg mt-1">
+                     <ShieldCheck className="w-6 h-6 text-emerald-400" />
+                  </div>
+                  <div>
+                     <h3 className="text-xl font-bold text-white mb-1">Entorno Multi-Tenancy Seguro</h3>
+                     <p className="text-slate-300 text-sm leading-relaxed">Tus datos están aislados y encriptados. Cada RUT tiene su propio ecosistema de operaciones y finanzas.</p>
+                  </div>
+               </div>
+               
+               <div className="flex gap-4 items-start">
+                  <div className="bg-amber-500/20 p-3 rounded-lg mt-1">
+                     <Zap className="w-6 h-6 text-amber-400" />
+                  </div>
+                  <div>
+                     <h3 className="text-xl font-bold text-white mb-1">Operación Sin Barreras</h3>
+                     <p className="text-slate-300 text-sm leading-relaxed">Desde el despacho hasta la conciliación bancaria. Todo automatizado y centralizado.</p>
+                  </div>
+               </div>
+               
+               <div className="flex gap-4 items-start">
+                  <div className="bg-sky-500/20 p-3 rounded-lg mt-1">
+                     <BarChart3 className="w-6 h-6 text-sky-400" />
+                  </div>
+                  <div>
+                     <h3 className="text-xl font-bold text-white mb-1">Decisiones Inteligentes</h3>
+                     <p className="text-slate-300 text-sm leading-relaxed">Analíticas avanzadas y trazabilidad integral para detectar sobrecostos y mejorar la rentabilidad mes a mes.</p>
+                  </div>
+               </div>
+            </div>
+         </div>
+      </div>
+    </div>
+  );
+}

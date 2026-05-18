@@ -5,52 +5,8 @@ import { Upload, FileText, FileCheck, FileWarning, Download, UserPlus, Truck, Sh
 import { exportToExcel } from '../../lib/excelExport';
 
 // --- MOCK DATA ---
-const INITIAL_DRIVERS = [
-  {
-    id: 'D1', nombre: 'Conductor 1', rut: '10.234.567-0', cargo: 'Conductor Interno Mina',
-    tipoLicencia: 'A3', vencimientoLicencia: '2027-05-15', vencimientoSalud: '2026-10-10', vacaciones: 'Al día',
-    documentos: [
-      { id: 'doc1', nombre: 'Licencia de Conducir', tipo: 'licencia', fechaVencimiento: '2027-05-15', estado: 'vigente' },
-      { id: 'doc2', nombre: 'Examen Preocupacional', tipo: 'salud', fechaVencimiento: '2026-10-10', estado: 'vigente' },
-    ]
-  },
-  {
-    id: 'D2', nombre: 'Conductor 2', rut: '11.234.567-1', cargo: 'Conductor Interprovincial',
-    tipoLicencia: 'A2', vencimientoLicencia: '2027-05-15', vencimientoSalud: '2026-11-20', vacaciones: 'Al día',
-    documentos: []
-  },
-  {
-    id: 'D3', nombre: 'Conductor 4', rut: '13.234.567-3', cargo: 'Conductor Interno Mina',
-    tipoLicencia: 'A5', vencimientoLicencia: '2025-01-01', vencimientoSalud: '2026-08-01', vacaciones: 'Vencidas',
-    documentos: [
-      { id: 'doc3', nombre: 'Licencia de Conducir', tipo: 'licencia', fechaVencimiento: '2025-01-01', estado: 'vencido' }
-    ]
-  },
-];
-
-const INITIAL_VEHICLES = [
-  {
-    id: 'V1', patente: 'AB-CD-10', tipo: 'Camion', anio: 2020,
-    vencimientoRev: '2026-11-30', vencimientoSeguro: '2026-12-15', 
-    kmActual: 100000, kmProximo: 150000,
-    documentos: [
-      { id: 'doc1', nombre: 'Revisión Técnica', tipo: 'revision', fechaVencimiento: '2026-11-30', estado: 'vigente' },
-      { id: 'doc2', nombre: 'Seguro Obligatorio', tipo: 'seguro', fechaVencimiento: '2026-12-15', estado: 'vigente' },
-    ]
-  },
-  {
-    id: 'V2', patente: 'AB-CD-11', tipo: 'Bus', anio: 2019,
-    vencimientoRev: '2026-11-30', vencimientoSeguro: '2027-01-10', 
-    kmActual: 105000, kmProximo: 160000,
-    documentos: []
-  },
-  {
-    id: 'V3', patente: 'AB-CD-15', tipo: 'Bus', anio: 2005,
-    vencimientoRev: '2026-11-30', vencimientoSeguro: '2026-10-01', 
-    kmActual: 125000, kmProximo: 200000,
-    documentos: []
-  },
-];
+const INITIAL_DRIVERS: any[] = [];
+const INITIAL_VEHICLES: any[] = [];
 
 export default function ControlDocumental() {
   const [activeTab, setActiveTab] = useState<'conductores' | 'vehiculos'>('conductores');

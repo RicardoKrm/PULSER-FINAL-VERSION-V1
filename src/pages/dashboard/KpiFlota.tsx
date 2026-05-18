@@ -7,75 +7,19 @@ import {
 } from 'recharts';
 
 // Mock Data
-const badActors = [
-  { id: 1, v: 'VEHÍCULO 10', name: 'DEMO10', cost: '$1 584 969', mtbf: '1296,0H', c: '98,1%' },
-  { id: 2, v: 'VEHÍCULO 28', name: 'DEMO28', cost: '$968 621', mtbf: '3 888,0H', c: '99,4%' },
-  { id: 3, v: 'VEHÍCULO 29', name: 'DEMO29', cost: '$565 010', mtbf: '3 888,0H', c: '99,4%' },
-  { id: 4, v: 'VEHÍCULO 1', name: 'DEMO01', cost: '$485 368', mtbf: '972,0H', c: '97,5%' },
-  { id: 5, v: 'VEHÍCULO 12', name: 'DEMO12', cost: '$421 617', mtbf: '1 296,0H', c: '98,1%' },
-];
+const badActors: any[] = [];
 
-const dispMensualData = [
-  { name: 'Dec 2025', disp: 100 },
-  { name: 'Jan 2026', disp: 100 },
-  { name: 'Feb 2026', disp: 100 },
-  { name: 'Mar 2026', disp: 100 },
-  { name: 'Apr 2026', disp: 100 },
-  { name: 'May 2026', disp: 100 },
-];
+const dispMensualData: any[] = [];
 
-const confMensualData = [
-  { name: 'Dec 2025', conf: 100 },
-  { name: 'Jan 2026', conf: 100 },
-  { name: 'Feb 2026', conf: 100 },
-  { name: 'Mar 2026', conf: 98.3 },
-  { name: 'Apr 2026', conf: 100 },
-  { name: 'May 2026', conf: 100 },
-];
+const confMensualData: any[] = [];
 
-const motivosPausaData = [
-  { name: 'Falta de Máquina...', count: 2.0 },
-  { name: 'Falta de Conductor', count: 1.0 },
-  { name: 'Falta de Repuesto...', count: 1.0 },
-  { name: 'Falta de Técnico...', count: 1.0 },
-];
+const motivosPausaData: any[] = [];
 
-const dispVsConfData = [
-  { name: 'Dec 2025', disp: 100, conf: 100 },
-  { name: 'Jan 2026', disp: 100, conf: 100 },
-  { name: 'Feb 2026', disp: 100, conf: 100 },
-  { name: 'Mar 2026', disp: 100, conf: 98.3 },
-  { name: 'Apr 2026', disp: 100, conf: 100 },
-  { name: 'May 2026', disp: 100, conf: 100 },
-];
+const dispVsConfData: any[] = [];
 
-const detailsData = [
-  { id: 1, v: 'V-10 (DEMO10)', mtbf: '1296h', conf: '98.1%' },
-  { id: 2, v: 'V-28 (DEMO28)', mtbf: '3888h', conf: '99.4%' },
-  { id: 3, v: 'V-29 (DEMO29)', mtbf: '3888h', conf: '99.4%' },
-  { id: 4, v: 'V-1 (DEMO01)', mtbf: '972h', conf: '97.5%' },
-  { id: 5, v: 'V-12 (DEMO12)', mtbf: '1296h', conf: '98.1%' },
-  { id: 6, v: 'V-4 (DEMO04)', mtbf: '3888h', conf: '99.4%' },
-  { id: 7, v: 'V-3 (DEMO03)', mtbf: '3888h', conf: '99.4%' },
-  { id: 8, v: 'V-8 (DEMO08)', mtbf: '3888h', conf: '99.4%' },
-  { id: 9, v: 'V-13 (DEMO13)', mtbf: '3888h', conf: '99.4%' },
-  { id: 10, v: 'V-17 (DEMO17)', mtbf: '3888h', conf: '99.4%' },
-];
+const detailsData: any[] = [];
 
-const rankingData = [
-  { id: 1, v: 'V-10', prev: 2, corr: 1, eva: 0, cost: '$1.584.969' },
-  { id: 2, v: 'V-28', prev: 1, corr: 0, eva: 0, cost: '$968.621' },
-  { id: 3, v: 'V-29', prev: 1, corr: 0, eva: 0, cost: '$565.010' },
-  { id: 4, v: 'V-1', prev: 1, corr: 2, eva: 1, cost: '$485.368' },
-  { id: 5, v: 'V-12', prev: 2, corr: 1, eva: 0, cost: '$421.617' },
-  { id: 6, v: 'V-4', prev: 1, corr: 0, eva: 0, cost: '$350.020' },
-  { id: 7, v: 'V-3', prev: 1, corr: 0, eva: 0, cost: '$294.763' },
-  { id: 8, v: 'V-8', prev: 0, corr: 1, eva: 0, cost: '$172.993' },
-  { id: 9, v: 'V-13', prev: 1, corr: 0, eva: 0, cost: '$159.202' },
-  { id: 10, v: 'V-17', prev: 0, corr: 1, eva: 0, cost: '$132.532' },
-  { id: 11, v: 'V-30', prev: 1, corr: 0, eva: 0, cost: '$60.451' },
-  { id: 12, v: 'V-9', prev: 1, corr: 0, eva: 0, cost: '$0' },
-];
+const rankingData: any[] = [];
 
 export default function KpiFlota() {
   const [activeDetail, setActiveDetail] = useState<string | null>(null);
@@ -117,13 +61,19 @@ export default function KpiFlota() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {detailsData.map((row) => (
-                    <tr key={row.id}>
-                      <td className="py-3 font-bold text-slate-700 dark:text-slate-300">{row.v}</td>
-                      <td className="py-3 text-right font-medium text-slate-600 dark:text-slate-400">720h</td>
-                      <td className="py-3 text-right font-bold text-emerald-500">{(95 + Math.random() * 5).toFixed(1)}%</td>
+                  {detailsData.length > 0 ? (
+                    detailsData.map((row) => (
+                      <tr key={row.id}>
+                        <td className="py-3 font-bold text-slate-700 dark:text-slate-300">{row.v}</td>
+                        <td className="py-3 text-right font-medium text-slate-600 dark:text-slate-400">720h</td>
+                        <td className="py-3 text-right font-bold text-emerald-500">{(95 + Math.random() * 5).toFixed(1)}%</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={3} className="py-6 text-center text-slate-500 text-xs font-medium">Sin datos registrados</td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
@@ -164,13 +114,19 @@ export default function KpiFlota() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {detailsData.map((row) => (
-                    <tr key={row.id}>
-                      <td className="py-3 px-2 font-bold text-slate-700 dark:text-slate-300">{row.v}</td>
-                      <td className="py-3 px-2 text-right font-bold text-purple-600 dark:text-purple-400">{row.mtbf}</td>
-                      <td className="py-3 px-2 text-right font-bold text-emerald-500">{row.conf}</td>
+                  {detailsData.length > 0 ? (
+                    detailsData.map((row) => (
+                      <tr key={row.id}>
+                        <td className="py-3 px-2 font-bold text-slate-700 dark:text-slate-300">{row.v}</td>
+                        <td className="py-3 px-2 text-right font-bold text-purple-600 dark:text-purple-400">{row.mtbf}</td>
+                        <td className="py-3 px-2 text-right font-bold text-emerald-500">{row.conf}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={3} className="py-6 text-center text-slate-500 text-xs font-medium">Sin datos registrados</td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
@@ -211,16 +167,22 @@ export default function KpiFlota() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {detailsData.map((row) => {
-                    const prev = Math.floor(70 + Math.random() * 30);
-                    return (
-                      <tr key={row.id}>
-                        <td className="py-3 px-2 font-bold text-slate-700 dark:text-slate-300">{row.v}</td>
-                        <td className="py-3 px-2 text-right font-bold text-blue-500 dark:text-blue-400">{prev}%</td>
-                        <td className="py-3 px-2 text-right font-bold text-rose-500 dark:text-rose-400">{100 - prev}%</td>
-                      </tr>
-                    );
-                  })}
+                  {detailsData.length > 0 ? (
+                    detailsData.map((row) => {
+                      const prev = Math.floor(70 + Math.random() * 30);
+                      return (
+                        <tr key={row.id}>
+                          <td className="py-3 px-2 font-bold text-slate-700 dark:text-slate-300">{row.v}</td>
+                          <td className="py-3 px-2 text-right font-bold text-blue-500 dark:text-blue-400">{prev}%</td>
+                          <td className="py-3 px-2 text-right font-bold text-rose-500 dark:text-rose-400">{100 - prev}%</td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={3} className="py-6 text-center text-slate-500 text-xs font-medium">Sin datos registrados</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -262,20 +224,26 @@ export default function KpiFlota() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {detailsData.map((row) => {
-                    // Simular cálculo real
-                    const mtbfParsed = parseFloat(row.mtbf.replace('h','')) || 1000;
-                    const c = Math.exp(-24 / mtbfParsed);
-                    const formattedConf = (c * 100).toFixed(1) + '%';
-                    
-                    return (
-                      <tr key={row.id}>
-                        <td className="py-3 px-2 font-bold text-slate-700 dark:text-slate-300">{row.v}</td>
-                        <td className="py-3 px-2 text-right font-bold text-purple-500 dark:text-purple-400">{mtbfParsed}h</td>
-                        <td className="py-3 px-2 text-right font-bold text-emerald-500">{formattedConf}</td>
-                      </tr>
-                    );
-                  })}
+                  {detailsData.length > 0 ? (
+                    detailsData.map((row) => {
+                      // Simular cálculo real
+                      const mtbfParsed = parseFloat(row.mtbf.replace('h','')) || 1000;
+                      const c = Math.exp(-24 / mtbfParsed);
+                      const formattedConf = (c * 100).toFixed(1) + '%';
+                      
+                      return (
+                        <tr key={row.id}>
+                          <td className="py-3 px-2 font-bold text-slate-700 dark:text-slate-300">{row.v}</td>
+                          <td className="py-3 px-2 text-right font-bold text-purple-500 dark:text-purple-400">{mtbfParsed}h</td>
+                          <td className="py-3 px-2 text-right font-bold text-emerald-500">{formattedConf}</td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={3} className="py-6 text-center text-slate-500 text-xs font-medium">Sin datos registrados</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -318,15 +286,21 @@ export default function KpiFlota() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {rankingData.map((row) => (
-                    <tr key={row.id}>
-                      <td className="py-3 px-2 font-bold text-slate-700 dark:text-slate-300">{row.v}</td>
-                      <td className="py-3 px-2 text-center font-bold text-slate-600 dark:text-slate-400">{row.prev}</td>
-                      <td className="py-3 px-2 text-center font-bold text-slate-600 dark:text-slate-400">{row.corr}</td>
-                      <td className="py-3 px-2 text-center font-bold text-slate-600 dark:text-slate-400">{row.eva}</td>
-                      <td className="py-3 px-2 text-right font-bold text-rose-600 dark:text-rose-400">{row.cost}</td>
+                  {rankingData.length > 0 ? (
+                    rankingData.map((row) => (
+                      <tr key={row.id}>
+                        <td className="py-3 px-2 font-bold text-slate-700 dark:text-slate-300">{row.v}</td>
+                        <td className="py-3 px-2 text-center font-bold text-slate-600 dark:text-slate-400">{row.prev}</td>
+                        <td className="py-3 px-2 text-center font-bold text-slate-600 dark:text-slate-400">{row.corr}</td>
+                        <td className="py-3 px-2 text-center font-bold text-slate-600 dark:text-slate-400">{row.eva}</td>
+                        <td className="py-3 px-2 text-right font-bold text-rose-600 dark:text-rose-400">{row.cost}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="py-6 text-center text-slate-500 text-xs font-medium">Sin datos registrados</td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
@@ -377,12 +351,9 @@ export default function KpiFlota() {
               
               <div className="space-y-3">
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 mt-6">Desglose de Datos Recientes</h4>
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="flex justify-between items-center p-3 border border-slate-100 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900/50">
-                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Registro {5 - i}</span>
-                    <span className="text-xs font-black text-blue-600 dark:text-blue-400">{Math.floor(Math.random() * 100)} pts</span>
-                  </div>
-                ))}
+                <div className="p-4 text-center border border-slate-100 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900/50">
+                  <span className="text-xs font-medium text-slate-500">Sin datos registrados</span>
+                </div>
               </div>
             </div>
           </>
@@ -455,7 +426,7 @@ export default function KpiFlota() {
           >
             <h3 className="text-xs font-extrabold text-blue-500 uppercase tracking-widest mb-3">Disponibilidad Física</h3>
             <div className="flex items-end gap-3 mb-2">
-              <span className="text-4xl font-black text-emerald-500 dark:text-emerald-400">99,5%</span>
+              <span className="text-4xl font-black text-emerald-500 dark:text-emerald-400">0,0%</span>
               <BarChart3 className="w-6 h-6 text-slate-300 dark:text-slate-600 mb-1" />
             </div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Meta Global {'>'} 90%</p>
@@ -467,7 +438,7 @@ export default function KpiFlota() {
           >
             <h3 className="text-xs font-extrabold text-purple-500 uppercase tracking-widest mb-3">MTBF (Confiabilidad)</h3>
             <div className="flex items-end gap-3 mb-2">
-              <span className="text-4xl font-black text-slate-800 dark:text-slate-100">6 138,9 hrs</span>
+              <span className="text-4xl font-black text-slate-800 dark:text-slate-100">0 hrs</span>
               <History className="w-5 h-5 text-slate-300 dark:text-slate-600 mb-1" />
             </div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tiempo medio entre eventos</p>
@@ -480,13 +451,13 @@ export default function KpiFlota() {
             <h3 className="text-xs font-extrabold text-orange-500 uppercase tracking-widest mb-1">Mix Gasto (70/30)</h3>
             <div className="flex items-center justify-between relative mt-2 mb-2">
               <div className="space-y-1">
-                <div className="text-sm font-black text-blue-500">PREV: 100,0%</div>
+                <div className="text-sm font-black text-blue-500">PREV: 0,0%</div>
                 <div className="text-sm font-black text-rose-500">CORR: 0,0%</div>
               </div>
               <div className="w-12 h-12 relative flex-shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={[{ value: 100 }]} innerRadius="60%" outerRadius="100%" dataKey="value" stroke="none">
+                    <Pie data={[]} innerRadius="60%" outerRadius="100%" dataKey="value" stroke="none">
                       <Cell fill="#3b82f6" />
                     </Pie>
                   </PieChart>
@@ -502,7 +473,7 @@ export default function KpiFlota() {
           >
             <h3 className="text-xs font-extrabold text-teal-500 uppercase tracking-widest mb-3">Confiabilidad de Misión</h3>
             <div className="flex items-end gap-3 mb-2">
-              <span className="text-4xl font-black text-emerald-500 dark:text-emerald-400">99,6%</span>
+              <span className="text-4xl font-black text-emerald-500 dark:text-emerald-400">0,0%</span>
               <Shield className="w-5 h-5 text-slate-300 dark:text-slate-600 mb-1" />
             </div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Probabilidad éxito 24h</p>
@@ -517,7 +488,7 @@ export default function KpiFlota() {
             <div className="h-40 w-full mb-4">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={[{ name: 'Prev', value: 95 }, { name: 'Corr', value: 5 }]} innerRadius="60%" outerRadius="90%" dataKey="value" stroke="none" startAngle={90} endAngle={-270}>
+                  <Pie data={[]} innerRadius="60%" outerRadius="90%" dataKey="value" stroke="none" startAngle={90} endAngle={-270}>
                     <Cell fill="#38bdf8" />
                     <Cell fill="#fb7185" />
                   </Pie>
@@ -536,7 +507,7 @@ export default function KpiFlota() {
             <div className="h-40 w-full mb-4">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={[{ name: 'OK', value: 80 }, { name: 'Pend', value: 20 }]} innerRadius="60%" outerRadius="90%" dataKey="value" stroke="none" startAngle={90} endAngle={-270}>
+                  <Pie data={[]} innerRadius="60%" outerRadius="90%" dataKey="value" stroke="none" startAngle={90} endAngle={-270}>
                     <Cell fill="#10b981" />
                     <Cell fill="#f1f5f9" />
                   </Pie>
@@ -555,7 +526,7 @@ export default function KpiFlota() {
             <div className="h-40 w-full mb-4">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={[{ name: 'OK', value: 100 }, { name: 'Pend', value: 0 }]} innerRadius="60%" outerRadius="90%" dataKey="value" stroke="none" startAngle={90} endAngle={-270}>
+                  <Pie data={[]} innerRadius="60%" outerRadius="90%" dataKey="value" stroke="none" startAngle={90} endAngle={-270}>
                     <Cell fill="#fb7185" />
                     <Cell fill="#f1f5f9" />
                   </Pie>

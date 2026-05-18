@@ -6,16 +6,23 @@ const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value);
 };
 
-const mockContratos = [
-  { id: '1', cliente: 'Minera Escondida', descripcion: 'CT1 • Transporte de personal interno', inicio: '2026-01-01', termino: '2026-12-31', valor: 50000000, activo: true, tipo: 'Personal', vehiculosAsignados: ['Furgón F-12', 'Minibus M-04'], maquinasAsignadas: [] },
-  { id: '2', cliente: 'BHP Billiton', descripcion: 'CT2 • Carga sobredimensionada', inicio: '2026-03-01', termino: '2026-09-30', valor: 25000000, activo: true, tipo: 'Sobredimensionada', vehiculosAsignados: ['Tractocamión T-01', 'Tractocamión T-05'], maquinasAsignadas: ['Grúa G-02', 'Cama Baja CB-01'] },
-  { id: '3', cliente: 'Codelco', descripcion: 'CT3 • Transporte de insumos', inicio: '2026-02-15', termino: '2027-02-15', valor: 120000000, activo: true, tipo: 'Carga General', vehiculosAsignados: ['Camión C-10', 'Camión C-11', 'Camión C-12'], maquinasAsignadas: ['Grúa Horquilla GH-01'] },
-  { id: '4', cliente: 'Soprole', descripcion: 'CT4 • Distribución zona norte', inicio: '2025-06-01', termino: '2026-05-31', valor: 35000000, activo: false, tipo: 'Carga Refrigerada', vehiculosAsignados: ['Camión Frigorífico F-01'], maquinasAsignadas: [] },
-  { id: '5', cliente: 'CCU', descripcion: 'CT5 • Transporte interurbano', inicio: '2026-04-01', termino: '2026-10-31', valor: 18000000, activo: true, tipo: 'Carga General', vehiculosAsignados: ['Camión C-20'], maquinasAsignadas: [] },
-];
+type Contrato = {
+  id: string;
+  cliente: string;
+  descripcion: string;
+  inicio: string;
+  termino: string;
+  valor: number;
+  activo: boolean;
+  tipo: string;
+  vehiculosAsignados: string[];
+  maquinasAsignadas: string[];
+};
 
-const mockVehiculos = ['Camión C-10', 'Camión C-11', 'Camión C-12', 'Camión C-20', 'Tractocamión T-01', 'Tractocamión T-05', 'Furgón F-12', 'Minibus M-04', 'Camión Frigorífico F-01'];
-const mockMaquinas = ['Grúa G-02', 'Cama Baja CB-01', 'Grúa Horquilla GH-01', 'Cargador Frontal CF-05'];
+const mockContratos: Contrato[] = [];
+
+const mockVehiculos: string[] = [];
+const mockMaquinas: string[] = [];
 
 export default function Contratos() {
   const [isModalOpen, setIsModalOpen] = useState(false);

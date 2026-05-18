@@ -1,41 +1,20 @@
 import React, { useState } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
-import { Shield, CheckCircle, AlertTriangle, TrendingUp, Filter, Info } from 'lucide-react';
+import { Shield, CheckCircle, AlertTriangle, TrendingUp, Filter, Info, Activity } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   BarChart, Bar, Legend
 } from 'recharts';
 
-// Datos de simulación para los gráficos
-const generateDashboardData = (companyId: string) => {
-  // Simulamos que hace 6 meses había más incidencias y ahora bajaron
-  const isGlobal = companyId === 'GLOBAL';
-  const multiplier = isGlobal ? 8 : 1;
-
-  return [
-    { mes: 'Mes -6', incidentes: 45 * multiplier, solucionados: 10 * multiplier, eficiencia: 65 },
-    { mes: 'Mes -5', incidentes: 42 * multiplier, solucionados: 15 * multiplier, eficiencia: 68 },
-    { mes: 'Mes -4', incidentes: 38 * multiplier, solucionados: 25 * multiplier, eficiencia: 72 },
-    { mes: 'Mes -3', incidentes: 30 * multiplier, solucionados: 28 * multiplier, eficiencia: 78 },
-    { mes: 'Mes -2', incidentes: 20 * multiplier, solucionados: 22 * multiplier, eficiencia: 85 },
-    { mes: 'Mes -1', incidentes: 12 * multiplier, solucionados: 18 * multiplier, eficiencia: 92 },
-    { mes: 'Actual', incidentes: 5 * multiplier, solucionados: 8 * multiplier, eficiencia: 96 },
-  ];
-};
-
 export default function SuperAdminVisionEvolucion() {
   const { companies } = useCompany();
   const [selectedCompanyIdForDashboard, setSelectedCompanyIdForDashboard] = useState<string>('GLOBAL');
   
   const selectedDashboardCompany = companies.find(c => c.id === selectedCompanyIdForDashboard);
-  const dashboardData = generateDashboardData(selectedCompanyIdForDashboard);
+  const dashboardData: any[] = []; // No mock data
 
-  // Stats para la compañía seleccionada:
   const isGlobal = selectedCompanyIdForDashboard === 'GLOBAL';
-  const currIncidentes = dashboardData[dashboardData.length - 1].incidentes;
-  const currEficiencia = dashboardData[dashboardData.length - 1].eficiencia;
-  const pastIncidentes = dashboardData[0].incidentes;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -93,103 +72,24 @@ export default function SuperAdminVisionEvolucion() {
           </div>
         </div>
 
-        {/* Highlight Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl p-4 flex items-center gap-4">
-            <div className="bg-red-100 dark:bg-red-900/30 p-3 rounded-lg">
-              <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
+        {dashboardData.length > 0 ? (
+          <div>
+            {/* Highlight Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+               {/* Stats Content */}
             </div>
-            <div>
-              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Incidentes (Mes -6)</p>
-              <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{pastIncidentes}</h3>
-            </div>
-          </div>
-          
-          <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl p-4 flex items-center gap-4">
-            <div className="bg-emerald-100 dark:bg-emerald-900/30 p-3 rounded-lg">
-              <CheckCircle className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Incidentes (Actual)</p>
-              <div className="flex items-baseline gap-2">
-                <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{currIncidentes}</h3>
-                <span className="text-xs font-bold text-emerald-500">
-                  -{Math.round(((pastIncidentes - currIncidentes) / pastIncidentes) * 100)}%
-                </span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl p-4 flex items-center gap-4">
-            <div className="bg-blue-100 dark:bg-blue-900/30 p-3 rounded-lg">
-              <TrendingUp className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Eficiencia Operativa</p>
-              <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{currEficiencia}%</h3>
-            </div>
-          </div>
-        </div>
 
-        {/* Gráficos */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Chart 1: Incidentes vs Resoluciones */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-slate-800 dark:text-slate-200">
-              Cierre de Brechas (Incidentes vs Control)
-            </h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dashboardData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
-                  <XAxis dataKey="mes" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
-                  <RechartsTooltip 
-                    cursor={{ fill: 'transparent' }}
-                    contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }}
-                  />
-                  <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                  <Bar dataKey="incidentes" name="Problemas Reportados" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                  <Bar dataKey="solucionados" name="Soluciones TMS" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                </BarChart>
-              </ResponsiveContainer>
+            {/* Gráficos */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             </div>
           </div>
-
-          {/* Chart 2: Eficiencia en el Tiempo */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-slate-800 dark:text-slate-200">
-              Desempeño y Productividad (%)
-            </h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={dashboardData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorEficiencia" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
-                  <XAxis dataKey="mes" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} domain={[0, 100]} />
-                  <RechartsTooltip 
-                    contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="eficiencia" 
-                    name="Eficiencia Acumulada"
-                    stroke="#3b82f6" 
-                    strokeWidth={3} 
-                    fillOpacity={1} 
-                    fill="url(#colorEficiencia)" 
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+        ) : (
+          <div className="py-16 text-center">
+            <Activity className="h-16 w-16 text-slate-300 dark:text-slate-700 mx-auto mb-4" />
+            <p className="text-slate-500 dark:text-slate-400 font-medium">Aún no hay suficientes datos registrados.</p>
+            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">El panel comenzará a procesar métricas cuando las empresas ingresen operaciones regulares.</p>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

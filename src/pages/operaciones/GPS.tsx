@@ -16,6 +16,12 @@ const createVehicleIcon = (patente: string, condicion: string) => {
   if (condicion === 'detenido') {
     borderColor = 'border-red-500'; bgColor = 'bg-red-500'; badgeColor = 'text-red-700 border-red-200 bg-red-50';
     pulseHtml = '<div class="absolute inset-0 bg-red-400 rounded-full animate-ping opacity-75"></div>';
+  } else if (condicion === 'jamming') {
+    borderColor = 'border-purple-500'; bgColor = 'bg-purple-600'; badgeColor = 'text-purple-700 border-purple-200 bg-purple-50';
+    pulseHtml = '<div class="absolute inset-0 bg-purple-500 rounded-full animate-ping opacity-75"></div>';
+  } else if (condicion === 'fatiga') {
+    borderColor = 'border-pink-500'; bgColor = 'bg-pink-500'; badgeColor = 'text-pink-700 border-pink-200 bg-pink-50';
+    pulseHtml = '<div class="absolute inset-0 bg-pink-400 rounded-full animate-ping opacity-75"></div>';
   } else if (condicion === 'exceso_velocidad') {
     borderColor = 'border-yellow-500'; bgColor = 'bg-yellow-500'; badgeColor = 'text-yellow-700 border-yellow-200 bg-yellow-50';
     pulseHtml = '<div class="absolute inset-0 bg-yellow-400 rounded-full animate-ping opacity-75"></div>';
@@ -106,72 +112,7 @@ interface FallbackInfraction {
   maxVel: number;
 }
 
-const initialVehicles = [
-  {
-    id: 'V1', patente: 'TT-RR-10', conductor: 'Julio Tapia',
-    velocidad: 85, limite: 90, condicion: 'normal', estado: 'en_ruta',
-    ruta: 'Iquique -> Collahuasi', path: pathSubida, progress: 0.15, speedStep: 0.003
-  },
-  {
-    id: 'V2', patente: 'CC-MM-22', conductor: 'Ana Rojas',
-    velocidad: 115, limite: 90, condicion: 'exceso_velocidad', estado: 'en_ruta',
-    ruta: 'Iquique -> Collahuasi', path: pathSubida, progress: 0.45, speedStep: 0.005,
-    historialInfracciones: [] as FallbackInfraction[]
-  },
-  {
-    id: 'V3', patente: 'FF-GG-88', conductor: 'Luis Medina',
-    velocidad: 70, limite: 90, condicion: 'normal', estado: 'en_ruta',
-    ruta: 'Iquique -> Collahuasi', path: pathSubida, progress: 0.70, speedStep: 0.0025,
-    historialInfracciones: [
-      { tramo: 'Curva Peñon', duracion: '3 min', maxVel: 105 }
-    ] as FallbackInfraction[]
-  },
-  {
-    id: 'V4', patente: 'XX-YY-99', conductor: 'Carmen Díaz',
-    velocidad: 35, limite: 50, condicion: 'normal', estado: 'en_ruta',
-    ruta: 'Iquique -> Collahuasi', path: pathSubida, progress: 0.95, speedStep: 0.001
-  },
-  {
-    id: 'V5', patente: 'BB-SV-55', conductor: 'Oscar Pizarro',
-    velocidad: 80, limite: 90, condicion: 'normal', estado: 'en_ruta',
-    ruta: 'Collahuasi -> Iquique', path: pathBajada, progress: 0.3, speedStep: 0.003
-  },
-  {
-    id: 'V6', patente: 'ZZ-XX-11', conductor: 'Raul Cardenas',
-    velocidad: 0, limite: 90, condicion: 'detenido', estado: 'detenido',
-    ruta: 'Iquique -> Collahuasi',
-    incidencia: 'Fallo mecánico (Tracción). Requiere asistencia logística en ruta.',
-    path: [[-20.650, -68.950]] as [number, number][], progress: 0, speedStep: 0
-  },
-  {
-    id: 'V7', patente: 'LL-PP-44', conductor: 'Esteban Mora',
-    velocidad: 0, limite: 90, condicion: 'ralenti', estado: 'en_ruta',
-    ruta: 'Pozo Almonte -> Interior',
-    path: [[-20.350, -69.780]] as [number, number][], progress: 0, speedStep: 0
-  },
-  {
-    id: 'V8', patente: 'RT-UI-77', conductor: 'Pedro Ramirez',
-    velocidad: 60, limite: 90, condicion: 'normal', estado: 'en_ruta',
-    ruta: 'Pica -> Collahuasi', path: pathPicaFaena, progress: 0.20, speedStep: 0.004
-  },
-  {
-    id: 'V9', patente: 'OP-LK-33', conductor: 'Maria Gonzalez',
-    velocidad: 95, limite: 90, condicion: 'exceso_velocidad', estado: 'en_ruta',
-    ruta: 'Calama -> Collahuasi', path: pathCalamaFaena, progress: 0.60, speedStep: 0.006,
-    historialInfracciones: [] as FallbackInfraction[]
-  },
-  {
-    id: 'V10', patente: 'MN-BV-88', conductor: 'Juan Soto',
-    velocidad: 75, limite: 90, condicion: 'normal', estado: 'en_ruta',
-    ruta: 'Huara -> Collahuasi', path: pathHuaraFaena, progress: 0.35, speedStep: 0.003
-  },
-  {
-    id: 'V11', patente: 'AB-CD-12', conductor: 'Carlos Paz',
-    velocidad: 82, limite: 90, condicion: 'normal', estado: 'en_ruta',
-    ruta: 'Iquique -> Calama', path: pathIquiqueCalama, progress: 0.40, speedStep: 0.004
-
-  }
-];
+const initialVehicles: any[] = [];
 
 export default function GPS() {
   const [mapCenter, setMapCenter] = useState<{lat: number, lng: number, zoom: number, ts: number}>({ 
@@ -417,28 +358,41 @@ export default function GPS() {
               <h3 className="font-black text-red-700 dark:text-red-400 text-sm tracking-tight">INCIDENCIAS OPERATIVAS (EMERGENCIAS)</h3>
             </div>
             <div className="p-4 space-y-4">
-              {vehiculosGPS.filter(v => v.condicion === 'detenido').length === 0 && (
+              {vehiculosGPS.filter(v => ['detenido', 'jamming'].includes(v.condicion)).length === 0 && (
                 <p className="text-xs text-red-400 text-center italic py-2 font-medium">Sin incidencias críticas.</p>
               )}
-              {vehiculosGPS.filter(v => v.condicion === 'detenido').map(v => (
+              {vehiculosGPS.filter(v => ['detenido', 'jamming'].includes(v.condicion)).map(v => (
                 <div 
                   key={v.id} 
-                  className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-red-100 dark:border-red-900/30 shadow-sm relative overflow-hidden cursor-pointer hover:border-red-400 transition-all group"
-                  onClick={() => handleCenterMap(v.lat, v.lng)}
+                  className={`bg-white dark:bg-slate-900 p-4 rounded-xl border ${v.condicion === 'jamming' ? 'border-purple-200 dark:border-purple-900/30 hover:border-purple-400' : 'border-red-100 dark:border-red-900/30 hover:border-red-400'} shadow-sm relative overflow-hidden transition-all group`}
                 >
-                  <div className="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
-                  <div className="flex justify-between items-center mb-3 ml-2">
+                  <div className={`absolute top-0 left-0 w-1 h-full ${v.condicion === 'jamming' ? 'bg-purple-500 animate-pulse' : 'bg-red-500'}`}></div>
+                  <div className="flex justify-between items-center mb-3 ml-2 cursor-pointer" onClick={() => handleCenterMap(v.lat, v.lng)}>
                     <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-red-500" />
+                      <AlertTriangle className={`w-4 h-4 ${v.condicion === 'jamming' ? 'text-purple-500' : 'text-red-500'}`} />
                       <span className="font-bold text-slate-900 dark:text-white">{v.patente}</span>
                     </div>
-                    <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider animate-pulse">Revisión Urgente</span>
+                    <span className={`${v.condicion === 'jamming' ? 'bg-purple-600' : 'bg-red-500'} text-white text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider animate-pulse`}>
+                        {v.condicion === 'jamming' ? 'ANTI-JAMMING!' : 'Revisión Urgente'}
+                    </span>
                   </div>
-                  <div className="bg-red-50 dark:bg-red-900/20 p-2.5 rounded-lg mb-3 ml-2">
-                    <p className="text-red-800 dark:text-red-200 text-xs italic">"{v.incidencia}"</p>
+                  <div className={`${v.condicion === 'jamming' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-800 dark:text-purple-200' : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200'} p-2.5 rounded-lg mb-3 ml-2`}>
+                    <p className="text-xs italic font-semibold">"{v.incidencia}"</p>
                   </div>
-                  <div className="flex justify-between items-center ml-2 border-t border-slate-100 dark:border-slate-800 pt-3">
-                     <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">{v.conductor}</span>
+                  
+                  {v.condicion === 'jamming' && (
+                     <div className="ml-2 mb-3 mt-1 flex gap-2">
+                        <button className="flex-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold py-1.5 rounded flex justify-center items-center gap-1 uppercase tracking-wider" onClick={() => alert('Comando de Bloqueo Motor/Cortacorriente enviado exitosamente. Vehículo inmovilizado.')}>
+                           Cortacorriente Remoto
+                        </button>
+                        <button className="flex-1 bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-bold py-1.5 rounded flex justify-center items-center gap-1 uppercase tracking-wider" onClick={() => alert('Sirena de cabina activada remotamente.')}>
+                           Activar Sirena
+                        </button>
+                     </div>
+                  )}
+
+                  <div className="flex justify-between items-center ml-2 border-t border-slate-100 dark:border-slate-800 pt-3 cursor-pointer" onClick={() => handleCenterMap(v.lat, v.lng)}>
+                     <span className="text-xs text-slate-500 dark:text-slate-400 font-medium cursor-default">{v.conductor}</span>
                      <button className="text-indigo-600 dark:text-indigo-400 font-bold text-xs flex items-center gap-1 group-hover:text-indigo-700 transition-colors">
                        <Navigation className="w-3 h-3" />
                        Ir al mapa
@@ -456,23 +410,23 @@ export default function GPS() {
               <h3 className="font-black text-orange-700 dark:text-orange-400 text-sm tracking-tight">ALERTAS DE CONDUCCIÓN</h3>
             </div>
             <div className="p-4 space-y-4">
-              {vehiculosGPS.filter(v => ['exceso_velocidad', 'ralenti'].includes(v.condicion) || v.historialInfracciones?.length).length === 0 && (
+              {vehiculosGPS.filter(v => ['exceso_velocidad', 'ralenti', 'fatiga'].includes(v.condicion) || v.historialInfracciones?.length).length === 0 && (
                 <p className="text-xs text-orange-400 text-center italic py-2 font-medium">Sin alertas registradas.</p>
               )}
-              {vehiculosGPS.filter(v => ['exceso_velocidad', 'ralenti'].includes(v.condicion) || v.historialInfracciones?.length).map(v => (
+              {vehiculosGPS.filter(v => ['exceso_velocidad', 'ralenti', 'fatiga'].includes(v.condicion) || v.historialInfracciones?.length).map(v => (
                 <div 
                   key={'alert-' + v.id} 
-                  className={`bg-white dark:bg-slate-900 p-4 rounded-xl border shadow-sm relative overflow-hidden cursor-pointer transition-all group ${v.condicion === 'exceso_velocidad' ? 'border-orange-200 dark:border-orange-900/50 hover:border-orange-400' : 'border-slate-200 dark:border-slate-800 hover:border-slate-400'}`}
+                  className={`bg-white dark:bg-slate-900 p-4 rounded-xl border shadow-sm relative overflow-hidden cursor-pointer transition-all group ${v.condicion === 'exceso_velocidad' ? 'border-orange-200 dark:border-orange-900/50 hover:border-orange-400' : v.condicion === 'fatiga' ? 'border-pink-200 dark:border-pink-900/50 hover:border-pink-400' : 'border-slate-200 dark:border-slate-800 hover:border-slate-400'}`}
                   onClick={() => handleCenterMap(v.lat, v.lng)}
                 >
-                  <div className={`absolute top-0 left-0 w-1 h-full ${v.condicion === 'exceso_velocidad' ? 'bg-orange-400' : v.condicion === 'ralenti' ? 'bg-amber-400' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
+                  <div className={`absolute top-0 left-0 w-1 h-full ${v.condicion === 'exceso_velocidad' ? 'bg-orange-400' : v.condicion === 'ralenti' ? 'bg-amber-400' : v.condicion === 'fatiga' ? 'bg-pink-400 animate-pulse' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
                   
                   <div className="flex justify-between items-center mb-3 ml-2">
                     <span className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
                       {v.patente}
                     </span>
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${v.condicion === 'exceso_velocidad' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 border border-orange-200 dark:border-orange-800 animate-pulse' : v.condicion === 'ralenti' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}`}>
-                      {v.condicion === 'exceso_velocidad' ? 'SOBREVELOCIDAD' : v.condicion === 'ralenti' ? 'EXCESO RALENTÍ' : 'HISTORIAL ADVERT.'}
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${v.condicion === 'exceso_velocidad' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 border border-orange-200 dark:border-orange-800 animate-pulse' : v.condicion === 'ralenti' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800' : v.condicion === 'fatiga' ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300 border border-pink-200 dark:border-pink-800' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}`}>
+                      {v.condicion === 'exceso_velocidad' ? 'SOBREVELOCIDAD' : v.condicion === 'ralenti' ? 'EXCESO RALENTÍ' : v.condicion === 'fatiga' ? 'FATIGA/SUEÑO' : 'HISTORIAL ADVERT.'}
                     </span>
                   </div>
 
@@ -481,11 +435,16 @@ export default function GPS() {
                        <div className="flex justify-between items-end">
                         <span className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Actual</span>
                         <strong className="text-red-600 dark:text-red-400 text-lg leading-none">{v.velocidad} km/h</strong>
-                      </div>
-                      <div className="flex justify-between items-center pt-1 border-t border-red-100/50 dark:border-red-900/30">
-                        <span className="text-[10px] text-slate-400 uppercase tracking-wider">Límite Permitido</span>
-                        <span className="text-xs text-slate-600 dark:text-slate-300 font-bold">{v.limite} km/h</span>
-                      </div>
+                       </div>
+                    </div>
+                  )}
+
+                  {v.condicion === 'fatiga' && (
+                    <div className="bg-pink-50 dark:bg-pink-900/10 border border-pink-100 dark:border-pink-900/30 p-3 rounded-lg mb-3 ml-2">
+                       <p className="text-[11px] text-pink-800 dark:text-pink-300 font-medium leading-relaxed italic">
+                         "{v.incidencia}"
+                       </p>
+                       <button className="mt-2 text-[10px] uppercase font-bold bg-pink-100 dark:bg-pink-800 text-pink-700 dark:text-pink-100 px-2 py-1 rounded w-full" onClick={(e) => { e.stopPropagation(); alert('Protocolo de fatiga iniciado: Llamada a cabina y desvío a zona de descanso coordinado.') }}>Aplicar Protocolo Fatiga</button>
                     </div>
                   )}
 

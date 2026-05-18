@@ -8,74 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 
 // Mock data para el historial
-const MOCK_HISTORY = [
-  {
-    id: 1,
-    date: '2026-05-15T14:30:00',
-    module: 'Contratos',
-    icon: Briefcase,
-    color: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-    user: 'Juan Pérez',
-    action: 'Creación',
-    description: 'Se ha creado el contrato #CTR-2026-001 para la empresa "Minera Norte".',
-    reference: 'CTR-2026-001',
-  },
-  {
-    id: 2,
-    date: '2026-05-15T12:15:00',
-    module: 'Alertas',
-    icon: AlertCircle,
-    color: 'bg-rose-50 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400',
-    user: 'Sistema',
-    action: 'Alerta Generada',
-    description: 'Exceso de velocidad registrado en vehículo patente AB-CD-12 (> 95 km/h).',
-    reference: 'ALT-1052',
-  },
-  {
-    id: 3,
-    date: '2026-05-14T16:45:00',
-    module: 'Servicios',
-    icon: ClipboardList,
-    color: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400',
-    user: 'María Gómez',
-    action: 'Actualización',
-    description: 'Servicio #SRV-901 actualizado a estado "En Ruta".',
-    reference: 'SRV-901',
-  },
-  {
-    id: 4,
-    date: '2026-05-14T09:20:00',
-    module: 'Control Documental',
-    icon: FileCheck,
-    color: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400',
-    user: 'Carlos Ruiz',
-    action: 'Aprobación',
-    description: 'Documentación aprobada: Licencia de conducir Juan Pérez, Vence 2028.',
-    reference: 'DOC-5012',
-  },
-  {
-    id: 5,
-    date: '2026-05-13T15:00:00',
-    module: 'Reservas',
-    icon: Calendar,
-    color: 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
-    user: 'Ana Silva',
-    action: 'Reserva Confirmada',
-    description: 'Reserva confirmada para Transporte de Personal el 2026-05-20.',
-    reference: 'RES-088',
-  },
-  {
-    id: 6,
-    date: '2026-05-13T10:10:00',
-    module: 'Contratos',
-    icon: Briefcase,
-    color: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-    user: 'Juan Pérez',
-    action: 'Renovación',
-    description: 'Contrato #CTR-2025-099 renovado por 12 meses.',
-    reference: 'CTR-2025-099',
-  },
-];
+const MOCK_HISTORY: any[] = [];
 
 const MODULE_FILTERS = ['Todos', 'Contratos', 'Servicios', 'Reservas', 'Control Documental', 'Alertas'];
 
