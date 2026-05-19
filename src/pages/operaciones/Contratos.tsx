@@ -140,7 +140,8 @@ export default function Contratos() {
             })));
             
             if (!formData.empresa_id) {
-               setFormData(prev => ({ ...prev, empresa_id: ua[0].empresa_id || ua[0].empresa?.id }));
+               const firstCompany = (ua[0] as any);
+               setFormData(prev => ({ ...prev, empresa_id: firstCompany.empresa_id || firstCompany.empresa?.id }));
             }
           } else {
             // Si el usuario no tiene empresa asociada (es super admin puro sin usuario_aplicacion, etc) 

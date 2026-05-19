@@ -5,9 +5,11 @@ import { Upload, FileText, FileCheck, FileWarning, Download, UserPlus, Truck, Sh
 import { exportToExcel } from '../../lib/excelExport';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
+import { useAuth } from '../../context/AuthContext';
 
 export default function ControlDocumental() {
   const { activeCompanyId } = useCompany();
+  const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState<'conductores' | 'vehiculos'>('conductores');
   
   const [drivers, setDrivers] = useState<any[]>([]);
@@ -195,10 +197,12 @@ export default function ControlDocumental() {
 
   const handleSaveDriver = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeCompanyId || activeCompanyId === 'GLOBAL') return alert('Selecciona una empresa específica en el menú principal superior para poder registrar.');
+    const saveCompanyId = profile?.empresa_id;
+    if (!saveCompanyId) return alert('No perteneces a una empresa asignada. Por favor contacta al administrador.');
+    
     try {
       const { data, error } = await supabase.from('colaborador').insert([{
-        empresa_id: activeCompanyId,
+        empresa_id: saveCompanyId,
         nombre: newDriverForm.nombre,
         rut: newDriverForm.rut,
         rol: newDriverForm.cargo,
@@ -221,10 +225,12 @@ export default function ControlDocumental() {
 
   const handleSaveVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeCompanyId || activeCompanyId === 'GLOBAL') return alert('Selecciona una empresa específica en el menú principal superior para poder registrar.');
+    const saveCompanyId = profile?.empresa_id;
+    if (!saveCompanyId) return alert('No perteneces a una empresa asignada. Por favor contacta al administrador.');
+    
     try {
       const { data, error } = await supabase.from('vehiculo').insert([{
-        empresa_id: activeCompanyId,
+        empresa_id: saveCompanyId,
         patente: newVehicleForm.patente,
         tipo: newVehicleForm.tipo,
         anio: parseInt(newVehicleForm.anio) || 2026,

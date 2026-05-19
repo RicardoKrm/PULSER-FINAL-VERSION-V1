@@ -119,7 +119,10 @@ export default function CrearServicio() {
           const { data: ua } = await supabase.from('usuario_aplicacion').select('empresa_id, empresa(id, nombre)').eq('email', userData.user.email);
           if (ua && ua.length > 0) {
             setUserCompanies(ua.map((u: any) => ({ id: u.empresa?.id || u.empresa_id, nombre: u.empresa?.nombre || 'Mi Empresa' })));
-            if (!newEmpresaId) setNewEmpresaId(ua[0].empresa_id || ua[0].empresa?.id);
+            if (!newEmpresaId) {
+              const firstCompany = (ua[0] as any);
+              setNewEmpresaId(firstCompany.empresa_id || firstCompany.empresa?.id);
+            }
           } else {
             const { data: allEmpresas } = await supabase.from('empresa').select('id, nombre').eq('estado', 'Activo');
             if (allEmpresas) {
