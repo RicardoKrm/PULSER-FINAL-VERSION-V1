@@ -139,15 +139,18 @@ export default function Layout() {
 
   // Filter navigation based on user permissions
   const filteredNavigation = React.useMemo(() => {
-    if (!profile?.rol) return [];
+    const roleName = profile?.rol?.nombre || currentUser?.cargo;
     
-    // Super Admins see everything (assuming roles without restrictions, or based on nome)
-    if (profile.rol.nombre === 'Súper Administrador' || profile.rol.nombre === 'Super Administrador') {
+    // If no role at all, default to full nav
+    if (!roleName) return navigation;
+    
+    // Super Admins and Admin see everything
+    if (['Súper Administrador', 'Super Administrador', 'Administrador', 'Admin'].includes(roleName)) {
       return navigation;
     }
 
-    const perms = profile.rol.permisos || [];
-    if (!Array.isArray(perms)) return [];
+    const perms = profile?.rol?.permisos || [];
+    if (!Array.isArray(perms) || perms.length === 0) return [];
 
     return navigation.reduce((acc, item) => {
       // Check if the user has access to the main module
@@ -167,7 +170,7 @@ export default function Layout() {
       }
       return acc;
     }, [] as typeof navigation);
-  }, [profile?.rol, navigation]);
+  }, [profile?.rol, currentUser?.cargo, navigation]);
 
   // Expand parent menu if child is active on load
   React.useEffect(() => {
