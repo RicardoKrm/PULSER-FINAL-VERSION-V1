@@ -17,17 +17,37 @@ export default function SuperAdminPerfiles() {
   const [newRoleType, setNewRoleType] = useState('Cliente');
   
   // Cargos management state
-  type Cargo = { nombre: string, perfil: string };
+  type Cargo = { id?: string, nombre: string, perfil: string, permisos?: string[] };
   const [cargos, setCargos] = useState<Cargo[]>([]);
   const [selectedCargoForPerms, setSelectedCargoForPerms] = useState<string>('');
   const [cargoPermissions, setCargoPermissions] = useState<Record<string, string[]>>({});
 
   const CARGO_MODULES = [
-    { section: 'Módulo de Flota', perms: ['Ver Vehículos', 'Crear/Editar Vehículos', 'Asignar Conductores', 'Archivar Vehículos'] },
-    { section: 'Módulo de Mantenimiento', perms: ['Ver Órdenes de Trabajo', 'Crear Órdenes', 'Aprobar Órdenes', 'Cerrar Órdenes'] },
-    { section: 'Módulo de Personal', perms: ['Ver Empleados', 'Crear/Editar Empleados', 'Gestionar Permisos', 'Evaluar Conductores'] },
-    { section: 'Reportes y Finanzas', perms: ['Ver Dashboards', 'Exportar Data', 'Ver Costos', 'Aprobar Presupuestos'] },
-    { section: 'Gestión de Bodega', perms: ['Ver Inventario', 'Ingresar Stock', 'Realizar Salida', 'Ajustes Manuales'] },
+    { 
+      section: 'Módulo de Flota', 
+      requiredPerms: ['Gestión de Flota', 'Operaciones y Servicios'], 
+      perms: ['Ver Vehículos', 'Crear/Editar Vehículos', 'Asignar Conductores', 'Archivar Vehículos'] 
+    },
+    { 
+      section: 'Módulo de Mantenimiento', 
+      requiredPerms: ['Gestión de Flota:Pizarra de Mantenimiento', 'Gestión de Flota:Órdenes de Trabajo (OT)'], 
+      perms: ['Ver Órdenes de Trabajo', 'Crear Órdenes', 'Aprobar Órdenes', 'Cerrar Órdenes', 'Aprobar Mantenciones Diarias'] 
+    },
+    { 
+      section: 'Módulo de Personal', 
+      requiredPerms: ['Configuración y Herramientas:Personal', 'Dashboard & Estrategia:KPI RR.HH.'], 
+      perms: ['Ver Empleados', 'Crear/Editar Empleados', 'Gestionar Permisos', 'Evaluar Conductores'] 
+    },
+    { 
+      section: 'Reportes y Finanzas', 
+      requiredPerms: ['Finanzas', 'Dashboard & Estrategia'], 
+      perms: ['Ver Dashboards', 'Exportar Data', 'Ver Costos', 'Aprobar Presupuestos'] 
+    },
+    { 
+      section: 'Gestión de Bodega', 
+      requiredPerms: ['Logística y Suministros:Gestión de Bodegas', 'Logística y Suministros:Gestión de Suministros'], 
+      perms: ['Ver Inventario', 'Ingresar Stock', 'Realizar Salida', 'Ajustes Manuales'] 
+    },
   ];
 
   const handleToggleCargoModule = (groupSection: string, subPerms: string[]) => {
@@ -61,6 +81,13 @@ export default function SuperAdminPerfiles() {
   };
 
   const handleDeleteCargo = (cargoName: string) => {
+    const cargoObj = cargos.find(c => c.nombre === cargoName);
+    if (!cargoObj?.id) {
+       setCargos(cargos.filter(r => r.nombre !== cargoName));
+       setSelectedCargoForPerms('');
+       return;
+    }
+
     Swal.fire({
       title: '¿Eliminar el cargo?',
       text: `Se eliminará el cargo ${cargoName}.`,
@@ -70,11 +97,20 @@ export default function SuperAdminPerfiles() {
       cancelButtonColor: '#slate-500',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar'
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
-        setCargos(cargos.filter(r => r.nombre !== cargoName));
-        setSelectedCargoForPerms('');
-        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Cargo eliminado', showConfirmButton: false, timer: 1500 });
+        try {
+          const { error } = await supabase.from('cargo').delete().eq('id', cargoObj.id);
+          if (error) throw error;
+          setCargos(cargos.filter(r => r.nombre !== cargoName));
+          if (selectedCargoForPerms === cargoName) {
+            setSelectedCargoForPerms('');
+          }
+          Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Cargo eliminado', showConfirmButton: false, timer: 1500 });
+        } catch (err: any) {
+          console.error(err);
+          Swal.fire('Error', 'No se pudo eliminar el cargo.', 'error');
+        }
       }
     });
   };
@@ -102,7 +138,7 @@ export default function SuperAdminPerfiles() {
       showCancelButton: true,
       confirmButtonText: 'Crear',
       cancelButtonText: 'Cancelar',
-      preConfirm: () => {
+      preConfirm: async () => {
         const name = (document.getElementById('swal-cargo-name') as HTMLInputElement).value;
         const perfil = (document.getElementById('swal-cargo-perfil') as HTMLSelectElement).value;
         
@@ -119,11 +155,27 @@ export default function SuperAdminPerfiles() {
           return false;
         }
         
-        return { nombre: name.trim(), perfil };
+        try {
+          const { data, error } = await supabase.from('cargo').insert([{
+            nombre: name.trim(),
+            perfil: perfil,
+            permisos: []
+          }]).select().single();
+          
+          if (error) throw error;
+          
+          return data;
+        } catch (err: any) {
+          console.error(err);
+          // If the table doesn't exist yet, we still return the local object to not block UI entirely
+          // but show a warning
+          Swal.showValidationMessage('Error al guardar. ¿Scripts de BD ejecutados?');
+          return false;
+        }
       }
     }).then((result) => {
       if (result.isConfirmed && result.value) {
-        setCargos([...cargos, result.value]);
+        setCargos([...cargos, { id: result.value.id, nombre: result.value.nombre, perfil: result.value.perfil, permisos: [] }]);
         setSelectedCargoForPerms(result.value.nombre);
         Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Cargo creado', showConfirmButton: false, timer: 1500 });
       }
@@ -249,6 +301,24 @@ export default function SuperAdminPerfiles() {
     }
   };
 
+  const fetchCargos = async () => {
+    try {
+      const { data, error } = await supabase.from('cargo').select('*').order('created_at', { ascending: true });
+      if (error) {
+        console.warn('Cargos table might not exist yet', error);
+      } else if (data) {
+        setCargos(data.map(c => ({ id: c.id, nombre: c.nombre, perfil: c.perfil, permisos: c.permisos || [] })));
+        const permissionsMap: Record<string, string[]> = {};
+        data.forEach(c => {
+          permissionsMap[c.nombre] = c.permisos || [];
+        });
+        setCargoPermissions(permissionsMap);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const fetchUsuarios = async () => {
     try {
       let query = supabase.from('usuario_aplicacion')
@@ -277,6 +347,7 @@ export default function SuperAdminPerfiles() {
     
     fetchEmpresas();
     fetchRoles();
+    fetchCargos();
   }, []);
 
   useEffect(() => {
@@ -938,7 +1009,12 @@ export default function SuperAdminPerfiles() {
                   {(() => {
                     const cargoObj = cargos.find(c => c.nombre === selectedCargoForPerms);
                     const perfilPerms = cargoObj ? (rolePermissions[cargoObj.perfil] || []) : [];
-                    const allowedModules = CARGO_MODULES.filter(group => perfilPerms.includes(group.section));
+                    const allowedModules = CARGO_MODULES.filter(group => 
+                      group.requiredPerms.some(req => 
+                        perfilPerms.includes(req) || 
+                        perfilPerms.some(p => p.startsWith(req) || req.startsWith(p))
+                      )
+                    );
                     
                     if (allowedModules.length === 0) {
                       return (
@@ -1004,7 +1080,22 @@ export default function SuperAdminPerfiles() {
                     Cancelar
                   </button>
                   <button 
-                    onClick={() => Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Permisos de cargo guardados', showConfirmButton: false, timer: 1500 })}
+                    onClick={async () => {
+                      const cargoObj = cargos.find(c => c.nombre === selectedCargoForPerms);
+                      if (cargoObj?.id) {
+                        try {
+                          const perms = cargoPermissions[selectedCargoForPerms] || [];
+                          const { error } = await supabase.from('cargo').update({ permisos: perms }).eq('id', cargoObj.id);
+                          if (error) throw error;
+                          Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Permisos de cargo guardados', showConfirmButton: false, timer: 1500 });
+                        } catch (err) {
+                          console.error(err);
+                          Swal.fire('Error', 'No se pudieron guardar los permisos en la base de datos.', 'error');
+                        }
+                      } else {
+                        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Permisos guardados localmente (sin BD)', showConfirmButton: false, timer: 1500 });
+                      }
+                    }}
                     className="px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm"
                   >
                     Guardar Permisos de Cargo

@@ -1,24 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Shield, Users, Check, Search, Save, UserCheck, AlertCircle, Briefcase } from 'lucide-react';
 import { useAppContext } from '../../context/AppContext';
 import Swal from 'sweetalert2';
 import { cn } from '../../lib/utils';
 import { Button } from '../../components/ui/Button';
+import { supabase } from '../../lib/supabase';
 
 export default function AsignacionPermisos() {
   const { personal, setPersonal } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  
+  type CargoInfo = { nombre: string, perfil: string, permisos: string[] };
+  const [availableCargos, setAvailableCargos] = useState<CargoInfo[]>([]);
 
-  // Cargos Dummy for now (in a real app, this comes from context/API)
-  const availableCargos = [
-    { nombre: 'Administrador', perfil: 'Administrador' },
-    { nombre: 'Supervisor de Turno', perfil: 'Supervisor Operaciones' },
-    { nombre: 'Mecánico Senior', perfil: 'Mecánico' },
-    { nombre: 'Mecánico Especialista', perfil: 'Mecánico' },
-    { nombre: 'Conductor Ruta A', perfil: 'Conductor' },
-    { nombre: 'Conductor Ruta B', perfil: 'Conductor' }
-  ];
+  useEffect(() => {
+    const fetchCargos = async () => {
+      try {
+        const { data, error } = await supabase.from('cargo').select('nombre, perfil, permisos');
+        if (error) {
+          console.warn('Cargos table might not exist yet', error);
+        } else if (data) {
+          setAvailableCargos(data as CargoInfo[]);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchCargos();
+  }, []);
 
   const selectedUser = personal.find(u => u.id === selectedUserId);
   const filteredUsers = personal.filter(u => 
