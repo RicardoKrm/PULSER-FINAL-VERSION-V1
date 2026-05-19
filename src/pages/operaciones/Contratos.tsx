@@ -31,6 +31,7 @@ export default function Contratos() {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedContrato, setSelectedContrato] = useState<Contrato | null>(null);
+  const [editingContratoId, setEditingContratoId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [toastMessage, setToastMessage] = useState('');
@@ -38,7 +39,7 @@ export default function Contratos() {
   const [userCompanies, setUserCompanies] = useState<{id: string, nombre: string}[]>([]);
 
   // Form states
-  const [formData, setFormData] = useState({
+  const emptyForm = {
     empresa_id: '',
     cliente: '',
     rut: '',
@@ -51,7 +52,9 @@ export default function Contratos() {
     condicion_pago: '30 Días',
     renovacion_auto: false,
     vehiculosAsignados: [] as string[]
-  });
+  };
+  
+  const [formData, setFormData] = useState(emptyForm);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -178,7 +181,7 @@ export default function Contratos() {
     try {
       showToast('Guardando contrato...');
 
-      const insertData = {
+      const savePayload = {
         empresa_id: finalCompanyId,
         cliente_razon_social: formData.cliente,
         cliente_rut: formData.rut,
@@ -191,13 +194,28 @@ export default function Contratos() {
         activo: true
       };
 
-      const { data: newContrato, error: insertError } = await supabase
-        .from('operacion_contrato')
-        .insert([insertData])
-        .select()
-        .single();
+      let newContrato;
+      if (editingContratoId) {
+        const { data, error } = await supabase
+          .from('operacion_contrato')
+          .update(savePayload)
+          .eq('id', editingContratoId)
+          .select()
+          .single();
+        if (error) throw error;
+        newContrato = data;
         
-      if (insertError) throw insertError;
+        // Remove old vehicle relations
+        await supabase.from('operacion_contrato_vehiculo').delete().eq('contrato_id', editingContratoId);
+      } else {
+        const { data, error } = await supabase
+          .from('operacion_contrato')
+          .insert([savePayload])
+          .select()
+          .single();
+        if (error) throw error;
+        newContrato = data;
+      }
 
       // Insert assigned vehicles
       if (formData.vehiculosAsignados.length > 0 && newContrato) {
@@ -214,18 +232,37 @@ export default function Contratos() {
       }
 
       setIsModalOpen(false);
+      setEditingContratoId(null);
       loadData();
-      showToast('Contrato creado exitosamente.');
-      setFormData({
-        empresa_id: finalCompanyId,
-        cliente: '', rut: '', descripcion: '', tipo: 'Transporte Personal', zona: 'Norte',
-        inicio: '', termino: '', valor: '', condicion_pago: '30 Días', renovacion_auto: false, vehiculosAsignados: []
-      });
+      showToast('Contrato guardado exitosamente.');
+      setFormData({ ...emptyForm, empresa_id: finalCompanyId });
       
     } catch (error) {
       console.error('Error saving contrato:', error);
       showToast('Error al guardar el contrato.');
     }
+  };
+
+  const handleDeleteContrato = async (id: string) => {
+    if(!confirm('¿Estás seguro de eliminar este contrato?')) return;
+    try {
+      showToast('Eliminando contrato...');
+      const { error } = await supabase.from('operacion_contrato').delete().eq('id', id);
+      if (error) throw error;
+      setSelectedContrato(null);
+      loadData();
+      showToast('Contrato eliminado exitosamente.');
+    } catch(err) {
+      console.error(err);
+      showToast('Error al eliminar');
+    }
+  };
+
+  const openNewModal = () => {
+    const finalCompanyId = activeCompanyId === 'GLOBAL' ? formData.empresa_id : activeCompanyId;
+    setFormData({ ...emptyForm, empresa_id: finalCompanyId || '' });
+    setEditingContratoId(null);
+    setIsModalOpen(true);
   };
 
   const toggleVehiculoAsignado = (vid: string) => {
@@ -267,7 +304,7 @@ export default function Contratos() {
             <span className="hidden sm:inline">Exportar Excel</span>
           </button>
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={openNewModal}
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-sm shadow-indigo-600/20 transition-all flex items-center justify-center gap-2"
           >
             <Plus className="w-5 h-5" />
@@ -391,8 +428,12 @@ export default function Contratos() {
                     <Briefcase className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Nuevo Contrato Comercial</h2>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-0.5 dark:text-slate-400">Ingreso de datos del acuerdo</p>
+                    <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                        {editingContratoId ? 'Editar Contrato Comercial' : 'Nuevo Contrato Comercial'}
+                    </h2>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-0.5 dark:text-slate-400">
+                        {editingContratoId ? 'Actualización de datos del acuerdo' : 'Ingreso de datos del acuerdo'}
+                    </p>
                   </div>
                 </div>
                 <button 
@@ -761,15 +802,39 @@ export default function Contratos() {
                  >
                    Añadir Servicio a Contrato
                  </button>
-                 <button 
-                  onClick={() => {
-                    setSelectedContrato(null);
-                    setIsModalOpen(true);
-                  }}
-                  className="w-full py-3.5 rounded-xl font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all"
-                 >
-                   Editar Acuerdo Comercial
-                 </button>
+                 <div className="grid grid-cols-2 gap-3 mt-3">
+                   <button 
+                    onClick={() => {
+                      if (!selectedContrato) return;
+                      setEditingContratoId(selectedContrato.id);
+                      setFormData({
+                        empresa_id: activeCompanyId === 'GLOBAL' ? '' : activeCompanyId, // Se puede mejorar si mantenemos la empresa del contrato
+                        cliente: selectedContrato.cliente,
+                        rut: '',
+                        descripcion: selectedContrato.descripcion,
+                        tipo: selectedContrato.tipo,
+                        zona: 'Norte',
+                        inicio: selectedContrato.inicio,
+                        termino: selectedContrato.termino,
+                        valor: selectedContrato.valor.toString(),
+                        condicion_pago: '30 Días',
+                        renovacion_auto: false,
+                        vehiculosAsignados: selectedContrato.vehiculosAsignados || []
+                      });
+                      setSelectedContrato(null);
+                      setIsModalOpen(true);
+                    }}
+                    className="w-full py-3.5 rounded-xl font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all"
+                   >
+                     Editar Acuerdo
+                   </button>
+                   <button 
+                     onClick={() => handleDeleteContrato(selectedContrato.id)}
+                     className="w-full py-3.5 rounded-xl font-bold bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-all"
+                   >
+                     Eliminar Contrato
+                   </button>
+                 </div>
               </div>
             </motion.div>
           </div>

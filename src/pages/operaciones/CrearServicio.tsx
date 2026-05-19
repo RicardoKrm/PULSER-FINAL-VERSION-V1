@@ -243,6 +243,23 @@ export default function CrearServicio() {
     }
   };
 
+  const handleDeleteService = async () => {
+    if (!selectedServicio) return;
+    if (confirm(`ATENCIÓN: ¿Estás seguro de que deseas ELIMINAR PERMANENTEMENTE el servicio ${selectedServicio.codigo}?`)) {
+      try {
+        showToast('Eliminando servicio...');
+        const { error } = await supabase.from('operacion_servicio').delete().eq('id', selectedServicio.id);
+        if (error) throw error;
+        showToast('Servicio eliminado exitosamente.');
+        setSelectedServicio(null);
+        loadData();
+      } catch (error) {
+        console.error('Error deleting service:', error);
+        showToast('Error al eliminar el servicio.');
+      }
+    }
+  };
+
   const filteredServicios = useMemo(() => {
     return servicios.filter(s => {
       const matchName = s.codigo.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -772,11 +789,17 @@ export default function CrearServicio() {
                  {selectedServicio.estado !== 'Anulado' && (
                    <button 
                      onClick={handleAnularService}
-                     className="w-full py-3.5 rounded-xl font-bold bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-all"
+                     className="w-full py-3.5 rounded-xl font-bold bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/10 dark:hover:bg-amber-900/20 text-amber-600 dark:text-amber-400 transition-all"
                    >
                      Anular Servicio
                    </button>
                  )}
+                 <button 
+                   onClick={handleDeleteService}
+                   className="w-full py-3.5 rounded-xl font-bold bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-all"
+                 >
+                   Eliminar Servicio
+                 </button>
               </div>
             </motion.div>
           </div>

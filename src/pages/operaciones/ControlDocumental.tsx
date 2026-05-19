@@ -19,9 +19,53 @@ export default function ControlDocumental() {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const handleFileUpload = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    alert(`Archivo "${files[0].name}" adjuntado correctamente (simulado)`);
+  const [documentos, setDocumentos] = useState<any[]>([]);
+
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !selectedEntity || !modalType) return;
+    
+    try {
+      const file = files[0];
+      const newDoc = {
+        entidad_tipo: modalType === 'driver' ? 'conductor' : 'vehiculo',
+        entidad_id: selectedEntity.id,
+        nombre: file.name,
+        estado: 'vigente'
+      };
+
+      const { data, error } = await supabase.from('operacion_documento').insert([newDoc]).select();
+      if (error) throw error;
+
+      if (data) {
+        setDocumentos(prev => [...prev, ...data]);
+        alert(`Archivo "${file.name}" registrado correctamente.`);
+      }
+    } catch (error) {
+      console.error('Error uploading document:', error);
+      alert('Error al adjuntar el documento.');
+    }
+  };
+
+  const loadDocumentos = async (entityId: string) => {
+    try {
+      const { data, error } = await supabase.from('operacion_documento').select('*').eq('entidad_id', entityId).order('created_at', { ascending: false });
+      if (error) throw error;
+      setDocumentos(data || []);
+    } catch(error) {
+      console.error(error);
+    }
+  };
+
+  const handleDeleteDocumento = async (docId: string) => {
+    if(!confirm('¿Estás seguro de que deseas eliminar este documento?')) return;
+    try {
+      const { error } = await supabase.from('operacion_documento').delete().eq('id', docId);
+      if(error) throw error;
+      setDocumentos(prev => prev.filter(d => d.id !== docId));
+    } catch(e) {
+      console.error(e);
+      alert('Error al eliminar');
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -79,7 +123,6 @@ export default function ControlDocumental() {
       console.error(e);
     }
   };
-
 
   const handleRegularizar = async (entityId: string, tipoEntidad: 'driver' | 'vehicle', field: string, newValue: string, reasonDetails: string) => {
     const timestamp = new Date().toLocaleString('es-CL');
@@ -160,11 +203,13 @@ export default function ControlDocumental() {
   const openDriverModal = (driver: any) => {
     setSelectedEntity(driver);
     setModalType('driver');
+    loadDocumentos(driver.id);
   };
 
   const openVehicleModal = (vehicle: any) => {
     setSelectedEntity(vehicle);
     setModalType('vehicle');
+    loadDocumentos(vehicle.id);
   };
 
   const closeModals = () => {
@@ -497,7 +542,7 @@ export default function ControlDocumental() {
                    onDragLeave={handleDragLeave}
                    onDrop={handleDrop}
                  >
-                   {(!selectedEntity.documentos || selectedEntity.documentos.length === 0) ? (
+                   {(!documentos || documentos.length === 0) ? (
                      <div className="h-full flex flex-col items-center justify-center py-6 text-center">
                        <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-full mb-3">
                          <Upload className="w-6 h-6 text-slate-400" />
@@ -507,7 +552,7 @@ export default function ControlDocumental() {
                      </div>
                    ) : (
                      <>
-                       {selectedEntity.documentos.map((doc: any) => (
+                       {documentos.map((doc: any) => (
                          <div key={doc.id} className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-xl hover:border-indigo-300 transition-colors group relative overflow-hidden">
                            <div className="flex items-center gap-3">
                              <div className={`p-2 rounded-lg ${doc.estado === 'vigente' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20' : 'bg-red-50 text-red-600 dark:bg-red-900/20'}`}>
@@ -516,12 +561,12 @@ export default function ControlDocumental() {
                              <div>
                                <p className="font-bold text-sm text-slate-800 dark:text-white">{doc.nombre}</p>
                                <p className={`text-[10px] font-bold uppercase tracking-wide ${doc.estado === 'vigente' ? 'text-emerald-600' : 'text-red-500'}`}>
-                                 Vence: {doc.fechaVencimiento}
+                                 Registrado
                                </p>
                              </div>
                            </div>
-                           <button className="text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-400 font-bold text-xs opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1">
-                             Ver
+                           <button onClick={() => handleDeleteDocumento(doc.id)} className="text-red-500 hover:text-red-700 dark:hover:text-red-400 font-bold text-xs opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1">
+                             Eliminar
                            </button>
                          </div>
                        ))}
