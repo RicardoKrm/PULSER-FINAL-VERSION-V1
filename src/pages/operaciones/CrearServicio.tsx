@@ -225,6 +225,24 @@ export default function CrearServicio() {
     }
   };
 
+  const handleAnularService = async () => {
+    if (!selectedServicio) return;
+    
+    if (confirm(`¿Estás seguro de que deseas anular el servicio ${selectedServicio.codigo}?`)) {
+      try {
+        const { error } = await supabase.from('operacion_servicio').update({ estado: 'Anulado' }).eq('id', selectedServicio.id);
+        if (error) throw error;
+        
+        showToast('Servicio anulado exitosamente.');
+        setSelectedServicio(null);
+        loadData();
+      } catch (error) {
+        console.error('Error al anular servicio:', error);
+        showToast('Error al anular el servicio.');
+      }
+    }
+  };
+
   const filteredServicios = useMemo(() => {
     return servicios.filter(s => {
       const matchName = s.codigo.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -751,9 +769,14 @@ export default function CrearServicio() {
                  >
                    Ver Hoja de Ruta <ChevronRight className="w-4 h-4" />
                  </button>
-                 <button className="w-full py-3.5 rounded-xl font-bold bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-all">
-                   Anular Servicio
-                 </button>
+                 {selectedServicio.estado !== 'Anulado' && (
+                   <button 
+                     onClick={handleAnularService}
+                     className="w-full py-3.5 rounded-xl font-bold bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-all"
+                   >
+                     Anular Servicio
+                   </button>
+                 )}
               </div>
             </motion.div>
           </div>
