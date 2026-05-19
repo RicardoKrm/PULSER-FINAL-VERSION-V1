@@ -3,6 +3,7 @@ import { MessageCircle, X } from 'lucide-react';
 
 export function WhatsAppButton() {
   const [isVisible, setIsVisible] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const phoneNumber = '56982938737';
   const message = 'Hola, tengo dudas sobre el sistema. ¿Me pueden ayudar?';
   const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
@@ -12,6 +13,40 @@ export function WhatsAppButton() {
     if (dismissed === 'true') {
       setIsVisible(false);
     }
+  }, []);
+
+  useEffect(() => {
+    const checkModals = () => {
+      let isModalOverlayActive = false;
+      
+      const bodyLocked = document.body.hasAttribute('data-scroll-locked') || document.body.style.overflow === 'hidden';
+      
+      const overlays = document.querySelectorAll('.fixed.inset-0, .fixed.inset-y-0');
+      overlays.forEach((el) => {
+        const classStr = el.className || '';
+        if (typeof classStr === 'string' && classStr.includes('z-')) {
+          const zMatch = classStr.match(/z-([0-9]+|\[[0-9]+\])/);
+          if (zMatch) {
+            const zDec = parseInt(zMatch[1].replace(/[\[\]]/g, ''), 10);
+            if (zDec >= 50) isModalOverlayActive = true;
+          }
+        }
+      });
+
+      setIsModalOpen(bodyLocked || isModalOverlayActive);
+    };
+
+    const observer = new MutationObserver(checkModals);
+    observer.observe(document.body, { 
+      childList: true, 
+      subtree: true, 
+      attributes: true, 
+      attributeFilter: ['class', 'style', 'data-scroll-locked'] 
+    });
+    
+    checkModals();
+
+    return () => observer.disconnect();
   }, []);
 
   const handleDismiss = (e: React.MouseEvent) => {
@@ -24,7 +59,7 @@ export function WhatsAppButton() {
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2">
+    <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 transition-opacity duration-300 ${isModalOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
       <a
         href={whatsappUrl}
         target="_blank"
