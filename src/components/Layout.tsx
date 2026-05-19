@@ -137,20 +137,52 @@ export default function Layout() {
     );
   };
 
+  // Filter navigation based on user permissions
+  const filteredNavigation = React.useMemo(() => {
+    if (!profile?.rol) return [];
+    
+    // Super Admins see everything (assuming roles without restrictions, or based on nome)
+    if (profile.rol.nombre === 'Súper Administrador' || profile.rol.nombre === 'Super Administrador') {
+      return navigation;
+    }
+
+    const perms = profile.rol.permisos || [];
+    if (!Array.isArray(perms)) return [];
+
+    return navigation.reduce((acc, item) => {
+      // Check if the user has access to the main module
+      if (perms.includes(item.title)) {
+        // Filter submodules if the item has them
+        let filteredSubmodules = item.submodules;
+        if (item.submodules) {
+          filteredSubmodules = item.submodules.filter((sub) => 
+            perms.includes(`${item.title}:${sub.title}`)
+          );
+        }
+        
+        acc.push({
+          ...item,
+          submodules: filteredSubmodules && filteredSubmodules.length > 0 ? filteredSubmodules : undefined
+        });
+      }
+      return acc;
+    }, [] as typeof navigation);
+  }, [profile?.rol, navigation]);
+
   // Expand parent menu if child is active on load
   React.useEffect(() => {
     if (window.innerWidth < 1024) {
       setSidebarOpen(false);
     }
     
-    navigation.forEach(item => {
+    filteredNavigation.forEach(item => {
       if (item.submodules?.some(sub => location.pathname.startsWith(sub.href))) {
         if (!expandedMenus.includes(item.title)) {
           setExpandedMenus([item.title]);
         }
       }
     });
-  }, [location.pathname]);
+  }, [location.pathname, filteredNavigation]);
 
   return (
     <div className="flex h-screen w-full bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200">
@@ -190,7 +222,7 @@ export default function Layout() {
         </div>
 
         <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1 scrollbar-thin scrollbar-thumb-slate-800">
-          {navigation.map((item) => {
+          {filteredNavigation.map((item) => {
             const Icon = item.icon;
             const isExpanded = expandedMenus.includes(item.title);
             const isActive = location.pathname.startsWith(item.href);
