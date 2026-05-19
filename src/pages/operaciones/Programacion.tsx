@@ -5,6 +5,7 @@ import { cn } from '../../lib/utils';
 import { Modal } from '../../components/ui/Modal';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
+import { useAuth } from '../../context/AuthContext';
 
 // Utilidades de Fechas
 function getStartOfWeek(date: Date) {
@@ -53,6 +54,7 @@ const HOURS = Array.from({ length: 12 }, (_, i) => i + 8); // 8 to 19
 
 export default function Programacion() {
   const { activeCompanyId } = useCompany();
+  const { profile } = useAuth();
   const [viewMode, setViewMode] = useState<'Día' | 'Semana' | 'Mes' | 'Tabla'>('Semana');
   const [currentDate, setCurrentDate] = useState<Date>(INIT_DATE);
   const [draggedItem, setDraggedItem] = useState<any>(null);
@@ -259,8 +261,11 @@ export default function Programacion() {
   const handleCrearServicio = async () => {
     if(!newSvrOrigen || !newSvrDestino) return alert('Debes completar el Origen y Destino');
     
+    const saveCompanyId = activeCompanyId === 'GLOBAL' ? profile?.empresa_id : activeCompanyId;
+    if (!saveCompanyId) return alert('No perteneces a una empresa asignada o no has seleccionado una empresa. Por favor contacta al administrador.');
+
     const newServiceData = {
-      empresa_id: activeCompanyId === 'GLOBAL' ? null : activeCompanyId,
+      empresa_id: saveCompanyId,
       codigo: `SRV-${Math.random().toString().slice(2, 6)}`,
       tipo_carga: newSvrTipo,
       origen: newSvrOrigen,
