@@ -69,14 +69,21 @@ export default function Programacion() {
 
   const fetchData = async () => {
     try {
-      let queryProg = supabase.from('operacion_programacion').select('*');
-      let queryServ = supabase.from('operacion_servicio').select('*').eq('estado', 'Borrador');
-      let queryCond = supabase.from('colaborador').select('id, nombre, estado').in('rol', ['Conductor', 'Chofer']);
+      let queryProg = supabase.from('operacion_programacion').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)');
+      let queryServ = supabase.from('operacion_servicio').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)').eq('estado', 'Borrador');
+      let queryCond = supabase.from('colaborador').select('id, nombre, estado, rol');
+      let queryVehs = supabase.from('vehiculo').select('id, patente, estado');
       
-      const [resProg, resServ, resCond] = await Promise.all([queryProg, queryServ, queryCond]);
+      const [resProg, resServ, resCond, resVehs] = await Promise.all([queryProg, queryServ, queryCond, queryVehs]);
       
+      if (resVehs.data) {
+        setDbVehiculos(resVehs.data.filter((v: any) => v.estado !== 'INACTIVO'));
+      }
+
       if (resCond.data) {
-        setConductores(resCond.data.map((c: any) => ({ ...c, vehiculo: 'Vehículo N/A', selected: true })));
+        const driversOnly = resCond.data.filter((c: any) => String(c.rol).toLowerCase().includes('conductor') || String(c.rol).toLowerCase().includes('chofer'));
+        setDbConductores(driversOnly);
+        setConductores(driversOnly.map((c: any) => ({ ...c, vehiculo: 'Sin Asignar', selected: true })));
       }
       
       if (resServ.data) {
@@ -85,6 +92,8 @@ export default function Programacion() {
           tipo: s.tipo_carga || 'Interprovincial',
           origen: s.origen,
           destino: s.destino,
+          conductorName: s.conductor?.nombre || null,
+          vehiculoPatente: s.vehiculo?.patente || null,
           bgColor: 'bg-white dark:bg-slate-800'
         })));
       }
@@ -99,6 +108,8 @@ export default function Programacion() {
           origen: p.origen,
           destino: p.destino,
           timeStr: `${p.hora || 10}:00`,
+          conductorName: p.conductor?.nombre || null,
+          vehiculoPatente: p.vehiculo?.patente || null,
           colorClass: 'bg-indigo-50 border-indigo-200 text-indigo-800 dark:bg-indigo-500/10 dark:border-indigo-500/20 dark:text-indigo-300'
         })));
       }
@@ -166,6 +177,8 @@ export default function Programacion() {
         tipo: item.tipo,
         origen: item.origen,
         destino: item.destino,
+        conductorName: item.conductorName, 
+        vehiculoPatente: item.vehiculoPatente,
         timeStr: hour ? `${hour}:00` : '10:00 AM',
         colorClass: 'bg-indigo-50 border-indigo-200 text-indigo-800 dark:bg-indigo-500/10 dark:border-indigo-500/20 dark:text-indigo-300'
       }]);
@@ -192,6 +205,8 @@ export default function Programacion() {
         tipo: item.tipo,
         origen: item.origen,
         destino: item.destino,
+        conductorName: item.conductorName,
+        vehiculoPatente: item.vehiculoPatente,
         bgColor: 'bg-white dark:bg-slate-800'
       }]);
     }
@@ -233,6 +248,11 @@ export default function Programacion() {
   const [newSvrTipo, setNewSvrTipo] = useState('Interprovincial');
   const [newSvrOrigen, setNewSvrOrigen] = useState('');
   const [newSvrDestino, setNewSvrDestino] = useState('');
+  const [newSvrConductor, setNewSvrConductor] = useState('');
+  const [newSvrVehiculo, setNewSvrVehiculo] = useState('');
+
+  const [dbConductores, setDbConductores] = useState<any[]>([]);
+  const [dbVehiculos, setDbVehiculos] = useState<any[]>([]);
 
   const currentMonthStr = `${MONTHS_ES[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
 
@@ -246,11 +266,14 @@ export default function Programacion() {
       origen: newSvrOrigen,
       destino: newSvrDestino,
       fecha_servicio: new Date().toISOString(),
-      estado: 'Borrador'
+      estado: 'Borrador',
+      conductor_id: newSvrConductor || null,
+      vehiculo_id: newSvrVehiculo || null
     };
 
     try {
-      const { data, error } = await supabase.from('operacion_servicio').insert([newServiceData]).select().single();
+      // Pedimos retorno completo incluyendo relaciones para pintarlas al instante si es posible
+      const { data, error } = await supabase.from('operacion_servicio').insert([newServiceData]).select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)').single();
       if (error) throw error;
       
       setPendings(prev => [...prev, {
@@ -258,6 +281,8 @@ export default function Programacion() {
         tipo: data.tipo_carga,
         origen: data.origen,
         destino: data.destino,
+        conductorName: data.conductor?.nombre || null,
+        vehiculoPatente: data.vehiculo?.patente || null,
         bgColor: 'bg-white dark:bg-slate-800'
       }]);
 
@@ -268,6 +293,8 @@ export default function Programacion() {
 
     setNewSvrOrigen('');
     setNewSvrDestino('');
+    setNewSvrConductor('');
+    setNewSvrVehiculo('');
     setIsNewModalOpen(false);
   };
 
@@ -341,6 +368,12 @@ export default function Programacion() {
                          <GripVertical className="w-4 h-4 text-slate-400 group-hover:text-blue-500 shrink-0" />
                        </div>
                        <div className="text-slate-500 dark:text-slate-400 mt-0.5 truncate">{servicio.origen} - {servicio.destino}</div>
+                       {(servicio.conductorName || servicio.vehiculoPatente) && (
+                         <div className="mt-1.5 flex flex-col gap-0.5 text-[10px] text-indigo-500 font-medium">
+                           {servicio.conductorName && <span>👤 {servicio.conductorName}</span>}
+                           {servicio.vehiculoPatente && <span>🚐 {servicio.vehiculoPatente}</span>}
+                         </div>
+                       )}
                     </div>
                  ))}
                  {pendings.length === 0 && (
@@ -489,8 +522,6 @@ export default function Programacion() {
                               const heightOffset = block.duration * 80;
                               
                               // Check if we need to assign a driver to display 
-                              const pseudoDriver = conductores.length > 0 ? conductores[Math.floor(Math.random() * conductores.length)] : null;
-
                               return (
                                 <div 
                                   key={block.id}
@@ -507,7 +538,11 @@ export default function Programacion() {
                                   <div className="font-semibold text-[10px] leading-tight truncate flex justify-between gap-1 items-center mb-0.5">
                                     <span>{block.tipo}</span>
                                   </div>
-                                  <div className="text-[9px] leading-tight truncate opacity-80">{pseudoDriver.nombre} - {pseudoDriver.vehiculo}</div>
+                                  {(block.conductorName || block.vehiculoPatente) && (
+                                    <div className="text-[9px] leading-tight truncate opacity-80">
+                                      {block.conductorName || 'Sin Cond.'} / {block.vehiculoPatente || 'Sin Veh.'}
+                                    </div>
+                                  )}
                                   <div className="mt-auto flex flex-col gap-0.5 pt-1">
                                     <div className="text-[9px] truncate opacity-90">{block.origen} - {block.destino}</div>
                                     <div className="flex items-center gap-1 opacity-80 text-[9px] font-medium">
@@ -697,7 +732,6 @@ export default function Programacion() {
                        </thead>
                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800/50 bg-white dark:bg-slate-900">
                          {scheduled.filter(s => s.dateStr >= dateFilterStart && s.dateStr <= dateFilterEnd).map((block, idx) => {
-                            const pseudoDriver = conductores.length > 0 ? conductores[idx % conductores.length] : null;
                             return (
                                <tr key={`tbl-${block.id}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
                                  <td className="px-4 py-3 font-medium text-blue-600 dark:text-blue-400">SRV-{block.id.replace('s','')}{(block.id.charCodeAt(block.id.length-1)*7).toString().padStart(3,'0')}</td>
@@ -712,9 +746,13 @@ export default function Programacion() {
                                    {block.origen} → {block.destino}
                                  </td>
                                  <td className="px-4 py-3">
-                                   <div className="flex flex-col">
-                                     <span className="font-bold text-slate-800 dark:text-slate-200 tracking-wider">{pseudoDriver.vehiculo}</span>
-                                     <span className="text-[11px] text-slate-500">{pseudoDriver.nombre}</span>
+                                   <div className="flex flex-col gap-0.5">
+                                     <span className="font-bold text-slate-800 dark:text-slate-200 tracking-wider">
+                                       {block.vehiculoPatente ? `🚐 ${block.vehiculoPatente}` : '🚐 Sin vehículo'}
+                                     </span>
+                                     <span className="text-[11px] text-slate-500">
+                                       {block.conductorName ? `👤 ${block.conductorName}` : '👤 Sin conductor'}
+                                     </span>
                                    </div>
                                  </td>
                                </tr>
@@ -789,6 +827,26 @@ export default function Programacion() {
                  <input type="text" value={newSvrDestino} onChange={e => setNewSvrDestino(e.target.value)} placeholder="Ej. Calama" className="w-full text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500" />
                </div>
              </div>
+             <div className="grid grid-cols-2 gap-4">
+               <div className="space-y-1">
+                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Conductor (Opcional)</label>
+                 <select value={newSvrConductor} onChange={e => setNewSvrConductor(e.target.value)} className="w-full text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500">
+                   <option value="">Sin asignar</option>
+                   {dbConductores.map(c => (
+                     <option key={c.id} value={c.id}>{c.nombre} ({c.rol})</option>
+                   ))}
+                 </select>
+               </div>
+               <div className="space-y-1">
+                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Vehículo (Opcional)</label>
+                 <select value={newSvrVehiculo} onChange={e => setNewSvrVehiculo(e.target.value)} className="w-full text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500">
+                   <option value="">Sin asignar</option>
+                   {dbVehiculos.map(v => (
+                     <option key={v.id} value={v.id}>{v.patente}</option>
+                   ))}
+                 </select>
+               </div>
+             </div>
           </div>
           <div className="flex justify-end gap-2 pt-4">
             <button onClick={() => setIsNewModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
@@ -806,6 +864,14 @@ export default function Programacion() {
                    <span className="text-xs font-medium px-2 py-0.5 rounded bg-black/5 dark:bg-white/10">{block.timeStr}</span>
                  </div>
                  <div className="text-sm opacity-90 text-slate-800 dark:text-slate-200 leading-tight mb-2"><span className="opacity-70">Ruta:</span> {block.origen} - {block.destino}</div>
+                 
+                 {(block.conductorName || block.vehiculoPatente) && (
+                   <div className="text-xs font-medium mb-2 opacity-90 flex items-center gap-3">
+                      {block.conductorName && <span>👤 {block.conductorName}</span>}
+                      {block.vehiculoPatente && <span>🚐 {block.vehiculoPatente}</span>}
+                   </div>
+                 )}
+
                  <div className="flex items-center gap-4 border-t border-black/10 dark:border-white/10 pt-2 text-xs opacity-80 text-slate-800 dark:text-slate-200">
                     <div className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {block.duration}h duración</div>
                  </div>
