@@ -23,7 +23,7 @@ import { useTheme } from './ThemeProvider';
 import { useCompany } from '../contexts/CompanyContext';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
-import { ChatBot } from './chatbot/ChatBot';
+import { WhatsAppButton } from './WhatsAppButton';
 import { supabase } from '../lib/supabase';
 import Swal from 'sweetalert2';
 
@@ -577,7 +577,7 @@ export default function Layout() {
         </div>
       )}
 
-      <ChatBot />
+      <WhatsAppButton />
     </div>
   );
 }

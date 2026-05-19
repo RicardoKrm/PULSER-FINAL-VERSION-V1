@@ -556,13 +556,17 @@ export default function SuperAdminPerfiles() {
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                 {filteredUsuarios.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <tr 
+                    key={u.id} 
+                    className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                    onClick={() => toggleSelectUser(u.id)}
+                  >
                     <td className="p-4 text-center">
                       <input 
                         type="checkbox" 
-                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer pointer-events-none"
                         checked={selectedUserIds.includes(u.id)}
-                        onChange={() => toggleSelectUser(u.id)}
+                        readOnly
                       />
                     </td>
                     <td className="p-4">
@@ -592,7 +596,7 @@ export default function SuperAdminPerfiles() {
                     </td>
                     <td className="p-4 text-right flex justify-end gap-2">
                       <button
-                        onClick={() => handleToggleEstadoUsuario(u)}
+                        onClick={(e) => { e.stopPropagation(); handleToggleEstadoUsuario(u); }}
                         className={cn(
                           "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border",
                           u.estado?.toLowerCase() === 'activo'
@@ -603,7 +607,7 @@ export default function SuperAdminPerfiles() {
                         {u.estado?.toLowerCase() === 'activo' ? 'Desactivar' : 'Activar'}
                       </button>
                       <button
-                        onClick={() => handleDeleteUsuario(u)}
+                        onClick={(e) => { e.stopPropagation(); handleDeleteUsuario(u); }}
                         className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border text-red-600 border-red-200 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/40"
                       >
                         Eliminar
@@ -713,7 +717,7 @@ export default function SuperAdminPerfiles() {
                   text: err?.message || 'Inténtalo de nuevo'
                 });
               }
-            }} className="flex flex-col h-full">
+            }} className="flex flex-col flex-1 min-h-0 overflow-hidden">
               <div className="p-6 overflow-y-auto flex-1 space-y-6">
                 
                 {/* Datos Personales */}
@@ -810,16 +814,16 @@ export default function SuperAdminPerfiles() {
                   <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Datos Económicos</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Sueldo Base ($)</label>
-                      <input type="number" min="0" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 500000" />
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Sueldo Base ($) <span className="text-xs font-normal text-slate-400">(Opcional)</span></label>
+                      <input name="sueldo_base" type="number" min="0" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 500000" />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Valor Hora Normal ($)</label>
-                      <input type="number" min="0" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 5000" />
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Valor Hora Normal ($) <span className="text-xs font-normal text-slate-400">(Opcional)</span></label>
+                      <input name="valor_hora_normal" type="number" min="0" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 5000" />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Valor Hora Extra ($)</label>
-                      <input type="number" min="0" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 7500" />
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Valor Hora Extra ($) <span className="text-xs font-normal text-slate-400">(Opcional)</span></label>
+                      <input name="valor_hora_extra" type="number" min="0" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white" placeholder="Ej: 7500" />
                     </div>
                   </div>
                 </div>
