@@ -16,6 +16,15 @@ export default function ControlDocumental() {
   const [modalType, setModalType] = useState<'driver' | 'vehicle' | null>(null);
   const [isAddingEntity, setIsAddingEntity] = useState<'driver' | 'vehicle' | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const [newDriverForm, setNewDriverForm] = useState({
+    nombre: '', rut: '', cargo: 'Conductor Interprovincial', tipoLicencia: 'A4', vencimientoLicencia: '', vencimientoSalud: ''
+  });
+
+  const [newVehicleForm, setNewVehicleForm] = useState({
+    patente: '', tipo: 'Bus', anio: '2026', kmActual: '0', vencimientoRev: '', vencimientoSeguro: ''
+  });
+
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -125,47 +134,31 @@ export default function ControlDocumental() {
   };
 
   const handleRegularizar = async (entityId: string, tipoEntidad: 'driver' | 'vehicle', field: string, newValue: string, reasonDetails: string) => {
-    const timestamp = new Date().toLocaleString('es-CL');
-    // Save to supersonic (using detalles jsonb if appropriate or mock logic)
-    // Here we update locale state while real supabase sync would write to `detalles` or proper DB columns.
-    // Given the complexity of JSON updates, we just optimistically update the state.
-    
-    if (tipoEntidad === 'driver') {
-      const updatedDrivers = drivers.map(d => {
-        if (d.id === entityId) {
-          const historial = d.historial || [];
-          const updated = {
-            ...d,
-            [field]: newValue,
-            historial: [
-              { id: Date.now().toString(), fecha: timestamp, accion: reasonDetails, tipo: 'success' },
-              ...historial
-            ]
-          };
-          if (selectedEntity?.id === entityId) setSelectedEntity(updated);
-          return updated;
-        }
-        return d;
-      });
-      setDrivers(updatedDrivers);
-    } else {
-      const updatedVehicles = vehicles.map(v => {
-        if (v.id === entityId) {
-          const historial = v.historial || [];
-          const updated = {
-            ...v,
-            [field]: newValue,
-            historial: [
-              { id: Date.now().toString(), fecha: timestamp, accion: reasonDetails, tipo: 'success' },
-              ...historial
-            ]
-          };
-          if (selectedEntity?.id === entityId) setSelectedEntity(updated);
-          return updated;
-        }
-        return v;
-      });
-      setVehicles(updatedVehicles);
+    try {
+      const table = tipoEntidad === 'driver' ? 'colaborador' : 'vehiculo';
+      
+      const res = await supabase.from(table).select('detalles').eq('id', entityId).single();
+      const currentDetails = res.data?.detalles || {};
+      
+      const updatedDetails = {
+        ...currentDetails,
+        [field]: newValue
+      };
+
+      const { error } = await supabase.from(table).update({
+        detalles: updatedDetails
+      }).eq('id', entityId);
+
+      if (error) throw error;
+
+      alert(`${reasonDetails}`);
+      fetchData();
+      if(selectedEntity && selectedEntity.id === entityId) {
+         setSelectedEntity({...selectedEntity, ...updatedDetails});
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error al actualizar datos');
     }
   };
 
@@ -198,6 +191,57 @@ export default function ControlDocumental() {
        ].filter(Boolean) }
     }
     return { status: 'ACTIVO', reasons: [] };
+  };
+
+  const handleSaveDriver = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeCompanyId) return alert('Selecciona una empresa primero');
+    try {
+      const { data, error } = await supabase.from('colaborador').insert([{
+        empresa_id: activeCompanyId === 'GLOBAL' ? null : activeCompanyId,
+        nombre: newDriverForm.nombre,
+        rut: newDriverForm.rut,
+        rol: newDriverForm.cargo,
+        detalles: {
+          tipoLicencia: newDriverForm.tipoLicencia,
+          vencimientoLicencia: newDriverForm.vencimientoLicencia,
+          vencimientoSalud: newDriverForm.vencimientoSalud,
+          vacaciones: 'Al día'
+        }
+      }]).select();
+      if (error) throw error;
+      alert('Conductor guardado correctamente');
+      setIsAddingEntity(null);
+      fetchData(); // reload
+    } catch (error) {
+      console.error(error);
+      alert('Error al guardar conductor');
+    }
+  };
+
+  const handleSaveVehicle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeCompanyId) return alert('Selecciona una empresa primero');
+    try {
+      const { data, error } = await supabase.from('vehiculo').insert([{
+        empresa_id: activeCompanyId === 'GLOBAL' ? null : activeCompanyId,
+        patente: newVehicleForm.patente,
+        tipo: newVehicleForm.tipo,
+        anio: parseInt(newVehicleForm.anio) || 2026,
+        kilometraje_actual: parseInt(newVehicleForm.kmActual) || 0,
+        detalles: {
+          vencimientoRev: newVehicleForm.vencimientoRev,
+          vencimientoSeguro: newVehicleForm.vencimientoSeguro
+        }
+      }]).select();
+      if (error) throw error;
+      alert('Unidad guardada correctamente');
+      setIsAddingEntity(null);
+      fetchData(); // reload
+    } catch (error) {
+      console.error(error);
+      alert('Error al guardar unidad');
+    }
   };
 
   const openDriverModal = (driver: any) => {
@@ -383,26 +427,26 @@ export default function ControlDocumental() {
                </button>
             </div>
             <div className="p-6">
-              <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); setIsAddingEntity(null); }}>
+              <form className="space-y-4" onSubmit={handleSaveDriver}>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Nombre Completo</label>
-                  <input type="text" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+                  <input type="text" value={newDriverForm.nombre} onChange={e => setNewDriverForm({...newDriverForm, nombre: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" required />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">RUT</label>
-                  <input type="text" placeholder="12.345.678-9" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+                  <input type="text" placeholder="12.345.678-9" value={newDriverForm.rut} onChange={e => setNewDriverForm({...newDriverForm, rut: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" required />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Cargo</label>
-                    <select className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
-                      <option>Conductor Interprovincial</option>
-                      <option>Conductor Interno Mina</option>
+                    <select value={newDriverForm.cargo} onChange={e => setNewDriverForm({...newDriverForm, cargo: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
+                      <option value="Conductor Interprovincial">Conductor Interprovincial</option>
+                      <option value="Conductor Interno Mina">Conductor Interno Mina</option>
                     </select>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Tipo de Licencia</label>
-                    <select className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
+                    <select value={newDriverForm.tipoLicencia} onChange={e => setNewDriverForm({...newDriverForm, tipoLicencia: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
                       <option>A1</option>
                       <option>A2</option>
                       <option>A3</option>
@@ -412,15 +456,15 @@ export default function ControlDocumental() {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Venc. Licencia</label>
-                    <input type="date" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+                    <input type="date" value={newDriverForm.vencimientoLicencia} onChange={e => setNewDriverForm({...newDriverForm, vencimientoLicencia: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" required />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Venc. Salud</label>
-                    <input type="date" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+                    <input type="date" value={newDriverForm.vencimientoSalud} onChange={e => setNewDriverForm({...newDriverForm, vencimientoSalud: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" required />
                   </div>
                 </div>
                 <div className="pt-2">
-                  <button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition-colors">
+                  <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition-colors">
                     Guardar Conductor
                   </button>
                 </div>
@@ -445,15 +489,15 @@ export default function ControlDocumental() {
                </button>
             </div>
             <div className="p-6">
-              <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); setIsAddingEntity(null); }}>
+              <form className="space-y-4" onSubmit={handleSaveVehicle}>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Patente</label>
-                    <input type="text" placeholder="AB-CD-12" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+                    <input type="text" placeholder="AB-CD-12" value={newVehicleForm.patente} onChange={e => setNewVehicleForm({...newVehicleForm, patente: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" required />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Tipo</label>
-                    <select className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
+                    <select value={newVehicleForm.tipo} onChange={e => setNewVehicleForm({...newVehicleForm, tipo: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
                       <option>Bus</option>
                       <option>Camion</option>
                       <option>Minibus</option>
@@ -461,23 +505,23 @@ export default function ControlDocumental() {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Año Inscrip.</label>
-                    <input type="number" defaultValue={2026} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+                    <input type="number" value={newVehicleForm.anio} onChange={e => setNewVehicleForm({...newVehicleForm, anio: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" required />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Km Actuales</label>
-                    <input type="number" defaultValue={0} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+                    <input type="number" value={newVehicleForm.kmActual} onChange={e => setNewVehicleForm({...newVehicleForm, kmActual: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" required />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Venc. Rev. Técnica</label>
-                    <input type="date" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+                    <input type="date" value={newVehicleForm.vencimientoRev} onChange={e => setNewVehicleForm({...newVehicleForm, vencimientoRev: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" required />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Venc. Seguro</label>
-                    <input type="date" className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+                    <input type="date" value={newVehicleForm.vencimientoSeguro} onChange={e => setNewVehicleForm({...newVehicleForm, vencimientoSeguro: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" required />
                   </div>
                 </div>
                 <div className="pt-2">
-                  <button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition-colors">
+                  <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition-colors">
                     Guardar Unidad
                   </button>
                 </div>
