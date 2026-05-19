@@ -49,6 +49,7 @@ import Cotizaciones from './pages/compras/Cotizaciones';
 import ContratosProveedores from './pages/compras/ContratosProveedores';
 import PrecioCombustible from './pages/configuracion/PrecioCombustible';
 import Personal from './pages/configuracion/Personal';
+import AsignacionPermisos from './pages/configuracion/AsignacionPermisos';
 import GestionFallas from './pages/configuracion/GestionFallas';
 import ConfiguracionEmpresa from './pages/configuracion/ConfiguracionEmpresa';
 import CargaMasiva from './pages/configuracion/CargaMasiva';
@@ -108,6 +109,7 @@ const router = createBrowserRouter([
       { path: "flota/combustible", element: <GestionCombustible /> },
       { path: "configuracion/pautas", element: <GestionPautas /> },
       { path: "configuracion/personal", element: <Personal /> },
+      { path: "configuracion/permisos", element: <AsignacionPermisos /> },
       { path: "configuracion/fallas", element: <GestionFallas /> },
       { path: "configuracion/empresa", element: <ConfiguracionEmpresa /> },
       { path: "configuracion/tareas", element: <GestionTareas /> },
