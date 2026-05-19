@@ -14,3 +14,9 @@ CREATE TABLE IF NOT EXISTS public.tickets_ayuda (
 );
 
 ALTER TABLE public.usuario_aplicacion ADD COLUMN IF NOT EXISTS cambio_clave_pendiente BOOLEAN DEFAULT true;
+
+-- Habilitar RLS en la tabla pero permitir inserciones de usuarios sin cuenta (login)
+ALTER TABLE public.tickets_ayuda ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Permitir inserts sin login" ON public.tickets_ayuda FOR INSERT WITH CHECK (true);
+CREATE POLICY "Permitir select a todos" ON public.tickets_ayuda FOR SELECT USING (true);
+CREATE POLICY "Permitir update a todos" ON public.tickets_ayuda FOR UPDATE USING (true);

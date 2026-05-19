@@ -96,9 +96,9 @@ export default function Login() {
       console.error('Error creating ticket:', err);
       // Fallback si la tabla no existe o falla
       Swal.fire({
-        icon: 'warning',
-        title: 'Solicitud Recibida (Modo Offline)',
-        text: 'Tu solicitud ha sido registrada temporalmente. Si la tabla "tickets_ayuda" no existe en Supabase, debes crearla.',
+        icon: 'error',
+        title: 'Error de Supabase',
+        text: `Error: ${err?.message || 'No se pudo crear el ticket. Revisa los permisos (RLS) de la tabla.'}`,
         confirmButtonColor: '#4f46e5'
       });
       setShowForgotModal(false);

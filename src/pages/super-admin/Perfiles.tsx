@@ -71,6 +71,34 @@ export default function SuperAdminPerfiles() {
     }
   };
 
+  const handleDeleteUsuario = async (u: any) => {
+    try {
+      const result = await Swal.fire({
+        title: '¿Eliminar usuario?',
+        text: `Se eliminará a ${u.nombre}. Si también existe en Authentication, tendrás que borrarlo manualmente desde el panel de Supabase.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar'
+      });
+
+      if (result.isConfirmed) {
+        const { error } = await supabase.from('usuario_aplicacion').delete().eq('id', u.id);
+        if (error) throw error;
+        
+        fetchUsuarios();
+        Swal.fire({
+          toast: true, position: 'top-end', icon: 'success', title: 'Usuario eliminado', showConfirmButton: false, timer: 1500
+        });
+      }
+    } catch (err: any) {
+      console.error(err);
+      Swal.fire('Error', err.message || 'No se pudo eliminar el usuario', 'error');
+    }
+  };
+
   useEffect(() => {
     // If navigation state has an empresa_id, set it as managed
     if (location.state && location.state.empresaId) {
@@ -562,17 +590,23 @@ export default function SuperAdminPerfiles() {
                         {u.estado || 'Activo'}
                       </span>
                     </td>
-                    <td className="p-4 text-right">
+                    <td className="p-4 text-right flex justify-end gap-2">
                       <button
                         onClick={() => handleToggleEstadoUsuario(u)}
                         className={cn(
                           "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border",
                           u.estado?.toLowerCase() === 'activo'
-                            ? "text-red-600 border-red-200 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/40"
+                            ? "text-orange-600 border-orange-200 bg-orange-50 hover:bg-orange-100 dark:bg-orange-900/20 dark:border-orange-800 dark:text-orange-400 dark:hover:bg-orange-900/40"
                             : "text-green-600 border-green-200 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-900/40"
                         )}
                       >
                         {u.estado?.toLowerCase() === 'activo' ? 'Desactivar' : 'Activar'}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteUsuario(u)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border text-red-600 border-red-200 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/40"
+                      >
+                        Eliminar
                       </button>
                     </td>
                   </tr>
