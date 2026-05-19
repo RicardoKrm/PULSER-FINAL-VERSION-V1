@@ -118,20 +118,27 @@ export default function Contratos() {
 
       if (activeCompanyId === 'GLOBAL') {
         const { data: userData } = await supabase.auth.getUser();
-        if (userData?.user) {
+        if (userData?.user?.email) {
           const { data: ua } = await supabase
             .from('usuario_aplicacion')
             .select('empresa_id, empresa(id, nombre_fantasia)')
-            .eq('auth_user_id', userData.user.id);
+            .eq('email', userData.user.email);
             
-          if (ua) {
+          if (ua && ua.length > 0) {
             setUserCompanies(ua.map((u: any) => ({
               id: u.empresa.id,
               nombre: u.empresa.nombre_fantasia
             })));
             
-            if (ua.length > 0 && !formData.empresa_id) {
+            if (!formData.empresa_id) {
                setFormData(prev => ({ ...prev, empresa_id: ua[0].empresa.id }));
+            }
+          } else {
+            // Si el usuario no tiene empresa asociada (es super admin puro sin usuario_aplicacion, etc) 
+            // Mostramos todas las empresas:
+            const { data: allEmpresas } = await supabase.from('empresa').select('id, nombre_fantasia').eq('estado', 'Activo');
+            if (allEmpresas) {
+              setUserCompanies(allEmpresas.map((e: any) => ({ id: e.id, nombre: e.nombre_fantasia })));
             }
           }
         }
