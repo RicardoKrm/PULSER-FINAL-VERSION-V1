@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Key, Plus, Check, Search, X, Building, Users } from 'lucide-react';
+import { Shield, Key, Plus, Check, Search, X, Building, Users, Pencil, Trash2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { navigation } from '../../config/navigation';
 import { supabase } from '../../lib/supabase';
@@ -195,6 +195,82 @@ export default function SuperAdminPerfiles() {
     } catch(err) {
       console.error(err);
       Swal.fire('Error', 'No se pudo crear el rol', 'error');
+    }
+  };
+
+  const handleEditRoleName = async (roleId: string, currentName: string) => {
+    const { value: formValues } = await Swal.fire({
+      title: 'Editar nombre del perfil',
+      html: `
+        <input id="swal-input1" class="swal2-input" value="${currentName}" placeholder="Nombre del perfil">
+      `,
+      focusConfirm: false,
+      showCancelButton: true,
+      confirmButtonText: 'Guardar',
+      cancelButtonText: 'Cancelar',
+      preConfirm: () => {
+        return [
+          (document.getElementById('swal-input1') as HTMLInputElement).value
+        ]
+      }
+    });
+
+    if (formValues) {
+      const newName = formValues[0].trim();
+      if (!newName || newName === currentName) return;
+
+      try {
+        const { error } = await supabase
+          .from('rol')
+          .update({ nombre: newName })
+          .eq('id', roleId);
+
+        if (error) throw error;
+        
+        fetchRoles();
+        
+        if (selectedRole === currentName) {
+          setSelectedRole(newName);
+        }
+
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Nombre de perfil actualizado', showConfirmButton: false, timer: 1500 });
+      } catch (err: any) {
+        console.error(err);
+        Swal.fire('Error', err.message || 'No se pudo actualizar el nombre del perfil', 'error');
+      }
+    }
+  };
+
+  const handleDeleteRole = async (roleId: string, roleName: string) => {
+    const result = await Swal.fire({
+      title: '¿Eliminar perfil?',
+      text: `Se eliminará el perfil "${roleName}". Si tiene usuarios asignados, esta acción podría fallar.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const { error } = await supabase
+          .from('rol')
+          .delete()
+          .eq('id', roleId);
+
+        if (error) throw error;
+
+        fetchRoles();
+        if (selectedRole === roleName) {
+          setSelectedRole('');
+        }
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'El perfil ha sido eliminado', showConfirmButton: false, timer: 1500 });
+      } catch (err: any) {
+        console.error(err);
+        Swal.fire('Error', err.message || 'No se pudo eliminar el perfil. Es posible que esté en uso.', 'error');
+      }
     }
   };
 
@@ -428,6 +504,32 @@ export default function SuperAdminPerfiles() {
                   Selecciona qué módulos y herramientas estarán disponibles para este perfil.
                 </p>
               </div>
+              
+              {/* Acciones de Perfil */}
+              {roles.find(r => r.name === selectedRole)?.type !== 'Sistema' && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const r = roles.find(r => r.name === selectedRole);
+                      if (r) handleEditRoleName(r.id, r.name);
+                    }}
+                    className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
+                    title="Editar nombre"
+                  >
+                    <Pencil className="h-5 w-5" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      const r = roles.find(r => r.name === selectedRole);
+                      if (r) handleDeleteRole(r.id, r.name);
+                    }}
+                    className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                    title="Eliminar perfil"
+                  >
+                    <Trash2 className="h-5 w-5" />
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
