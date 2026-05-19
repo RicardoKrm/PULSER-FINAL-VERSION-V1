@@ -16,6 +16,29 @@ export default function ControlDocumental() {
   const [modalType, setModalType] = useState<'driver' | 'vehicle' | null>(null);
   const [isAddingEntity, setIsAddingEntity] = useState<'driver' | 'vehicle' | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    alert(`Archivo "${files[0].name}" adjuntado correctamente (simulado)`);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+  
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+  
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    handleFileUpload(e.dataTransfer.files);
+  };
 
   const today = new Date('2026-05-12').getTime();
 
@@ -452,36 +475,58 @@ export default function ControlDocumental() {
                    <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
                      <FileText className="w-4 h-4 text-slate-400"/> Control Documental
                    </h3>
-                   <button className="text-indigo-600 font-bold text-xs hover:underline flex items-center gap-1">
+                   <label className="text-indigo-600 font-bold text-xs hover:underline flex items-center gap-1 cursor-pointer">
                      <Upload className="w-3 h-3"/> Adjuntar Documento
-                   </button>
+                     <input 
+                       type="file" 
+                       className="hidden" 
+                       ref={fileInputRef}
+                       onChange={(e) => handleFileUpload(e.target.files)} 
+                       multiple 
+                     />
+                   </label>
                  </div>
                  
-                 <div className="space-y-3">
-                   {selectedEntity.documentos?.length === 0 && (
-                     <div className="p-6 border-2 border-dashed border-slate-200 rounded-xl text-center dark:border-slate-800">
-                       <FileWarning className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                       <p className="text-sm font-bold text-slate-500 dark:text-slate-400">No hay documentos adjuntos</p>
-                     </div>
-                   )}
-                   {selectedEntity.documentos?.map((doc: any) => (
-                     <div key={doc.id} className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-indigo-300 transition-colors group">
-                       <div className="flex items-center gap-3">
-                         <div className={`p-2 rounded-lg ${doc.estado === 'vigente' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                           {doc.estado === 'vigente' ? <FileCheck className="w-5 h-5" /> : <FileWarning className="w-5 h-5" />}
-                         </div>
-                         <div>
-                           <p className="font-bold text-sm text-slate-800 dark:text-white">{doc.nombre}</p>
-                           <p className={`text-[10px] font-bold uppercase tracking-wide ${doc.estado === 'vigente' ? 'text-emerald-600' : 'text-red-500'}`}>
-                             Vence: {doc.fechaVencimiento}
-                           </p>
-                         </div>
+                 <div 
+                   className={`space-y-3 min-h-[140px] rounded-xl border-2 border-dashed p-4 transition-colors ${
+                     isDragging 
+                       ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/10' 
+                       : 'border-slate-200 dark:border-slate-800'
+                   }`}
+                   onDragOver={handleDragOver}
+                   onDragLeave={handleDragLeave}
+                   onDrop={handleDrop}
+                 >
+                   {(!selectedEntity.documentos || selectedEntity.documentos.length === 0) ? (
+                     <div className="h-full flex flex-col items-center justify-center py-6 text-center">
+                       <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-full mb-3">
+                         <Upload className="w-6 h-6 text-slate-400" />
                        </div>
-                       <button className="text-indigo-500 hover:text-indigo-700 font-bold text-xs opacity-0 group-hover:opacity-100 transition-opacity">
-                         Ver
-                       </button>
+                       <p className="text-sm font-bold text-slate-600 dark:text-slate-300">No hay documentos adjuntos</p>
+                       <p className="text-xs font-medium text-slate-400 mt-1">Arrastra tus archivos aquí o escoge "Adjuntar Documento"</p>
                      </div>
-                   ))}
+                   ) : (
+                     <>
+                       {selectedEntity.documentos.map((doc: any) => (
+                         <div key={doc.id} className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-xl hover:border-indigo-300 transition-colors group relative overflow-hidden">
+                           <div className="flex items-center gap-3">
+                             <div className={`p-2 rounded-lg ${doc.estado === 'vigente' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20' : 'bg-red-50 text-red-600 dark:bg-red-900/20'}`}>
+                               {doc.estado === 'vigente' ? <FileCheck className="w-5 h-5" /> : <FileWarning className="w-5 h-5" />}
+                             </div>
+                             <div>
+                               <p className="font-bold text-sm text-slate-800 dark:text-white">{doc.nombre}</p>
+                               <p className={`text-[10px] font-bold uppercase tracking-wide ${doc.estado === 'vigente' ? 'text-emerald-600' : 'text-red-500'}`}>
+                                 Vence: {doc.fechaVencimiento}
+                               </p>
+                             </div>
+                           </div>
+                           <button className="text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-400 font-bold text-xs opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1">
+                             Ver
+                           </button>
+                         </div>
+                       ))}
+                     </>
+                   )}
                  </div>
                </div>
 
