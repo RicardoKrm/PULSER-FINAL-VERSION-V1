@@ -33,8 +33,11 @@ export default function Contratos() {
   const [dateFilter, setDateFilter] = useState('');
   const [toastMessage, setToastMessage] = useState('');
 
+  const [userCompanies, setUserCompanies] = useState<{id: string, nombre: string}[]>([]);
+
   // Form states
   const [formData, setFormData] = useState({
+    empresa_id: '',
     cliente: '',
     rut: '',
     descripcion: '',
@@ -113,6 +116,29 @@ export default function Contratos() {
       const uniqueClients = Array.from(new Set(formatContratos.map(c => c.cliente))).filter(Boolean);
       setClientesExistentes(uniqueClients);
 
+      if (activeCompanyId === 'GLOBAL') {
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user) {
+          const { data: ua } = await supabase
+            .from('usuario_aplicacion')
+            .select('empresa_id, empresa(id, nombre_fantasia)')
+            .eq('auth_user_id', userData.user.id);
+            
+          if (ua) {
+            setUserCompanies(ua.map((u: any) => ({
+              id: u.empresa.id,
+              nombre: u.empresa.nombre_fantasia
+            })));
+            
+            if (ua.length > 0 && !formData.empresa_id) {
+               setFormData(prev => ({ ...prev, empresa_id: ua[0].empresa.id }));
+            }
+          }
+        }
+      } else {
+        setFormData(prev => ({ ...prev, empresa_id: activeCompanyId }));
+      }
+
     } catch (error) {
       console.error('Error loading contracts data:', error);
       showToast('Error cargando los datos.');
@@ -124,10 +150,10 @@ export default function Contratos() {
   }, [activeCompanyId]);
 
   const handleSaveContrato = async () => {
-    if (!activeCompanyId) return;
+    const finalCompanyId = activeCompanyId === 'GLOBAL' ? formData.empresa_id : activeCompanyId;
 
-    if (activeCompanyId === 'GLOBAL') {
-      showToast('Por favor, selecciona una empresa específica para crear un contrato.');
+    if (!finalCompanyId) {
+      showToast('Por favor, selecciona una empresa operadora para asignar este contrato.');
       return;
     }
 
@@ -140,7 +166,7 @@ export default function Contratos() {
       showToast('Guardando contrato...');
 
       const insertData = {
-        empresa_id: activeCompanyId,
+        empresa_id: finalCompanyId,
         cliente_razon_social: formData.cliente,
         cliente_rut: formData.rut,
         descripcion: formData.descripcion,
@@ -178,7 +204,7 @@ export default function Contratos() {
       loadData();
       showToast('Contrato creado exitosamente.');
       setFormData({
-        empresa_id: activeCompanyId !== 'GLOBAL' ? activeCompanyId : '',
+        empresa_id: finalCompanyId,
         cliente: '', rut: '', descripcion: '', tipo: 'Transporte Personal', zona: 'Norte',
         inicio: '', termino: '', valor: '', condicion_pago: '30 Días', renovacion_auto: false, vehiculosAsignados: []
       });
@@ -374,8 +400,24 @@ export default function Contratos() {
                       <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">1. Datos Generales</h3>
                       
                       <div className="space-y-4">
+                        {activeCompanyId === 'GLOBAL' && (
+                          <div>
+                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Empresa Operadora (Propietaria)</label>
+                            <select 
+                              value={formData.empresa_id} 
+                              onChange={e => setFormData({...formData, empresa_id: e.target.value})} 
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white"
+                            >
+                              <option value="">Selecciona Empresa Operadora...</option>
+                              {userCompanies.map(c => (
+                                <option key={c.id} value={c.id}>{c.nombre}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
                         <div>
-                          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Cliente Razon Social</label>
+                          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Empresa Cliente (Razón Social)</label>
                           <input 
                             type="text" 
                             list="clientes-list"

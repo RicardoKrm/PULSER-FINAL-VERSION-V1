@@ -93,6 +93,19 @@ export default function ReservasTurismo() {
       const { data: vehData } = await vehQuery;
       if (vehData) setVehiculos(vehData);
 
+      if (activeCompanyId === 'GLOBAL') {
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user) {
+          const { data: ua } = await supabase.from('usuario_aplicacion').select('empresa_id, empresa(id, nombre_fantasia)').eq('auth_user_id', userData.user.id);
+          if (ua) {
+            setUserCompanies(ua.map((u: any) => ({ id: u.empresa.id, nombre: u.empresa.nombre_fantasia })));
+            if (ua.length > 0 && !newEmpresaId) setNewEmpresaId(ua[0].empresa.id);
+          }
+        }
+      } else {
+        setNewEmpresaId(activeCompanyId);
+      }
+
     } catch (error) {
       console.error('Error loading data', error);
     }
@@ -148,6 +161,8 @@ export default function ReservasTurismo() {
   };
 
   const [formReserva, setFormReserva] = useState(initialFormState);
+  const [userCompanies, setUserCompanies] = useState<{id: string, nombre: string}[]>([]);
+  const [newEmpresaId, setNewEmpresaId] = useState('');
 
   // Filter Logic
   const reservasFiltradas = reservasTurismo.filter(res => {
@@ -211,10 +226,10 @@ export default function ReservasTurismo() {
 
   const handleCrearReserva = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeCompanyId) return;
+    const finalCompanyId = activeCompanyId === 'GLOBAL' ? newEmpresaId : activeCompanyId;
 
-    if (activeCompanyId === 'GLOBAL') {
-      alert('Por favor, selecciona una empresa específica para crear una reserva.');
+    if (!finalCompanyId) {
+      alert('Por favor, selecciona una empresa operadora para esta reserva.');
       return;
     }
 
@@ -222,7 +237,7 @@ export default function ReservasTurismo() {
     
     // Default structure for details JSONB
     const reservationData = {
-      empresa_id: activeCompanyId,
+      empresa_id: finalCompanyId,
       codigo: `OP-${Math.floor(1000 + Math.random() * 9000)}-${new Date().getFullYear()}`,
       categoria: formReserva.categoria,
       cliente_nombre: formReserva.cliente.nombre,
@@ -666,6 +681,21 @@ export default function ReservasTurismo() {
             </CardHeader>
             <CardContent className="p-0 overflow-y-auto max-h-[85vh]">
               <form onSubmit={handleCrearReserva} className="divide-y divide-slate-100 dark:divide-slate-800">
+                {activeCompanyId === 'GLOBAL' && (
+                  <div className="p-6 bg-slate-50 dark:bg-slate-900/50">
+                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2 block">Empresa Operadora (Propietaria)</label>
+                    <select 
+                      value={newEmpresaId} 
+                      onChange={(e) => setNewEmpresaId(e.target.value)} 
+                      className="w-full bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white"
+                    >
+                      <option value="">Selecciona Empresa Operadora...</option>
+                      {userCompanies.map(c => (
+                        <option key={c.id} value={c.id}>{c.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 {/* Bloque 1: Cliente y Categoría */}
                 <div className="p-6 grid md:grid-cols-3 gap-6 bg-slate-50 dark:bg-slate-900/50">
                   <div className="space-y-2">

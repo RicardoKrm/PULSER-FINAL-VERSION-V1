@@ -46,6 +46,8 @@ export default function CrearServicio() {
   const [newIngreso, setNewIngreso] = useState<number | ''>('');
   const [newCosto, setNewCosto] = useState<number | ''>('');
   const [toastMessage, setToastMessage] = useState('');
+  const [userCompanies, setUserCompanies] = useState<{id: string, nombre: string}[]>([]);
+  const [newEmpresaId, setNewEmpresaId] = useState('');
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -111,6 +113,19 @@ export default function CrearServicio() {
       if (vehiculos.data) setVehiculosDisponibles(vehiculos.data);
       if (colaboradores.data) setConductoresDisponibles(colaboradores.data);
 
+      if (activeCompanyId === 'GLOBAL') {
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user) {
+          const { data: ua } = await supabase.from('usuario_aplicacion').select('empresa_id, empresa(id, nombre_fantasia)').eq('auth_user_id', userData.user.id);
+          if (ua) {
+            setUserCompanies(ua.map((u: any) => ({ id: u.empresa.id, nombre: u.empresa.nombre_fantasia })));
+            if (ua.length > 0 && !newEmpresaId) setNewEmpresaId(ua[0].empresa.id);
+          }
+        }
+      } else {
+        setNewEmpresaId(activeCompanyId);
+      }
+
     } catch (error) {
       console.error('Error loading data:', error);
     }
@@ -154,10 +169,10 @@ export default function CrearServicio() {
   };
 
   const handleSaveService = async () => {
-    if (!activeCompanyId) return;
+    const finalCompanyId = activeCompanyId === 'GLOBAL' ? newEmpresaId : activeCompanyId;
 
-    if (activeCompanyId === 'GLOBAL') {
-      showToast('Por favor, selecciona una empresa específica para crear un servicio.');
+    if (!finalCompanyId) {
+      showToast('Por favor, selecciona una empresa operadora para asignar este servicio.');
       return;
     }
 
@@ -170,7 +185,7 @@ export default function CrearServicio() {
       showToast('Guardando servicio...');
 
       const serviceData = {
-        empresa_id: activeCompanyId,
+        empresa_id: finalCompanyId,
         codigo: editingServicio?.codigo || `SRV-${Math.floor(Math.random() * 10000)}`,
         contrato_id: newContrato || null,
         tipo_carga: newTipoCarga,
@@ -398,6 +413,18 @@ export default function CrearServicio() {
                   <div className="lg:col-span-8 p-6 md:p-8 border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-slate-800">
                     <div className="space-y-6">
                       
+                      {activeCompanyId === 'GLOBAL' && (
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Empresa Operadora (Propietaria)</label>
+                          <select value={newEmpresaId} onChange={(e) => setNewEmpresaId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
+                            <option value="">Selecciona Empresa Operadora...</option>
+                            {userCompanies.map(c => (
+                              <option key={c.id} value={c.id}>{c.nombre}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Contrato Asociado (Opcional)</label>
