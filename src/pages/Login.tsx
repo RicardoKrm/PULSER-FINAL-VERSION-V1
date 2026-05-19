@@ -172,7 +172,7 @@ export default function Login() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="block w-full pl-10 pr-3 py-3 border border-slate-600 rounded-xl bg-slate-900/50 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-medium"
-                      placeholder="••••••••"
+                      placeholder="Tu primera contraseña suele ser tu RUT"
                       required
                     />
                   </div>

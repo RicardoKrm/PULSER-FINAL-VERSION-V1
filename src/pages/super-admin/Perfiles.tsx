@@ -5,6 +5,7 @@ import { navigation } from '../../config/navigation';
 import { supabase } from '../../lib/supabase';
 import Swal from 'sweetalert2';
 import { useLocation } from 'react-router-dom';
+import { createClient } from '@supabase/supabase-js';
 
 export default function SuperAdminPerfiles() {
   const location = useLocation();
@@ -610,15 +611,53 @@ export default function SuperAdminPerfiles() {
               const data = Object.fromEntries(formData.entries());
               
               try {
+                // Generar auto-email si no vino
+                const emailToUse = data.email && typeof data.email === 'string' && data.email.trim() !== '' 
+                  ? data.email 
+                  : newUserEmail;
+
+                if (!emailToUse) {
+                  throw new Error("Se requiere un correo electrónico (puede ser el auto-generado).");
+                }
+
+                // 1. Create user in Supabase Auth using a temporary client to avoid overwriting the admin session
+                const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL || '';
+                const supabaseAnonKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY || '';
+                const tempSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+                  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+                });
+
+                // RUT serves as initial password
+                const initialPassword = String(data.rut).trim();
+
+                const { data: authData, error: authError } = await tempSupabase.auth.signUp({
+                  email: emailToUse as string,
+                  password: initialPassword,
+                });
+
+                if (authError) {
+                  console.error("Auth Sign Up Error:", authError);
+                  throw new Error(`Error creando usuario en Auth: ${authError.message}`);
+                }
+
+                let authUserId = null;
+                // Since this is a temporary client and auto-confirm might be off, we still get a user object if successful (authData.user)
+                if (authData.user) {
+                  authUserId = authData.user.id;
+                }
+
+                // 2. Create the profile in usuario_aplicacion
                 const fullName = `${data.nombre} ${data.apellido_p} ${data.apellido_m || ''}`.trim();
 
                 const { error } = await supabase.from('usuario_aplicacion').insert([{ 
+                  auth_user_id: authUserId,
                   nombre: fullName,
                   rut: data.rut,
                   empresa_id: data.empresa_id,
                   rol_id: data.rol_id,
                   estado: data.estado,
-                  email: data.email || null
+                  email: emailToUse,
+                  cambio_clave_pendiente: true
                 }]);
                 
                 if (error) throw error;
