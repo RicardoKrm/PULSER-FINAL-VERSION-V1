@@ -195,10 +195,10 @@ export default function ControlDocumental() {
 
   const handleSaveDriver = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeCompanyId) return alert('Selecciona una empresa primero');
+    if (!activeCompanyId || activeCompanyId === 'GLOBAL') return alert('Selecciona una empresa específica en el menú principal superior para poder registrar.');
     try {
       const { data, error } = await supabase.from('colaborador').insert([{
-        empresa_id: activeCompanyId === 'GLOBAL' ? null : activeCompanyId,
+        empresa_id: activeCompanyId,
         nombre: newDriverForm.nombre,
         rut: newDriverForm.rut,
         rol: newDriverForm.cargo,
@@ -221,10 +221,10 @@ export default function ControlDocumental() {
 
   const handleSaveVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeCompanyId) return alert('Selecciona una empresa primero');
+    if (!activeCompanyId || activeCompanyId === 'GLOBAL') return alert('Selecciona una empresa específica en el menú principal superior para poder registrar.');
     try {
       const { data, error } = await supabase.from('vehiculo').insert([{
-        empresa_id: activeCompanyId === 'GLOBAL' ? null : activeCompanyId,
+        empresa_id: activeCompanyId,
         patente: newVehicleForm.patente,
         tipo: newVehicleForm.tipo,
         anio: parseInt(newVehicleForm.anio) || 2026,
