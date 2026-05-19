@@ -1,8 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Calendar as CalendarIcon, Download, Filter, Search, GripVertical, Clock, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { Modal } from '../../components/ui/Modal';
+import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
 
 // Utilidades de Fechas
 function getStartOfWeek(date: Date) {
@@ -50,15 +52,60 @@ const SCHEDULED_BLOCKS: any[] = [];
 const HOURS = Array.from({ length: 12 }, (_, i) => i + 8); // 8 to 19
 
 export default function Programacion() {
+  const { activeCompanyId } = useCompany();
   const [viewMode, setViewMode] = useState<'Día' | 'Semana' | 'Mes' | 'Tabla'>('Semana');
   const [currentDate, setCurrentDate] = useState<Date>(INIT_DATE);
   const [draggedItem, setDraggedItem] = useState<any>(null);
-  const [scheduled, setScheduled] = useState([...SCHEDULED_BLOCKS]);
-  const [pendings, setPendings] = useState([...PENDING_SERVICES]);
+  const [scheduled, setScheduled] = useState<any[]>([]);
+  const [pendings, setPendings] = useState<any[]>([]);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success'>('idle');
 
   const [dateFilterStart, setDateFilterStart] = useState('2026-04-01');
   const [dateFilterEnd, setDateFilterEnd] = useState('2026-04-30');
+
+  useEffect(() => {
+    fetchData();
+  }, [activeCompanyId]);
+
+  const fetchData = async () => {
+    try {
+      let queryProg = supabase.from('operacion_programacion').select('*');
+      let queryServ = supabase.from('operacion_servicio').select('*').eq('estado', 'Borrador');
+      let queryCond = supabase.from('colaborador').select('id, nombre, estado').in('rol', ['Conductor', 'Chofer']);
+      
+      const [resProg, resServ, resCond] = await Promise.all([queryProg, queryServ, queryCond]);
+      
+      if (resCond.data) {
+        setConductores(resCond.data.map((c: any) => ({ ...c, vehiculo: 'Vehículo N/A', selected: true })));
+      }
+      
+      if (resServ.data) {
+        setPendings(resServ.data.map((s: any) => ({
+          id: s.id,
+          tipo: s.tipo_carga || 'Interprovincial',
+          origen: s.origen,
+          destino: s.destino,
+          bgColor: 'bg-white dark:bg-slate-800'
+        })));
+      }
+      
+      if (resProg.data) {
+        setScheduled(resProg.data.map((p: any) => ({
+          id: p.id,
+          dateStr: p.fecha,
+          hour: p.hora || 10,
+          duration: p.duracion || 2,
+          tipo: p.tipo,
+          origen: p.origen,
+          destino: p.destino,
+          timeStr: `${p.hora || 10}:00`,
+          colorClass: 'bg-indigo-50 border-indigo-200 text-indigo-800 dark:bg-indigo-500/10 dark:border-indigo-500/20 dark:text-indigo-300'
+        })));
+      }
+    } catch(e) {
+      console.error(e);
+    }
+  };
 
   const handleSyncDrive = () => {
     setSyncStatus('syncing');
@@ -189,16 +236,35 @@ export default function Programacion() {
 
   const currentMonthStr = `${MONTHS_ES[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
 
-  const handleCrearServicio = () => {
+  const handleCrearServicio = async () => {
     if(!newSvrOrigen || !newSvrDestino) return alert('Debes completar el Origen y Destino');
     
-    setPendings(prev => [...prev, {
-      id: `p${Math.random().toString().slice(2, 6)}`,
-      tipo: newSvrTipo,
+    const newServiceData = {
+      empresa_id: activeCompanyId === 'GLOBAL' ? null : activeCompanyId,
+      codigo: `SRV-${Math.random().toString().slice(2, 6)}`,
+      tipo_carga: newSvrTipo,
       origen: newSvrOrigen,
       destino: newSvrDestino,
-      bgColor: 'bg-white dark:bg-slate-800'
-    }]);
+      fecha_servicio: new Date().toISOString(),
+      estado: 'Borrador'
+    };
+
+    try {
+      const { data, error } = await supabase.from('operacion_servicio').insert([newServiceData]).select().single();
+      if (error) throw error;
+      
+      setPendings(prev => [...prev, {
+        id: data.id,
+        tipo: data.tipo_carga,
+        origen: data.origen,
+        destino: data.destino,
+        bgColor: 'bg-white dark:bg-slate-800'
+      }]);
+
+    } catch (error) {
+      console.error("Error creating service:", error);
+      alert("Error al crear servicio");
+    }
 
     setNewSvrOrigen('');
     setNewSvrDestino('');
