@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, MapPin, Clock, Truck, Play, CheckCircle2, AlertCircle, FileText, ChevronRight, Briefcase, Baby, Users, Map as MapIcon, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -21,6 +23,7 @@ interface Viaje {
   origen: string;
   destino: string;
   vehiculo: string;
+  conductorName: string;
   estado: 'PROGRAMADO' | 'EN_CURSO' | 'FINALIZADO';
   pasajeros?: number;
   maletas?: number;
@@ -30,21 +33,65 @@ interface Viaje {
   tipoViaje: string;
 }
 
-const misViajes: Viaje[] = [];
-
 export default function PortalConductor() {
-  const [viajes, setViajes] = useState<Viaje[]>(misViajes);
+  const { activeCompanyId } = useCompany();
+  const [viajes, setViajes] = useState<Viaje[]>([]);
   const [mapModalData, setMapModalData] = useState<{ isOpen: boolean; lat?: number; lng?: number; label?: string }>({ isOpen: false });
+
+  useEffect(() => {
+    const fetchViajes = async () => {
+      let query = supabase.from('operacion_programacion').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)').order('fecha', { ascending: true });
+      if (activeCompanyId && activeCompanyId !== 'GLOBAL') {
+        query = query.eq('empresa_id', activeCompanyId);
+      } else {
+        query = query.is('empresa_id', null); // If GLOBAL doesn't fetch everything, adjust based on your logic
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        console.error("Error fetching programming:", error);
+        return;
+      }
+
+      if (data) {
+        const mappedViajes: Viaje[] = data.map((v: any) => ({
+          id: v.id,
+          fecha: v.fecha,
+          horaInicio: `${v.hora || 10}:00`,
+          horaFin: `${(v.hora || 10) + (v.duracion || 2)}:00`,
+          origen: v.origen,
+          destino: v.destino,
+          vehiculo: v.vehiculo?.patente || 'Sin Vehículo',
+          conductorName: v.conductor?.nombre || 'Sin Conductor',
+          estado: v.estado === 'Asignado' ? 'PROGRAMADO' : (v.estado === 'En Curso' ? 'EN_CURSO' : (v.estado === 'Realizado' ? 'FINALIZADO' : 'PROGRAMADO')),
+          tipoViaje: v.tipo || 'Servicio'
+        }));
+        setViajes(mappedViajes);
+      }
+    };
+    
+    fetchViajes();
+  }, [activeCompanyId]);
 
   const activeViaje = viajes.find(v => v.estado === 'EN_CURSO');
   const proximosViajes = viajes.filter(v => v.estado === 'PROGRAMADO');
 
-  const iniciarViaje = (id: string) => {
-    setViajes(prev => prev.map(v => v.id === id ? { ...v, estado: 'EN_CURSO' } : v));
+  const iniciarViaje = async (id: string) => {
+    try {
+      await supabase.from('operacion_programacion').update({ estado: 'En Curso' }).eq('id', id);
+      setViajes(prev => prev.map(v => v.id === id ? { ...v, estado: 'EN_CURSO' } : v));
+    } catch (e) {
+      alert("Error al iniciar el viaje");
+    }
   };
 
-  const finalizarViaje = (id: string) => {
-    setViajes(prev => prev.map(v => v.id === id ? { ...v, estado: 'FINALIZADO' } : v));
+  const finalizarViaje = async (id: string) => {
+    try {
+      await supabase.from('operacion_programacion').update({ estado: 'Realizado' }).eq('id', id);
+      setViajes(prev => prev.map(v => v.id === id ? { ...v, estado: 'FINALIZADO' } : v));
+    } catch (e) {
+      alert("Error al finalizar el viaje");
+    }
   };
 
   const handleOpenMap = (origen: string, lat?: number, lng?: number) => {
@@ -63,7 +110,7 @@ export default function PortalConductor() {
               <Truck className="w-6 h-6 text-indigo-500" />
               Portal Conductor
             </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Conductor: Juan Pérez • ID: COND-045</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Conductor: Varios / General • ID: GLOBAL</p>
           </div>
           <div className="text-right flex flex-col items-end">
              <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">Jornada Actual</div>
@@ -85,7 +132,7 @@ export default function PortalConductor() {
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-4 border-b border-indigo-500/50 pb-4">
                    <div>
                      <span className="bg-indigo-500/50 text-indigo-100 px-2.5 py-1 rounded-md text-xs font-bold tracking-wide uppercase">
-                       {activeViaje.id}
+                       {activeViaje.id.substring(0, 8)}
                      </span>
                      <h3 className="text-xl font-bold mt-2">{activeViaje.tipoViaje}</h3>
                    </div>
@@ -126,9 +173,12 @@ export default function PortalConductor() {
                   
                   <div className="space-y-4">
                     <div>
-                      <p className="text-xs text-indigo-300 uppercase tracking-wider font-semibold">Vehículo Asignado</p>
-                      <p className="font-medium flex items-center gap-2 mt-1">
+                      <p className="text-xs text-indigo-300 uppercase tracking-wider font-semibold">Vehículo y Conductor</p>
+                      <p className="font-medium flex items-center gap-2 mt-1 text-sm bg-indigo-500/20 px-2 py-1 rounded">
                         <Truck className="w-4 h-4" /> {activeViaje.vehiculo}
+                      </p>
+                      <p className="font-medium flex items-center gap-2 mt-1 text-sm bg-indigo-500/20 px-2 py-1 rounded">
+                        <Users className="w-4 h-4" /> {activeViaje.conductorName}
                       </p>
                     </div>
                     
@@ -163,7 +213,7 @@ export default function PortalConductor() {
                     <AlertCircle className="w-5 h-5" /> Reportar Incidencia
                   </button>
                   <button className="bg-indigo-500 hover:bg-indigo-400 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors flex justify-center items-center gap-2">
-                    <FileText className="w-5 h-5" /> Checklist Vehículo
+                    <FileText className="w-5 h-5" /> Checklist
                   </button>
                 </div>
               </div>
@@ -185,7 +235,7 @@ export default function PortalConductor() {
                 <div key={viaje.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
                    <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">{viaje.id}</span>
+                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">{viaje.id.substring(0, 8)}</span>
                         <span className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">{viaje.tipoViaje}</span>
                       </div>
                       <div className="flex items-center gap-4 text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
@@ -210,9 +260,10 @@ export default function PortalConductor() {
                           </div>
                         </div>
                         <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2.5 border border-slate-100 dark:border-slate-800">
-                          <p className="text-[10px] uppercase text-slate-500 font-bold mb-1">Vehículo Asignado</p>
-                          <div className="font-semibold text-slate-800 dark:text-slate-200 text-sm flex items-center gap-1.5">
-                            <Truck className="w-3.5 h-3.5 text-slate-400"/> {viaje.vehiculo}
+                          <p className="text-[10px] uppercase text-slate-500 font-bold mb-1">Vehículo / Cond.</p>
+                          <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs flex flex-col gap-1">
+                            <span className="flex items-center gap-1.5"><Truck className="w-3.5 h-3.5 text-slate-400"/> {viaje.vehiculo}</span>
+                            <span className="flex items-center gap-1.5 text-slate-500"><Users className="w-3 h-3 text-slate-400"/> {viaje.conductorName}</span>
                           </div>
                         </div>
                       </div>
@@ -237,7 +288,7 @@ export default function PortalConductor() {
              ))}
              {proximosViajes.length === 0 && (
                <div className="text-center py-6 text-slate-500">
-                  No tienes próximos viajes programados.
+                  No tienes próximos viajes programados en tu compañía.
                </div>
              )}
            </div>

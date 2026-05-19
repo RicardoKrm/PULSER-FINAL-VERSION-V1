@@ -96,6 +96,9 @@ export default function Programacion() {
           destino: s.destino,
           conductorName: s.conductor?.nombre || null,
           vehiculoPatente: s.vehiculo?.patente || null,
+          empresa_id: s.empresa_id,
+          conductor_id: s.conductor_id,
+          vehiculo_id: s.vehiculo_id,
           bgColor: 'bg-white dark:bg-slate-800'
         })));
       }
@@ -112,6 +115,9 @@ export default function Programacion() {
           timeStr: `${p.hora || 10}:00`,
           conductorName: p.conductor?.nombre || null,
           vehiculoPatente: p.vehiculo?.patente || null,
+          empresa_id: p.empresa_id,
+          conductor_id: p.conductor_id,
+          vehiculo_id: p.vehiculo_id,
           colorClass: 'bg-indigo-50 border-indigo-200 text-indigo-800 dark:bg-indigo-500/10 dark:border-indigo-500/20 dark:text-indigo-300'
         })));
       }
@@ -153,7 +159,7 @@ export default function Programacion() {
     e.preventDefault();
   };
 
-  const handleDrop = (e: React.DragEvent, dateStr: string, hour?: number) => {
+  const handleDrop = async (e: React.DragEvent, dateStr: string, hour?: number) => {
     e.preventDefault();
     if (!draggedItem) return;
 
@@ -170,47 +176,107 @@ export default function Programacion() {
     }
 
     if (source === 'pending') {
-      setPendings(prev => prev.filter(p => p.id !== item.id));
-      setScheduled(prev => [...prev, {
-        id: item.id,
-        dateStr,
-        hour: hour || 10,
-        duration: 2,
-        tipo: item.tipo,
-        origen: item.origen,
-        destino: item.destino,
-        conductorName: item.conductorName, 
-        vehiculoPatente: item.vehiculoPatente,
-        timeStr: hour ? `${hour}:00` : '10:00 AM',
-        colorClass: 'bg-indigo-50 border-indigo-200 text-indigo-800 dark:bg-indigo-500/10 dark:border-indigo-500/20 dark:text-indigo-300'
-      }]);
+      try {
+        const { data: progData, error: progErr } = await supabase.from('operacion_programacion').insert([{
+          empresa_id: item.empresa_id,
+          tipo: item.tipo,
+          origen: item.origen,
+          destino: item.destino,
+          fecha: dateStr,
+          hora: hour !== undefined ? hour : 10,
+          duracion: 2,
+          conductor_id: item.conductor_id,
+          vehiculo_id: item.vehiculo_id,
+          estado: 'Asignado'
+        }]).select().single();
+
+        if (progErr) throw progErr;
+
+        // Modificamos el estado del servicio original a Confirmado
+        await supabase.from('operacion_servicio').update({ estado: 'Confirmado' }).eq('id', item.id);
+
+        setPendings(prev => prev.filter(p => p.id !== item.id));
+        setScheduled(prev => [...prev, {
+          id: progData.id,
+          dateStr: progData.fecha,
+          hour: progData.hora || 10,
+          duration: progData.duracion || 2,
+          tipo: progData.tipo,
+          origen: progData.origen,
+          destino: progData.destino,
+          conductorName: item.conductorName, 
+          vehiculoPatente: item.vehiculoPatente,
+          empresa_id: progData.empresa_id,
+          conductor_id: progData.conductor_id,
+          vehiculo_id: progData.vehiculo_id,
+          timeStr: hour !== undefined ? `${hour}:00` : '10:00 AM',
+          colorClass: 'bg-indigo-50 border-indigo-200 text-indigo-800 dark:bg-indigo-500/10 dark:border-indigo-500/20 dark:text-indigo-300'
+        }]);
+      } catch (err) {
+         console.error('Error programando:', err);
+         alert('Error al guardar la programación.');
+      }
     } else if (source === 'scheduled') {
-      setScheduled(prev => prev.map(s => 
-        s.id === item.id 
-          ? { ...s, dateStr, hour: hour !== undefined ? hour : s.hour, timeStr: hour ? `${hour}:00` : s.timeStr } 
-          : s
-      ));
+      try {
+         await supabase.from('operacion_programacion').update({ 
+           fecha: dateStr, 
+           hora: hour !== undefined ? hour : item.hour 
+         }).eq('id', item.id);
+
+         setScheduled(prev => prev.map(s => 
+           s.id === item.id 
+             ? { ...s, dateStr, hour: hour !== undefined ? hour : s.hour, timeStr: hour !== undefined ? `${hour}:00` : s.timeStr } 
+             : s
+         ));
+      } catch (err) {
+         console.error('Error re-programando:', err);
+         alert('Error al actualizar la programación.');
+      }
     }
     setDraggedItem(null);
   };
 
-  const handleDropToPending = (e: React.DragEvent) => {
+  const handleDropToPending = async (e: React.DragEvent) => {
     e.preventDefault();
     if (!draggedItem) return;
 
     const { item, source } = draggedItem;
     
     if (source === 'scheduled') {
-      setScheduled(prev => prev.filter(s => s.id !== item.id));
-      setPendings(prev => [...prev, {
-        id: item.id,
-        tipo: item.tipo,
-        origen: item.origen,
-        destino: item.destino,
-        conductorName: item.conductorName,
-        vehiculoPatente: item.vehiculoPatente,
-        bgColor: 'bg-white dark:bg-slate-800'
-      }]);
+      try {
+        await supabase.from('operacion_programacion').delete().eq('id', item.id);
+        
+        const { data: servData, error: servErr } = await supabase.from('operacion_servicio').insert([{
+           empresa_id: item.empresa_id,
+           codigo: `SRV-${Math.random().toString().slice(2, 6)}`,
+           tipo_carga: item.tipo,
+           origen: item.origen,
+           destino: item.destino,
+           fecha_servicio: new Date().toISOString(),
+           estado: 'Borrador',
+           conductor_id: item.conductor_id,
+           vehiculo_id: item.vehiculo_id
+        }]).select().single();
+
+        if (servErr) throw servErr;
+
+        setScheduled(prev => prev.filter(s => s.id !== item.id));
+        setPendings(prev => [...prev, {
+          id: servData.id,
+          tipo: servData.tipo_carga,
+          origen: servData.origen,
+          destino: servData.destino,
+          conductorName: item.conductorName,
+          vehiculoPatente: item.vehiculoPatente,
+          empresa_id: servData.empresa_id,
+          conductor_id: servData.conductor_id,
+          vehiculo_id: servData.vehiculo_id,
+          bgColor: 'bg-white dark:bg-slate-800'
+        }]);
+      } catch (err) {
+        console.error('Error moviendo a pendientes:', err);
+        alert('Error al regresar el servicio a pendientes.');
+      }
     }
     setDraggedItem(null);
   };
