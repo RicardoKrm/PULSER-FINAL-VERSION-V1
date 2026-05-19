@@ -22,11 +22,10 @@ type Contrato = {
 };
 
 export default function Contratos() {
-  const { activeCompanyId, companies } = useCompany();
+  const { activeCompanyId } = useCompany();
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [vehiculosDisponibles, setVehiculosDisponibles] = useState<{ id: string; patente: string; tipo: string }[]>([]);
-  const [dbEmpresas, setDbEmpresas] = useState<{id: string, nombre: string}[]>([]);
-  const [inputEmpresa, setInputEmpresa] = useState('');
+  const [clientesExistentes, setClientesExistentes] = useState<string[]>([]);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedContrato, setSelectedContrato] = useState<Contrato | null>(null);
@@ -36,7 +35,6 @@ export default function Contratos() {
 
   // Form states
   const [formData, setFormData] = useState({
-    empresa_id: activeCompanyId !== 'GLOBAL' ? activeCompanyId : '',
     cliente: '',
     rut: '',
     descripcion: '',
@@ -111,12 +109,9 @@ export default function Contratos() {
         setVehiculosDisponibles(vehiculosData);
       }
 
-      // Cargar empresas
-      const { data: empData, error: empError } = await supabase.from('empresa').select('id, nombre').eq('estado', 'Activo');
-      if (!empError && empData) {
-        setDbEmpresas(empData);
-      }
-
+      // Obtener lista de clientes únicos para autocompletar
+      const uniqueClients = Array.from(new Set(formatContratos.map(c => c.cliente))).filter(Boolean);
+      setClientesExistentes(uniqueClients);
 
     } catch (error) {
       console.error('Error loading contracts data:', error);
@@ -131,32 +126,9 @@ export default function Contratos() {
   const handleSaveContrato = async () => {
     if (!activeCompanyId) return;
 
-    let finalEmpresaId = activeCompanyId;
-
     if (activeCompanyId === 'GLOBAL') {
-      if (!inputEmpresa.trim()) {
-        showToast('Por favor, indica una empresa (escribe para crear o selecciona una).');
-        return;
-      }
-      const existing = dbEmpresas.find(e => e.nombre.toLowerCase() === inputEmpresa.trim().toLowerCase());
-      if (existing) {
-        finalEmpresaId = existing.id;
-      } else {
-        // Create new company
-        try {
-          const { data: newEmpresa, error: empError } = await supabase
-            .from('empresa')
-            .insert([{ nombre: inputEmpresa.trim(), razon_social: inputEmpresa.trim(), rut: '', estado: 'Activo' }])
-            .select('id')
-            .single();
-          if (empError) throw empError;
-          finalEmpresaId = newEmpresa.id;
-        } catch (e) {
-          showToast('Error al crear la empresa nueva.');
-          console.error(e);
-          return;
-        }
-      }
+      showToast('Por favor, selecciona una empresa específica para crear un contrato.');
+      return;
     }
 
     if (!formData.cliente || formData.cliente.trim() === '') {
@@ -168,7 +140,7 @@ export default function Contratos() {
       showToast('Guardando contrato...');
 
       const insertData = {
-        empresa_id: finalEmpresaId,
+        empresa_id: activeCompanyId,
         cliente_razon_social: formData.cliente,
         cliente_rut: formData.rut,
         descripcion: formData.descripcion,
@@ -402,29 +374,21 @@ export default function Contratos() {
                       <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">1. Datos Generales</h3>
                       
                       <div className="space-y-4">
-                        {activeCompanyId === 'GLOBAL' && (
-                          <div>
-                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Empresa Asignada</label>
-                            <div className="relative">
-                              <input 
-                                list="empresas-list"
-                                value={inputEmpresa} 
-                                onChange={e => setInputEmpresa(e.target.value)}
-                                placeholder="Escribe para crear o selecciona una empresa..."
-                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white"
-                              />
-                              <datalist id="empresas-list">
-                                {dbEmpresas.map(company => (
-                                  <option key={company.id} value={company.nombre} />
-                                ))}
-                              </datalist>
-                            </div>
-                          </div>
-                        )}
-
                         <div>
                           <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Cliente Razon Social</label>
-                          <input type="text" value={formData.cliente} onChange={e => setFormData({...formData, cliente: e.target.value})} placeholder="Ej: Minera Escondida Ltda." className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+                          <input 
+                            type="text" 
+                            list="clientes-list"
+                            value={formData.cliente} 
+                            onChange={e => setFormData({...formData, cliente: e.target.value})} 
+                            placeholder="Ej: Minera Escondida Ltda." 
+                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" 
+                          />
+                          <datalist id="clientes-list">
+                            {clientesExistentes.map(c => (
+                              <option key={c} value={c} />
+                            ))}
+                          </datalist>
                         </div>
 
                         <div>
