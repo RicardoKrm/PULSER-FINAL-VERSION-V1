@@ -19,6 +19,53 @@ export default function SuperAdminPerfiles() {
   // Cargos management state
   const [cargos, setCargos] = useState(['Administrador', 'Mecánico', 'Conductor', 'Supervisor Operaciones', 'Prevencionista', 'Despachador']);
   const [selectedCargoForPerms, setSelectedCargoForPerms] = useState('Administrador');
+  const [cargoPermissions, setCargoPermissions] = useState<Record<string, string[]>>({
+    'Administrador': [
+      'Módulo de Flota', 'Módulo de Flota:Ver Vehículos', 'Módulo de Flota:Crear/Editar Vehículos', 'Módulo de Flota:Asignar Conductores', 'Módulo de Flota:Archivar Vehículos',
+      'Módulo de Mantenimiento', 'Módulo de Mantenimiento:Ver Órdenes de Trabajo', 'Módulo de Mantenimiento:Crear Órdenes', 'Módulo de Mantenimiento:Aprobar Órdenes', 'Módulo de Mantenimiento:Cerrar Órdenes',
+      'Módulo de Personal', 'Módulo de Personal:Ver Empleados', 'Módulo de Personal:Crear/Editar Empleados', 'Módulo de Personal:Gestionar Permisos', 'Módulo de Personal:Evaluar Conductores',
+      'Reportes y Finanzas', 'Reportes y Finanzas:Ver Dashboards', 'Reportes y Finanzas:Exportar Data', 'Reportes y Finanzas:Ver Costos', 'Reportes y Finanzas:Aprobar Presupuestos',
+      'Gestión de Bodega', 'Gestión de Bodega:Ver Inventario', 'Gestión de Bodega:Ingresar Stock', 'Gestión de Bodega:Realizar Salida', 'Gestión de Bodega:Ajustes Manuales'
+    ]
+  });
+
+  const CARGO_MODULES = [
+    { section: 'Módulo de Flota', perms: ['Ver Vehículos', 'Crear/Editar Vehículos', 'Asignar Conductores', 'Archivar Vehículos'] },
+    { section: 'Módulo de Mantenimiento', perms: ['Ver Órdenes de Trabajo', 'Crear Órdenes', 'Aprobar Órdenes', 'Cerrar Órdenes'] },
+    { section: 'Módulo de Personal', perms: ['Ver Empleados', 'Crear/Editar Empleados', 'Gestionar Permisos', 'Evaluar Conductores'] },
+    { section: 'Reportes y Finanzas', perms: ['Ver Dashboards', 'Exportar Data', 'Ver Costos', 'Aprobar Presupuestos'] },
+    { section: 'Gestión de Bodega', perms: ['Ver Inventario', 'Ingresar Stock', 'Realizar Salida', 'Ajustes Manuales'] },
+  ];
+
+  const handleToggleCargoModule = (groupSection: string, subPerms: string[]) => {
+    setCargoPermissions(prev => {
+      const perms = prev[selectedCargoForPerms] || [];
+      const isEnabled = perms.includes(groupSection);
+      let newPerms;
+      if (isEnabled) {
+        newPerms = perms.filter(p => p !== groupSection && !p.startsWith(`${groupSection}:`));
+      } else {
+        newPerms = [...perms, groupSection, ...subPerms.map(sp => `${groupSection}:${sp}`)];
+      }
+      return { ...prev, [selectedCargoForPerms]: newPerms };
+    });
+  };
+
+  const handleToggleCargoSubPerm = (groupSection: string, p: string) => {
+    setCargoPermissions(prev => {
+      const perms = prev[selectedCargoForPerms] || [];
+      const key = `${groupSection}:${p}`;
+      const isEnabled = perms.includes(key);
+      let newPerms;
+      if (isEnabled) {
+        newPerms = perms.filter(x => x !== key);
+      } else {
+        newPerms = [...perms, key];
+        if (!newPerms.includes(groupSection)) newPerms.push(groupSection);
+      }
+      return { ...prev, [selectedCargoForPerms]: newPerms };
+    });
+  };
 
   const handleDeleteCargo = (cargo: string) => {
     Swal.fire({
@@ -855,21 +902,20 @@ export default function SuperAdminPerfiles() {
             </div>
 
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
-              {[
-                { section: 'Módulo de Flota', perms: ['Ver Vehículos', 'Crear/Editar Vehículos', 'Asignar Conductores', 'Archivar Vehículos'] },
-                { section: 'Módulo de Mantenimiento', perms: ['Ver Órdenes de Trabajo', 'Crear Órdenes', 'Aprobar Órdenes', 'Cerrar Órdenes'] },
-                { section: 'Módulo de Personal', perms: ['Ver Empleados', 'Crear/Editar Empleados', 'Gestionar Permisos', 'Evaluar Conductores'] },
-                { section: 'Reportes y Finanzas', perms: ['Ver Dashboards', 'Exportar Data', 'Ver Costos', 'Aprobar Presupuestos'] },
-                { section: 'Gestión de Bodega', perms: ['Ver Inventario', 'Ingresar Stock', 'Realizar Salida', 'Ajustes Manuales'] },
-              ].map((group, idx) => (
+              {CARGO_MODULES.map((group, idx) => {
+                const isGroupEnabled = (cargoPermissions[selectedCargoForPerms] || []).includes(group.section);
+                
+                return (
                 <div key={idx} className="space-y-3">
                   <label className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors">
-                     <input type="checkbox" className="hidden" checked={selectedCargoForPerms === 'Administrador' || idx % 2 === 0} readOnly />
+                     <input type="checkbox" className="hidden" 
+                            checked={isGroupEnabled} 
+                            onChange={() => handleToggleCargoModule(group.section, group.perms)} />
                      <div className={cn(
                         "flex items-center justify-center w-5 h-5 rounded border",
-                        (selectedCargoForPerms === 'Administrador' || idx % 2 === 0) ? "bg-indigo-500 border-indigo-500 text-white" : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
+                        isGroupEnabled ? "bg-indigo-500 border-indigo-500 text-white" : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
                       )}>
-                        {(selectedCargoForPerms === 'Administrador' || idx % 2 === 0) && <Check className="h-3.5 w-3.5" />}
+                        {isGroupEnabled && <Check className="h-3.5 w-3.5" />}
                      </div>
                      <div className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-200 text-sm">
                         {group.section}
@@ -877,26 +923,30 @@ export default function SuperAdminPerfiles() {
                   </label>
                   
                   <div className="pl-6 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 ml-5">
-                    {group.perms.map((p, pidx) => (
+                    {group.perms.map((p, pidx) => {
+                      const isPermEnabled = (cargoPermissions[selectedCargoForPerms] || []).includes(`${group.section}:${p}`);
+                      return (
                       <label key={pidx} className="flex items-center gap-3 cursor-pointer group hover:bg-slate-50 dark:hover:bg-slate-800 p-1 -m-1 rounded transition-colors">
-                        <input type="checkbox" className="hidden" checked={selectedCargoForPerms === 'Administrador' || (idx % 2 === 0 && pidx % 2 !== 0)} readOnly />
+                        <input type="checkbox" className="hidden" 
+                               checked={isPermEnabled} 
+                               onChange={() => handleToggleCargoSubPerm(group.section, p)} />
                         <div className={cn(
                           "flex items-center justify-center w-4 h-4 rounded border transition-colors",
-                          (selectedCargoForPerms === 'Administrador' || (idx % 2 === 0 && pidx % 2 !== 0)) ? "bg-indigo-500 border-indigo-500 text-white" : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 group-hover:border-indigo-300"
+                          isPermEnabled ? "bg-indigo-500 border-indigo-500 text-white" : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 group-hover:border-indigo-300"
                         )}>
-                           {(selectedCargoForPerms === 'Administrador' || (idx % 2 === 0 && pidx % 2 !== 0)) && <Check className="h-3 w-3" />}
+                           {isPermEnabled && <Check className="h-3 w-3" />}
                         </div>
                         <span className={cn(
                           "text-sm transition-colors",
-                          (selectedCargoForPerms === 'Administrador' || (idx % 2 === 0 && pidx % 2 !== 0)) ? "text-slate-700 dark:text-slate-300 font-medium" : "text-slate-500 dark:text-slate-500"
+                          isPermEnabled ? "text-slate-700 dark:text-slate-300 font-medium" : "text-slate-500 dark:text-slate-500"
                         )}>
                           {p}
                         </span>
                       </label>
-                    ))}
+                    )})}
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
 
             <div className="p-6 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 flex justify-end gap-3 mt-auto rounded-b-xl">
