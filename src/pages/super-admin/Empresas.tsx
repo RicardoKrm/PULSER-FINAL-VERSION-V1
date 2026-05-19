@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Building, Users, Truck, Plus, Shield, Calendar, Filter, X, Settings } from 'lucide-react';
+import { Building, Users, Truck, Plus, Shield, Calendar, Filter, X, Settings, Pencil, Trash2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import Swal from 'sweetalert2';
 
 interface Empresa {
   id: string;
@@ -20,6 +21,7 @@ export default function SuperAdminEmpresas() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     nombre: '',
     razonSocial: '',
@@ -42,30 +44,57 @@ export default function SuperAdminEmpresas() {
   useEffect(() => {
     fetchEmpresas();
   }, []);
+  
+  const handleOpenCreateModal = () => {
+    setEditingCompanyId(null);
+    setFormData({
+      nombre: '',
+      razonSocial: '',
+      rut: '',
+    });
+    setIsModalOpen(true);
+  };
 
-  const handleCreateCompany = async (e: React.FormEvent) => {
+  const handleOpenEditModal = (company: Empresa) => {
+    setEditingCompanyId(company.id);
+    setFormData({
+      nombre: company.nombre,
+      razonSocial: company.razon_social || '',
+      rut: company.rut,
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleSaveCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { data, error } = await supabase.from('empresa').insert([
-        {
+      if (editingCompanyId) {
+        const { error } = await supabase.from('empresa').update({
           nombre: formData.nombre,
           razon_social: formData.razonSocial,
           rut: formData.rut,
-          estado: 'Activo'
-        }
-      ]);
-      if (error) throw error;
+        }).eq('id', editingCompanyId);
+        
+        if (error) throw error;
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Empresa actualizada', showConfirmButton: false, timer: 1500 });
+      } else {
+        const { error } = await supabase.from('empresa').insert([
+          {
+            nombre: formData.nombre,
+            razon_social: formData.razonSocial,
+            rut: formData.rut,
+            estado: 'Activo'
+          }
+        ]);
+        if (error) throw error;
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Empresa creada', showConfirmButton: false, timer: 1500 });
+      }
       
       setIsModalOpen(false);
-      setFormData({
-        nombre: '',
-        razonSocial: '',
-        rut: '',
-      });
       fetchEmpresas();
-    } catch (error) {
-      console.error('Error al crear empresa:', error);
-      alert('Error al crear la empresa. Verifica los datos.');
+    } catch (error: any) {
+      console.error('Error al guardar empresa:', error);
+      Swal.fire('Error', error.message || 'Error al guardar la empresa. Verifica los datos.', 'error');
     }
   };
 
@@ -77,6 +106,36 @@ export default function SuperAdminEmpresas() {
       fetchEmpresas();
     } catch (error) {
       console.error('Error al cambiar estado de empresa:', error);
+    }
+  };
+  
+  const handleDeleteCompany = async (id: string, nombre: string) => {
+    const result = await Swal.fire({
+      title: '¿Eliminar empresa?',
+      text: `Se eliminará la empresa "${nombre}". Esta acción podría fallar si hay registros asociados a ella.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const { error } = await supabase
+          .from('empresa')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+        
+        fetchEmpresas();
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'La empresa ha sido eliminada', showConfirmButton: false, timer: 1500 });
+      } catch (err: any) {
+        console.error(err);
+        Swal.fire('Error', err.message || 'No se pudo eliminar la empresa. Es posible que esté en uso.', 'error');
+      }
     }
   };
 
@@ -95,7 +154,7 @@ export default function SuperAdminEmpresas() {
         </div>
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={handleOpenCreateModal}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
             <Plus className="h-4 w-4" /> Nueva Empresa
@@ -162,7 +221,7 @@ export default function SuperAdminEmpresas() {
                           {company.estado}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-right space-x-2">
+                      <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
                         <button
                           onClick={() => toggleCompanyStatus(company.id, company.estado)}
                           className={cn(
@@ -180,6 +239,22 @@ export default function SuperAdminEmpresas() {
                           className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 transition-colors border border-blue-200 dark:border-blue-800/50 flex items-center gap-1 inline-flex"
                         >
                           <Settings className="w-3.5 h-3.5" /> Gestionar
+                        </button>
+                        
+                        <button
+                          onClick={() => handleOpenEditModal(company)}
+                          className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors inline-flex border border-transparent"
+                          title="Editar empresa"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteCompany(company.id, company.nombre)}
+                          className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors inline-flex border border-transparent"
+                          title="Eliminar empresa"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </button>
                         
                         {profile?.empresa_id === company.id ? (
@@ -205,14 +280,14 @@ export default function SuperAdminEmpresas() {
         </div>
       </div>
 
-      {/* Modal Nueva Empresa */}
+      {/* Modal Empresa */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-800">
               <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                 <Building className="h-5 w-5 text-blue-500" />
-                Nueva Empresa
+                {editingCompanyId ? 'Editar Empresa' : 'Nueva Empresa'}
               </h2>
               <button 
                 onClick={() => setIsModalOpen(false)}
@@ -223,7 +298,7 @@ export default function SuperAdminEmpresas() {
               </button>
             </div>
             
-            <form onSubmit={handleCreateCompany} className="p-5 space-y-4 text-sm">
+            <form onSubmit={handleSaveCompany} className="p-5 space-y-4 text-sm">
               <div className="space-y-1.5">
                 <label className="font-medium text-slate-700 dark:text-slate-300">Nombre Comercial</label>
                 <input 
@@ -272,7 +347,7 @@ export default function SuperAdminEmpresas() {
                   type="submit"
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
                 >
-                  Confirmar y Crear
+                  {editingCompanyId ? 'Guardar Cambios' : 'Confirmar y Crear'}
                 </button>
               </div>
             </form>
