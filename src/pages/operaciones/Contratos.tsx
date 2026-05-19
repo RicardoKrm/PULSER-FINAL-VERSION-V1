@@ -57,14 +57,19 @@ export default function Contratos() {
 
     try {
       // Cargar contratos
-      const { data: contratosData, error: contratosError } = await supabase
+      let contratosQuery = supabase
         .from('operacion_contrato')
         .select(`
           *,
           operacion_contrato_vehiculo( vehiculo_id, vehiculo( patente, tipo ) )
         `)
-        .eq('empresa_id', activeCompanyId)
         .order('created_at', { ascending: false });
+        
+      if (activeCompanyId !== 'GLOBAL') {
+        contratosQuery = contratosQuery.eq('empresa_id', activeCompanyId);
+      }
+
+      const { data: contratosData, error: contratosError } = await contratosQuery;
 
       if (contratosError) throw contratosError;
 
@@ -89,10 +94,15 @@ export default function Contratos() {
       setContratos(formatContratos);
 
       // Cargar vehículos
-      const { data: vehiculosData, error: vehiculosError } = await supabase
+      let vehiculosQuery = supabase
         .from('vehiculo')
-        .select('id, patente, tipo')
-        .eq('empresa_id', activeCompanyId);
+        .select('id, patente, tipo');
+        
+      if (activeCompanyId !== 'GLOBAL') {
+        vehiculosQuery = vehiculosQuery.eq('empresa_id', activeCompanyId);
+      }
+      
+      const { data: vehiculosData, error: vehiculosError } = await vehiculosQuery;
       
       if (!vehiculosError && vehiculosData) {
         setVehiculosDisponibles(vehiculosData);
@@ -110,6 +120,11 @@ export default function Contratos() {
 
   const handleSaveContrato = async () => {
     if (!activeCompanyId) return;
+
+    if (activeCompanyId === 'GLOBAL') {
+      showToast('Por favor, selecciona una empresa específica para crear un contrato.');
+      return;
+    }
 
     if (!formData.cliente || formData.cliente.trim() === '') {
       showToast('Por favor, ingresa el nombre o razón social del cliente.');

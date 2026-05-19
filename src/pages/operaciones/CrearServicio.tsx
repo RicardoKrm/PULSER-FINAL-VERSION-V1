@@ -56,7 +56,7 @@ export default function CrearServicio() {
     if (!activeCompanyId) return;
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('operacion_servicio')
         .select(`
           *,
@@ -64,8 +64,13 @@ export default function CrearServicio() {
           colaborador ( nombre, estado ),
           vehiculo ( patente, estado )
         `)
-        .eq('empresa_id', activeCompanyId)
         .order('created_at', { ascending: false });
+
+      if (activeCompanyId !== 'GLOBAL') {
+        query = query.eq('empresa_id', activeCompanyId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -88,10 +93,18 @@ export default function CrearServicio() {
       setServicios(formattedServices);
 
       // Load form options
+      let contratosQ = supabase.from('operacion_contrato').select('id, cliente_razon_social').eq('activo', true);
+      let vehiculosQ = supabase.from('vehiculo').select('id, patente');
+      let colaboradoresQ = supabase.from('colaborador').select('id, nombre, estado').in('rol', ['Conductor', 'Chofer']);
+
+      if (activeCompanyId !== 'GLOBAL') {
+        contratosQ = contratosQ.eq('empresa_id', activeCompanyId);
+        vehiculosQ = vehiculosQ.eq('empresa_id', activeCompanyId);
+        colaboradoresQ = colaboradoresQ.eq('empresa_id', activeCompanyId);
+      }
+
       const [contratos, vehiculos, colaboradores] = await Promise.all([
-        supabase.from('operacion_contrato').select('id, cliente_razon_social').eq('empresa_id', activeCompanyId).eq('activo', true),
-        supabase.from('vehiculo').select('id, patente').eq('empresa_id', activeCompanyId),
-        supabase.from('colaborador').select('id, nombre, estado').eq('empresa_id', activeCompanyId).in('rol', ['Conductor', 'Chofer'])
+        contratosQ, vehiculosQ, colaboradoresQ
       ]);
 
       if (contratos.data) setContratosDisponibles(contratos.data.map(c => ({ id: c.id, cliente: c.cliente_razon_social })));
@@ -142,6 +155,11 @@ export default function CrearServicio() {
 
   const handleSaveService = async () => {
     if (!activeCompanyId) return;
+
+    if (activeCompanyId === 'GLOBAL') {
+      showToast('Por favor, selecciona una empresa específica para crear un servicio.');
+      return;
+    }
 
     if (!newOrigen.trim() || !newDestino.trim()) {
       showToast('Origen y Destino son campos requeridos.');

@@ -25,11 +25,16 @@ export default function ReservasTurismo() {
     if (!activeCompanyId) return;
 
     try {
-      const { data: reservasData, error: reservasError } = await supabase
+      let query = supabase
         .from('operacion_reserva')
         .select('*')
-        .eq('empresa_id', activeCompanyId)
         .order('created_at', { ascending: false });
+
+      if (activeCompanyId !== 'GLOBAL') {
+        query = query.eq('empresa_id', activeCompanyId);
+      }
+
+      const { data: reservasData, error: reservasError } = await query;
 
       if (reservasError) throw reservasError;
 
@@ -74,10 +79,18 @@ export default function ReservasTurismo() {
 
       setReservasTurismo(formattedReservas);
 
-      const { data: condData } = await supabase.from('colaborador').select('id, nombre, estado').eq('empresa_id', activeCompanyId).in('rol', ['Conductor', 'Chofer']);
+      let condQuery = supabase.from('colaborador').select('id, nombre, estado').in('rol', ['Conductor', 'Chofer']);
+      let vehQuery = supabase.from('vehiculo').select('id, patente, marca, estado');
+      
+      if (activeCompanyId !== 'GLOBAL') {
+        condQuery = condQuery.eq('empresa_id', activeCompanyId);
+        vehQuery = vehQuery.eq('empresa_id', activeCompanyId);
+      }
+
+      const { data: condData } = await condQuery;
       if (condData) setConductores(condData);
 
-      const { data: vehData } = await supabase.from('vehiculo').select('id, patente, marca, estado').eq('empresa_id', activeCompanyId);
+      const { data: vehData } = await vehQuery;
       if (vehData) setVehiculos(vehData);
 
     } catch (error) {
@@ -199,6 +212,11 @@ export default function ReservasTurismo() {
   const handleCrearReserva = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeCompanyId) return;
+
+    if (activeCompanyId === 'GLOBAL') {
+      alert('Por favor, selecciona una empresa específica para crear una reserva.');
+      return;
+    }
 
     const neto = calcularNeto(formReserva.finanzas.montoBruto, formReserva.finanzas.gastosAdicionales, formReserva.finanzas.porcentajeComision);
     
