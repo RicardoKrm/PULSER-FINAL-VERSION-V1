@@ -506,7 +506,7 @@ export default function SuperAdminPerfiles() {
               </div>
               
               {/* Acciones de Perfil */}
-              {roles.find(r => r.name === selectedRole)?.type !== 'Sistema' && (
+              {selectedRole && (
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => {
