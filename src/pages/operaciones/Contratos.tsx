@@ -22,7 +22,7 @@ type Contrato = {
 };
 
 export default function Contratos() {
-  const { activeCompanyId } = useCompany();
+  const { activeCompanyId, companies } = useCompany();
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [vehiculosDisponibles, setVehiculosDisponibles] = useState<{ id: string; patente: string; tipo: string }[]>([]);
   
@@ -34,6 +34,7 @@ export default function Contratos() {
 
   // Form states
   const [formData, setFormData] = useState({
+    empresa_id: activeCompanyId !== 'GLOBAL' ? activeCompanyId : '',
     cliente: '',
     rut: '',
     descripcion: '',
@@ -121,10 +122,11 @@ export default function Contratos() {
   const handleSaveContrato = async () => {
     if (!activeCompanyId) return;
 
-    if (activeCompanyId === 'GLOBAL') {
-      showToast('Por favor, selecciona una empresa específica para crear un contrato.');
+    if (activeCompanyId === 'GLOBAL' && !formData.empresa_id) {
+      showToast('Por favor, selecciona una empresa específica para este contrato.');
       return;
     }
+    const finalEmpresaId = activeCompanyId === 'GLOBAL' ? formData.empresa_id : activeCompanyId;
 
     if (!formData.cliente || formData.cliente.trim() === '') {
       showToast('Por favor, ingresa el nombre o razón social del cliente.');
@@ -135,7 +137,7 @@ export default function Contratos() {
       showToast('Guardando contrato...');
 
       const insertData = {
-        empresa_id: activeCompanyId,
+        empresa_id: finalEmpresaId,
         cliente_razon_social: formData.cliente,
         cliente_rut: formData.rut,
         descripcion: formData.descripcion,
@@ -173,6 +175,7 @@ export default function Contratos() {
       loadData();
       showToast('Contrato creado exitosamente.');
       setFormData({
+        empresa_id: activeCompanyId !== 'GLOBAL' ? activeCompanyId : '',
         cliente: '', rut: '', descripcion: '', tipo: 'Transporte Personal', zona: 'Norte',
         inicio: '', termino: '', valor: '', condicion_pago: '30 Días', renovacion_auto: false, vehiculosAsignados: []
       });
@@ -368,6 +371,29 @@ export default function Contratos() {
                       <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">1. Datos Generales</h3>
                       
                       <div className="space-y-4">
+                        {activeCompanyId === 'GLOBAL' && (
+                          <div>
+                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Empresa Asignada</label>
+                            <div className="relative">
+                              <select 
+                                value={formData.empresa_id} 
+                                onChange={e => setFormData({...formData, empresa_id: e.target.value})} 
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white appearance-none"
+                              >
+                                <option value="" disabled>Seleccione una empresa</option>
+                                {companies.filter(c => c.id !== 'GLOBAL').map(company => (
+                                  <option key={company.id} value={company.id}>
+                                    {company.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         <div>
                           <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Cliente Razon Social</label>
                           <input type="text" value={formData.cliente} onChange={e => setFormData({...formData, cliente: e.target.value})} placeholder="Ej: Minera Escondida Ltda." className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
