@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { useAppContext } from '../../context/AppContext';
+import { useCompany } from '../../contexts/CompanyContext';
+import { supabase } from '../../lib/supabase';
 import { 
   Plus, Search, Filter, MapPin, Clock, User, Users, Car, FileText, 
   FileSpreadsheet, ChevronRight, CheckCircle, XCircle, Calendar as CalendarIcon, 
@@ -13,7 +14,80 @@ import { Pagination } from '../../components/ui/Pagination';
 import { ReservaTurismo } from '../../types';
 
 export default function ReservasTurismo() {
-  const { reservasTurismo, conductores, vehiculos, crearReservaTurismo } = useAppContext();
+  const { activeCompanyId } = useCompany();
+  
+  // States to hold DB data
+  const [reservasTurismo, setReservasTurismo] = useState<ReservaTurismo[]>([]);
+  const [conductores, setConductores] = useState<any[]>([]);
+  const [vehiculos, setVehiculos] = useState<any[]>([]);
+
+  const loadData = async () => {
+    if (!activeCompanyId) return;
+
+    try {
+      const { data: reservasData, error: reservasError } = await supabase
+        .from('operacion_reserva')
+        .select('*')
+        .eq('empresa_id', activeCompanyId)
+        .order('created_at', { ascending: false });
+
+      if (reservasError) throw reservasError;
+
+      const formattedReservas: ReservaTurismo[] = (reservasData || []).map((dbR: any) => ({
+        id: dbR.id,
+        op: dbR.codigo || 'SIN-OP',
+        categoria: dbR.categoria as any,
+        cliente: {
+          nombre: dbR.cliente_nombre || '',
+          email: dbR.cliente_email || '',
+          telefono: dbR.cliente_telefono || '',
+          dni_pasaporte: dbR.detalles?.cliente?.dni_pasaporte || '',
+          rut_empresa: dbR.cliente_rut || ''
+        },
+        pasajeros: dbR.detalles?.pasajeros || { nombre: '', telefono: '', cantidad: dbR.pasajeros_cantidad || 1 },
+        lugares: {
+          origen: dbR.origen || '',
+          destino: dbR.destino || '',
+          numeroVuelo: dbR.detalles?.lugares?.numeroVuelo || ''
+        },
+        logistica: dbR.detalles?.logistica || { maletasGrandes: 0, maletasChicas: 0, sillaBebe: false, cantidadSillas: 0 },
+        servicio: dbR.detalles?.servicio || '',
+        tipoVehiculo: dbR.detalles?.tipoVehiculo || 'SUV',
+        fecha: dbR.fecha_reserva ? new Date(dbR.fecha_reserva).toISOString().split('T')[0] : '',
+        horaInicio: dbR.detalles?.horaInicio || '',
+        horaTermino: dbR.detalles?.horaTermino || '',
+        conductorId: dbR.conductor_id || '',
+        vehiculoId: dbR.vehiculo_id || '',
+        finanzas: dbR.detalles?.finanzas || {
+          montoBruto: Number(dbR.monto_total) || 0,
+          gastosAdicionales: 0,
+          porcentajeComision: 10,
+          formaPago: 'Efectivo',
+          tipoDocumento: 'Boleta',
+          cobrado: false,
+          montoNeto: 0
+        },
+        comentarios: dbR.detalles?.comentarios || { conductor: '', interno: '' },
+        estado: dbR.estado_viaje?.toLowerCase() || 'pendiente',
+        auditLogs: dbR.detalles?.auditLogs || []
+      }));
+
+      setReservasTurismo(formattedReservas);
+
+      const { data: condData } = await supabase.from('colaborador').select('id, nombre, estado').eq('empresa_id', activeCompanyId).in('rol', ['Conductor', 'Chofer']);
+      if (condData) setConductores(condData);
+
+      const { data: vehData } = await supabase.from('vehiculo').select('id, patente, marca, estado').eq('empresa_id', activeCompanyId);
+      if (vehData) setVehiculos(vehData);
+
+    } catch (error) {
+      console.error('Error loading data', error);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [activeCompanyId]);
   
   const opcionesFecha: Intl.DateTimeFormatOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
   const fechaTexto = new Date().toLocaleDateString('es-ES', opcionesFecha);
@@ -122,23 +196,59 @@ export default function ReservasTurismo() {
     return (bruto - adicional) * (1 - comision / 100);
   };
 
-  const handleCrearReserva = (e: React.FormEvent) => {
+  const handleCrearReserva = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!activeCompanyId) return;
+
     const neto = calcularNeto(formReserva.finanzas.montoBruto, formReserva.finanzas.gastosAdicionales, formReserva.finanzas.porcentajeComision);
     
-    crearReservaTurismo({
-      ...formReserva,
-      estado: 'confirmada',
-      finanzas: {
-        ...formReserva.finanzas,
-        montoNeto: neto
-      },
-      auditLogs: [], // AppContext handles the first log
-      op: '' // AppContext handles ID/OP
-    } as any);
-    
-    setMostrarFormulario(false);
-    setFormReserva(initialFormState);
+    // Default structure for details JSONB
+    const reservationData = {
+      empresa_id: activeCompanyId,
+      codigo: `OP-${Math.floor(1000 + Math.random() * 9000)}-${new Date().getFullYear()}`,
+      categoria: formReserva.categoria,
+      cliente_nombre: formReserva.cliente.nombre,
+      cliente_email: formReserva.cliente.email,
+      cliente_telefono: formReserva.cliente.telefono,
+      cliente_rut: formReserva.cliente.rut_empresa,
+      origen: formReserva.lugares.origen,
+      destino: formReserva.lugares.destino,
+      fecha_reserva: formReserva.fecha ? new Date(`${formReserva.fecha}T${formReserva.horaInicio || '00:00'}:00`).toISOString() : null,
+      pasajeros_cantidad: formReserva.pasajeros.cantidad,
+      monto_total: formReserva.finanzas.montoBruto,
+      estado_pago: formReserva.finanzas.cobrado ? 'Pagado' : 'Pendiente',
+      estado_viaje: 'Confirmado',
+      conductor_id: formReserva.conductorId || null,
+      vehiculo_id: formReserva.vehiculoId || null,
+      detalles: {
+        cliente: { dni_pasaporte: formReserva.cliente.dni_pasaporte },
+        pasajeros: formReserva.pasajeros,
+        lugares: formReserva.lugares,
+        logistica: formReserva.logistica,
+        servicio: formReserva.servicio,
+        tipoVehiculo: formReserva.tipoVehiculo,
+        horaInicio: formReserva.horaInicio,
+        horaTermino: formReserva.horaTermino,
+        finanzas: {
+          ...formReserva.finanzas,
+          montoNeto: neto
+        },
+        comentarios: formReserva.comentarios,
+        auditLogs: [{ accion: 'Reserva Creada', quien: 'Actual Usuario', cuando: new Date().toISOString() }]
+      }
+    };
+
+    try {
+      const { error } = await supabase.from('operacion_reserva').insert([reservationData]);
+      if (error) throw error;
+      
+      setMostrarFormulario(false);
+      setFormReserva(initialFormState);
+      loadData(); // refresh data
+    } catch (err) {
+      console.error('Error saving reserva', err);
+      alert('Error guardando reserva');
+    }
   };
 
   const verDetalle = (reserva: ReservaTurismo) => {
@@ -767,8 +877,8 @@ export default function ReservasTurismo() {
                                onChange={(e) => setFormReserva({...formReserva, conductorId: e.target.value})}
                             >
                                <option value="">Seleccione Conductor</option>
-                               {conductores.filter(c => c.estado === 'activo').map(c => (
-                                 <option key={c.id} value={c.id}>{c.nombre}</option>
+                               {conductores.map(c => (
+                                 <option key={c.id} value={c.id}>{c.nombre} ({c.estado})</option>
                                ))}
                             </select>
                          </div>

@@ -1,6 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Calendar as CalendarIcon, CheckCircle2, AlertCircle, Plus, Search, MapPin, Truck, User, FileText, X, Activity, Download, ChevronRight, DollarSign, Clock, FileWarning, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
 
 type Servicio = {
   id: string;
@@ -18,12 +20,16 @@ type Servicio = {
   costo: number;
 };
 
-const mockServicios: Servicio[] = [];
-
 export default function CrearServicio() {
+  const { activeCompanyId } = useCompany();
+  const [servicios, setServicios] = useState<Servicio[]>([]);
+  const [contratosDisponibles, setContratosDisponibles] = useState<{ id: string; cliente: string }[]>([]);
+  const [vehiculosDisponibles, setVehiculosDisponibles] = useState<{ id: string; patente: string }[]>([]);
+  const [conductoresDisponibles, setConductoresDisponibles] = useState<{ id: string; nombre: string; estado: string }[]>([]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedServicio, setSelectedServicio] = useState<typeof mockServicios[0] | null>(null);
-  const [editingServicio, setEditingServicio] = useState<typeof mockServicios[0] | null>(null);
+  const [selectedServicio, setSelectedServicio] = useState<Servicio | null>(null);
+  const [editingServicio, setEditingServicio] = useState<Servicio | null>(null);
   const [showHojaRuta, setShowHojaRuta] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('');
@@ -39,6 +45,67 @@ export default function CrearServicio() {
   const [newUnidad, setNewUnidad] = useState('');
   const [newIngreso, setNewIngreso] = useState<number | ''>('');
   const [newCosto, setNewCosto] = useState<number | ''>('');
+  const [toastMessage, setToastMessage] = useState('');
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(''), 3000);
+  };
+
+  const loadData = async () => {
+    if (!activeCompanyId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('operacion_servicio')
+        .select(`
+          *,
+          operacion_contrato ( cliente_razon_social ),
+          colaborador ( nombre, estado ),
+          vehiculo ( patente, estado )
+        `)
+        .eq('empresa_id', activeCompanyId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedServices: Servicio[] = (data || []).map((s: any) => ({
+        id: s.id,
+        codigo: s.codigo || 'S-S/N',
+        contrato: s.operacion_contrato?.cliente_razon_social || 'Sin contrato',
+        tipo: s.tipo_carga,
+        subtipo: s.subtipo || '',
+        origen: s.origen,
+        destino: s.destino,
+        fecha: s.fecha_servicio,
+        conductor: s.colaborador?.nombre || 'Sin asignar',
+        unidad: s.vehiculo?.patente || 'Sin asignar',
+        estado: s.estado,
+        ingreso: parseFloat(s.ingreso_esperado) || 0,
+        costo: parseFloat(s.costo_estimado) || 0
+      }));
+
+      setServicios(formattedServices);
+
+      // Load form options
+      const [contratos, vehiculos, colaboradores] = await Promise.all([
+        supabase.from('operacion_contrato').select('id, cliente_razon_social').eq('empresa_id', activeCompanyId).eq('activo', true),
+        supabase.from('vehiculo').select('id, patente').eq('empresa_id', activeCompanyId),
+        supabase.from('colaborador').select('id, nombre, estado').eq('empresa_id', activeCompanyId).in('rol', ['Conductor', 'Chofer'])
+      ]);
+
+      if (contratos.data) setContratosDisponibles(contratos.data.map(c => ({ id: c.id, cliente: c.cliente_razon_social })));
+      if (vehiculos.data) setVehiculosDisponibles(vehiculos.data);
+      if (colaboradores.data) setConductoresDisponibles(colaboradores.data);
+
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [activeCompanyId]);
 
   const handleNewService = () => {
     setEditingServicio(null);
@@ -73,15 +140,57 @@ export default function CrearServicio() {
     setIsModalOpen(true);
   };
 
+  const handleSaveService = async () => {
+    if (!activeCompanyId) return;
+
+    try {
+      showToast('Guardando servicio...');
+
+      const serviceData = {
+        empresa_id: activeCompanyId,
+        codigo: editingServicio?.codigo || `SRV-${Math.floor(Math.random() * 10000)}`,
+        contrato_id: newContrato || null,
+        tipo_carga: newTipoCarga,
+        subtipo: newSubtipo,
+        origen: newOrigen,
+        destino: newDestino,
+        fecha_servicio: newFecha || new Date().toISOString(),
+        conductor_id: newConductor || null,
+        vehiculo_id: newUnidad || null,
+        estado: 'Programado',
+        ingreso_esperado: newIngreso ? Number(newIngreso) : 0,
+        costo_estimado: newCosto ? Number(newCosto) : 0
+      };
+
+      let saveError;
+      if (editingServicio) {
+        const { error } = await supabase.from('operacion_servicio').update(serviceData).eq('id', editingServicio.id);
+        saveError = error;
+      } else {
+        const { error } = await supabase.from('operacion_servicio').insert([serviceData]);
+        saveError = error;
+      }
+
+      if (saveError) throw saveError;
+
+      setIsModalOpen(false);
+      loadData();
+      showToast('Servicio guardado exitosamente.');
+    } catch (error) {
+      console.error('Error saving service:', error);
+      showToast('Error al guardar el servicio.');
+    }
+  };
+
   const filteredServicios = useMemo(() => {
-    return mockServicios.filter(s => {
+    return servicios.filter(s => {
       const matchName = s.codigo.toLowerCase().includes(searchTerm.toLowerCase()) || 
                         s.contrato.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         s.conductor.toLowerCase().includes(searchTerm.toLowerCase());
       const matchDate = dateFilter ? s.fecha.startsWith(dateFilter) : true;
       return matchName && matchDate;
     });
-  }, [searchTerm, dateFilter]);
+  }, [servicios, searchTerm, dateFilter]);
 
   // Real-time validations logic
   const validations = useMemo(() => {
@@ -92,8 +201,10 @@ export default function CrearServicio() {
     if (newTipoCarga === 'Peligrosa / MATPEL') {
       v.push({ type: 'warning', text: 'Carga MATPEL: El conductor debe tener curso MATPEL vigente.' });
     }
-    if (newConductor === 'Carlos Silva (En ruta)') {
-      v.push({ type: 'error', text: 'Programación Cruzada (Anticolisión): El conductor está en ruta.' });
+    
+    const driver = conductoresDisponibles.find(d => d.id === newConductor);
+    if (driver && driver.estado === 'EN_RUTA') {
+      v.push({ type: 'error', text: 'Programación Cruzada (Anticolisión): El conductor ya está en ruta.' });
     } else if (newConductor) {
       v.push({ type: 'success', text: 'Documentación en regla: Conductor habilitado (Integración GDC).' });
     }
@@ -103,7 +214,7 @@ export default function CrearServicio() {
     }
     
     return v;
-  }, [newSubtipo, newTipoCarga, newConductor]);
+  }, [newSubtipo, newTipoCarga, newConductor, conductoresDisponibles]);
 
   const getStatusColor = (estado: string) => {
     switch(estado) {
@@ -269,9 +380,9 @@ export default function CrearServicio() {
                           <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Contrato Asociado (Opcional)</label>
                           <select value={newContrato} onChange={(e) => setNewContrato(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
                             <option value="">Sin contrato especifico</option>
-                            <option value="Minera Escondida - CT1">Minera Escondida - CT1</option>
-                            <option value="BHP Billiton - CT2">BHP Billiton - CT2</option>
-                            <option value="Codelco - CT3">Codelco - CT3</option>
+                            {contratosDisponibles.map(c => (
+                              <option key={c.id} value={c.id}>{c.cliente}</option>
+                            ))}
                           </select>
                         </div>
                         <div>
@@ -320,20 +431,18 @@ export default function CrearServicio() {
                           <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Asignar Conductor</label>
                           <select value={newConductor} onChange={e => setNewConductor(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
                             <option value="">Seleccionar conductor...</option>
-                            <option value="Juan Pérez">Juan Pérez (Disponible)</option>
-                            <option value="Carlos Silva">Carlos Silva (En ruta)</option>
-                            <option value="Luis Martínez">Luis Martínez (Disponible)</option>
-                            <option value="Ana Gómez">Ana Gómez (Disponible)</option>
+                            {conductoresDisponibles.map(d => (
+                              <option key={d.id} value={d.id}>{d.nombre} ({d.estado})</option>
+                            ))}
                           </select>
                         </div>
                         <div>
                           <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Asignar Vehículo/Máquina</label>
                           <select value={newUnidad} onChange={(e) => setNewUnidad(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
                             <option value="">Seleccionar unidad...</option>
-                            <option value="Camión C-10">Camión C-10 (Operativo)</option>
-                            <option value="Camión C-11">Camión C-11 (Operativo)</option>
-                            <option value="Minibus M-04">Minibus M-04 (Operativo)</option>
-                            <option value="Tractocamión T-01">Tractocamión T-01 (Mantenimiento próximo)</option>
+                            {vehiculosDisponibles.map(v => (
+                              <option key={v.id} value={v.id}>{v.patente}</option>
+                            ))}
                           </select>
                         </div>
                       </div>
@@ -412,7 +521,7 @@ export default function CrearServicio() {
                  </button>
                  <button 
                    disabled={validations.some(v => v.type === 'error')}
-                   onClick={() => setIsModalOpen(false)}
+                   onClick={handleSaveService}
                    className="px-8 py-3 rounded-xl font-black text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-indigo-600/20 transition-all flex items-center gap-2"
                  >
                    <CheckCircle2 className="w-5 h-5" />

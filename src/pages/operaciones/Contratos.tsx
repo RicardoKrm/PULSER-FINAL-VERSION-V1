@@ -1,6 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { FileText, Plus, Search, Calendar, X, Briefcase, Download, Paperclip, ChevronRight, CheckCircle2, Truck, Wrench, Info, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value);
@@ -19,31 +21,164 @@ type Contrato = {
   maquinasAsignadas: string[];
 };
 
-const mockContratos: Contrato[] = [];
-
-const mockVehiculos: string[] = [];
-const mockMaquinas: string[] = [];
-
 export default function Contratos() {
+  const { activeCompanyId } = useCompany();
+  const [contratos, setContratos] = useState<Contrato[]>([]);
+  const [vehiculosDisponibles, setVehiculosDisponibles] = useState<{ id: string; patente: string; tipo: string }[]>([]);
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedContrato, setSelectedContrato] = useState<typeof mockContratos[0] | null>(null);
+  const [selectedContrato, setSelectedContrato] = useState<Contrato | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [toastMessage, setToastMessage] = useState('');
+
+  // Form states
+  const [formData, setFormData] = useState({
+    cliente: '',
+    rut: '',
+    descripcion: '',
+    tipo: 'Transporte Personal',
+    zona: 'Norte',
+    inicio: '',
+    termino: '',
+    valor: '',
+    condicion_pago: '30 Días',
+    renovacion_auto: false,
+    vehiculosAsignados: [] as string[]
+  });
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(''), 3000);
   };
 
+  const loadData = async () => {
+    if (!activeCompanyId) return;
+
+    try {
+      // Cargar contratos
+      const { data: contratosData, error: contratosError } = await supabase
+        .from('operacion_contrato')
+        .select(`
+          *,
+          operacion_contrato_vehiculo( vehiculo_id, vehiculo( patente, tipo ) )
+        `)
+        .eq('empresa_id', activeCompanyId)
+        .order('created_at', { ascending: false });
+
+      if (contratosError) throw contratosError;
+
+      const formatContratos: Contrato[] = (contratosData || []).map(c => {
+        const vehiculos = c.operacion_contrato_vehiculo
+          ? c.operacion_contrato_vehiculo.map((v: any) => v.vehiculo?.patente).filter(Boolean)
+          : [];
+        return {
+          id: c.id,
+          cliente: c.cliente_razon_social,
+          descripcion: c.descripcion || '',
+          inicio: c.fecha_inicio || '',
+          termino: c.fecha_termino || '',
+          valor: parseFloat(c.valor_total) || 0,
+          activo: c.activo !== false,
+          tipo: c.tipo_servicio || 'General',
+          vehiculosAsignados: vehiculos,
+          maquinasAsignadas: [] // Si manejas máquinas en otra tabla
+        };
+      });
+
+      setContratos(formatContratos);
+
+      // Cargar vehículos
+      const { data: vehiculosData, error: vehiculosError } = await supabase
+        .from('vehiculo')
+        .select('id, patente, tipo')
+        .eq('empresa_id', activeCompanyId);
+      
+      if (!vehiculosError && vehiculosData) {
+        setVehiculosDisponibles(vehiculosData);
+      }
+
+    } catch (error) {
+      console.error('Error loading contracts data:', error);
+      showToast('Error cargando los datos.');
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [activeCompanyId]);
+
+  const handleSaveContrato = async () => {
+    if (!activeCompanyId) return;
+    try {
+      showToast('Guardando contrato...');
+
+      const insertData = {
+        empresa_id: activeCompanyId,
+        cliente_razon_social: formData.cliente,
+        cliente_rut: formData.rut,
+        descripcion: formData.descripcion,
+        tipo_servicio: formData.tipo,
+        zona_operacion: formData.zona,
+        fecha_inicio: formData.inicio || null,
+        fecha_termino: formData.termino || null,
+        valor_total: formData.valor ? parseFloat(formData.valor) : 0,
+        activo: true
+      };
+
+      const { data: newContrato, error: insertError } = await supabase
+        .from('operacion_contrato')
+        .insert([insertData])
+        .select()
+        .single();
+        
+      if (insertError) throw insertError;
+
+      // Insert assigned vehicles
+      if (formData.vehiculosAsignados.length > 0 && newContrato) {
+        const vehiculosToInsert = formData.vehiculosAsignados.map(vid => ({
+          contrato_id: newContrato.id,
+          vehiculo_id: vid
+        }));
+
+        const { error: asignacionError } = await supabase
+          .from('operacion_contrato_vehiculo')
+          .insert(vehiculosToInsert);
+          
+        if (asignacionError) throw asignacionError;
+      }
+
+      setIsModalOpen(false);
+      loadData();
+      showToast('Contrato creado exitosamente.');
+      setFormData({
+        cliente: '', rut: '', descripcion: '', tipo: 'Transporte Personal', zona: 'Norte',
+        inicio: '', termino: '', valor: '', condicion_pago: '30 Días', renovacion_auto: false, vehiculosAsignados: []
+      });
+      
+    } catch (error) {
+      console.error('Error saving contrato:', error);
+      showToast('Error al guardar el contrato.');
+    }
+  };
+
+  const toggleVehiculoAsignado = (vid: string) => {
+    setFormData(prev => ({
+      ...prev,
+      vehiculosAsignados: prev.vehiculosAsignados.includes(vid)
+        ? prev.vehiculosAsignados.filter(id => id !== vid)
+        : [...prev.vehiculosAsignados, vid]
+    }));
+  };
+
   const filteredContratos = useMemo(() => {
-    return mockContratos.filter(c => {
+    return contratos.filter(c => {
       const matchName = c.cliente.toLowerCase().includes(searchTerm.toLowerCase()) || 
                         c.descripcion.toLowerCase().includes(searchTerm.toLowerCase());
       const matchDate = dateFilter ? c.inicio >= dateFilter : true;
       return matchName && matchDate;
     });
-  }, [searchTerm, dateFilter]);
+  }, [contratos, searchTerm, dateFilter]);
 
   return (
     <div className="w-full relative min-h-screen">
@@ -214,17 +349,17 @@ export default function Contratos() {
                       <div className="space-y-4">
                         <div>
                           <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Cliente Razon Social</label>
-                          <input type="text" placeholder="Ej: Minera Escondida Ltda." className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+                          <input type="text" value={formData.cliente} onChange={e => setFormData({...formData, cliente: e.target.value})} placeholder="Ej: Minera Escondida Ltda." className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
                         </div>
 
                         <div>
                           <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">RUT / Identificación</label>
-                          <input type="text" placeholder="Ej: 76.543.210-K" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+                          <input type="text" value={formData.rut} onChange={e => setFormData({...formData, rut: e.target.value})} placeholder="Ej: 76.543.210-K" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
                         </div>
 
                         <div>
                           <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Descripción Corta del Proyecto</label>
-                          <textarea rows={3} placeholder="Detalles de la operación acordada..." className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all resize-none text-slate-900 dark:text-white"></textarea>
+                          <textarea rows={3} value={formData.descripcion} onChange={e => setFormData({...formData, descripcion: e.target.value})} placeholder="Detalles de la operación acordada..." className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all resize-none text-slate-900 dark:text-white"></textarea>
                         </div>
                       </div>
                     </div>
@@ -234,7 +369,7 @@ export default function Contratos() {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Tipo de Servicio</label>
-                          <select className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
+                          <select value={formData.tipo} onChange={e => setFormData({...formData, tipo: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
                             <option>Transporte Personal</option>
                             <option>Carga General</option>
                             <option>Sobredimensionada</option>
@@ -244,7 +379,7 @@ export default function Contratos() {
                         </div>
                         <div>
                           <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Zona Operación</label>
-                          <select className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
+                          <select value={formData.zona} onChange={e => setFormData({...formData, zona: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
                             <option>Norte</option>
                             <option>Centro</option>
                             <option>Sur</option>
@@ -263,22 +398,22 @@ export default function Contratos() {
                       <div className="grid grid-cols-2 gap-4 mb-4">
                         <div>
                           <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Fecha Inicio</label>
-                          <input type="date" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white [color-scheme:light] dark:[color-scheme:dark]" />
+                          <input type="date" value={formData.inicio} onChange={e => setFormData({...formData, inicio: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white [color-scheme:light] dark:[color-scheme:dark]" />
                         </div>
                         <div>
                           <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Fecha Término</label>
-                          <input type="date" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white [color-scheme:light] dark:[color-scheme:dark]" />
+                          <input type="date" value={formData.termino} onChange={e => setFormData({...formData, termino: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white [color-scheme:light] dark:[color-scheme:dark]" />
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4 mb-4">
                         <div>
                           <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Valor Total ($ o UF)</label>
-                          <input type="number" placeholder="0" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
+                          <input type="number" value={formData.valor} onChange={e => setFormData({...formData, valor: e.target.value})} placeholder="0" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" />
                         </div>
                         <div>
                           <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Condición de Pago</label>
-                          <select className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
+                          <select value={formData.condicion_pago} onChange={e => setFormData({...formData, condicion_pago: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
                             <option>30 Días</option>
                             <option>45 Días</option>
                             <option>60 Días</option>
@@ -288,7 +423,7 @@ export default function Contratos() {
                       </div>
 
                       <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
-                         <input type="checkbox" id="renovacion_auto" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 dark:border-slate-700 dark:text-slate-100" />
+                         <input type="checkbox" checked={formData.renovacion_auto} onChange={e => setFormData({...formData, renovacion_auto: e.target.checked})} id="renovacion_auto" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 dark:border-slate-700 dark:text-slate-100" />
                          <label htmlFor="renovacion_auto" className="text-sm font-bold text-slate-700 dark:text-slate-300 cursor-pointer">Renovación Automática</label>
                       </div>
                     </div>
@@ -312,12 +447,17 @@ export default function Contratos() {
                     <div>
                       <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 flex justify-between">Vehículos <span className="text-xs text-indigo-600 font-medium">Múltiples</span></label>
                       <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 h-48 overflow-y-auto space-y-2">
-                        {mockVehiculos.map(v => (
-                          <label key={v} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors shadow-sm">
-                            <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" />
+                        {vehiculosDisponibles.filter(v => v.tipo !== 'Maquinaria').map(v => (
+                          <label key={v.id} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors shadow-sm">
+                            <input 
+                              type="checkbox" 
+                              checked={formData.vehiculosAsignados.includes(v.id)}
+                              onChange={() => toggleVehiculoAsignado(v.id)}
+                              className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" 
+                            />
                             <div className="flex items-center gap-2">
                                <Truck className="w-4 h-4 text-slate-400" />
-                               <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{v}</span>
+                               <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{v.patente} - {v.tipo}</span>
                             </div>
                           </label>
                         ))}
@@ -326,12 +466,17 @@ export default function Contratos() {
                     <div>
                       <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 flex justify-between">Maquinaria <span className="text-xs text-indigo-600 font-medium">Múltiples</span></label>
                       <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 h-48 overflow-y-auto space-y-2">
-                        {mockMaquinas.map(m => (
-                          <label key={m} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors shadow-sm">
-                            <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" />
+                        {vehiculosDisponibles.filter(v => v.tipo === 'Maquinaria').map(m => (
+                          <label key={m.id} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors shadow-sm">
+                            <input 
+                              type="checkbox" 
+                              checked={formData.vehiculosAsignados.includes(m.id)}
+                              onChange={() => toggleVehiculoAsignado(m.id)}
+                              className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" 
+                            />
                             <div className="flex items-center gap-2">
                                <Wrench className="w-4 h-4 text-slate-400" />
-                               <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{m}</span>
+                               <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{m.patente}</span>
                             </div>
                           </label>
                         ))}
@@ -351,7 +496,7 @@ export default function Contratos() {
                    Cancelar
                  </button>
                  <button 
-                   onClick={() => setIsModalOpen(false)}
+                   onClick={handleSaveContrato}
                    className="px-8 py-3 rounded-xl font-black text-white bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 transition-all flex items-center gap-2"
                  >
                    <CheckCircle2 className="w-5 h-5" />
