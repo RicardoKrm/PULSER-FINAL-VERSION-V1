@@ -3,6 +3,7 @@ import { FileText, Plus, Search, Calendar, X, Briefcase, Download, Paperclip, Ch
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
+import { useAuth } from '../../context/AuthContext';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value);
@@ -23,6 +24,7 @@ type Contrato = {
 
 export default function Contratos() {
   const { activeCompanyId } = useCompany();
+  const { profile } = useAuth();
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [vehiculosDisponibles, setVehiculosDisponibles] = useState<{ id: string; patente: string; tipo: string }[]>([]);
   const [clientesExistentes, setClientesExistentes] = useState<string[]>([]);
@@ -71,6 +73,8 @@ export default function Contratos() {
         
       if (activeCompanyId !== 'GLOBAL') {
         contratosQuery = contratosQuery.eq('empresa_id', activeCompanyId);
+      } else if (profile?.rol?.nombre !== 'Súper Administrador' && profile?.empresa_id) {
+        contratosQuery = contratosQuery.eq('empresa_id', profile.empresa_id);
       }
 
       const { data: contratosData, error: contratosError } = await contratosQuery;
@@ -104,6 +108,8 @@ export default function Contratos() {
         
       if (activeCompanyId !== 'GLOBAL') {
         vehiculosQuery = vehiculosQuery.eq('empresa_id', activeCompanyId);
+      } else if (profile?.rol?.nombre !== 'Súper Administrador' && profile?.empresa_id) {
+        vehiculosQuery = vehiculosQuery.eq('empresa_id', profile.empresa_id);
       }
       
       const { data: vehiculosData, error: vehiculosError } = await vehiculosQuery;
@@ -121,24 +127,24 @@ export default function Contratos() {
         if (userData?.user?.email) {
           const { data: ua } = await supabase
             .from('usuario_aplicacion')
-            .select('empresa_id, empresa(id, nombre_fantasia)')
+            .select('empresa_id, empresa(id, nombre)')
             .eq('email', userData.user.email);
             
           if (ua && ua.length > 0) {
             setUserCompanies(ua.map((u: any) => ({
-              id: u.empresa.id,
-              nombre: u.empresa.nombre_fantasia
+              id: u.empresa?.id || u.empresa_id,
+              nombre: u.empresa?.nombre || 'Mi Empresa'
             })));
             
             if (!formData.empresa_id) {
-               setFormData(prev => ({ ...prev, empresa_id: ua[0].empresa.id }));
+               setFormData(prev => ({ ...prev, empresa_id: ua[0].empresa_id || ua[0].empresa?.id }));
             }
           } else {
             // Si el usuario no tiene empresa asociada (es super admin puro sin usuario_aplicacion, etc) 
             // Mostramos todas las empresas:
-            const { data: allEmpresas } = await supabase.from('empresa').select('id, nombre_fantasia').eq('estado', 'Activo');
+            const { data: allEmpresas } = await supabase.from('empresa').select('id, nombre').eq('estado', 'Activo');
             if (allEmpresas) {
-              setUserCompanies(allEmpresas.map((e: any) => ({ id: e.id, nombre: e.nombre_fantasia })));
+              setUserCompanies(allEmpresas.map((e: any) => ({ id: e.id, nombre: e.nombre })));
             }
           }
         }
@@ -154,7 +160,7 @@ export default function Contratos() {
 
   useEffect(() => {
     loadData();
-  }, [activeCompanyId]);
+  }, [activeCompanyId, profile]);
 
   const handleSaveContrato = async () => {
     const finalCompanyId = activeCompanyId === 'GLOBAL' ? formData.empresa_id : activeCompanyId;
