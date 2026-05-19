@@ -101,8 +101,8 @@ export default function ControlDocumental() {
 
   const fetchData = async () => {
     try {
-      let dQuery = supabase.from('colaborador').select('id, nombre, rut, rol, email, detalles');
-      let vQuery = supabase.from('vehiculo').select('id, patente, marca, modelo, anio, kilometraje_actual, tipo');
+      let dQuery = supabase.from('colaborador').select('id, nombre, rut, rol, telefono, detalles');
+      let vQuery = supabase.from('vehiculo').select('id, patente, marca, modelo, anio, kilometraje_actual, tipo, detalles');
       
       const [dRes, vRes] = await Promise.all([dQuery, vQuery]);
       
