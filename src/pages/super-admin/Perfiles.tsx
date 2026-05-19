@@ -17,17 +17,10 @@ export default function SuperAdminPerfiles() {
   const [newRoleType, setNewRoleType] = useState('Cliente');
   
   // Cargos management state
-  const [cargos, setCargos] = useState(['Administrador', 'Mecánico', 'Conductor', 'Supervisor Operaciones', 'Prevencionista', 'Despachador']);
-  const [selectedCargoForPerms, setSelectedCargoForPerms] = useState('Administrador');
-  const [cargoPermissions, setCargoPermissions] = useState<Record<string, string[]>>({
-    'Administrador': [
-      'Módulo de Flota', 'Módulo de Flota:Ver Vehículos', 'Módulo de Flota:Crear/Editar Vehículos', 'Módulo de Flota:Asignar Conductores', 'Módulo de Flota:Archivar Vehículos',
-      'Módulo de Mantenimiento', 'Módulo de Mantenimiento:Ver Órdenes de Trabajo', 'Módulo de Mantenimiento:Crear Órdenes', 'Módulo de Mantenimiento:Aprobar Órdenes', 'Módulo de Mantenimiento:Cerrar Órdenes',
-      'Módulo de Personal', 'Módulo de Personal:Ver Empleados', 'Módulo de Personal:Crear/Editar Empleados', 'Módulo de Personal:Gestionar Permisos', 'Módulo de Personal:Evaluar Conductores',
-      'Reportes y Finanzas', 'Reportes y Finanzas:Ver Dashboards', 'Reportes y Finanzas:Exportar Data', 'Reportes y Finanzas:Ver Costos', 'Reportes y Finanzas:Aprobar Presupuestos',
-      'Gestión de Bodega', 'Gestión de Bodega:Ver Inventario', 'Gestión de Bodega:Ingresar Stock', 'Gestión de Bodega:Realizar Salida', 'Gestión de Bodega:Ajustes Manuales'
-    ]
-  });
+  type Cargo = { nombre: string, perfil: string };
+  const [cargos, setCargos] = useState<Cargo[]>([]);
+  const [selectedCargoForPerms, setSelectedCargoForPerms] = useState<string>('');
+  const [cargoPermissions, setCargoPermissions] = useState<Record<string, string[]>>({});
 
   const CARGO_MODULES = [
     { section: 'Módulo de Flota', perms: ['Ver Vehículos', 'Crear/Editar Vehículos', 'Asignar Conductores', 'Archivar Vehículos'] },
@@ -67,10 +60,10 @@ export default function SuperAdminPerfiles() {
     });
   };
 
-  const handleDeleteCargo = (cargo: string) => {
+  const handleDeleteCargo = (cargoName: string) => {
     Swal.fire({
       title: '¿Eliminar el cargo?',
-      text: `Se eliminará el cargo ${cargo}.`,
+      text: `Se eliminará el cargo ${cargoName}.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
@@ -79,29 +72,59 @@ export default function SuperAdminPerfiles() {
       cancelButtonText: 'Cancelar'
     }).then((result) => {
       if (result.isConfirmed) {
-        setCargos(cargos.filter(r => r !== cargo));
-        setSelectedCargoForPerms('Administrador');
+        setCargos(cargos.filter(r => r.nombre !== cargoName));
+        setSelectedCargoForPerms('');
         Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Cargo eliminado', showConfirmButton: false, timer: 1500 });
       }
     });
   };
 
   const handleCreateCargo = () => {
+    const rolesOptions = roles.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
+    
     Swal.fire({
       title: 'Crear nuevo cargo',
-      input: 'text',
-      inputPlaceholder: 'Nombre del cargo',
+      html: `
+        <div class="flex flex-col gap-4 text-left">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Nombre del cargo</label>
+            <input id="swal-cargo-name" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ej. Mecánico de Patio" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Perfil Asociado</label>
+            <select id="swal-cargo-perfil" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+              <option value="" disabled selected>Selecciona un perfil...</option>
+              ${rolesOptions}
+            </select>
+          </div>
+        </div>
+      `,
       showCancelButton: true,
       confirmButtonText: 'Crear',
-      inputValidator: (value) => {
-        if (!value) return 'Debes ingresar un nombre';
-        if (cargos.includes(value)) return 'Este cargo ya existe';
-        return null;
+      cancelButtonText: 'Cancelar',
+      preConfirm: () => {
+        const name = (document.getElementById('swal-cargo-name') as HTMLInputElement).value;
+        const perfil = (document.getElementById('swal-cargo-perfil') as HTMLSelectElement).value;
+        
+        if (!name.trim()) {
+          Swal.showValidationMessage('Debes ingresar un nombre para el cargo');
+          return false;
+        }
+        if (!perfil) {
+          Swal.showValidationMessage('Debes asociar el cargo a un perfil');
+          return false;
+        }
+        if (cargos.some(c => c.nombre.toLowerCase() === name.trim().toLowerCase())) {
+          Swal.showValidationMessage('Este cargo ya existe');
+          return false;
+        }
+        
+        return { nombre: name.trim(), perfil };
       }
     }).then((result) => {
-      if (result.isConfirmed) {
+      if (result.isConfirmed && result.value) {
         setCargos([...cargos, result.value]);
-        setSelectedCargoForPerms(result.value);
+        setSelectedCargoForPerms(result.value.nombre);
         Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Cargo creado', showConfirmButton: false, timer: 1500 });
       }
     });
@@ -852,23 +875,29 @@ export default function SuperAdminPerfiles() {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {cargos.map((cargo) => (
+              {cargos.length === 0 ? (
+                <div className="text-center p-6 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 m-2">
+                  <Briefcase className="h-8 w-8 text-slate-400 mx-auto mb-2" />
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">No hay cargos creados</p>
+                  <p className="text-xs text-slate-500 mt-1">Crea un nuevo cargo para comenzar</p>
+                </div>
+              ) : cargos.map((cargo) => (
                 <button
-                  key={cargo}
-                  onClick={() => setSelectedCargoForPerms(cargo)}
+                  key={cargo.nombre}
+                  onClick={() => setSelectedCargoForPerms(cargo.nombre)}
                   className={cn(
                     "w-full text-left px-3 py-3 rounded-lg transition-all border",
-                    selectedCargoForPerms === cargo 
+                    selectedCargoForPerms === cargo.nombre 
                       ? "bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300" 
                       : "bg-transparent border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300"
                   )}
                 >
                   <div className="font-semibold text-sm flex items-center justify-between">
-                     {cargo}
-                     <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                     {cargo.nombre}
+                     <ShieldCheck className={cn("h-4 w-4", selectedCargoForPerms === cargo.nombre ? "text-indigo-500" : "text-slate-400")} />
                   </div>
                   <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex justify-between">
-                     <span>Sistema</span>
+                     <span>{cargo.perfil}</span>
                   </div>
                 </button>
               ))}
@@ -880,10 +909,12 @@ export default function SuperAdminPerfiles() {
             <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-start">
               <div>
                 <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                  Configurando Cargo: {selectedCargoForPerms}
+                  {selectedCargoForPerms ? `Configurando Cargo: ${selectedCargoForPerms}` : 'Selecciona un cargo'}
                 </h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                  Selecciona qué herramientas y permisos de acciones estarán disponibles para este cargo en la operativa.
+                  {selectedCargoForPerms 
+                    ? `Selecciona qué herramientas y permisos de acciones estarán disponibles en ${cargos.find(c => c.nombre === selectedCargoForPerms)?.perfil || ''}.` 
+                    : 'Selecciona o crea un cargo para configurar sus acciones.'}
                 </p>
               </div>
               
@@ -901,65 +932,92 @@ export default function SuperAdminPerfiles() {
               )}
             </div>
 
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
-              {CARGO_MODULES.map((group, idx) => {
-                const isGroupEnabled = (cargoPermissions[selectedCargoForPerms] || []).includes(group.section);
-                
-                return (
-                <div key={idx} className="space-y-3">
-                  <label className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors">
-                     <input type="checkbox" className="hidden" 
-                            checked={isGroupEnabled} 
-                            onChange={() => handleToggleCargoModule(group.section, group.perms)} />
-                     <div className={cn(
-                        "flex items-center justify-center w-5 h-5 rounded border",
-                        isGroupEnabled ? "bg-indigo-500 border-indigo-500 text-white" : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
-                      )}>
-                        {isGroupEnabled && <Check className="h-3.5 w-3.5" />}
-                     </div>
-                     <div className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-200 text-sm">
-                        {group.section}
-                     </div>
-                  </label>
-                  
-                  <div className="pl-6 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 ml-5">
-                    {group.perms.map((p, pidx) => {
-                      const isPermEnabled = (cargoPermissions[selectedCargoForPerms] || []).includes(`${group.section}:${p}`);
+            {selectedCargoForPerms ? (
+              <>
+                <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+                  {(() => {
+                    const cargoObj = cargos.find(c => c.nombre === selectedCargoForPerms);
+                    const perfilPerms = cargoObj ? (rolePermissions[cargoObj.perfil] || []) : [];
+                    const allowedModules = CARGO_MODULES.filter(group => perfilPerms.includes(group.section));
+                    
+                    if (allowedModules.length === 0) {
                       return (
-                      <label key={pidx} className="flex items-center gap-3 cursor-pointer group hover:bg-slate-50 dark:hover:bg-slate-800 p-1 -m-1 rounded transition-colors">
-                        <input type="checkbox" className="hidden" 
-                               checked={isPermEnabled} 
-                               onChange={() => handleToggleCargoSubPerm(group.section, p)} />
-                        <div className={cn(
-                          "flex items-center justify-center w-4 h-4 rounded border transition-colors",
-                          isPermEnabled ? "bg-indigo-500 border-indigo-500 text-white" : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 group-hover:border-indigo-300"
-                        )}>
-                           {isPermEnabled && <Check className="h-3 w-3" />}
+                        <div className="col-span-full py-8 text-center text-slate-500 dark:text-slate-400">
+                          <Shield className="h-10 w-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+                          <p>El perfil "{cargoObj?.perfil}" no tiene módulos asignados.</p>
+                          <p className="text-sm mt-1">Asigna módulos al perfil en la pestaña "Perfiles y Módulos" para configurar las acciones aquí.</p>
                         </div>
-                        <span className={cn(
-                          "text-sm transition-colors",
-                          isPermEnabled ? "text-slate-700 dark:text-slate-300 font-medium" : "text-slate-500 dark:text-slate-500"
-                        )}>
-                          {p}
-                        </span>
-                      </label>
-                    )})}
-                  </div>
-                </div>
-              )})}
-            </div>
+                      );
+                    }
 
-            <div className="p-6 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 flex justify-end gap-3 mt-auto rounded-b-xl">
-              <button className="px-5 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
-                Cancelar
-              </button>
-              <button 
-                onClick={() => Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Permisos de cargo guardados', showConfirmButton: false, timer: 1500 })}
-                className="px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm"
-              >
-                Guardar Permisos de Cargo
-              </button>
-            </div>
+                    return allowedModules.map((group, idx) => {
+                      const isGroupEnabled = (cargoPermissions[selectedCargoForPerms] || []).includes(group.section);
+                      
+                      return (
+                        <div key={idx} className="space-y-3">
+                          <label className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors">
+                            <input type="checkbox" className="hidden" 
+                                    checked={isGroupEnabled} 
+                                    onChange={() => handleToggleCargoModule(group.section, group.perms)} />
+                            <div className={cn(
+                                "flex items-center justify-center w-5 h-5 rounded border",
+                                isGroupEnabled ? "bg-indigo-500 border-indigo-500 text-white" : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
+                              )}>
+                                {isGroupEnabled && <Check className="h-3.5 w-3.5" />}
+                            </div>
+                            <div className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-200 text-sm">
+                                {group.section}
+                            </div>
+                          </label>
+                          
+                          <div className="pl-6 space-y-2 border-l-2 border-slate-100 dark:border-slate-800 ml-5">
+                            {group.perms.map((p, pidx) => {
+                              const isPermEnabled = (cargoPermissions[selectedCargoForPerms] || []).includes(`${group.section}:${p}`);
+                              return (
+                              <label key={pidx} className="flex items-center gap-3 cursor-pointer group hover:bg-slate-50 dark:hover:bg-slate-800 p-1 -m-1 rounded transition-colors">
+                                <input type="checkbox" className="hidden" 
+                                      checked={isPermEnabled} 
+                                      onChange={() => handleToggleCargoSubPerm(group.section, p)} />
+                                <div className={cn(
+                                  "flex items-center justify-center w-4 h-4 rounded border transition-colors",
+                                  isPermEnabled ? "bg-indigo-500 border-indigo-500 text-white" : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 group-hover:border-indigo-300"
+                                )}>
+                                  {isPermEnabled && <Check className="h-3 w-3" />}
+                                </div>
+                                <span className={cn(
+                                  "text-sm transition-colors",
+                                  isPermEnabled ? "text-slate-700 dark:text-slate-300 font-medium" : "text-slate-500 dark:text-slate-500"
+                                )}>
+                                  {p}
+                                </span>
+                              </label>
+                            )})}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+
+                <div className="p-6 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 flex justify-end gap-3 mt-auto rounded-b-xl">
+                  <button className="px-5 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={() => Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Permisos de cargo guardados', showConfirmButton: false, timer: 1500 })}
+                    className="px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm"
+                  >
+                    Guardar Permisos de Cargo
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center p-12 text-slate-500">
+                <Briefcase className="h-16 w-16 text-slate-200 dark:text-slate-800 mb-4" />
+                <p className="text-lg font-medium text-slate-700 dark:text-slate-300">Ningún cargo seleccionado</p>
+                <p className="text-sm mt-1">Selecciona un cargo en el menú lateral o crea uno nuevo para configurar sus permisos de acciones.</p>
+              </div>
+            )}
           </div>
         </div>
       ) : null}
@@ -1115,7 +1173,7 @@ export default function SuperAdminPerfiles() {
                       <select name="cargo" required defaultValue="" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
                         <option value="" disabled>Seleccionar cargo...</option>
                         {cargos.map(cargoOption => (
-                           <option key={cargoOption} value={cargoOption}>{cargoOption}</option>
+                           <option key={cargoOption.nombre} value={cargoOption.nombre}>{cargoOption.nombre}</option>
                         ))}
                       </select>
                     </div>
