@@ -25,6 +25,8 @@ export default function Contratos() {
   const { activeCompanyId, companies } = useCompany();
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [vehiculosDisponibles, setVehiculosDisponibles] = useState<{ id: string; patente: string; tipo: string }[]>([]);
+  const [dbEmpresas, setDbEmpresas] = useState<{id: string, nombre: string}[]>([]);
+  const [inputEmpresa, setInputEmpresa] = useState('');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedContrato, setSelectedContrato] = useState<Contrato | null>(null);
@@ -109,6 +111,13 @@ export default function Contratos() {
         setVehiculosDisponibles(vehiculosData);
       }
 
+      // Cargar empresas
+      const { data: empData, error: empError } = await supabase.from('empresa').select('id, nombre').eq('estado', 'Activo');
+      if (!empError && empData) {
+        setDbEmpresas(empData);
+      }
+
+
     } catch (error) {
       console.error('Error loading contracts data:', error);
       showToast('Error cargando los datos.');
@@ -122,11 +131,33 @@ export default function Contratos() {
   const handleSaveContrato = async () => {
     if (!activeCompanyId) return;
 
-    if (activeCompanyId === 'GLOBAL' && !formData.empresa_id) {
-      showToast('Por favor, selecciona una empresa específica para este contrato.');
-      return;
+    let finalEmpresaId = activeCompanyId;
+
+    if (activeCompanyId === 'GLOBAL') {
+      if (!inputEmpresa.trim()) {
+        showToast('Por favor, indica una empresa (escribe para crear o selecciona una).');
+        return;
+      }
+      const existing = dbEmpresas.find(e => e.nombre.toLowerCase() === inputEmpresa.trim().toLowerCase());
+      if (existing) {
+        finalEmpresaId = existing.id;
+      } else {
+        // Create new company
+        try {
+          const { data: newEmpresa, error: empError } = await supabase
+            .from('empresa')
+            .insert([{ nombre: inputEmpresa.trim(), razon_social: inputEmpresa.trim(), rut: '', estado: 'Activo' }])
+            .select('id')
+            .single();
+          if (empError) throw empError;
+          finalEmpresaId = newEmpresa.id;
+        } catch (e) {
+          showToast('Error al crear la empresa nueva.');
+          console.error(e);
+          return;
+        }
+      }
     }
-    const finalEmpresaId = activeCompanyId === 'GLOBAL' ? formData.empresa_id : activeCompanyId;
 
     if (!formData.cliente || formData.cliente.trim() === '') {
       showToast('Por favor, ingresa el nombre o razón social del cliente.');
@@ -375,21 +406,18 @@ export default function Contratos() {
                           <div>
                             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Empresa Asignada</label>
                             <div className="relative">
-                              <select 
-                                value={formData.empresa_id} 
-                                onChange={e => setFormData({...formData, empresa_id: e.target.value})} 
-                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white appearance-none"
-                              >
-                                <option value="" disabled>Seleccione una empresa</option>
-                                {companies.filter(c => c.id !== 'GLOBAL').map(company => (
-                                  <option key={company.id} value={company.id}>
-                                    {company.name}
-                                  </option>
+                              <input 
+                                list="empresas-list"
+                                value={inputEmpresa} 
+                                onChange={e => setInputEmpresa(e.target.value)}
+                                placeholder="Escribe para crear o selecciona una empresa..."
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white"
+                              />
+                              <datalist id="empresas-list">
+                                {dbEmpresas.map(company => (
+                                  <option key={company.id} value={company.nombre} />
                                 ))}
-                              </select>
-                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
-                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                              </div>
+                              </datalist>
                             </div>
                           </div>
                         )}
