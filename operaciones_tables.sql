@@ -162,6 +162,17 @@ CREATE POLICY "Users can access operacion_contrato of their company" ON public.o
     )
 );
 
+CREATE POLICY "Users can access operacion_contrato_vehiculo of their company" ON public.operacion_contrato_vehiculo FOR ALL USING (
+    EXISTS (
+        SELECT 1 FROM public.operacion_contrato c
+        WHERE c.id = contrato_id AND c.empresa_id IN (
+            SELECT empresa_id 
+            FROM public.usuario_aplicacion 
+            WHERE auth_user_id = auth.uid()
+        )
+    )
+);
+
 CREATE POLICY "Users can access operacion_servicio of their company" ON public.operacion_servicio FOR ALL USING (
     empresa_id IN (
         SELECT empresa_id 

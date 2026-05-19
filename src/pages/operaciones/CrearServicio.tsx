@@ -143,6 +143,11 @@ export default function CrearServicio() {
   const handleSaveService = async () => {
     if (!activeCompanyId) return;
 
+    if (!newOrigen.trim() || !newDestino.trim()) {
+      showToast('Origen y Destino son campos requeridos.');
+      return;
+    }
+
     try {
       showToast('Guardando servicio...');
 

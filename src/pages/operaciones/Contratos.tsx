@@ -110,6 +110,12 @@ export default function Contratos() {
 
   const handleSaveContrato = async () => {
     if (!activeCompanyId) return;
+
+    if (!formData.cliente || formData.cliente.trim() === '') {
+      showToast('Por favor, ingresa el nombre o razón social del cliente.');
+      return;
+    }
+
     try {
       showToast('Guardando contrato...');
 
