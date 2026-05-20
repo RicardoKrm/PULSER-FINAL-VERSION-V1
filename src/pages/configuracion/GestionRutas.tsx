@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
 import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -72,6 +72,44 @@ export default function GestionRutas() {
       setRouteLine([]);
     }
   }, [mapOriginCoords, mapDestCoords]);
+
+  const handleGeocode = async (address: string, type: 'origen' | 'destino') => {
+    if (!address) return;
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
+      const data = await response.json();
+      if (data && data.length > 0) {
+        const coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+        if (type === 'origen') {
+           setMapOriginCoords(coords);
+        } else {
+           setMapDestCoords(coords);
+        }
+      } else {
+        alert('No se encontraron resultados para la dirección.');
+      }
+    } catch (error) {
+       console.error(error);
+       alert('Error de conexión al buscar la dirección.');
+    }
+  };
+
+  const MapBounds = ({ origen, destino }: { origen: RouteCoords | null, destino: RouteCoords | null }) => {
+    const map = useMap();
+    useEffect(() => {
+      if (origen && destino) {
+        map.fitBounds([
+          [origen.lat, origen.lng],
+          [destino.lat, destino.lng]
+        ], { padding: [50, 50] });
+      } else if (origen) {
+        map.flyTo([origen.lat, origen.lng], 14, { animate: true });
+      } else if (destino) {
+        map.flyTo([destino.lat, destino.lng], 14, { animate: true });
+      }
+    }, [origen, destino, map]);
+    return null;
+  };
 
   const MapClickHandler = () => {
     useMapEvents({
@@ -276,11 +314,21 @@ export default function GestionRutas() {
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
              <div>
                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2"><MapPin className="w-4 h-4 text-emerald-500" /> Origen *</label>
-               <input type="text" value={origen} onChange={e => setOrigen(e.target.value)} placeholder="Click en el mapa o escribe" className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" />
+               <div className="flex gap-2">
+                 <input type="text" value={origen} onChange={e => setOrigen(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleGeocode(origen, 'origen'); }} placeholder="Dirección o punto origen" className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" />
+                 <button onClick={() => handleGeocode(origen, 'origen')} className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg px-3 transition-colors text-slate-500">
+                    <Search className="w-4 h-4" />
+                 </button>
+               </div>
              </div>
              <div>
                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2"><MapIcon className="w-4 h-4 text-indigo-500" /> Destino *</label>
-               <input type="text" value={destino} onChange={e => setDestino(e.target.value)} placeholder="Click en el mapa o escribe" className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" />
+               <div className="flex gap-2">
+                 <input type="text" value={destino} onChange={e => setDestino(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleGeocode(destino, 'destino'); }} placeholder="Dirección o punto destino" className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" />
+                 <button onClick={() => handleGeocode(destino, 'destino')} className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg px-3 transition-colors text-slate-500">
+                    <Search className="w-4 h-4" />
+                 </button>
+               </div>
              </div>
            </div>
 
@@ -288,6 +336,7 @@ export default function GestionRutas() {
              <MapContainer center={[-33.4372, -70.6506]} zoom={10} scrollWheelZoom={true} className="w-full h-full">
                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" />
                <MapClickHandler />
+               <MapBounds origen={mapOriginCoords} destino={mapDestCoords} />
                {mapOriginCoords && (
                  <Marker position={[mapOriginCoords.lat, mapOriginCoords.lng]}>
                    <Popup>Origen</Popup>
