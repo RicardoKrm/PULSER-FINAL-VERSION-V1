@@ -7,9 +7,10 @@ import Swal from 'sweetalert2';
 
 export default function RegistrosFinancieros() {
   const { activeCompanyId } = useCompany();
+  const [empresa, setEmpresa] = useState<any>(null);
   const [vehiculos, setVehiculos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedVehiculoId, setSelectedVehiculoId] = useState<string>('');
+  const [selectedEntityId, setSelectedEntityId] = useState<string>('global');
 
   // Form State para Nuevo Registro
   const [fechaRegistro, setFechaRegistro] = useState(new Date().toISOString().split('T')[0]);
@@ -28,6 +29,16 @@ export default function RegistrosFinancieros() {
   const fetchData = async () => {
     setLoading(true);
     try {
+      const { data: empData, error: empError } = await supabase
+        .from('empresa')
+        .select('*')
+        .eq('id', activeCompanyId)
+        .single();
+      
+      if (!empError && empData) {
+        setEmpresa(empData);
+      }
+
       const { data: vehData, error: vehError } = await supabase
         .from('vehiculo')
         .select('*')
@@ -35,9 +46,6 @@ export default function RegistrosFinancieros() {
       
       if (!vehError && vehData) {
         setVehiculos(vehData);
-        if (vehData.length > 0) {
-           setSelectedVehiculoId(vehData[0].id);
-        }
       }
     } catch (e) {
       console.error("Error fetching data:", e);
@@ -46,12 +54,13 @@ export default function RegistrosFinancieros() {
     }
   };
 
-  const selectedVehiculo = vehiculos.find(v => v.id === selectedVehiculoId);
-  const registros = selectedVehiculo?.detalles?.registros_financieros || [];
+  const isGlobal = selectedEntityId === 'global';
+  const activeEntity = isGlobal ? empresa : vehiculos.find(v => v.id === selectedEntityId);
+  const registros = activeEntity?.detalles?.registros_financieros || [];
 
   const handleSaveRegistro = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedVehiculo) return;
+    if (!activeEntity) return;
     if (!descripcion || !monto || !categoria) {
        Swal.fire('Error', 'Complete todos los campos obligatorios', 'error');
        return;
@@ -67,7 +76,7 @@ export default function RegistrosFinancieros() {
        monto: parseFloat(monto)
     };
 
-    const currentDetalles = selectedVehiculo.detalles || {};
+    const currentDetalles = activeEntity.detalles || {};
     const newRegistros = [nuevoRegistro, ...registros];
 
     const newDetalles = {
@@ -76,15 +85,20 @@ export default function RegistrosFinancieros() {
     };
 
     try {
+      const table = isGlobal ? 'empresa' : 'vehiculo';
       const { error } = await supabase
-        .from('vehiculo')
+        .from(table)
         .update({ detalles: newDetalles })
-        .eq('id', selectedVehiculo.id);
+        .eq('id', activeEntity.id);
 
       if (!error) {
         Swal.fire('Guardado', 'Registro guardado exitosamente', 'success');
-        const updatedVeh = { ...selectedVehiculo, detalles: newDetalles };
-        setVehiculos(vehiculos.map(v => v.id === updatedVeh.id ? updatedVeh : v));
+        
+        if (isGlobal) {
+           setEmpresa({ ...empresa, detalles: newDetalles });
+        } else {
+           setVehiculos(vehiculos.map(v => v.id === activeEntity.id ? { ...v, detalles: newDetalles } : v));
+        }
         
         // Form Reset
         setDescripcion('');
@@ -99,7 +113,7 @@ export default function RegistrosFinancieros() {
   };
 
   const handleDeleteRegistro = async (id: string) => {
-    if (!selectedVehiculo) return;
+    if (!activeEntity) return;
 
     Swal.fire({
       title: '¿Eliminar registro?',
@@ -112,7 +126,7 @@ export default function RegistrosFinancieros() {
       cancelButtonText: 'Cancelar'
     }).then(async (result) => {
       if (result.isConfirmed) {
-        const currentDetalles = selectedVehiculo.detalles || {};
+        const currentDetalles = activeEntity.detalles || {};
         const newRegistros = registros.filter((r: any) => r.id !== id);
 
         const newDetalles = {
@@ -121,14 +135,18 @@ export default function RegistrosFinancieros() {
         };
 
         try {
+          const table = isGlobal ? 'empresa' : 'vehiculo';
           const { error } = await supabase
-            .from('vehiculo')
+            .from(table)
             .update({ detalles: newDetalles })
-            .eq('id', selectedVehiculo.id);
+            .eq('id', activeEntity.id);
 
           if (!error) {
-            const updatedVeh = { ...selectedVehiculo, detalles: newDetalles };
-            setVehiculos(vehiculos.map(v => v.id === updatedVeh.id ? updatedVeh : v));
+            if (isGlobal) {
+               setEmpresa({ ...empresa, detalles: newDetalles });
+            } else {
+               setVehiculos(vehiculos.map(v => v.id === activeEntity.id ? { ...v, detalles: newDetalles } : v));
+            }
             Swal.fire('Eliminado!', 'El registro ha sido eliminado.', 'success');
           } else {
              throw error;
@@ -143,6 +161,8 @@ export default function RegistrosFinancieros() {
   const categoriasOptions = tipoRegistro === 'Ingreso' ? [
     'Ingreso por Contrato',
     'Ingreso Variable (Viaje, KM)',
+    'Ingreso Software / Plataforma',
+    'Suscripciones',
     'Otros Ingresos'
   ] : [
     'Costo Fijo (Seguros, Salarios)',
@@ -152,6 +172,8 @@ export default function RegistrosFinancieros() {
     'Peajes y Estacionamiento',
     'Lubricantes y Fluidos',
     'Costo Extraordinario (Multas)',
+    'Infraestructura Web / Software',
+    'Servicios y Licencias',
     'Otros Gastos'
   ];
 
@@ -180,22 +202,22 @@ export default function RegistrosFinancieros() {
             <p className="text-slate-500 text-sm font-medium mt-1">Ingresa ingresos y costos por vehículo para mantener el control financiero al día.</p>
          </div>
          <div className="w-full md:w-auto">
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Seleccionar Vehículo / Patente</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Seleccionar Unidad / Global</label>
             <select 
-               value={selectedVehiculoId}
-               onChange={(e) => setSelectedVehiculoId(e.target.value)}
+               value={selectedEntityId}
+               onChange={(e) => setSelectedEntityId(e.target.value)}
                className="w-full md:w-72 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-[#0ea5e9] font-medium text-slate-800 dark:text-slate-200">
-               {vehiculos.length === 0 && <option value="">Sin vehículos...</option>}
+               <option value="global">Empresa / Software General</option>
                {vehiculos.map(v => (
-                  <option key={v.id} value={v.id}>{v.patente || 'S/P'} - {v.modelo || 'Sin Modelo'}</option>
+                  <option key={v.id} value={v.id}>Vehículo: {v.patente || 'S/P'} - {v.modelo || 'Sin Modelo'}</option>
                ))}
             </select>
          </div>
       </div>
 
-      {!selectedVehiculo ? (
+      {!activeEntity ? (
          <div className="text-center py-20 text-slate-500 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 font-medium">
-            Seleccione un vehículo para gestionar sus registros.
+            Seleccione una entidad para gestionar sus registros.
          </div>
       ) : (
          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -305,7 +327,9 @@ export default function RegistrosFinancieros() {
 
                <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
                   <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
-                     <h3 className="font-bold text-slate-800 dark:text-slate-200">Historial de Transacciones (Unidad)</h3>
+                     <h3 className="font-bold text-slate-800 dark:text-slate-200">
+                        Historial de Transacciones ({isGlobal ? 'Global / Software' : 'Unidad'})
+                     </h3>
                   </div>
                   <div className="overflow-x-auto">
                      <table className="w-full text-sm text-left">
@@ -321,7 +345,7 @@ export default function RegistrosFinancieros() {
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                            {registros.length === 0 ? (
                              <tr>
-                                <td colSpan={5} className="text-center py-12 text-slate-500 italic">No hay registros financieros para este vehículo.</td>
+                                <td colSpan={5} className="text-center py-12 text-slate-500 italic">No hay registros financieros.</td>
                              </tr>
                            ) : (
                               registros.map((reg: any) => (
