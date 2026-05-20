@@ -40,13 +40,14 @@ export default function Historial() {
            action: `Viaje Finalizado - ${item.tipo || 'Servicio'}`,
            description: `El viaje con origen en ${item.origen} y destino en ${item.destino} fue marcado como realizado.`,
            user: item.conductor?.nombre || 'Sin Conductor',
-           date: new Date(item.fecha + 'T' + (item.hora || '10') + ':00:00').toISOString(),
+           date: new Date(item.fecha + 'T' + String(item.hora || 10).padStart(2, '0') + ':00:00').toISOString(),
            reference: item.id.substring(0, 8).toUpperCase(),
            icon: Briefcase,
            color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400',
            origen: item.origen,
            destino: item.destino,
-           vehiculo: item.vehiculo?.patente
+           vehiculo: item.vehiculo?.patente,
+           fecha: item.fecha
          })));
       }
     };
@@ -61,12 +62,10 @@ export default function Historial() {
     
     let matchesDate = true;
     if (startDate) {
-      matchesDate = matchesDate && new Date(item.date) >= new Date(startDate);
+      matchesDate = matchesDate && item.fecha >= startDate;
     }
     if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      matchesDate = matchesDate && new Date(item.date) <= end;
+      matchesDate = matchesDate && item.fecha <= endDate;
     }
 
     return matchesSearch && matchesModule && matchesDate;
