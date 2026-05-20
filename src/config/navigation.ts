@@ -34,7 +34,8 @@ import {
   HelpCircle,
   MessageSquare,
   Link,
-  BookOpen
+  BookOpen,
+  Map as MapIcon
 } from 'lucide-react';
 
 export const navigation = [
@@ -141,6 +142,7 @@ export const navigation = [
       { title: 'Vehículos Archivados', icon: Archive, href: '/configuracion/vehiculos-archivados' },
       { title: 'Kit de Repuestos', icon: Package, href: '/herramientas/kits' },
       { title: 'Gestión de Pausas', icon: Clock, href: '/configuracion/pausas' },
+      { title: 'Gestión de Rutas', icon: MapIcon, href: '/configuracion/rutas' },
       { title: 'Carga Masiva', icon: Zap, href: '/configuracion/carga-masiva' },
     ],
   },
