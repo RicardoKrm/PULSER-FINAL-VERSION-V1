@@ -90,7 +90,7 @@ export default function GPS() {
        ]);
        
        if (vehiculosRes.data && !vehiculosRes.error) {
-          const configured = vehiculosRes.data.filter(v => v.detalles?.gps_proveedor && v.detalles?.gps_imei);
+          const configured = vehiculosRes.data.filter(v => v.detalles?.gps_proveedor);
           
           let apiKeys: any = {};
           if (configRes.data && configRes.data.detalles) {

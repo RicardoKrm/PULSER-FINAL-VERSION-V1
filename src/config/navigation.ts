@@ -140,7 +140,7 @@ export const navigation = [
       { title: 'Gestión de Pautas', icon: FileText, href: '/configuracion/pautas' },
       { title: 'Gestión de Tareas', icon: ClipboardList, href: '/configuracion/tareas' },
       { title: 'Gestión de Fallas', icon: AlertCircle, href: '/configuracion/fallas' },
-      { title: 'Vehículos Archivados', icon: Archive, href: '/configuracion/vehiculos-archivados' },
+      { title: 'Gestión de Vehículos', icon: Archive, href: '/configuracion/vehiculos' },
       { title: 'Kit de Repuestos', icon: Package, href: '/herramientas/kits' },
       { title: 'Gestión de Pausas', icon: Clock, href: '/configuracion/pausas' },
       { title: 'Gestión de Rutas', icon: MapIcon, href: '/configuracion/rutas' },

@@ -263,7 +263,7 @@ export default function ConfiguracionGPS() {
                        </tbody>
                     </table>
                  </div>
-                 {vehiculos.some(v => !v.gps_proveedor || !v.gps_imei) && vehiculos.length > 0 && (
+                 {vehiculos.some(v => !v.gps_proveedor) && vehiculos.length > 0 && (
                     <div className="p-4 bg-orange-50 dark:bg-orange-900/20 text-orange-800 dark:text-orange-300 text-xs font-medium flex items-center gap-2 border-t border-orange-100 dark:border-orange-800/30">
                        <AlertCircle className="w-4 h-4 shrink-0" /> Hay vehículos sin configuración GPS definida, no reportarán datos a la plataforma.
                     </div>

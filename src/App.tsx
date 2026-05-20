@@ -32,7 +32,7 @@ import GestionOrdenesTrabajo from './pages/flota/OrdenesTrabajo';
 import OrdenesTrabajoDetail from './pages/flota/OrdenesTrabajoDetail';
 import GestionPautas from './pages/configuracion/GestionPautas';
 import GestionTareas from './pages/configuracion/GestionTareas';
-import VehiculosArchivados from './pages/configuracion/VehiculosArchivados';
+import Vehiculos from './pages/configuracion/Vehiculos';
 import ConfiguracionGPS from './pages/configuracion/ConfiguracionGPS';
 import GestionKits from './pages/herramientas/GestionKits';
 import GestionNeumaticos from './pages/flota/GestionNeumaticos';
@@ -115,7 +115,7 @@ const router = createBrowserRouter([
       { path: "configuracion/fallas", element: <GestionFallas /> },
       { path: "configuracion/empresa", element: <ConfiguracionEmpresa /> },
       { path: "configuracion/tareas", element: <GestionTareas /> },
-      { path: "configuracion/vehiculos-archivados", element: <VehiculosArchivados /> },
+      { path: "configuracion/vehiculos", element: <Vehiculos /> },
       { path: "configuracion/gps", element: <ConfiguracionGPS /> },
       { path: "configuracion/pausas", element: <GestionPausas /> },
       { path: "configuracion/rutas", element: <GestionRutas /> },
