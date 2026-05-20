@@ -75,11 +75,16 @@ export default function Programacion() {
       let queryServ = supabase.from('operacion_servicio').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)').eq('estado', 'Borrador');
       let queryCond = supabase.from('colaborador').select('id, nombre, estado, rol');
       let queryVehs = supabase.from('vehiculo').select('id, patente, estado');
+      let queryRutas = supabase.from('operacion_ruta').select('id, nombre, origen, destino');
       
-      const [resProg, resServ, resCond, resVehs] = await Promise.all([queryProg, queryServ, queryCond, queryVehs]);
+      const [resProg, resServ, resCond, resVehs, resRutas] = await Promise.all([queryProg, queryServ, queryCond, queryVehs, queryRutas]);
       
       if (resVehs.data) {
         setDbVehiculos(resVehs.data.filter((v: any) => v.estado !== 'INACTIVO'));
+      }
+
+      if (resRutas.data) {
+        setDbRutas(resRutas.data);
       }
 
       if (resCond.data) {
@@ -321,6 +326,8 @@ export default function Programacion() {
 
   const [dbConductores, setDbConductores] = useState<any[]>([]);
   const [dbVehiculos, setDbVehiculos] = useState<any[]>([]);
+  const [dbRutas, setDbRutas] = useState<any[]>([]);
+  const [selectedRouteId, setSelectedRouteId] = useState('');
 
   const currentMonthStr = `${MONTHS_ES[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
 
@@ -890,6 +897,26 @@ export default function Programacion() {
                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Duración Est. (Horas)</label>
                  <input type="number" defaultValue="2" min="1" className="w-full text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500" />
                </div>
+             </div>
+             <div className="space-y-1">
+               <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Ruta Predefinida (Opcional)</label>
+               <select 
+                 value={selectedRouteId} 
+                 onChange={e => {
+                   setSelectedRouteId(e.target.value);
+                   const route = dbRutas.find(r => r.id === e.target.value);
+                   if (route) {
+                     setNewSvrOrigen(route.origen);
+                     setNewSvrDestino(route.destino);
+                   }
+                 }} 
+                 className="w-full text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+               >
+                 <option value="">-- Seleccionar Ruta --</option>
+                 {dbRutas.map(r => (
+                   <option key={r.id} value={r.id}>{r.nombre}</option>
+                 ))}
+               </select>
              </div>
              <div className="grid grid-cols-2 gap-4">
                <div className="space-y-1">

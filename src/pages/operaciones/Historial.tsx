@@ -92,7 +92,7 @@ export default function Historial() {
     return `Hace ${days} ${days === 1 ? 'día' : 'días'}`;
   };
 
-  const handleOpenDetails = (item: typeof MOCK_HISTORY[0]) => {
+  const handleOpenDetails = (item: any) => {
     setSelectedItem(item);
     setIsDetailModalOpen(true);
   };

@@ -107,6 +107,21 @@ CREATE TABLE IF NOT EXISTS public.operacion_programacion (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- 6. Tabla de Rutas
+CREATE TABLE IF NOT EXISTS public.operacion_ruta (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    empresa_id UUID REFERENCES public.empresa(id) ON DELETE CASCADE,
+    nombre TEXT NOT NULL,
+    origen TEXT NOT NULL,
+    destino TEXT NOT NULL,
+    paradas JSONB DEFAULT '[]'::jsonb,
+    distancia_km NUMERIC,
+    tiempo_estimado_mins INTEGER,
+    activa BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- Habilitar RLS
 ALTER TABLE public.operacion_contrato ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.operacion_contrato_vehiculo ENABLE ROW LEVEL SECURITY;
@@ -114,6 +129,8 @@ ALTER TABLE public.operacion_servicio ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.operacion_reserva ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.operacion_documento ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.operacion_programacion ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE public.operacion_ruta ENABLE ROW LEVEL SECURITY;
 
 -- Políticas
 DO $$ 
@@ -124,6 +141,7 @@ BEGIN
     DROP POLICY IF EXISTS "Users can access operacion_reserva of their company" ON public.operacion_reserva;
     DROP POLICY IF EXISTS "Users can access operacion_documento of their company" ON public.operacion_documento;
     DROP POLICY IF EXISTS "Users can access operacion_programacion of their company" ON public.operacion_programacion;
+    DROP POLICY IF EXISTS "Users can access operacion_ruta of their company" ON public.operacion_ruta;
 EXCEPTION
     WHEN undefined_object THEN null;
 END $$;
@@ -172,6 +190,14 @@ CREATE POLICY "Users can access operacion_documento of their company" ON public.
 );
 
 CREATE POLICY "Users can access operacion_programacion of their company" ON public.operacion_programacion FOR ALL USING (
+    empresa_id IN (
+        SELECT empresa_id 
+        FROM public.usuario_aplicacion 
+        WHERE auth_user_id = auth.uid()
+    )
+);
+
+CREATE POLICY "Users can access operacion_ruta of their company" ON public.operacion_ruta FOR ALL USING (
     empresa_id IN (
         SELECT empresa_id 
         FROM public.usuario_aplicacion 

@@ -54,6 +54,7 @@ import GestionFallas from './pages/configuracion/GestionFallas';
 import ConfiguracionEmpresa from './pages/configuracion/ConfiguracionEmpresa';
 import CargaMasiva from './pages/configuracion/CargaMasiva';
 import GestionPausas from './pages/configuracion/GestionPausas';
+import GestionRutas from './pages/configuracion/GestionRutas';
 import Integraciones from './pages/soporte/Integraciones';
 import CentroAyuda from './pages/soporte/CentroAyuda';
 import ManualUso from './pages/soporte/ManualUso';
@@ -115,6 +116,7 @@ const router = createBrowserRouter([
       { path: "configuracion/tareas", element: <GestionTareas /> },
       { path: "configuracion/vehiculos-archivados", element: <VehiculosArchivados /> },
       { path: "configuracion/pausas", element: <GestionPausas /> },
+      { path: "configuracion/rutas", element: <GestionRutas /> },
       { path: "configuracion/carga-masiva", element: <CargaMasiva /> },
       { path: "herramientas/kits", element: <GestionKits /> },
       { path: "compras/ordenes", element: <OrdenesCompra /> },
