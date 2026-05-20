@@ -4,17 +4,14 @@ import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
 import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, Polyline } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { APIProvider, Map as GoogleMap, AdvancedMarker, Pin, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
 
-// Fix Leaflet icons
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
+const API_KEY =
+  process.env.GOOGLE_MAPS_PLATFORM_KEY ||
+  (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
+  (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY ||
+  '';
+const hasValidKey = Boolean(API_KEY) && API_KEY !== 'YOUR_API_KEY';
 
 interface RouteCoords {
   lat: number;
@@ -31,7 +28,7 @@ interface Ruta {
   tiempo_estimado_mins?: number;
 }
 
-export default function GestionRutas() {
+function GestionRutasContent() {
   const { activeCompanyId } = useCompany();
   const [rutas, setRutas] = useState<Ruta[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,90 +44,6 @@ export default function GestionRutas() {
   
   const [mapOriginCoords, setMapOriginCoords] = useState<RouteCoords | null>(null);
   const [mapDestCoords, setMapDestCoords] = useState<RouteCoords | null>(null);
-  const [routeLine, setRouteLine] = useState<[number, number][]>([]);
-
-  const fetchRouteOSRM = async (orig: RouteCoords, dest: RouteCoords) => {
-    try {
-      const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${orig.lng},${orig.lat};${dest.lng},${dest.lat}?overview=full&geometries=geojson`);
-      const data = await res.json();
-      if (data && data.routes && data.routes.length > 0) {
-        const route = data.routes[0];
-        const coords = route.geometry.coordinates.map((c: any) => [c[1], c[0]]);
-        setRouteLine(coords);
-        setDistanciaKm((route.distance / 1000).toFixed(1));
-        setTiempoEstimadoMins(Math.round(route.duration / 60).toString());
-      }
-    } catch(e) {
-      console.error(e);
-    }
-  }
-
-  useEffect(() => {
-    if (mapOriginCoords && mapDestCoords) {
-      fetchRouteOSRM(mapOriginCoords, mapDestCoords);
-    } else {
-      setRouteLine([]);
-    }
-  }, [mapOriginCoords, mapDestCoords]);
-
-  const handleGeocode = async (address: string, type: 'origen' | 'destino') => {
-    if (!address) return;
-    try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
-      const data = await response.json();
-      if (data && data.length > 0) {
-        const coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-        if (type === 'origen') {
-           setMapOriginCoords(coords);
-        } else {
-           setMapDestCoords(coords);
-        }
-      } else {
-        alert('No se encontraron resultados para la dirección.');
-      }
-    } catch (error) {
-       console.error(error);
-       alert('Error de conexión al buscar la dirección.');
-    }
-  };
-
-  const MapBounds = ({ origen, destino }: { origen: RouteCoords | null, destino: RouteCoords | null }) => {
-    const map = useMap();
-    useEffect(() => {
-      if (origen && destino) {
-        map.fitBounds([
-          [origen.lat, origen.lng],
-          [destino.lat, destino.lng]
-        ], { padding: [50, 50] });
-      } else if (origen) {
-        map.flyTo([origen.lat, origen.lng], 14, { animate: true });
-      } else if (destino) {
-        map.flyTo([destino.lat, destino.lng], 14, { animate: true });
-      }
-    }, [origen, destino, map]);
-    return null;
-  };
-
-  const MapClickHandler = () => {
-    useMapEvents({
-      click(e) {
-        if (!mapOriginCoords) {
-           setMapOriginCoords({ lat: e.latlng.lat, lng: e.latlng.lng });
-           setOrigen(`Lat: ${e.latlng.lat.toFixed(4)}, Lng: ${e.latlng.lng.toFixed(4)}`);
-        } else if (!mapDestCoords) {
-           setMapDestCoords({ lat: e.latlng.lat, lng: e.latlng.lng });
-           setDestino(`Lat: ${e.latlng.lat.toFixed(4)}, Lng: ${e.latlng.lng.toFixed(4)}`);
-        } else {
-           setMapOriginCoords({ lat: e.latlng.lat, lng: e.latlng.lng });
-           setOrigen(`Lat: ${e.latlng.lat.toFixed(4)}, Lng: ${e.latlng.lng.toFixed(4)}`);
-           setMapDestCoords(null);
-           setDestino('');
-           setRouteLine([]);
-        }
-      }
-    });
-    return null;
-  };
 
   useEffect(() => {
     fetchRutas();
@@ -140,14 +53,12 @@ export default function GestionRutas() {
     setIsLoading(true);
     try {
       let query = supabase.from('operacion_ruta').select('*').order('created_at', { ascending: false });
-      
       if (activeCompanyId && activeCompanyId !== 'GLOBAL') {
         query = query.eq('empresa_id', activeCompanyId);
       }
-      
       const { data, error } = await query;
       if (!error && data) {
-        setRutas(data);
+         setRutas(data);
       }
     } catch (e) {
       console.error(e);
@@ -184,6 +95,8 @@ export default function GestionRutas() {
       setDestino('');
       setDistanciaKm('');
       setTiempoEstimadoMins('');
+      setMapOriginCoords(null);
+      setMapDestCoords(null);
     } else {
       alert("Error al guardar la ruta. Asegúrate de que la tabla 'operacion_ruta' exista.");
     }
@@ -211,7 +124,6 @@ export default function GestionRutas() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
@@ -241,7 +153,6 @@ export default function GestionRutas() {
         </div>
       </div>
 
-      {/* Grid */}
       {isLoading ? (
         <div className="text-center py-10">Cargando rutas...</div>
       ) : (
@@ -303,78 +214,202 @@ export default function GestionRutas() {
         </div>
       )}
 
-      {/* Modal Nueva Ruta */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Crear Nueva Ruta">
-         <div className="space-y-4">
-           <div>
-             <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Nombre de la Ruta *</label>
-             <input type="text" value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej. STGO - CALAMA (Ruta Norte)" className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" />
-           </div>
-           
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {isModalOpen && (
+        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Crear Nueva Ruta">
+           <div className="space-y-4">
              <div>
-               <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2"><MapPin className="w-4 h-4 text-emerald-500" /> Origen *</label>
-               <div className="flex gap-2">
-                 <input type="text" value={origen} onChange={e => setOrigen(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleGeocode(origen, 'origen'); }} placeholder="Dirección o punto origen" className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" />
-                 <button onClick={() => handleGeocode(origen, 'origen')} className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg px-3 transition-colors text-slate-500">
-                    <Search className="w-4 h-4" />
-                 </button>
+               <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Nombre de la Ruta *</label>
+               <input type="text" value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej. STGO - CALAMA (Ruta Norte)" className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" />
+             </div>
+             
+             {!hasValidKey ? (
+                <div style={{textAlign:'left', padding: '16px', background: '#fff3cd', borderRadius: '8px', color: '#856404'}}>
+                  <h4 style={{fontWeight: 'bold', marginBottom: '8px'}}>Google Maps API Key Required</h4>
+                  <p className="text-sm font-medium"><strong>Step 1:</strong> <a href="https://console.cloud.google.com/google/maps-apis/start?utm_campaign=gmp-code-assist-ais" target="_blank" rel="noopener" className="underline">Get an API Key</a></p>
+                  <p className="text-sm font-medium"><strong>Step 2:</strong> Add your key as a secret in AI Studio:</p>
+                  <ul className="text-sm list-disc pl-5 mt-2 space-y-1">
+                    <li>Open <strong>Settings</strong> (⚙️ gear icon, <strong>top-right corner</strong>)</li>
+                    <li>Select <strong>Secrets</strong></li>
+                    <li>Type <code>GOOGLE_MAPS_PLATFORM_KEY</code> as the secret name, press <strong>Enter</strong></li>
+                    <li>Paste your API key as the value, press <strong>Enter</strong></li>
+                  </ul>
+                  <p className="text-sm mt-2">The app rebuilds automatically after you add the secret.</p>
+                </div>
+             ) : (
+                <MapRouteBuilder 
+                   origen={origen} setOrigen={setOrigen}
+                   destino={destino} setDestino={setDestino}
+                   setDistanciaKm={setDistanciaKm}
+                   setTiempoEstimadoMins={setTiempoEstimadoMins}
+                   setMapOriginCoords={setMapOriginCoords}
+                   setMapDestCoords={setMapDestCoords}
+                   mapOriginCoords={mapOriginCoords}
+                   mapDestCoords={mapDestCoords}
+                />
+             )}
+
+             <div className="grid grid-cols-2 gap-4">
+               <div>
+                 <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Distancia estimada (km)</label>
+                 <input type="number" value={distancia_km} onChange={e => setDistanciaKm(e.target.value)} placeholder="Ej. 120" className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" />
+               </div>
+               <div>
+                 <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Tiempo estimado (mins)</label>
+                 <input type="number" value={tiempo_estimado_mins} onChange={e => setTiempoEstimadoMins(e.target.value)} placeholder="Ej. 180" className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" />
                </div>
              </div>
-             <div>
-               <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2"><MapIcon className="w-4 h-4 text-indigo-500" /> Destino *</label>
-               <div className="flex gap-2">
-                 <input type="text" value={destino} onChange={e => setDestino(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleGeocode(destino, 'destino'); }} placeholder="Dirección o punto destino" className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" />
-                 <button onClick={() => handleGeocode(destino, 'destino')} className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg px-3 transition-colors text-slate-500">
-                    <Search className="w-4 h-4" />
-                 </button>
-               </div>
+
+             <div className="pt-4 flex justify-end gap-3 border-t border-slate-200 dark:border-slate-800 mt-6">
+               <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
+               <Button variant="primary" onClick={handleSaveRuta}>Guardar Ruta</Button>
              </div>
            </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
 
-           <div className="w-full h-[300px] rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 relative z-0">
-             <MapContainer center={[-33.4372, -70.6506]} zoom={10} scrollWheelZoom={true} className="w-full h-full">
-               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" />
-               <MapClickHandler />
-               <MapBounds origen={mapOriginCoords} destino={mapDestCoords} />
-               {mapOriginCoords && (
-                 <Marker position={[mapOriginCoords.lat, mapOriginCoords.lng]}>
-                   <Popup>Origen</Popup>
-                 </Marker>
-               )}
-               {mapDestCoords && (
-                 <Marker position={[mapDestCoords.lat, mapDestCoords.lng]}>
-                   <Popup>Destino</Popup>
-                 </Marker>
-               )}
-               {routeLine.length > 0 && (
-                 <Polyline positions={routeLine} color="#4f46e5" weight={5} />
-               )}
-             </MapContainer>
-             <div className="absolute top-2 right-2 z-[1000] bg-white/90 dark:bg-slate-900/90 p-2 rounded shadow-md text-xs backdrop-blur-sm pointer-events-none">
-                <p>1° Click: Origen</p>
-                <p>2° Click: Destino</p>
-                <p>3° Click: Reiniciar</p>
-             </div>
-           </div>
+function MapRouteBuilder({ origen, setOrigen, destino, setDestino, setDistanciaKm, setTiempoEstimadoMins, setMapOriginCoords, setMapDestCoords, mapOriginCoords, mapDestCoords }: any) {
+  const map = useMap();
+  const routesLib = useMapsLibrary('routes');
+  const placesLib = useMapsLibrary('places');
+  const polylinesRef = useRef<google.maps.Polyline[]>([]);
 
-           <div className="grid grid-cols-2 gap-4">
-             <div>
-               <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Distancia estimada (km)</label>
-               <input type="number" value={distancia_km} onChange={e => setDistanciaKm(e.target.value)} placeholder="Ej. 120" className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" />
-             </div>
-             <div>
-               <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Tiempo estimado (mins)</label>
-               <input type="number" value={tiempo_estimado_mins} onChange={e => setTiempoEstimadoMins(e.target.value)} placeholder="Ej. 180" className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" />
-             </div>
-           </div>
+  const handleGeocode = async (address: string, type: 'origen' | 'destino') => {
+    if (!address || !placesLib || !map) return;
+    placesLib.Place.searchByText({
+       textQuery: `${address}, Chile`,
+       fields: ['location', 'displayName', 'formattedAddress'],
+       maxResultCount: 1,
+    }).then(({ places }) => {
+       if (places && places.length > 0) {
+          const loc = places[0].location;
+          if (loc) {
+             const coords = { lat: loc.lat(), lng: loc.lng() };
+             if (type === 'origen') setMapOriginCoords(coords);
+             else setMapDestCoords(coords);
+             map.panTo(coords);
+             map.setZoom(14);
+          }
+       } else {
+          alert('No se encontraron resultados en Chile.');
+       }
+    }).catch(e => {
+       console.error(e);
+       alert('Error de conexión al buscar la dirección.');
+    });
+  };
 
-           <div className="pt-4 flex justify-end gap-3 border-t border-slate-200 dark:border-slate-800 mt-6">
-             <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
-             <Button variant="primary" onClick={handleSaveRuta}>Guardar Ruta</Button>
+  useEffect(() => {
+    if (!routesLib || !map) return;
+    // Clear previous route
+    polylinesRef.current.forEach(p => p.setMap(null));
+
+    if (mapOriginCoords && mapDestCoords) {
+      routesLib.Route.computeRoutes({
+        origin: mapOriginCoords,
+        destination: mapDestCoords,
+        travelMode: 'DRIVING',
+        fields: ['path', 'distanceMeters', 'durationMillis', 'viewport'],
+      }).then(({ routes }) => {
+        if (routes?.[0]) {
+          const newPolylines = routes[0].createPolylines();
+          newPolylines.forEach(p => p.setMap(map));
+          polylinesRef.current = newPolylines;
+          
+          setDistanciaKm((routes[0].distanceMeters! / 1000).toFixed(1));
+          setTiempoEstimadoMins(Math.round(routes[0].durationMillis! / 60000).toString());
+          
+          if (routes[0].viewport) map.fitBounds(routes[0].viewport);
+        }
+      }).catch(e => console.error("Error computing route:", e));
+    }
+    
+    return () => polylinesRef.current.forEach(p => p.setMap(null));
+  }, [routesLib, map, mapOriginCoords, mapDestCoords, setDistanciaKm, setTiempoEstimadoMins]);
+
+  // Click map behavior
+  useEffect(() => {
+     if (!map) return;
+     const listener = map.addListener('click', (e: any) => {
+        const lat = e.latLng.lat();
+        const lng = e.latLng.lng();
+        if (!mapOriginCoords) {
+           setMapOriginCoords({ lat, lng });
+           setOrigen(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
+        } else if (!mapDestCoords) {
+           setMapDestCoords({ lat, lng });
+           setDestino(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
+        } else {
+           setMapOriginCoords({ lat, lng });
+           setOrigen(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
+           setMapDestCoords(null);
+           setDestino('');
+        }
+     });
+     return () => {
+        google.maps.event.removeListener(listener);
+     };
+  }, [map, mapOriginCoords, mapDestCoords, setOrigen, setDestino, setMapOriginCoords, setMapDestCoords]);
+
+  return (
+     <>
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+         <div>
+           <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2"><MapPin className="w-4 h-4 text-emerald-500" /> Origen *</label>
+           <div className="flex gap-2">
+             <input type="text" value={origen} onChange={e => setOrigen(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleGeocode(origen, 'origen'); }} placeholder="Dirección o punto origen" className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" />
+             <button onClick={() => handleGeocode(origen, 'origen')} className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg px-3 transition-colors text-slate-500">
+                <Search className="w-4 h-4" />
+             </button>
            </div>
          </div>
-      </Modal>
-    </div>
+         <div>
+           <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2"><MapIcon className="w-4 h-4 text-indigo-500" /> Destino *</label>
+           <div className="flex gap-2">
+             <input type="text" value={destino} onChange={e => setDestino(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleGeocode(destino, 'destino'); }} placeholder="Dirección o punto destino" className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" />
+             <button onClick={() => handleGeocode(destino, 'destino')} className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg px-3 transition-colors text-slate-500">
+                <Search className="w-4 h-4" />
+             </button>
+           </div>
+         </div>
+       </div>
+
+       <div className="w-full h-[300px] rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 relative z-0">
+         <GoogleMap
+            defaultCenter={{ lat: -33.4372, lng: -70.6506 }} // Santiago, Chile defaults
+            defaultZoom={10}
+            mapId="ROUTE_MAP_ID"
+            disableDefaultUI
+            internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
+            style={{ width: '100%', height: '100%' }}
+         >
+            {mapOriginCoords && (
+               <AdvancedMarker position={mapOriginCoords} title="Origen">
+                 <Pin background="#10b981" glyphColor="#fff" borderColor="#047857" />
+               </AdvancedMarker>
+            )}
+            {mapDestCoords && (
+               <AdvancedMarker position={mapDestCoords} title="Destino">
+                 <Pin background="#6366f1" glyphColor="#fff" borderColor="#4338ca" />
+               </AdvancedMarker>
+            )}
+         </GoogleMap>
+         <div className="absolute top-2 right-2 z-[1000] bg-white/90 dark:bg-slate-900/90 p-2 rounded shadow-md text-xs backdrop-blur-sm pointer-events-none">
+            <p>1° Click: Origen</p>
+            <p>2° Click: Destino</p>
+            <p>3° Click: Reiniciar</p>
+         </div>
+       </div>
+     </>
+  );
+}
+
+export default function GestionRutas() {
+  return (
+    <APIProvider apiKey={API_KEY} version="weekly">
+      <GestionRutasContent />
+    </APIProvider>
   );
 }
