@@ -120,6 +120,8 @@ export const navigation = [
     href: '/finanzas',
     submodules: [
       { title: 'Estado de Pago', icon: ClipboardList, href: '/finanzas/estado-pago' },
+      { title: 'Registros Financieros', icon: FileText, href: '/finanzas/registros-financieros' },
+      { title: 'Gestión Operativa', icon: Activity, href: '/finanzas/gestion-operativa' },
       { title: 'Historial Facturación', icon: FileText, href: '/finanzas/historial-facturacion' },
       { title: 'Costos Operacionales', icon: DollarSign, href: '/finanzas/costos' },
       { title: 'Presupuestos', icon: Activity, href: '/finanzas/presupuestos' },

@@ -63,6 +63,8 @@ import EstadoPago from './pages/finanzas/EstadoPago';
 import HistorialFacturacion from './pages/finanzas/HistorialFacturacion';
 import Trazabilidad from './pages/finanzas/Trazabilidad';
 import EvaluacionEmpresa from './pages/finanzas/EvaluacionEmpresa';
+import RegistrosFinancieros from './pages/finanzas/RegistrosFinancieros';
+import GestionOperativa from './pages/finanzas/GestionOperativa';
 import CostosOperacionales from './pages/finanzas/CostosOperacionales';
 import Presupuestos from './pages/finanzas/Presupuestos';
 import { ThemeProvider } from './components/ThemeProvider';
@@ -127,6 +129,8 @@ const router = createBrowserRouter([
       { path: "compras/cotizaciones", element: <Cotizaciones /> },
       { path: "compras/contratos", element: <ContratosProveedores /> },
       { path: "finanzas/estado-pago", element: <EstadoPago /> },
+      { path: "finanzas/registros-financieros", element: <RegistrosFinancieros /> },
+      { path: "finanzas/gestion-operativa", element: <GestionOperativa /> },
       { path: "finanzas/historial-facturacion", element: <HistorialFacturacion /> },
       { path: "finanzas/costos", element: <CostosOperacionales /> },
       { path: "finanzas/presupuestos", element: <Presupuestos /> },
