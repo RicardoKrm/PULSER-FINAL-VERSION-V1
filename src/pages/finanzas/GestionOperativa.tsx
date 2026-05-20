@@ -95,7 +95,7 @@ export default function GestionOperativa() {
   });
   
   let cajaDisponible = totalIngresosRango - totalCostosRango;
-  let inmovilizadoBodega = 3536437210;
+  let inmovilizadoBodega = 0;
 
   return (
     <div className="flex flex-col h-[calc(100vh-80px)] xl:h-[calc(100vh-100px)]">
