@@ -10,6 +10,33 @@ export default function GestionOperativa() {
   const [empresa, setEmpresa] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const [fechaDesde, setFechaDesde] = useState<string>(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
+  const [fechaHasta, setFechaHasta] = useState<string>(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0]);
+
+  const exportToCSV = () => {
+    const headers = ['Unidad / Patente', 'Razon Social', 'Costo Total Rango', 'Ingreso Rango', 'Rentabilidad'];
+    const rows = vehiculos.map(veh => {
+      const stats = calculateVehiculoTotals(veh);
+      return [
+        `"${veh.id} / ${veh.patente || 'SIN PATENTE'}"`,
+        `"${empresa?.razon_social || 'No especificada'}"`,
+        stats.costos,
+        stats.ingresos,
+        stats.utilidad
+      ].join(',');
+    });
+    
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `gestion_operativa_${fechaDesde}_${fechaHasta}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   useEffect(() => {
     if (activeCompanyId) {
       fetchData();
@@ -49,8 +76,10 @@ export default function GestionOperativa() {
      let ingresos = 0;
      let costos = 0;
      registros.forEach((r: any) => {
-        if (r.tipo === 'Ingreso') ingresos += r.monto;
-        else if (r.tipo === 'Costo/Egreso') costos += r.monto;
+        if (r.fecha >= fechaDesde && r.fecha <= fechaHasta) {
+           if (r.tipo === 'Ingreso') ingresos += r.monto;
+           else if (r.tipo === 'Costo/Egreso') costos += r.monto;
+        }
      });
      return { ingresos, costos, utilidad: ingresos - costos };
   };
@@ -83,14 +112,14 @@ export default function GestionOperativa() {
                    <div className="flex border border-slate-300 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800">
                       <div className="px-3 py-2 border-r border-slate-300 dark:border-slate-700 text-xs text-slate-500 flex flex-col justify-center bg-slate-50 dark:bg-slate-900">
                          <span className="font-bold uppercase tracking-wider mb-0.5" style={{fontSize: '9px'}}>Desde</span>
-                         <input type="date" className="bg-transparent outline-none font-medium text-slate-800 dark:text-slate-200" defaultValue="2026-05-01"/>
+                         <input type="date" className="bg-transparent outline-none font-medium text-slate-800 dark:text-slate-200" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)}/>
                       </div>
                       <div className="px-3 py-2 text-xs text-slate-500 flex flex-col justify-center">
                          <span className="font-bold uppercase tracking-wider mb-0.5" style={{fontSize: '9px'}}>Hasta</span>
-                         <input type="date" className="bg-transparent outline-none font-medium text-slate-800 dark:text-slate-200" defaultValue="2026-05-31"/>
+                         <input type="date" className="bg-transparent outline-none font-medium text-slate-800 dark:text-slate-200" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)}/>
                       </div>
                    </div>
-                   <button className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-lg flex items-center gap-2 transition-colors">
+                   <button onClick={exportToCSV} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-lg flex items-center gap-2 transition-colors">
                       <Download className="w-4 h-4" /> Excel
                    </button>
                 </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '../../components/ui/Card';
-import { DollarSign, Search, Plus, Trash2, ArrowLeft, Download, Filter, Hourglass, TrendingUp, TrendingDown } from 'lucide-react';
+import { DollarSign, Search, Plus, Trash2, ArrowLeft, Download, Filter, Hourglass, TrendingUp, TrendingDown, Edit } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
 import Swal from 'sweetalert2';
@@ -19,6 +19,7 @@ export default function RegistrosFinancieros() {
   const [contrato, setContrato] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [monto, setMonto] = useState('');
+  const [editingRegistroId, setEditingRegistroId] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeCompanyId) {
@@ -58,6 +59,25 @@ export default function RegistrosFinancieros() {
   const activeEntity = isGlobal ? empresa : vehiculos.find(v => v.id === selectedEntityId);
   const registros = activeEntity?.detalles?.registros_financieros || [];
 
+  const handleEditClick = (reg: any) => {
+     setEditingRegistroId(reg.id);
+     setFechaRegistro(reg.fecha);
+     setTipoRegistro(reg.tipo);
+     setCategoria(reg.categoria);
+     setContrato(reg.contrato || '');
+     setDescripcion(reg.descripcion);
+     setMonto(reg.monto.toString());
+     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEdit = () => {
+     setEditingRegistroId(null);
+     setDescripcion('');
+     setMonto('');
+     setContrato('');
+     setFechaRegistro(new Date().toISOString().split('T')[0]);
+  };
+
   const handleSaveRegistro = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeEntity) return;
@@ -66,18 +86,27 @@ export default function RegistrosFinancieros() {
        return;
     }
 
-    const nuevoRegistro = {
-       id: crypto.randomUUID(),
-       fecha: fechaRegistro,
-       tipo: tipoRegistro,
-       categoria,
-       contrato,
-       descripcion,
-       monto: parseFloat(monto)
-    };
-
     const currentDetalles = activeEntity.detalles || {};
-    const newRegistros = [nuevoRegistro, ...registros];
+    let newRegistros = [...registros];
+
+    if (editingRegistroId) {
+       newRegistros = newRegistros.map((r: any) => 
+         r.id === editingRegistroId 
+           ? { ...r, fecha: fechaRegistro, tipo: tipoRegistro, categoria, contrato, descripcion, monto: parseFloat(monto) }
+           : r
+       );
+    } else {
+       const nuevoRegistro = {
+          id: crypto.randomUUID(),
+          fecha: fechaRegistro,
+          tipo: tipoRegistro,
+          categoria,
+          contrato,
+          descripcion,
+          monto: parseFloat(monto)
+       };
+       newRegistros = [nuevoRegistro, ...registros];
+    }
 
     const newDetalles = {
        ...currentDetalles,
@@ -101,8 +130,7 @@ export default function RegistrosFinancieros() {
         }
         
         // Form Reset
-        setDescripcion('');
-        setMonto('');
+        cancelEdit();
       } else {
         throw error;
       }
@@ -230,7 +258,7 @@ export default function RegistrosFinancieros() {
             {/* Formulario */}
             <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 h-fit xl:col-span-1">
                <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
-                  <h3 className="font-bold text-slate-800 dark:text-slate-200">Añadir Nuevo Registro</h3>
+                  <h3 className="font-bold text-slate-800 dark:text-slate-200">{editingRegistroId ? 'Editar Registro' : 'Añadir Nuevo Registro'}</h3>
                </div>
                <CardContent className="p-6">
                   <form onSubmit={handleSaveRegistro} className="space-y-5">
@@ -302,9 +330,16 @@ export default function RegistrosFinancieros() {
                         />
                         <p className="text-[11px] text-slate-500 mt-1">Monto del registro. Ingresar siempre como número positivo.</p>
                      </div>
-                     <button type="submit" className="w-full bg-[#14b8a6] hover:bg-[#0d9488] text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors">
-                        <Plus className="w-5 h-5" /> Guardar Registro
-                     </button>
+                     <div className="flex gap-2">
+                        <button type="submit" className="flex-1 bg-[#14b8a6] hover:bg-[#0d9488] text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors">
+                           <Plus className="w-5 h-5" /> {editingRegistroId ? 'Actualizar Registro' : 'Guardar Registro'}
+                        </button>
+                        {editingRegistroId && (
+                           <button type="button" onClick={cancelEdit} className="px-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg transition-colors">
+                              Cancelar
+                           </button>
+                        )}
+                     </div>
                   </form>
                </CardContent>
             </Card>
@@ -367,6 +402,11 @@ export default function RegistrosFinancieros() {
                                       {reg.tipo === 'Ingreso' ? '+' : '-'}${reg.monto.toLocaleString('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                    </td>
                                    <td className="px-5 py-4 text-center">
+                                      <button 
+                                        onClick={() => handleEditClick(reg)}
+                                        className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-md transition-colors mr-1">
+                                         <Edit className="w-4 h-4" />
+                                      </button>
                                       <button 
                                         onClick={() => handleDeleteRegistro(reg.id)}
                                         className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-md transition-colors">
