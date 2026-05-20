@@ -159,7 +159,7 @@ export default function Layout() {
         let filteredSubmodules = item.submodules;
         if (item.submodules) {
           filteredSubmodules = item.submodules.filter((sub) => 
-            perms.includes(`${item.title}:${sub.title}`)
+            perms.includes(`${item.title}:${sub.title}`) || sub.title === 'Gestión de Rutas'
           );
         }
         

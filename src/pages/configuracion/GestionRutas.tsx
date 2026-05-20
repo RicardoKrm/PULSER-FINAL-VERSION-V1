@@ -1,9 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MapPin, Plus, Search, Map as MapIcon, MoreVertical, Edit2, Trash2, Navigation } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
 import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, Polyline } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix Leaflet icons
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+interface RouteCoords {
+  lat: number;
+  lng: number;
+}
 
 interface Ruta {
   id: string;
@@ -28,6 +44,55 @@ export default function GestionRutas() {
   const [destino, setDestino] = useState('');
   const [distancia_km, setDistanciaKm] = useState('');
   const [tiempo_estimado_mins, setTiempoEstimadoMins] = useState('');
+  
+  const [mapOriginCoords, setMapOriginCoords] = useState<RouteCoords | null>(null);
+  const [mapDestCoords, setMapDestCoords] = useState<RouteCoords | null>(null);
+  const [routeLine, setRouteLine] = useState<[number, number][]>([]);
+
+  const fetchRouteOSRM = async (orig: RouteCoords, dest: RouteCoords) => {
+    try {
+      const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${orig.lng},${orig.lat};${dest.lng},${dest.lat}?overview=full&geometries=geojson`);
+      const data = await res.json();
+      if (data && data.routes && data.routes.length > 0) {
+        const route = data.routes[0];
+        const coords = route.geometry.coordinates.map((c: any) => [c[1], c[0]]);
+        setRouteLine(coords);
+        setDistanciaKm((route.distance / 1000).toFixed(1));
+        setTiempoEstimadoMins(Math.round(route.duration / 60).toString());
+      }
+    } catch(e) {
+      console.error(e);
+    }
+  }
+
+  useEffect(() => {
+    if (mapOriginCoords && mapDestCoords) {
+      fetchRouteOSRM(mapOriginCoords, mapDestCoords);
+    } else {
+      setRouteLine([]);
+    }
+  }, [mapOriginCoords, mapDestCoords]);
+
+  const MapClickHandler = () => {
+    useMapEvents({
+      click(e) {
+        if (!mapOriginCoords) {
+           setMapOriginCoords({ lat: e.latlng.lat, lng: e.latlng.lng });
+           setOrigen(`Lat: ${e.latlng.lat.toFixed(4)}, Lng: ${e.latlng.lng.toFixed(4)}`);
+        } else if (!mapDestCoords) {
+           setMapDestCoords({ lat: e.latlng.lat, lng: e.latlng.lng });
+           setDestino(`Lat: ${e.latlng.lat.toFixed(4)}, Lng: ${e.latlng.lng.toFixed(4)}`);
+        } else {
+           setMapOriginCoords({ lat: e.latlng.lat, lng: e.latlng.lng });
+           setOrigen(`Lat: ${e.latlng.lat.toFixed(4)}, Lng: ${e.latlng.lng.toFixed(4)}`);
+           setMapDestCoords(null);
+           setDestino('');
+           setRouteLine([]);
+        }
+      }
+    });
+    return null;
+  };
 
   useEffect(() => {
     fetchRutas();
@@ -211,11 +276,36 @@ export default function GestionRutas() {
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
              <div>
                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2"><MapPin className="w-4 h-4 text-emerald-500" /> Origen *</label>
-               <input type="text" value={origen} onChange={e => setOrigen(e.target.value)} placeholder="Dirección o punto origen" className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" />
+               <input type="text" value={origen} onChange={e => setOrigen(e.target.value)} placeholder="Click en el mapa o escribe" className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" />
              </div>
              <div>
                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2"><MapIcon className="w-4 h-4 text-indigo-500" /> Destino *</label>
-               <input type="text" value={destino} onChange={e => setDestino(e.target.value)} placeholder="Dirección o punto destino" className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" />
+               <input type="text" value={destino} onChange={e => setDestino(e.target.value)} placeholder="Click en el mapa o escribe" className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" />
+             </div>
+           </div>
+
+           <div className="w-full h-[300px] rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 relative z-0">
+             <MapContainer center={[-33.4372, -70.6506]} zoom={10} scrollWheelZoom={true} className="w-full h-full">
+               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" />
+               <MapClickHandler />
+               {mapOriginCoords && (
+                 <Marker position={[mapOriginCoords.lat, mapOriginCoords.lng]}>
+                   <Popup>Origen</Popup>
+                 </Marker>
+               )}
+               {mapDestCoords && (
+                 <Marker position={[mapDestCoords.lat, mapDestCoords.lng]}>
+                   <Popup>Destino</Popup>
+                 </Marker>
+               )}
+               {routeLine.length > 0 && (
+                 <Polyline positions={routeLine} color="#4f46e5" weight={5} />
+               )}
+             </MapContainer>
+             <div className="absolute top-2 right-2 z-[1000] bg-white/90 dark:bg-slate-900/90 p-2 rounded shadow-md text-xs backdrop-blur-sm pointer-events-none">
+                <p>1° Click: Origen</p>
+                <p>2° Click: Destino</p>
+                <p>3° Click: Reiniciar</p>
              </div>
            </div>
 
