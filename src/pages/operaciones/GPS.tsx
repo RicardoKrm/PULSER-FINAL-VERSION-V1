@@ -80,80 +80,129 @@ export default function GPS() {
 
   const [vehiculosGPS, setVehiculosGPS] = useState<any[]>(initialVehicles);
 
-  useEffect(() => {
+  const fetchGpsVehicles = async (updateOdometer = false) => {
     if (!activeCompanyId) return;
 
-    const fetchGpsVehicles = async () => {
-      try {
-         const { data, error } = await supabase
-           .from('vehiculo')
-           .select('id, patente, kilometraje_actual, detalles')
-           .eq('empresa_id', activeCompanyId);
-         
-         if (data && !error) {
-            // Filter only vehicles that have gps config
-            const configured = data.filter(v => v.detalles?.gps_proveedor && v.detalles?.gps_imei);
-            
-            // Generate mock real-time data for these vehicles
-            const liveData = configured.map((v, i) => {
-               // Pseudo-random deterministic values based on index
-               const isDetenido = i % 5 === 0;
-               const isExceso = i % 4 === 1;
-               const condicion = isDetenido ? 'detenido' : (isExceso ? 'exceso_velocidad' : 'en_ruta');
-               
-               return {
-                  id: v.id,
-                  patente: v.patente,
-                  kmTracker: v.kilometraje_actual || 0,
-                  lat: -20.590 + (Math.random() * 0.1 - 0.05),
-                  lng: -69.310 + (Math.random() * 0.1 - 0.05),
-                  velocidad: isDetenido ? 0 : (isExceso ? 115 : 78),
-                  limite: 100,
-                  estado: isDetenido ? 'detenido' : 'movimiento',
-                  condicion: condicion,
-                  conductor: 'Conductor Asignado',
-                  ruta: 'Ruta 1',
-                  gps_proveedor: v.detalles.gps_proveedor
-               };
-            });
-            
-            setVehiculosGPS(liveData);
-         }
-      } catch (e) {
-         console.error(e);
-      }
-    };
-    
+    try {
+       const [vehiculosRes, configRes] = await Promise.all([
+          supabase.from('vehiculo').select('id, patente, kilometraje_actual, detalles').eq('empresa_id', activeCompanyId),
+          supabase.from('empresa').select('detalles').eq('id', activeCompanyId).single()
+       ]);
+       
+       if (vehiculosRes.data && !vehiculosRes.error) {
+          const configured = vehiculosRes.data.filter(v => v.detalles?.gps_proveedor && v.detalles?.gps_imei);
+          
+          let apiKeys: any = {};
+          if (configRes.data && configRes.data.detalles) {
+             apiKeys = configRes.data.detalles.gps_config || {};
+          }
+
+          let gps2Data: any[] = [];
+          if (apiKeys.traccar_url && apiKeys.traccar_user && apiKeys.traccar_pass) {
+             try {
+                 const res = await fetch("/api/gps/sync-gps2", {
+                     method: "POST",
+                     headers: { "Content-Type": "application/json" },
+                     body: JSON.stringify({
+                         url: apiKeys.traccar_url,
+                         username: apiKeys.traccar_user,
+                         password: apiKeys.traccar_pass
+                     })
+                 });
+                 if (res.ok) {
+                     gps2Data = await res.json();
+                 }
+             } catch (e) {
+                 console.error("Error fetching GPS2 via proxy:", e);
+             }
+          }
+
+          const liveDataPromises = configured.map(async (v, i) => {
+             const prov = v.detalles.gps_proveedor;
+             let lat = -20.590 + (Math.random() * 0.1 - 0.05);
+             let lng = -69.310 + (Math.random() * 0.1 - 0.05);
+             let velocidad = 0;
+             let newKm = v.kilometraje_actual || 0;
+             
+             if (prov === 'gpsglobal' && apiKeys.gpsglobal) {
+                 try {
+                     const res = await fetch("/api/gps/sync-gps1", {
+                         method: "POST",
+                         headers: { "Content-Type": "application/json" },
+                         body: JSON.stringify({ patente: v.patente, token: apiKeys.gpsglobal })
+                     });
+                     if (res.ok) {
+                         const resData = await res.json();
+                         if (resData && resData.data && resData.data.length > 0) {
+                             const ult = resData.data[resData.data.length - 1]; 
+                             if (ult.latitud && ult.longitud) {
+                                 lat = parseFloat(ult.latitud) || lat;
+                                 lng = parseFloat(ult.longitud) || lng;
+                                 velocidad = parseFloat(ult.velocidad) || 0;
+                             }
+                         }
+                     }
+                 } catch(e) {}
+             } 
+             else if (prov === 'traccar') {
+                 // Using the GPS2 logic array with plateNumber
+                 const registro = gps2Data.find((x: any) => x.plateNumber === v.patente);
+                 if (registro) {
+                     lat = registro.lat || lat;
+                     lng = registro.lng || lng;
+                     velocidad = registro.speed ? Math.round(registro.speed) : velocidad;
+                     if (registro.odometer) {
+                         const km = parseInt(registro.odometer);
+                         if (km > newKm) newKm = km;
+                     }
+                 }
+             }
+
+             const isDetenido = velocidad < 2;
+             const isExceso = velocidad > 100;
+             const condicion = isDetenido ? 'detenido' : (isExceso ? 'exceso_velocidad' : 'en_ruta');
+             
+             if (updateOdometer && newKm > (v.kilometraje_actual || 0)) {
+                 await supabase.from('vehiculo').update({ kilometraje_actual: newKm }).eq('id', v.id);
+             }
+
+             return {
+                id: v.id,
+                patente: v.patente,
+                kmTracker: newKm, 
+                lat,
+                lng,
+                velocidad,
+                limite: 100,
+                estado: isDetenido ? 'detenido' : 'movimiento',
+                condicion,
+                conductor: 'Conductor Asignado', 
+                ruta: 'Ruta ' + (i+1),
+                gps_proveedor: prov
+             };
+          });
+          
+          const liveData = await Promise.all(liveDataPromises);
+          setVehiculosGPS(liveData);
+       }
+    } catch (e) {
+       console.error(e);
+    }
+  };
+  
+  useEffect(() => {
+    if (!activeCompanyId) return;
     fetchGpsVehicles();
     
-    // Simulate real-time polling every 30 secs
-    const interval = setInterval(fetchGpsVehicles, 30000);
+    // Real-time polling every 60 secs
+    const interval = setInterval(() => fetchGpsVehicles(), 60000);
     return () => clearInterval(interval);
   }, [activeCompanyId]);
 
   const syncGPSData = async () => {
     setIsSyncing(true);
-    try {
-      // Add random KM to current km to simulate driving
-      for (const veh of vehiculosGPS) {
-        const kmsToAdd = Math.floor(Math.random() * 50) + 10;
-        await supabase
-          .from('vehiculo')
-          .update({ kilometraje_actual: veh.kmTracker + kmsToAdd })
-          .eq('id', veh.id);
-      }
-      
-      // Update local state to reflect the new simulated KM
-      setVehiculosGPS(prev => prev.map(v => ({
-         ...v,
-         kmTracker: v.kmTracker + (Math.floor(Math.random() * 50) + 10) // Just visual
-      })));
-      
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setTimeout(() => setIsSyncing(false), 800);
-    }
+    await fetchGpsVehicles(true);
+    setIsSyncing(false);
   };
 
   const handleCenterMap = (lat: number, lng: number) => {

@@ -282,6 +282,82 @@ Responde de forma concisa.`;
     }
   });
 
+  // API Route for GPS1 (GPS Global)
+  app.post("/api/gps/sync-gps1", async (req, res) => {
+    try {
+      const { patente, token } = req.body;
+      if (!patente || !token) {
+        return res.status(400).json({ error: "Missing patente or token" });
+      }
+
+      // We just fetch the last 1 day to get the most recent location
+      const today = new Date();
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      const formatLocalStr = (d: Date) => d.toISOString().split('T')[0] + ' ' + d.toTimeString().split(' ')[0];
+      const fechaInicio = formatLocalStr(yesterday);
+      const fechaFin = formatLocalStr(today);
+
+      const url = `https://backend.gpsglobal.cl/api/open/recorrido?patente=${patente}&api_token=${token}&fecha_inicio=${encodeURIComponent(fechaInicio)}&fecha_fin=${encodeURIComponent(fechaFin)}`;
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`GPS API Error: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      res.json(data);
+    } catch (e: any) {
+      console.error('Error fetching GPS1:', e);
+      res.status(500).json({ error: "Failed to fetch GPS Global data" });
+    }
+  });
+
+  // API Route for GPS2 (Fleetsatlatam - Custom API)
+  app.post("/api/gps/sync-gps2", async (req, res) => {
+    try {
+      const { url, username, password } = req.body;
+      if (!url || !username || !password) {
+        return res.status(400).json({ error: "Missing gps2 url, username or password" });
+      }
+
+      // Step 1: Login
+      const loginRes = await fetch(`${url}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      
+      if (!loginRes.ok) {
+        throw new Error(`GPS2 Login Error: ${loginRes.statusText}`);
+      }
+      
+      const loginData = await loginRes.json();
+      const token = loginData.accessToken;
+      
+      if (!token) {
+        throw new Error("No accessToken returned from GPS2");
+      }
+
+      // Step 2: Fetch GPS data
+      const gpsRes = await fetch(`${url}/api/gps`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!gpsRes.ok) {
+        throw new Error(`GPS2 Data Error: ${gpsRes.statusText}`);
+      }
+      
+      const gpsData = await gpsRes.json();
+      res.json(gpsData);
+    } catch (e: any) {
+      console.error('Error fetching GPS2:', e);
+      res.status(500).json({ error: "Failed to fetch GPS2 data" });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

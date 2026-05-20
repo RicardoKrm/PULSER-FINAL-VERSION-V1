@@ -16,13 +16,26 @@ export default function ConfiguracionGPS() {
   useEffect(() => {
     if (activeCompanyId) {
       fetchVehicles();
-      // Simulating fetching global API keys
-      const savedKeys = localStorage.getItem(`gps_api_keys_${activeCompanyId}`);
-      if (savedKeys) {
-        setApiKeys(JSON.parse(savedKeys));
-      }
+      fetchCompanyConfig();
     }
   }, [activeCompanyId]);
+
+  const fetchCompanyConfig = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('empresa')
+        .select('detalles')
+        .eq('id', activeCompanyId)
+        .single();
+
+      if (!error && data?.detalles) {
+         const gpsConfig = data.detalles?.gps_config || {};
+         setApiKeys(gpsConfig);
+      }
+    } catch (e) {
+      console.error('Error fetching company GPS config:', e);
+    }
+  };
 
   const fetchVehicles = async () => {
     setLoading(true);
@@ -68,10 +81,32 @@ export default function ConfiguracionGPS() {
     }
   };
 
-  const saveApiKeys = () => {
+  const saveApiKeys = async () => {
     if (activeCompanyId) {
-      localStorage.setItem(`gps_api_keys_${activeCompanyId}`, JSON.stringify(apiKeys));
-      alert('Credenciales de API guardadas exitosamente.');
+      try {
+        const { data: currentEmpresa } = await supabase
+          .from('empresa')
+          .select('detalles')
+          .eq('id', activeCompanyId)
+          .single();
+
+        const currentDetails = currentEmpresa?.detalles || {};
+        
+        await supabase
+          .from('empresa')
+          .update({
+             detalles: {
+               ...currentDetails,
+               gps_config: apiKeys
+             }
+          })
+          .eq('id', activeCompanyId);
+          
+        alert('Credenciales de API guardadas exitosamente en la base de datos de la empresa.');
+      } catch (e) {
+        console.error('Error saving GPS config:', e);
+        alert('Error al guardar credenciales.');
+      }
     }
   };
 
@@ -100,44 +135,45 @@ export default function ConfiguracionGPS() {
                 </div>
                 <div className="space-y-4">
                   <div>
-                    <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1 block">TrackSolid Pro (API Key)</label>
+                    <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1 block">GPS Global (Token)</label>
                     <div className="flex gap-2">
                       <div className="relative flex-1">
                         <Key className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input 
                           type="password"
-                          value={apiKeys.tracksolid || ''}
-                          onChange={e => setApiKeys(prev => ({...prev, tracksolid: e.target.value}))}
+                          value={apiKeys.gpsglobal || ''}
+                          onChange={e => setApiKeys(prev => ({...prev, gpsglobal: e.target.value}))}
                           className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                          placeholder="Token de acceso..."
+                          placeholder="CjilvA2Ozo..."
                         />
                       </div>
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1 block">Wialon (Token)</label>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <Key className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input 
-                          type="password"
-                          value={apiKeys.wialon || ''}
-                          onChange={e => setApiKeys(prev => ({...prev, wialon: e.target.value}))}
-                          className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                          placeholder="Token de acceso..."
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1 block">Traccar (URL Servidor)</label>
+                    <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1 block">Traccar / Fleetsatlatam</label>
                     <input 
                       type="text"
                       value={apiKeys.traccar_url || ''}
                       onChange={e => setApiKeys(prev => ({...prev, traccar_url: e.target.value}))}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                      placeholder="https://mi-traccar.com/api"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none mb-2"
+                      placeholder="URL (Ej: http://167.172.253.216:8090)"
                     />
+                    <div className="grid grid-cols-2 gap-2">
+                       <input 
+                         type="text"
+                         value={apiKeys.traccar_user || ''}
+                         onChange={e => setApiKeys(prev => ({...prev, traccar_user: e.target.value}))}
+                         className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                         placeholder="Usuario..."
+                       />
+                       <input 
+                         type="password"
+                         value={apiKeys.traccar_pass || ''}
+                         onChange={e => setApiKeys(prev => ({...prev, traccar_pass: e.target.value}))}
+                         className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                         placeholder="Contraseña..."
+                       />
+                    </div>
                   </div>
                   <button onClick={saveApiKeys} className="w-full flex items-center justify-center gap-2 bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm mt-2">
                     <Save className="w-4 h-4" /> Guardar Credenciales
@@ -191,10 +227,8 @@ export default function ConfiguracionGPS() {
                                          className="w-full bg-transparent border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none dark:text-slate-200"
                                       >
                                          <option value="">-- Sin asignar --</option>
-                                         <option value="tracksolid">TrackSolid Pro</option>
-                                         <option value="wialon">Wialon</option>
-                                         <option value="traccar">Traccar</option>
-                                         <option value="samsara">Samsara</option>
+                                         <option value="gpsglobal">GPS Global</option>
+                                         <option value="traccar">Traccar (Fleetsatlatam)</option>
                                       </select>
                                    </td>
                                    <td className="p-3">
