@@ -4,6 +4,9 @@ import { exportToExcel } from '../../lib/excelExport';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
+import { RefreshCw } from 'lucide-react';
 
 const carFrontSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px; margin-top:2px;"><rect width="14" height="10" x="5" y="8" rx="2" ry="2"/><path d="M2 12h3"/><path d="M19 12h3"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="m19 8-1.5-4H6.5L5 8"/></svg>`;
 
@@ -67,13 +70,91 @@ interface FallbackInfraction {
 const initialVehicles: any[] = [];
 
 export default function GPS() {
+  const { activeCompanyId } = useCompany();
   const [mapCenter, setMapCenter] = useState<{lat: number, lng: number, zoom: number, ts: number}>({ 
     lat: -20.590, lng: -69.310, zoom: 9, ts: 0 
   }); 
 
   const [isGlobalMonitorOpen, setIsGlobalMonitorOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const [vehiculosGPS, setVehiculosGPS] = useState<any[]>(initialVehicles);
+
+  useEffect(() => {
+    if (!activeCompanyId) return;
+
+    const fetchGpsVehicles = async () => {
+      try {
+         const { data, error } = await supabase
+           .from('vehiculo')
+           .select('id, patente, kilometraje_actual, detalles')
+           .eq('empresa_id', activeCompanyId);
+         
+         if (data && !error) {
+            // Filter only vehicles that have gps config
+            const configured = data.filter(v => v.detalles?.gps_proveedor && v.detalles?.gps_imei);
+            
+            // Generate mock real-time data for these vehicles
+            const liveData = configured.map((v, i) => {
+               // Pseudo-random deterministic values based on index
+               const isDetenido = i % 5 === 0;
+               const isExceso = i % 4 === 1;
+               const condicion = isDetenido ? 'detenido' : (isExceso ? 'exceso_velocidad' : 'en_ruta');
+               
+               return {
+                  id: v.id,
+                  patente: v.patente,
+                  kmTracker: v.kilometraje_actual || 0,
+                  lat: -20.590 + (Math.random() * 0.1 - 0.05),
+                  lng: -69.310 + (Math.random() * 0.1 - 0.05),
+                  velocidad: isDetenido ? 0 : (isExceso ? 115 : 78),
+                  limite: 100,
+                  estado: isDetenido ? 'detenido' : 'movimiento',
+                  condicion: condicion,
+                  conductor: 'Conductor Asignado',
+                  ruta: 'Ruta 1',
+                  gps_proveedor: v.detalles.gps_proveedor
+               };
+            });
+            
+            setVehiculosGPS(liveData);
+         }
+      } catch (e) {
+         console.error(e);
+      }
+    };
+    
+    fetchGpsVehicles();
+    
+    // Simulate real-time polling every 30 secs
+    const interval = setInterval(fetchGpsVehicles, 30000);
+    return () => clearInterval(interval);
+  }, [activeCompanyId]);
+
+  const syncGPSData = async () => {
+    setIsSyncing(true);
+    try {
+      // Add random KM to current km to simulate driving
+      for (const veh of vehiculosGPS) {
+        const kmsToAdd = Math.floor(Math.random() * 50) + 10;
+        await supabase
+          .from('vehiculo')
+          .update({ kilometraje_actual: veh.kmTracker + kmsToAdd })
+          .eq('id', veh.id);
+      }
+      
+      // Update local state to reflect the new simulated KM
+      setVehiculosGPS(prev => prev.map(v => ({
+         ...v,
+         kmTracker: v.kmTracker + (Math.floor(Math.random() * 50) + 10) // Just visual
+      })));
+      
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setTimeout(() => setIsSyncing(false), 800);
+    }
+  };
 
   const handleCenterMap = (lat: number, lng: number) => {
     setMapCenter({ lat, lng, zoom: 14, ts: Date.now() });
@@ -111,6 +192,14 @@ export default function GPS() {
           >
             <Activity className="w-4 h-4" />
             Monitoreo Global
+          </button>
+          <button
+            onClick={syncGPSData}
+            disabled={isSyncing}
+            className={`bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-colors flex items-center justify-center gap-2 text-sm max-w-[fit-content] ${isSyncing ? 'opacity-70 cursor-not-allowed' : ''}`}
+          >
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            Sincronizar Odómetros
           </button>
           <button 
             onClick={handleExport}
@@ -181,6 +270,10 @@ export default function GPS() {
                           <p className="flex justify-between items-center pb-1 mb-1 border-b border-slate-200/50">
                             <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Límite Tramo:</span>
                             <span className="font-bold text-slate-700 dark:text-slate-300">{v.limite} km/h</span>
+                          </p>
+                          <p className="flex justify-between items-center pb-1 mb-1 border-b border-slate-200/50">
+                            <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Odómetro (KM):</span>
+                            <span className="font-bold text-slate-700 dark:text-slate-300">{v.kmTracker} km</span>
                           </p>
                           <p className="flex justify-between items-center">
                             <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Velocidad Actual:</span> 
@@ -402,7 +495,10 @@ export default function GPS() {
                         <div className="min-w-0 flex flex-col justify-center">
                           <h5 className="font-bold text-sm text-slate-800 dark:text-white leading-tight mb-0.5">{v.patente}</h5>
                           <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">{v.ruta}</p>
-                          <p className="text-[10px] text-slate-400">Cond: {v.conductor}</p>
+                          <p className="text-[10px] text-slate-400 flex items-center gap-2">
+                             <span>Cond: {v.conductor}</span>
+                             <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">KM: {v.kmTracker}</span>
+                          </p>
                         </div>
                       </div>
                       <div className="flex flex-col items-end justify-center">

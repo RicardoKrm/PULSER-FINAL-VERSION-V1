@@ -135,6 +135,7 @@ export const navigation = [
       { title: 'Gestión de Empresa', icon: Settings, href: '/configuracion/empresa' },
       { title: 'Personal', icon: Users, href: '/configuracion/personal' },
       { title: 'Asignación de Cargos', icon: UserCircle, href: '/configuracion/permisos' },
+      { title: 'Integración GPS', icon: MapPin, href: '/configuracion/gps' },
       { title: 'Precio de Combustible', icon: DollarSign, href: '/configuracion/precio-combustible' },
       { title: 'Gestión de Pautas', icon: FileText, href: '/configuracion/pautas' },
       { title: 'Gestión de Tareas', icon: ClipboardList, href: '/configuracion/tareas' },

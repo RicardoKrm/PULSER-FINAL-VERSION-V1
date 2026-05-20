@@ -34,21 +34,32 @@ export default function Historial() {
 
       const { data, error } = await query;
       if (!error && data) {
-         setHistoryItems(data.map(item => ({
-           id: item.id,
-           module: 'Viajes',
-           action: `Viaje Finalizado - ${item.tipo || 'Servicio'}`,
-           description: `El viaje con origen en ${item.origen} y destino en ${item.destino} fue marcado como realizado.`,
-           user: item.conductor?.nombre || 'Sin Conductor',
-           date: new Date(item.fecha + 'T' + String(item.hora || 10).padStart(2, '0') + ':00:00').toISOString(),
-           reference: item.id.substring(0, 8).toUpperCase(),
-           icon: Briefcase,
-           color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400',
-           origen: item.origen,
-           destino: item.destino,
-           vehiculo: item.vehiculo?.patente,
-           fecha: item.fecha
-         })));
+         setHistoryItems(data.map(item => {
+           let parsedDate = new Date().toISOString();
+           try {
+             if (item.fecha) {
+               // Safe parsing
+               const timePart = String(item.hora || 10).padStart(2, '0');
+               parsedDate = new Date(`${item.fecha}T${timePart}:00:00`).toISOString();
+             }
+           } catch(e) {}
+           
+           return {
+             id: item.id,
+             module: 'Viajes',
+             action: `Viaje Finalizado - ${item.tipo || 'Servicio'}`,
+             description: `El viaje con origen en ${item.origen || 'N/A'} y destino en ${item.destino || 'N/A'} fue marcado como realizado.`,
+             user: item.conductor?.nombre || 'Sin Conductor',
+             date: parsedDate,
+             reference: item.id.substring(0, 8).toUpperCase(),
+             icon: Briefcase,
+             color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400',
+             origen: item.origen || 'N/A',
+             destino: item.destino || 'N/A',
+             vehiculo: item.vehiculo?.patente || 'Sin Vehículo',
+             fecha: item.fecha || '2000-01-01'
+           };
+         }));
       }
     };
     fetchHistory();
