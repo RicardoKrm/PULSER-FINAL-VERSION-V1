@@ -1,19 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Clock, Truck, Play, CheckCircle2, AlertCircle, FileText, ChevronRight, Briefcase, Baby, Users, Map as MapIcon, X } from 'lucide-react';
+import { Calendar, MapPin, Clock, Truck, Play, CheckCircle2, AlertCircle, FileText, ChevronRight, Briefcase, Baby, Users, Map as MapIcon, X, Navigation, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-
-// Fix typical Leaflet icon issues in React
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
+import { Modal } from '../../components/ui/Modal';
 
 interface Viaje {
   id: string;
@@ -36,7 +26,10 @@ interface Viaje {
 export default function PortalConductor() {
   const { activeCompanyId } = useCompany();
   const [viajes, setViajes] = useState<Viaje[]>([]);
-  const [mapModalData, setMapModalData] = useState<{ isOpen: boolean; lat?: number; lng?: number; label?: string }>({ isOpen: false });
+  const [activeTab, setActiveTab] = useState<'PROGRAMADOS' | 'HISTORIAL'>('PROGRAMADOS');
+  const [selectedViaje, setSelectedViaje] = useState<Viaje | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [actionModal, setActionModal] = useState<{ isOpen: boolean; type: 'INCIDENCIA' | 'CHECKLIST' }>({ isOpen: false, type: 'INCIDENCIA' });
 
   useEffect(() => {
     const fetchViajes = async () => {
@@ -92,10 +85,14 @@ export default function PortalConductor() {
     }
   };
 
-  const handleOpenMap = (origen: string, lat?: number, lng?: number) => {
-    if (lat && lng) {
-      setMapModalData({ isOpen: true, lat, lng, label: origen });
-    }
+  const handleOpenMap = (origen: string, destino: string) => {
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origen)}&destination=${encodeURIComponent(destino)}&travelmode=driving`;
+    window.open(url, '_blank');
+  };
+
+  const openTripDetails = (viaje: Viaje) => {
+    setSelectedViaje(viaje);
+    setIsDetailModalOpen(true);
   };
 
   return (
@@ -118,56 +115,80 @@ export default function PortalConductor() {
           </div>
         </div>
 
-        {/* Viaje Activo */}
-        {activeViaje ? (
-          <div>
-            <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-3">En Curso</h2>
-            <div className="bg-indigo-600 rounded-xl p-5 shadow-lg lg:p-6 text-white relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 opacity-10">
-                <Truck className="w-32 h-32" />
-              </div>
-              <div className="relative z-10">
-                <div className="flex flex-wrap items-center justify-between gap-4 mb-4 border-b border-indigo-500/50 pb-4">
-                   <div>
-                     <span className="bg-indigo-500/50 text-indigo-100 px-2.5 py-1 rounded-md text-xs font-bold tracking-wide uppercase">
-                       {activeViaje.id.substring(0, 8)}
-                     </span>
-                     <h3 className="text-xl font-bold mt-2">{activeViaje.tipoViaje}</h3>
-                   </div>
-                   <div className="text-right">
-                     <div className="text-indigo-200 text-sm flex items-center justify-end gap-1"><Calendar className="w-4 h-4"/> {activeViaje.fecha}</div>
-                     <div className="font-bold text-lg">{activeViaje.horaInicio} - {activeViaje.horaFin}</div>
-                   </div>
-                </div>
+        {/* Tabs Navigation */}
+        <div className="flex items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-2">
+           <button
+             onClick={() => setActiveTab('PROGRAMADOS')}
+             className={cn(
+               "pb-2 font-bold transition-colors text-sm border-b-2",
+               activeTab === 'PROGRAMADOS' 
+                 ? "text-indigo-600 dark:text-indigo-400 border-indigo-600 dark:border-indigo-400" 
+                 : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-300 border-transparent"
+             )}
+           >
+             Viajes Programados
+           </button>
+           <button
+             onClick={() => setActiveTab('HISTORIAL')}
+             className={cn(
+               "pb-2 font-bold transition-colors text-sm border-b-2",
+               activeTab === 'HISTORIAL' 
+                 ? "text-indigo-600 dark:text-indigo-400 border-indigo-600 dark:border-indigo-400" 
+                 : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-300 border-transparent"
+             )}
+           >
+             Mi Historial
+           </button>
+        </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-6">
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5"><MapPin className="w-5 h-5 text-indigo-300" /></div>
-                      <div>
-                        <p className="text-xs text-indigo-300 uppercase tracking-wider font-semibold">Origen</p>
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-lg leading-tight">{activeViaje.origen}</p>
-                          {activeViaje.latOrigen && (
-                            <button 
-                              onClick={() => handleOpenMap(activeViaje.origen, activeViaje.latOrigen, activeViaje.lngOrigen)}
-                              className="bg-indigo-500/30 hover:bg-indigo-500/50 p-1.5 rounded-full transition-colors"
-                              title="Ver en Mapa"
-                            >
-                              <MapIcon className="w-4 h-4 text-indigo-100" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5"><MapPin className="w-5 h-5 text-indigo-300" /></div>
-                      <div>
-                        <p className="text-xs text-indigo-300 uppercase tracking-wider font-semibold">Destino</p>
-                        <p className="font-medium text-lg leading-tight">{activeViaje.destino}</p>
-                      </div>
-                    </div>
+        {activeTab === 'PROGRAMADOS' ? (
+          <>
+            {/* Viaje Activo */}
+            {activeViaje ? (
+              <div>
+                <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-3">En Curso</h2>
+                <div className="bg-indigo-600 rounded-xl p-5 shadow-lg lg:p-6 text-white relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <Truck className="w-32 h-32" />
                   </div>
+                  <div className="relative z-10">
+                    <div className="flex flex-wrap items-center justify-between gap-4 mb-4 border-b border-indigo-500/50 pb-4">
+                       <div>
+                         <span className="bg-indigo-500/50 text-indigo-100 px-2.5 py-1 rounded-md text-xs font-bold tracking-wide uppercase">
+                           {activeViaje.id.substring(0, 8)}
+                         </span>
+                         <h3 className="text-xl font-bold mt-2">{activeViaje.tipoViaje}</h3>
+                       </div>
+                       <div className="text-right">
+                         <div className="text-indigo-200 text-sm flex items-center justify-end gap-1"><Calendar className="w-4 h-4"/> {activeViaje.fecha}</div>
+                         <div className="font-bold text-lg">{activeViaje.horaInicio} - {activeViaje.horaFin}</div>
+                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-6">
+                      <div className="space-y-4">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5"><MapPin className="w-5 h-5 text-indigo-300" /></div>
+                          <div>
+                            <p className="text-xs text-indigo-300 uppercase tracking-wider font-semibold">Origen</p>
+                            <p className="font-medium text-lg leading-tight">{activeViaje.origen}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5"><MapPin className="w-5 h-5 text-indigo-300" /></div>
+                          <div>
+                            <p className="text-xs text-indigo-300 uppercase tracking-wider font-semibold">Destino</p>
+                            <p className="font-medium text-lg leading-tight">{activeViaje.destino}</p>
+                          </div>
+                        </div>
+
+                        <button 
+                           onClick={() => handleOpenMap(activeViaje.origen, activeViaje.destino)}
+                           className="bg-indigo-500/30 hover:bg-indigo-500/50 px-4 py-2 mt-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-semibold text-white inline-flex"
+                        >
+                           <Navigation className="w-4 h-4" /> Traza Ruta en Mapa
+                        </button>
+                      </div>
                   
                   <div className="space-y-4">
                     <div>
@@ -207,10 +228,16 @@ export default function PortalConductor() {
                   >
                     <CheckCircle2 className="w-5 h-5" /> Finalizar Viaje
                   </button>
-                  <button className="bg-indigo-500 hover:bg-indigo-400 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors flex justify-center items-center gap-2">
+                  <button 
+                    onClick={() => setActionModal({ isOpen: true, type: 'INCIDENCIA' })}
+                    className="bg-indigo-500 hover:bg-indigo-400 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors flex justify-center items-center gap-2"
+                  >
                     <AlertCircle className="w-5 h-5" /> Reportar Incidencia
                   </button>
-                  <button className="bg-indigo-500 hover:bg-indigo-400 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors flex justify-center items-center gap-2">
+                  <button 
+                    onClick={() => setActionModal({ isOpen: true, type: 'CHECKLIST' })}
+                    className="bg-indigo-500 hover:bg-indigo-400 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors flex justify-center items-center gap-2"
+                  >
                     <FileText className="w-5 h-5" /> Checklist
                   </button>
                 </div>
@@ -226,12 +253,16 @@ export default function PortalConductor() {
         )}
 
         {/* Próximos Viajes */}
-        <div>
+        <div className="mt-8">
            <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-3">Próximos Viajes Programados</h2>
            <div className="space-y-4">
              {proximosViajes.map(viaje => (
-                <div key={viaje.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
-                   <div className="flex-1">
+                <div 
+                  key={viaje.id} 
+                  onClick={() => openTripDetails(viaje)}
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer"
+                >
+                   <div className="flex-1 pointer-events-none">
                       <div className="flex items-center gap-3 mb-2">
                         <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">{viaje.id.substring(0, 8)}</span>
                         <span className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">{viaje.tipoViaje}</span>
@@ -246,15 +277,6 @@ export default function PortalConductor() {
                           <p className="text-[10px] uppercase text-slate-500 font-bold mb-1">Ruta</p>
                           <div className="flex items-center justify-between gap-2">
                             <div className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{viaje.origen} <ChevronRight className="w-3 h-3 inline text-slate-400 relative -top-0.5" /> {viaje.destino}</div>
-                            {viaje.latOrigen && (
-                               <button 
-                                 onClick={() => handleOpenMap(viaje.origen, viaje.latOrigen, viaje.lngOrigen)}
-                                 className="text-indigo-500 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 p-1.5 rounded-full shrink-0 transition-colors"
-                                 title="Ver en Mapa"
-                               >
-                                 <MapIcon className="w-4 h-4" />
-                               </button>
-                             )}
                           </div>
                         </div>
                         <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2.5 border border-slate-100 dark:border-slate-800">
@@ -269,16 +291,10 @@ export default function PortalConductor() {
                    
                    <div className="md:w-auto shrink-0 flex flex-col md:items-end justify-center pt-3 md:pt-0 border-t border-slate-100 dark:border-slate-800 md:border-none">
                      <button 
-                       onClick={() => iniciarViaje(viaje.id)}
-                       disabled={!!activeViaje}
-                       className={cn(
-                         "px-6 py-2.5 rounded-lg font-bold transition-all shadow-sm flex items-center justify-center gap-2",
-                         activeViaje 
-                           ? "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed" 
-                           : "bg-emerald-600 hover:bg-emerald-700 text-white hover:shadow-md"
-                       )}
+                       onClick={(e) => { e.stopPropagation(); openTripDetails(viaje); }}
+                       className="px-6 py-2.5 rounded-lg font-bold transition-all shadow-sm flex items-center justify-center gap-2 bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                      >
-                       <Play className="w-4 h-4" /> Iniciar Viaje
+                       Ver Detalles
                      </button>
                      {activeViaje && <p className="text-xs text-slate-400 text-center md:text-right mt-2 line-clamp-2 max-w-[150px]">Debes finalizar el viaje actual primero</p>}
                    </div>
@@ -291,54 +307,173 @@ export default function PortalConductor() {
              )}
            </div>
         </div>
+        </>
+        ) : (
+          <div className="mt-6 space-y-4">
+             <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-3 flex items-center gap-2">
+               <History className="w-5 h-5 text-indigo-500" />
+               Historial de Viajes Finalizados
+             </h2>
+             {viajes.filter(v => v.estado === 'FINALIZADO').length > 0 ? (
+                viajes.filter(v => v.estado === 'FINALIZADO').map((viaje) => (
+                  <div key={viaje.id} className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                     <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded">{viaje.id.substring(0, 8)}</span>
+                          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{viaje.tipoViaje}</span>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">
+                           <div className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-slate-400"/> {viaje.fecha}</div>
+                           <div className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-slate-400"/> {viaje.horaInicio} - {viaje.horaFin}</div>
+                           <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold"><CheckCircle2 className="w-4 h-4" /> Finalizado</div>
+                        </div>
+                        <div className="text-slate-600 dark:text-slate-300 text-sm font-medium">
+                          {viaje.origen} <ChevronRight className="w-3 h-3 inline text-slate-400 relative -top-0.5" /> {viaje.destino}
+                        </div>
+                     </div>
+                  </div>
+                ))
+             ) : (
+               <div className="text-center py-6 text-slate-500">
+                  No hay viajes finalizados en tu historial.
+               </div>
+             )}
+          </div>
+        )}
 
       </div>
 
-      {/* Map Modal */}
-      {mapModalData.isOpen && mapModalData.lat && mapModalData.lng && (
-        <div className="fixed inset-0 z-50 flex justify-center items-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col">
-            <div className="px-6 py-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-800">
-              <h2 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-indigo-500" />
-                Punto de Origen: {mapModalData.label}
-              </h2>
+      {/* Details Modal */}
+      <Modal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} title="Detalles del Viaje Programado">
+         {selectedViaje && (
+            <div className="space-y-6">
+               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-md text-xs font-bold tracking-wide uppercase">
+                      ID: {selectedViaje.id.substring(0, 8)}
+                    </span>
+                    <h3 className="text-xl font-bold mt-2 text-slate-800 dark:text-slate-100">{selectedViaje.tipoViaje}</h3>
+                  </div>
+                  <div className="text-left md:text-right">
+                    <div className="text-slate-500 dark:text-slate-400 text-sm flex items-center md:justify-end gap-1"><Calendar className="w-4 h-4"/> {selectedViaje.fecha}</div>
+                    <div className="font-bold text-lg text-slate-800 dark:text-slate-100">{selectedViaje.horaInicio} - {selectedViaje.horaFin}</div>
+                  </div>
+               </div>
+
+               <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-4">
+                 <div className="flex items-start gap-3">
+                   <div className="mt-0.5"><MapPin className="w-5 h-5 text-indigo-500" /></div>
+                   <div>
+                     <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Origen</p>
+                     <p className="font-medium text-slate-800 dark:text-slate-100">{selectedViaje.origen}</p>
+                   </div>
+                 </div>
+                 <div className="flex items-start gap-3">
+                   <div className="mt-0.5"><MapPin className="w-5 h-5 text-indigo-500" /></div>
+                   <div>
+                     <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Destino</p>
+                     <p className="font-medium text-slate-800 dark:text-slate-100">{selectedViaje.destino}</p>
+                   </div>
+                 </div>
+
+                 <button 
+                    onClick={() => handleOpenMap(selectedViaje.origen, selectedViaje.destino)}
+                    className="bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 px-4 py-2 mt-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-semibold inline-flex border border-indigo-200 dark:border-indigo-500/30"
+                 >
+                    <Navigation className="w-4 h-4" /> Traza Ruta en Mapa
+                 </button>
+               </div>
+
+               <div className="flex bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 border border-slate-200 dark:border-slate-800 divide-x divide-slate-200 dark:divide-slate-700">
+                  <div className="flex-1 px-3 text-center">
+                    <Users className="w-4 h-4 mx-auto mb-1 text-slate-400" />
+                    <span className="block text-xl font-bold text-slate-800 dark:text-slate-100">{selectedViaje.pasajeros || 0}</span>
+                    <span className="block text-[10px] uppercase tracking-wider text-slate-500">Pax</span>
+                  </div>
+                  <div className="flex-1 px-3 text-center">
+                    <Briefcase className="w-4 h-4 mx-auto mb-1 text-slate-400" />
+                    <span className="block text-xl font-bold text-slate-800 dark:text-slate-100">{selectedViaje.maletas || 0}</span>
+                    <span className="block text-[10px] uppercase tracking-wider text-slate-500">Maletas</span>
+                  </div>
+                  <div className="flex-1 px-3 text-center">
+                    <Baby className="w-4 h-4 mx-auto mb-1 text-slate-400" />
+                    <span className="block text-xl font-bold text-slate-800 dark:text-slate-100">{selectedViaje.sillaNino || 0}</span>
+                    <span className="block text-[10px] uppercase tracking-wider text-slate-500">Sillas</span>
+                  </div>
+               </div>
+
+               <div className="pt-4 flex flex-wrap-reverse md:flex-nowrap justify-between gap-3 border-t border-slate-200 dark:border-slate-800">
+                  <button 
+                     onClick={() => setIsDetailModalOpen(false)}
+                     className="px-5 py-2.5 rounded-lg font-bold transition-colors bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 w-full md:w-auto"
+                  >
+                     Cerrar
+                  </button>
+                  <button 
+                     onClick={() => {
+                        setIsDetailModalOpen(false);
+                        iniciarViaje(selectedViaje.id);
+                     }}
+                     disabled={!!activeViaje}
+                     className={cn(
+                       "px-5 py-2.5 rounded-lg font-bold transition-colors flex justify-center items-center gap-2 w-full md:w-auto shadow-sm",
+                       activeViaje 
+                         ? "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed" 
+                         : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                     )}
+                  >
+                     <Play className="w-5 h-5" /> Iniciar Viaje
+                  </button>
+               </div>
+            </div>
+         )}
+      </Modal>
+
+      {/* Action Modal (Incidencia / Checklist) */}
+      <Modal isOpen={actionModal.isOpen} onClose={() => setActionModal({ isOpen: false, type: 'INCIDENCIA' })} title={actionModal.type === 'INCIDENCIA' ? 'Reportar Incidencia' : 'Checklist Vehículo'}>
+         <div className="space-y-4">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+              {actionModal.type === 'INCIDENCIA' 
+                ? 'Describe la incidencia ocurrida durante el viaje. Esta información se enviará inmediatamente al centro de control.'
+                : 'Completa el checklist de inspección del vehículo y del viaje.'}
+            </p>
+            
+            {actionModal.type === 'INCIDENCIA' ? (
+               <textarea 
+                 rows={4}
+                 placeholder="Ej. Problema mecánico, retraso por tráfico, incidente con pasajero..."
+                 className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white transition-all shadow-sm"
+               />
+            ) : (
+               <div className="space-y-3 bg-slate-50 dark:bg-slate-800/50 p-4 border border-slate-200 dark:border-slate-800 rounded-xl">
+                 {['Niveles de aceite y fluidos revisados', 'Neumáticos en buen estado y con presión', 'Luces operativas', 'Documentación del vehículo al día', 'Limpieza interior y exterior'].map((item, i) => (
+                    <label key={i} className="flex items-center gap-3 cursor-pointer">
+                       <input type="checkbox" className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" />
+                       <span className="text-sm text-slate-700 dark:text-slate-300 font-medium">{item}</span>
+                    </label>
+                 ))}
+               </div>
+            )}
+            
+            <div className="pt-2 flex justify-end gap-3">
               <button 
-                onClick={() => setMapModalData({ isOpen: false })}
-                className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
+                 onClick={() => setActionModal({ isOpen: false, type: 'INCIDENCIA' })}
+                 className="px-4 py-2 rounded-lg font-bold transition-colors text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
-                <X className="w-5 h-5" />
+                 Cancelar
+              </button>
+              <button 
+                 onClick={() => {
+                   alert(actionModal.type === 'INCIDENCIA' ? 'Incidencia reportada con éxito.' : 'Checklist guardado con éxito.');
+                   setActionModal({ isOpen: false, type: 'INCIDENCIA' });
+                 }}
+                 className="px-4 py-2 rounded-lg font-bold transition-colors bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                 {actionModal.type === 'INCIDENCIA' ? 'Enviar Reporte' : 'Guardar Checklist'}
               </button>
             </div>
-            <div className="p-2 h-[400px] w-full bg-slate-100 dark:bg-slate-900">
-              <MapContainer 
-                center={[mapModalData.lat, mapModalData.lng]} 
-                zoom={14} 
-                scrollWheelZoom={true} 
-                className="w-full h-full rounded-lg z-0"
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                <Marker position={[mapModalData.lat, mapModalData.lng]}>
-                  <Popup>
-                    Origen: {mapModalData.label}
-                  </Popup>
-                </Marker>
-              </MapContainer>
-            </div>
-            <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 flex justify-end">
-               <button 
-                 onClick={() => setMapModalData({ isOpen: false })}
-                 className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-bold hover:bg-indigo-700 transition"
-               >
-                 Cerrar Mapa
-               </button>
-            </div>
-          </div>
-        </div>
-      )}
+         </div>
+      </Modal>
     </div>
   );
 }

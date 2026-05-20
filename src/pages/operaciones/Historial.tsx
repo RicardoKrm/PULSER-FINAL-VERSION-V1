@@ -1,29 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   History, Search, Filter, Briefcase, ClipboardList, Calendar, 
   FileCheck, AlertCircle, Activity, ChevronLeft, ChevronRight, 
-  User, Clock, ArrowUpRight, X
+  User, Clock, ArrowUpRight, X, MapPin
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
 
-// Mock data para el historial
-const MOCK_HISTORY: any[] = [];
-
-const MODULE_FILTERS = ['Todos', 'Contratos', 'Servicios', 'Reservas', 'Control Documental', 'Alertas'];
+const MODULE_FILTERS = ['Todos', 'Viajes', 'Operaciones'];
 
 export default function Historial() {
+  const { activeCompanyId } = useCompany();
+  const [historyItems, setHistoryItems] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedModule, setSelectedModule] = useState('Todos');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<typeof MOCK_HISTORY[0] | null>(null);
+  const [selectedItem, setSelectedItem] = useState<any | null>(null);
 
   const itemsPerPage = 8;
 
-  const filteredHistory = MOCK_HISTORY.filter(item => {
+  useEffect(() => {
+    const fetchHistory = async () => {
+      let query = supabase.from('operacion_programacion').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)').eq('estado', 'Realizado').order('fecha', { ascending: false });
+      
+      if (activeCompanyId && activeCompanyId !== 'GLOBAL') {
+        query = query.eq('empresa_id', activeCompanyId);
+      }
+
+      const { data, error } = await query;
+      if (!error && data) {
+         setHistoryItems(data.map(item => ({
+           id: item.id,
+           module: 'Viajes',
+           action: `Viaje Finalizado - ${item.tipo || 'Servicio'}`,
+           description: `El viaje con origen en ${item.origen} y destino en ${item.destino} fue marcado como realizado.`,
+           user: item.conductor?.nombre || 'Sin Conductor',
+           date: new Date(item.fecha + 'T' + (item.hora || '10') + ':00:00').toISOString(),
+           reference: item.id.substring(0, 8).toUpperCase(),
+           icon: Briefcase,
+           color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400',
+           origen: item.origen,
+           destino: item.destino,
+           vehiculo: item.vehiculo?.patente
+         })));
+      }
+    };
+    fetchHistory();
+  }, [activeCompanyId]);
+
+  const filteredHistory = historyItems.filter(item => {
     const matchesSearch = item.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           item.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           item.user.toLowerCase().includes(searchTerm.toLowerCase());
