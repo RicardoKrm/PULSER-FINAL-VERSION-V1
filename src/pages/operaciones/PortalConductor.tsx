@@ -43,8 +43,6 @@ export default function PortalConductor() {
       let query = supabase.from('operacion_programacion').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)').order('fecha', { ascending: true });
       if (activeCompanyId && activeCompanyId !== 'GLOBAL') {
         query = query.eq('empresa_id', activeCompanyId);
-      } else {
-        query = query.is('empresa_id', null); // If GLOBAL doesn't fetch everything, adjust based on your logic
       }
 
       const { data, error } = await query;

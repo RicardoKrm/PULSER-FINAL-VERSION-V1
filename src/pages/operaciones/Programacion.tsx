@@ -354,6 +354,9 @@ export default function Programacion() {
         destino: data.destino,
         conductorName: data.conductor?.nombre || null,
         vehiculoPatente: data.vehiculo?.patente || null,
+        empresa_id: data.empresa_id,
+        conductor_id: data.conductor_id,
+        vehiculo_id: data.vehiculo_id,
         bgColor: 'bg-white dark:bg-slate-800'
       }]);
 
