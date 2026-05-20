@@ -158,11 +158,16 @@ export default function RegistrosFinancieros() {
     });
   };
 
-  const categoriasOptions = tipoRegistro === 'Ingreso' ? [
+  const categoriasOptions = isGlobal ? [
+    'Operaciones y Servicios',
+    'Gestión de Flota',
+    'Logística y Suministros',
+    'Compras y Proveedores',
+    'Finanzas',
+    'Administración / Otros'
+  ] : tipoRegistro === 'Ingreso' ? [
     'Ingreso por Contrato',
     'Ingreso Variable (Viaje, KM)',
-    'Ingreso Software / Plataforma',
-    'Suscripciones',
     'Otros Ingresos'
   ] : [
     'Costo Fijo (Seguros, Salarios)',
@@ -172,19 +177,19 @@ export default function RegistrosFinancieros() {
     'Peajes y Estacionamiento',
     'Lubricantes y Fluidos',
     'Costo Extraordinario (Multas)',
-    'Infraestructura Web / Software',
-    'Servicios y Licencias',
     'Otros Gastos'
   ];
 
-  // Auto-select first category when type changes
+  // Auto-select first category when type or entity changes
   useEffect(() => {
-     if (tipoRegistro === 'Ingreso') {
+     if (isGlobal) {
+        setCategoria('Operaciones y Servicios');
+     } else if (tipoRegistro === 'Ingreso') {
         setCategoria('Ingreso por Contrato');
      } else {
         setCategoria('Combustible');
      }
-  }, [tipoRegistro]);
+  }, [tipoRegistro, isGlobal]);
 
   const totalIngresos = registros.filter((r:any) => r.tipo === 'Ingreso').reduce((acc: number, r:any) => acc + r.monto, 0);
   const totalCostos = registros.filter((r:any) => r.tipo === 'Costo/Egreso').reduce((acc: number, r:any) => acc + r.monto, 0);
