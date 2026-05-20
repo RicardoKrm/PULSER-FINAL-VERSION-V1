@@ -14,7 +14,7 @@ interface Viaje {
   destino: string;
   vehiculo: string;
   conductorName: string;
-  estado: 'PROGRAMADO' | 'EN_CURSO' | 'FINALIZADO';
+  estado: 'PROGRAMADO' | 'EN_CURSO' | 'FINALIZADO' | 'PAUSADO';
   pasajeros?: number;
   maletas?: number;
   sillaNino?: number;
@@ -54,7 +54,7 @@ export default function PortalConductor() {
           destino: v.destino,
           vehiculo: v.vehiculo?.patente || 'Sin Vehículo',
           conductorName: v.conductor?.nombre || 'Sin Conductor',
-          estado: v.estado === 'Asignado' ? 'PROGRAMADO' : (v.estado === 'En Curso' ? 'EN_CURSO' : (v.estado === 'Realizado' ? 'FINALIZADO' : 'PROGRAMADO')),
+          estado: v.estado === 'Asignado' ? 'PROGRAMADO' : (v.estado === 'En Curso' ? 'EN_CURSO' : (v.estado === 'Realizado' ? 'FINALIZADO' : (v.estado === 'Pausado' ? 'PAUSADO' : 'PROGRAMADO'))),
           tipoViaje: v.tipo || 'Servicio'
         }));
         setViajes(mappedViajes);
@@ -65,7 +65,7 @@ export default function PortalConductor() {
   }, [activeCompanyId]);
 
   const activeViaje = viajes.find(v => v.estado === 'EN_CURSO');
-  const proximosViajes = viajes.filter(v => v.estado === 'PROGRAMADO');
+  const proximosViajes = viajes.filter(v => v.estado === 'PROGRAMADO' || v.estado === 'PAUSADO');
 
   const iniciarViaje = async (id: string) => {
     try {
@@ -88,8 +88,7 @@ export default function PortalConductor() {
   const pausarViaje = async (id: string) => {
     try {
       await supabase.from('operacion_programacion').update({ estado: 'Pausado' }).eq('id', id);
-      setViajes(prev => prev.map(v => v.id === id ? { ...v, estado: 'PROGRAMADO' } : v)); // We can put it back to PROGRAMADO so they can resume it. Or we can add PAUSADO state, but 'PROGRAMADO' effectively puts it back in the list to be initiated again.
-      // Or let's just make it PROGRAMADO so it becomes pending again for the driver.
+      setViajes(prev => prev.map(v => v.id === id ? { ...v, estado: 'PAUSADO' } : v));
     } catch (e) {
       alert("Error al pausar el viaje");
     }
@@ -276,8 +275,13 @@ export default function PortalConductor() {
                 <div 
                   key={viaje.id} 
                   onClick={() => openTripDetails(viaje)}
-                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer"
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer relative overflow-hidden"
                 >
+                  {viaje.estado === 'PAUSADO' && (
+                    <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] uppercase font-bold tracking-wider px-3 py-1 rounded-bl-lg">
+                      Pausado
+                    </div>
+                  )}
                    <div className="flex-1 pointer-events-none">
                       <div className="flex items-center gap-3 mb-2">
                         <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">{viaje.id.substring(0, 8)}</span>
@@ -438,7 +442,7 @@ export default function PortalConductor() {
                          : "bg-emerald-600 hover:bg-emerald-700 text-white"
                      )}
                   >
-                     <Play className="w-5 h-5" /> Iniciar Viaje
+                     <Play className="w-5 h-5" /> {selectedViaje.estado === 'PAUSADO' ? 'Reanudar Viaje' : 'Iniciar Viaje'}
                   </button>
                </div>
             </div>

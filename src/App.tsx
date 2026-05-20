@@ -12,7 +12,7 @@ import Dashboard from './pages/Dashboard';
 import SuperAdminEmpresas from './pages/super-admin/Empresas';
 import SuperAdminPerfiles from './pages/super-admin/Perfiles';
 import SuperAdminVisionEvolucion from './pages/super-admin/VisionEvolucion';
-import OperacionesAlertas from './pages/operaciones/Alertas';
+import FlotaAlertas from './pages/flota/Alertas';
 import Contratos from './pages/operaciones/Contratos';
 import CrearServicio from './pages/operaciones/CrearServicio';
 import Programacion from './pages/operaciones/Programacion';
@@ -85,7 +85,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="/dashboard" replace /> },
           { path: "dashboard", element: <Dashboard /> },
-      { path: "operaciones/alertas", element: <OperacionesAlertas /> },
+      { path: "flota/alertas", element: <FlotaAlertas /> },
       { path: "operaciones/contratos", element: <Contratos /> },
       { path: "operaciones/servicios", element: <CrearServicio /> },
       { path: "operaciones/reservas", element: <Reservas /> },

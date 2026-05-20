@@ -75,7 +75,6 @@ export const navigation = [
       { title: 'Historial', icon: Activity, href: '/operaciones/historial' },
       { title: 'GPS FleetSat', icon: MapPin, href: '/operaciones/gps' },
       { title: 'Portal Conductor', icon: UserCircle, href: '/operaciones/portal-conductor' },
-      { title: 'Alertas', icon: AlertCircle, href: '/operaciones/alertas' },
     ],
   },
   {
@@ -83,6 +82,7 @@ export const navigation = [
     icon: Truck,
     href: '/flota',
     submodules: [
+      { title: 'Alertas', icon: AlertCircle, href: '/flota/alertas' },
       { title: 'Pizarra de Mantenimiento', icon: Wrench, href: '/flota/mantenimiento' },
       { title: 'Pizarra de Programación', icon: Calendar, href: '/flota/programacion' },
       { title: 'Órdenes de Trabajo (OT)', icon: FileText, href: '/flota/ordenes-trabajo' },
