@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Clock, Truck, Play, CheckCircle2, AlertCircle, FileText, ChevronRight, Briefcase, Baby, Users, Map as MapIcon, X, Navigation, History } from 'lucide-react';
+import { Calendar, MapPin, Clock, Truck, Play, CheckCircle2, AlertCircle, FileText, ChevronRight, Briefcase, Baby, Users, Map as MapIcon, X, Navigation, History, Pause } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
@@ -82,6 +82,16 @@ export default function PortalConductor() {
       setViajes(prev => prev.map(v => v.id === id ? { ...v, estado: 'FINALIZADO' } : v));
     } catch (e) {
       alert("Error al finalizar el viaje");
+    }
+  };
+
+  const pausarViaje = async (id: string) => {
+    try {
+      await supabase.from('operacion_programacion').update({ estado: 'Pausado' }).eq('id', id);
+      setViajes(prev => prev.map(v => v.id === id ? { ...v, estado: 'PROGRAMADO' } : v)); // We can put it back to PROGRAMADO so they can resume it. Or we can add PAUSADO state, but 'PROGRAMADO' effectively puts it back in the list to be initiated again.
+      // Or let's just make it PROGRAMADO so it becomes pending again for the driver.
+    } catch (e) {
+      alert("Error al pausar el viaje");
     }
   };
 
@@ -227,6 +237,12 @@ export default function PortalConductor() {
                     className="bg-white text-indigo-600 hover:bg-indigo-50 px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors flex justify-center items-center gap-2"
                   >
                     <CheckCircle2 className="w-5 h-5" /> Finalizar Viaje
+                  </button>
+                  <button 
+                    onClick={() => pausarViaje(activeViaje.id)}
+                    className="bg-amber-500 hover:bg-amber-400 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-colors flex justify-center items-center gap-2"
+                  >
+                    <Pause className="w-5 h-5" /> Pausar
                   </button>
                   <button 
                     onClick={() => setActionModal({ isOpen: true, type: 'INCIDENCIA' })}

@@ -109,7 +109,19 @@ export default function Programacion() {
       }
       
       if (resProg.data) {
-        setScheduled(resProg.data.map((p: any) => ({
+        setScheduled(resProg.data.map((p: any) => {
+          let colorClass = 'bg-indigo-50 border-indigo-200 text-indigo-800 dark:bg-indigo-500/10 dark:border-indigo-500/20 dark:text-indigo-300';
+          if (p.estado === 'Asignado') colorClass = 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-500/10 dark:border-blue-500/20 dark:text-blue-300'; // RESERVADO
+          else if (p.estado === 'En Curso') colorClass = 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-300'; // EN PROCESO
+          else if (p.estado === 'Realizado') colorClass = 'bg-slate-100 border-slate-300 text-slate-800 dark:bg-slate-700/50 dark:border-slate-600 dark:text-slate-300'; // TERMINO
+          else if (p.estado === 'Pausado') colorClass = 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-300'; // PAUSADO
+
+          let estadoLabel = 'RESERVADO';
+          if (p.estado === 'En Curso') estadoLabel = 'EN PROCESO';
+          else if (p.estado === 'Realizado') estadoLabel = 'TERMINADO';
+          else if (p.estado === 'Pausado') estadoLabel = 'PAUSADO';
+
+          return {
           id: p.id,
           dateStr: p.fecha,
           hour: p.hora || 10,
@@ -117,14 +129,17 @@ export default function Programacion() {
           tipo: p.tipo,
           origen: p.origen,
           destino: p.destino,
+          estado: estadoLabel,
+          estadoRaw: p.estado,
           timeStr: `${p.hora || 10}:00`,
           conductorName: p.conductor?.nombre || null,
           vehiculoPatente: p.vehiculo?.patente || null,
           empresa_id: p.empresa_id,
           conductor_id: p.conductor_id,
           vehiculo_id: p.vehiculo_id,
-          colorClass: 'bg-indigo-50 border-indigo-200 text-indigo-800 dark:bg-indigo-500/10 dark:border-indigo-500/20 dark:text-indigo-300'
-        })));
+          colorClass
+        };
+        }));
       }
     } catch(e) {
       console.error(e);
@@ -596,8 +611,7 @@ export default function Programacion() {
                              >
                              </div>
                            ))}
-
-                           {/* Render blocks for this day */}
+                            {/* Render blocks for this day */}
                            {scheduled.filter(s => s.dateStr === dateStr).map(block => {
                               const topOffset = (block.hour - 8) * 80; 
                               const heightOffset = block.duration * 80;
@@ -606,18 +620,20 @@ export default function Programacion() {
                               return (
                                 <div 
                                   key={block.id}
-                                  draggable
+                                  draggable={block.estadoRaw !== 'Realizado'}
                                   onDragStart={(e) => handleDragStart(e, block, 'scheduled')}
                                   onMouseEnter={(e) => handleMouseEnterTooltip(e, block)}
                                   onMouseLeave={handleMouseLeaveTooltip}
                                   className={cn(
-                                    "absolute left-1 right-1 rounded-md shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-all flex flex-col p-1.5 border border-transparent hover:border-blue-400 z-10 hover:z-50",
+                                    "absolute left-1 right-1 rounded-md shadow-sm overflow-hidden transition-all flex flex-col p-1.5 border border-transparent z-10",
+                                    block.estadoRaw !== 'Realizado' ? "cursor-pointer hover:border-blue-400 hover:shadow-md hover:z-50" : "opacity-80 cursor-not-allowed",
                                     block.colorClass
                                   )}
                                   style={{ top: `${topOffset + 2}px`, height: `${heightOffset - 4}px` }}
                                 >
                                   <div className="font-semibold text-[10px] leading-tight truncate flex justify-between gap-1 items-center mb-0.5">
                                     <span>{block.tipo}</span>
+                                    <span className="text-[9px] uppercase tracking-wider opacity-80">{block.estado}</span>
                                   </div>
                                   {(block.conductorName || block.vehiculoPatente) && (
                                     <div className="text-[9px] leading-tight truncate opacity-80">
@@ -663,18 +679,20 @@ export default function Programacion() {
                               return (
                                 <div 
                                   key={block.id}
-                                  draggable
+                                  draggable={block.estadoRaw !== 'Realizado'}
                                   onDragStart={(e) => handleDragStart(e, block, 'scheduled')}
                                   onMouseEnter={(e) => handleMouseEnterTooltip(e, block)}
                                   onMouseLeave={handleMouseLeaveTooltip}
                                   className={cn(
-                                    "absolute left-1 right-1 rounded-md shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-all flex flex-col p-1.5 border border-transparent hover:border-blue-400 z-10 hover:z-50",
+                                    "absolute left-1 right-1 rounded-md shadow-sm overflow-hidden transition-all flex flex-col p-1.5 border border-transparent z-10",
+                                    block.estadoRaw !== 'Realizado' ? "cursor-pointer hover:border-blue-400 hover:shadow-md hover:z-50" : "opacity-80 cursor-not-allowed",
                                     block.colorClass
                                   )}
                                   style={{ top: `${topOffset + 2}px`, height: `${heightOffset - 4}px` }}
                                 >
-                                  <div className="font-semibold text-xs leading-tight truncate flex mb-0.5">
+                                  <div className="font-semibold text-xs leading-tight truncate flex justify-between gap-1 items-center mb-0.5">
                                     <span>{block.tipo}</span>
+                                    <span className="text-[10px] uppercase tracking-wider opacity-80">{block.estado}</span>
                                   </div>
                                   <div className="mt-auto flex flex-col gap-1 pt-1 opacity-90">
                                     <div className="text-[10px] truncate leading-tight"><span className="opacity-70 mr-1">Ruta:</span> {block.origen} - {block.destino}</div>
@@ -683,7 +701,7 @@ export default function Programacion() {
                                          <Clock className="w-3 h-3 text-current" />
                                          <span>{block.hour}:00 - {block.hour + block.duration}:00</span>
                                        </div>
-                                       <span className="font-bold text-[10px] tracking-wider opacity-80">{c.vehiculo}</span>
+                                       <span className="font-bold text-[10px] tracking-wider opacity-80">{block.vehiculoPatente ? `🚐 ${block.vehiculoPatente}` : '🚐 Sin Vehículo'}</span>
                                     </div>
                                     <div className="text-[9px] mt-0.5 bg-black/10 dark:bg-black/20 rounded px-1.5 py-0.5 w-fit font-medium">
                                       Conductor: {c.nombre}
@@ -747,19 +765,22 @@ export default function Programacion() {
                           
                           <div className="flex-1 overflow-y-auto space-y-1 scrollbar-none px-0.5 mt-1">
                             {visibleBlocks.map(block => (
-                               <div 
-                                 key={block.id}
-                                 draggable
-                                 onDragStart={(e) => handleDragStart(e, block, 'scheduled')}
-                                 onMouseEnter={(e) => handleMouseEnterTooltip(e, block)}
-                                 onMouseLeave={handleMouseLeaveTooltip}
-                                 className={cn(
-                                   "text-[10px] font-medium px-2 py-1 rounded shadow-sm border truncate cursor-grab active:cursor-grabbing hover:opacity-90 transition-opacity bg-blue-500 text-white border-blue-600 dark:bg-blue-600 dark:border-blue-700",
-                                   !isCurrentMonth && "opacity-60"
-                                 )}
-                               >
-                                 <span className="font-semibold opacity-90 mr-1">• {block.timeStr.split(' ')[0]}</span> {block.tipo}
-                               </div>
+                                <div 
+                                  key={block.id}
+                                  draggable={block.estadoRaw !== 'Realizado'}
+                                  onDragStart={(e) => handleDragStart(e, block, 'scheduled')}
+                                  onMouseEnter={(e) => handleMouseEnterTooltip(e, block)}
+                                  onMouseLeave={handleMouseLeaveTooltip}
+                                  className={cn(
+                                    "text-[10px] font-medium px-2 py-1 rounded shadow-sm border truncate transition-opacity flex justify-between items-center gap-2",
+                                    block.estadoRaw !== 'Realizado' ? "cursor-grab active:cursor-grabbing hover:opacity-90" : "cursor-not-allowed opacity-80",
+                                    block.colorClass,
+                                    !isCurrentMonth && "opacity-60"
+                                  )}
+                                >
+                                  <div className="truncate"><span className="font-semibold opacity-90 mr-1">• {block.timeStr.split(' ')[0]}</span> {block.tipo}</div>
+                                  <span className="text-[8px] uppercase tracking-wider opacity-80 shrink-0">{block.estado}</span>
+                                </div>
                             ))}
                             {hiddenBlocksCount > 0 && (
                                <button 
