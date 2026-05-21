@@ -105,7 +105,7 @@ export default function BibliotecaExplorador() {
         </div>
       </div>
 
-      <Card className="p-4 sm:p-6 bg-gradient-to-r from-blue-900 to-slate-900 border-none shadow-lg text-white">
+      <Card className="p-4 sm:p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
           <div className="md:col-span-6 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -114,14 +114,14 @@ export default function BibliotecaExplorador() {
               placeholder="Buscar por palabra clave, etiqueta o equipo..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-slate-300 focus:bg-white/20 focus:outline-none transition-colors"
+              className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
             />
           </div>
           <div className="md:col-span-3">
             <select 
               value={filterTipo}
               onChange={(e) => setFilterTipo(e.target.value)}
-              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white appearance-none focus:bg-white/20 focus:outline-none transition-colors [&>option]:text-slate-900"
+              className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white appearance-none focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
             >
               <option value="all">Tipos de Documento</option>
               {uniqueTipos.map(t => <option key={t} value={t}>{t}</option>)}
@@ -131,7 +131,7 @@ export default function BibliotecaExplorador() {
             <select 
               value={filterMarca}
               onChange={(e) => setFilterMarca(e.target.value)}
-              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white appearance-none focus:bg-white/20 focus:outline-none transition-colors [&>option]:text-slate-900"
+              className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white appearance-none focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
             >
               <option value="all">Todas las Marcas</option>
               {uniqueMarcas.map(m => <option key={m} value={m}>{m}</option>)}
