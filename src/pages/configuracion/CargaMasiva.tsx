@@ -26,6 +26,8 @@ import { exportToExcel } from '../../lib/excelExport';
 import * as XLSX from 'xlsx';
 import { supabase } from '../../lib/supabase';
 
+import { useCompany } from '../../contexts/CompanyContext';
+
 interface UploadModule {
   id: string;
   title: string;
@@ -288,6 +290,7 @@ const MODULES: UploadModule[] = [
 ];
 
 export default function CargaMasiva() {
+  const { currentCompany } = useCompany();
   const [draggedOver, setDraggedOver] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<Record<string, File>>({});
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
@@ -366,6 +369,9 @@ export default function CargaMasiva() {
       // Limpieza de undefined properties que fallen en Supabase
       const cleanData = mappedData.map(row => {
         const newRow: any = {};
+        if (currentCompany) {
+          newRow.empresa_id = currentCompany.id;
+        }
         for(const [key, val] of Object.entries(row)) {
           if (val !== undefined) newRow[key] = val;
         }
