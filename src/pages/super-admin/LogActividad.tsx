@@ -19,6 +19,7 @@ export default function LogActividad() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState('all');
   const [stats, setStats] = useState({
     totalActions: 0,
     activeCompanies: 0,
@@ -165,19 +166,32 @@ export default function LogActividad() {
       )}
 
       <Card className="p-0 overflow-hidden shadow-sm">
-        <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
             <Clock className="w-5 h-5 text-slate-500" />
             Registro Global
           </h2>
-          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-400 border-none flex items-center">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
-            En vivo
-          </Badge>
+          <div className="flex items-center gap-4 w-full sm:w-auto">
+            <select
+              title="Filtrar por empresa"
+              className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+              value={selectedCompany}
+              onChange={(e) => setSelectedCompany(e.target.value)}
+            >
+              <option value="all">Todas las empresas</option>
+              {Array.from(new Set(logs.map(l => l.company_name))).map(company => (
+                <option key={company} value={company}>{company}</option>
+              ))}
+            </select>
+            <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-400 border-none flex items-center">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
+              En vivo
+            </Badge>
+          </div>
         </div>
         
         <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-[600px] overflow-y-auto">
-          {logs.map((log) => (
+          {logs.filter(log => selectedCompany === 'all' || log.company_name === selectedCompany).map((log) => (
             <div key={log.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-start gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
               {log.company_logo ? (
                 <img src={log.company_logo} alt={log.company_name} className="w-10 h-10 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 object-cover" />
@@ -186,6 +200,7 @@ export default function LogActividad() {
                   <Building className="w-5 h-5 text-slate-500" />
                 </div>
               )}
+
               
               <div className="flex-1 min-w-0">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-1 gap-2">
