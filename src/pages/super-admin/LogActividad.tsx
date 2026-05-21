@@ -18,47 +18,82 @@ interface LogEntry {
 export default function LogActividad() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({
     totalActions: 0,
     activeCompanies: 0,
     activeUsers: 0
   });
 
+  const fetchLogs = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('log_actividad')
+        .select(`
+          id,
+          accion,
+          modulo,
+          detalles,
+          created_at,
+          empresa:empresa_id (nombre),
+          usuario:usuario_id (nombre)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      if (data) {
+        const mappedLogs: LogEntry[] = data.map((item: any) => ({
+          id: item.id,
+          company_name: item.empresa?.nombre || 'Empresa Desconocida',
+          company_logo: `https://ui-avatars.com/api/?name=${encodeURIComponent(item.empresa?.nombre || 'UN')}&background=0D8ABC&color=fff`,
+          user_name: item.usuario?.nombre || 'Sistema',
+          action: item.accion,
+          module: item.modulo,
+          details: item.detalles || '',
+          created_at: item.created_at
+        }));
+        setLogs(mappedLogs);
+        
+        // Calculate dynamic stats
+        const uniqueCompanies = new Set(mappedLogs.map(l => l.company_name)).size;
+        const uniqueUsers = new Set(mappedLogs.map(l => l.user_name)).size;
+        
+        setStats({
+          totalActions: mappedLogs.length,
+          activeCompanies: uniqueCompanies,
+          activeUsers: uniqueUsers
+        });
+      }
+    } catch (err: any) {
+      console.error('Error fetching logs:', err);
+      // Fallback for UI if table doesn't exist yet
+      setError("No se pudo cargar el registro (asegúrate de haber ejecutado el script SQL de logs).");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // Mock inicial de la base de datos de actividad
-    const mockDb: LogEntry[] = [
-      { id: '1', company_name: 'Minera Los Andes', company_logo: 'https://ui-avatars.com/api/?name=ML&background=0D8ABC&color=fff', user_name: 'Juan Pérez', action: 'Creó OT', module: 'Mantenimiento', details: 'OT-2023-001 generada para equipo CAT-793', created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString() },
-      { id: '2', company_name: 'Transportes Global', company_logo: 'https://ui-avatars.com/api/?name=TG&background=F7703D&color=fff', user_name: 'María Silva', action: 'Creó Reserva', module: 'Operaciones', details: 'Reserva R-098 confirmada origen Stgo destino Valpo', created_at: new Date(Date.now() - 1000 * 60 * 15).toISOString() },
-      { id: '3', company_name: 'Minera Los Andes', company_logo: 'https://ui-avatars.com/api/?name=ML&background=0D8ABC&color=fff', user_name: 'Carlos Gómez', action: 'Aprobó Factura', module: 'Finanzas', details: 'Factura #9901 aprobada por $1.5M', created_at: new Date(Date.now() - 1000 * 60 * 45).toISOString() },
-      { id: '4', company_name: 'EcoLogistics', company_logo: 'https://ui-avatars.com/api/?name=EL&background=2DD4BF&color=fff', user_name: 'Ana Rojas', action: 'Completó Ruta', module: 'Operaciones', details: 'Ruta Santiago-Concepción finalizada sin novedades', created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString() },
-    ];
+    fetchLogs();
 
-    setStats({
-      totalActions: mockDb.length + 1204, // Un número base de acciones para dar contexto
-      activeCompanies: 3,
-      activeUsers: 45
-    });
+    // Subscribe to realtime inserts
+    const channel = supabase
+      .channel('log_actividad_changes')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'log_actividad' },
+        (payload) => {
+          fetchLogs(); // simple reload on new event to get joins
+        }
+      )
+      .subscribe();
 
-    setLogs(mockDb);
-    setLoading(false);
-
-    // Simular el ingreso de nuevas actividades en tiempo real
-    const interval = setInterval(() => {
-      const newAction = {
-        id: Math.random().toString(),
-        company_name: 'Transportes Global',
-        company_logo: 'https://ui-avatars.com/api/?name=TG&background=F7703D&color=fff',
-        user_name: 'Sistema Automatizado',
-        action: 'Alerta GPS',
-        module: 'Flota',
-        details: 'Exceso de velocidad registrado en Patente AB-CD-12',
-        created_at: new Date().toISOString()
-      };
-      setLogs(prev => [newAction, ...prev]);
-      setStats(prev => ({ ...prev, totalActions: prev.totalActions + 1 }));
-    }, 12000); // Se añade un nuevo evento cada 12 segundos para que se vea el efecto en vivo
-
-    return () => clearInterval(interval);
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const getModuleIcon = (moduleName: string) => {
@@ -119,6 +154,15 @@ export default function LogActividad() {
           </div>
         </Card>
       </div>
+
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 p-4 rounded-xl text-red-600 dark:text-red-400">
+          <p className="flex items-center gap-2">
+            <ShieldAlert className="w-5 h-5" />
+            {error}
+          </p>
+        </div>
+      )}
 
       <Card className="p-0 overflow-hidden shadow-sm">
         <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
