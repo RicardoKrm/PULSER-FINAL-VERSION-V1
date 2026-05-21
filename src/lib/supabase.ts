@@ -8,3 +8,24 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+export const logActividad = async (
+  modulo: string,
+  accion: string,
+  detalles: string,
+  empresaId?: string,
+  usuarioId?: string
+) => {
+  try {
+    // We intentionally don't await this if we want it to run detached
+    await supabase.from('log_actividad').insert([{
+      modulo,
+      accion,
+      detalles,
+      empresa_id: empresaId,
+      usuario_id: usuarioId
+    }]);
+  } catch (error) {
+    console.error("No se pudo registrar la actividad:", error);
+  }
+};

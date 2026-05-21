@@ -20,6 +20,7 @@ export default function LogActividad() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCompany, setSelectedCompany] = useState('all');
+  const [activeCompaniesList, setActiveCompaniesList] = useState<{id: string, name: string}[]>([]);
   const [stats, setStats] = useState({
     totalActions: 0,
     activeCompanies: 0,
@@ -29,9 +30,12 @@ export default function LogActividad() {
   const fetchLogs = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('log_actividad')
-        .select(`
+      
+      // Fetch stats natively instead of from logs
+      const [empresaRes, usuarioRes, logRes] = await Promise.all([
+        supabase.from('empresa').select('id, nombre'),
+        supabase.from('usuario_aplicacion').select('id', { count: 'exact' }),
+        supabase.from('log_actividad').select(`
           id,
           accion,
           modulo,
@@ -39,14 +43,22 @@ export default function LogActividad() {
           created_at,
           empresa:empresa_id (nombre),
           usuario:usuario_id (nombre)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(100);
+        `).order('created_at', { ascending: false }).limit(100)
+      ]);
 
-      if (error) throw error;
+      if (logRes.error) throw logRes.error;
 
-      if (data) {
-        const mappedLogs: LogEntry[] = data.map((item: any) => ({
+      let fetchedCompanies = [];
+      if (empresaRes.data) {
+        fetchedCompanies = empresaRes.data.map(c => ({ id: c.id, name: c.nombre }));
+        setActiveCompaniesList(fetchedCompanies);
+      }
+
+      const activeUsersCount = usuarioRes.count || (usuarioRes.data ? usuarioRes.data.length : 0);
+      const activeCompaniesCount = empresaRes.data ? empresaRes.data.length : 0;
+
+      if (logRes.data) {
+        const mappedLogs: LogEntry[] = logRes.data.map((item: any) => ({
           id: item.id,
           company_name: item.empresa?.nombre || 'Empresa Desconocida',
           company_logo: `https://ui-avatars.com/api/?name=${encodeURIComponent(item.empresa?.nombre || 'UN')}&background=0D8ABC&color=fff`,
@@ -58,14 +70,10 @@ export default function LogActividad() {
         }));
         setLogs(mappedLogs);
         
-        // Calculate dynamic stats
-        const uniqueCompanies = new Set(mappedLogs.map(l => l.company_name)).size;
-        const uniqueUsers = new Set(mappedLogs.map(l => l.user_name)).size;
-        
         setStats({
           totalActions: mappedLogs.length,
-          activeCompanies: uniqueCompanies,
-          activeUsers: uniqueUsers
+          activeCompanies: activeCompaniesCount,
+          activeUsers: activeUsersCount
         });
       }
     } catch (err: any) {
@@ -179,8 +187,8 @@ export default function LogActividad() {
               onChange={(e) => setSelectedCompany(e.target.value)}
             >
               <option value="all">Todas las empresas</option>
-              {Array.from(new Set(logs.map(l => l.company_name))).map(company => (
-                <option key={company} value={company}>{company}</option>
+              {activeCompaniesList.map(company => (
+                <option key={company.id} value={company.name}>{company.name}</option>
               ))}
             </select>
             <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-400 border-none flex items-center">

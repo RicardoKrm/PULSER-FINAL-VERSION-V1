@@ -3,6 +3,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { useAppContext } from '../../context/AppContext';
 import { OrdenDeTrabajo } from '../../types';
+import { logActividad } from '../../lib/supabase';
 
 interface CrearOTModalProps {
   isOpen: boolean;
@@ -77,6 +78,18 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
       tiempoTrabajadoSegundos: 0,
     };
     crearOrdenTrabajo(nuevaOT);
+    
+    // Asynchronously log the activity dynamically 
+    const vehiculo = vehiculos.find(v => v.id === formData.vehiculoId);
+    logActividad(
+      'Mantenimiento',
+      'Creó OT',
+      `OT ${nuevaOT.folio} generada para patente ${vehiculo ? vehiculo.patente : 'desconocida'}`,
+      // we would use currentUser and currentCompany from Auth context but this is a demo, 
+      // so if we don't have them handy in the local state, we'll let supabase triggers handle it later or omit for now
+      // Actually we have personal and active companies, let's keep ids null to not break constraints if IDs don't match exactly.
+    );
+
     onClose();
   };
 
