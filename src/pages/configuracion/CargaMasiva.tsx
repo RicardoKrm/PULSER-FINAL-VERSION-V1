@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { exportToExcel } from '../../lib/excelExport';
+import * as XLSX from 'xlsx';
+import { supabase } from '../../lib/supabase';
 
 interface UploadModule {
   id: string;
@@ -31,6 +33,84 @@ interface UploadModule {
   icon: React.ElementType;
   template?: any[];
 }
+
+const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any }> = {
+  empleados: { 
+    table: 'colaborador', 
+    mapConfig: (r: any) => ({ rut: r.Rut, nombres: r.Nombres, apellidos: r.Apellidos, cargos: r.Cargo, telefono: r.Telefono, email: r.Email }) 
+  },
+  vehiculos: { 
+    table: 'vehiculo', 
+    mapConfig: (r: any) => ({ ...r }) 
+  },
+  inventario: { 
+    table: 'insumo', 
+    mapConfig: (r: any) => ({ codigo: r.Codigo, nombre: r.Nombre, categoria: r.Categoria, stock: r.StockInicial, precio_unitario: r.PrecioUnitario, proveedor_principal: r.ProveedorPrincipal }) 
+  },
+  pautas: { 
+    table: 'pauta_mantenimiento', 
+    mapConfig: (r: any) => ({ nombre_pauta: r.NombrePauta, modelo_vehiculo: r.ModeloVehiculo, tipo: r.Tipo, km_ejecucion: r.KMEjecucion }) 
+  },
+  tareas: { 
+    table: 'tarea_estandar', 
+    mapConfig: (r: any) => ({ codigo_tarea: r.CodigoTarea, descripcion: r.Descripcion, tiempo_estimado_horas: r.TiempoEstimadoHoras, costo_base_mano_obra: r.CostoBaseManoObra }) 
+  },
+  fallas: { 
+    table: 'tipo_falla', 
+    mapConfig: (r: any) => ({ codigo_falla: r.CodigoFalla, descripcion: r.Descripcion, sistema_afectado: r.SistemaAfectado, criticidad: r.Criticidad }) 
+  },
+  proveedores: { 
+    table: 'proveedor', 
+    mapConfig: (r: any) => ({ rut: r.Rut, razon_social: r.RazonSocial, contacto: r.Contacto, telefono: r.Telefono, email: r.Email, tipo_servicio: r.TipoServicio }) 
+  },
+  kits: { 
+    table: 'kit_repuesto', 
+    mapConfig: (r: any) => ({ codigo_kit: r.CodigoKit, nombre: r.Nombre }) 
+  },
+  rutas: { 
+    table: 'ruta', 
+    mapConfig: (r: any) => ({ codigo_ruta: r.CodigoRuta, origen: r.Origen, destino: r.Destino, distancia_km: r.DistanciaKM, tiempo_estimado_horas: r.TiempoEstimadoHoras, tarifa_base: r.TarifaBase }) 
+  },
+  neumaticos: { 
+    table: 'neumatico', 
+    mapConfig: (r: any) => ({ codigo_interno: r.CodigoInterno, marca: r.Marca, modelo: r.Modelo, medida: r.Medida, estado: r.Estado, patente_asignada: r.PatenteAsignada, posicion: r.Posicion }) 
+  },
+  combustible: { 
+    table: 'registro_combustible', 
+    mapConfig: (r: any) => ({ 
+      fecha: r.Fecha ? new Date(r.Fecha).toISOString() : new Date().toISOString(), 
+      patente: r.Patente, odometro: r.Odometro, litros: r.Litros, costo_total: r.CostoTotal, proveedor: r.Proveedor, conductor: r.Conductor 
+    }) 
+  },
+  contratos: { 
+    table: 'operacion_contrato', 
+    mapConfig: (r: any) => ({ codigo_contrato: r.CodigoContrato, cliente: r.Cliente, fecha_inicio: r.FechaInicio, fecha_fin: r.FechaFin, monto_mensual: r.MontoMensual }) 
+  },
+  documental: { 
+    table: 'operacion_documento', 
+    mapConfig: (r: any) => ({ entidad: r.Entidad, referencia: r.Referencia, tipo_documento: r.TipoDocumento, fecha_emision: r.FechaEmision, fecha_vencimiento: r.FechaVencimiento }) 
+  },
+  bodegas: { 
+    table: 'bodega', 
+    mapConfig: (r: any) => ({ codigo_bodega: r.CodigoBodega, nombre: r.Nombre, direccion: r.Dirección || r.Direccion, encargado: r.Encargado }) 
+  },
+  suministros: { 
+    table: 'sumuministro', // actually let's check schema: table name is suministro
+    mapConfig: (r: any) => ({ codigo_suministro: r.CodigoSuministro, nombres: r.Nombres, tipo: r.Tipo, stock: r.Stock, precio_unitario: r.PrecioUnitario }) 
+  },
+  ots: { 
+    table: 'orden_de_trabajo', 
+    mapConfig: (r: any) => ({ numero_ot: r.NumeroOT, patente: r.Patente, estado: r.Estado, tipo_mantenimiento: r.TipoMantenimiento, costo_total: r.CostoTotal }) 
+  },
+  reservas: { 
+    table: 'operacion_reserva', 
+    mapConfig: (r: any) => ({ codigo_reserva: r.CodigoReserva, cliente: r.Cliente, fecha_servicio: r.FechaServicio, origen: r.Origen, destino: r.Destino, pasajeros: r.Pasajeros }) 
+  }
+};
+
+// Fix table name just in case
+UPLOAD_MAPPING.suministros.table = 'suministro';
+
 
 const MODULES: UploadModule[] = [
   {
@@ -255,7 +335,8 @@ export default function CargaMasiva() {
   };
 
   const handleUpload = async (moduleId: string) => {
-    if (!selectedFiles[moduleId]) return;
+    const file = selectedFiles[moduleId];
+    if (!file) return;
 
     setUploading(prev => ({ ...prev, [moduleId]: true }));
     setResults(prev => {
@@ -264,27 +345,65 @@ export default function CargaMasiva() {
       return newResults;
     });
 
-    // Simulate API call
-    setTimeout(() => {
-      setUploading(prev => ({ ...prev, [moduleId]: false }));
-      
-      // Simulate success for demonstration
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      if (!jsonData || jsonData.length === 0) {
+        throw new Error("El archivo está vacío o no se pudo leer correctamente.");
+      }
+
+      const config = UPLOAD_MAPPING[moduleId];
+      if (!config) {
+        throw new Error("Módulo no configurado para carga masiva en el sistema.");
+      }
+
+      const mappedData = jsonData.map(config.mapConfig);
+
+      // Limpieza de undefined properties que fallen en Supabase
+      const cleanData = mappedData.map(row => {
+        const newRow: any = {};
+        for(const [key, val] of Object.entries(row)) {
+          if (val !== undefined) newRow[key] = val;
+        }
+        return newRow;
+      });
+
+      const { error } = await supabase.from(config.table).insert(cleanData);
+
+      if (error) {
+        console.error("Supabase insert error:", error);
+        throw new Error(error.message);
+      }
+
       setResults(prev => ({ 
         ...prev, 
         [moduleId]: { 
           success: true, 
-          message: `Carga completada: 120 registros procesados correctamente.` 
+          message: `Carga completada exitosamente: ${jsonData.length} registros insertados.` 
         } 
       }));
       
-      // Clear file after success
       setSelectedFiles(prev => {
         const newFiles = { ...prev };
         delete newFiles[moduleId];
         return newFiles;
       });
 
-    }, 2000);
+    } catch (error: any) {
+      setResults(prev => ({ 
+        ...prev, 
+        [moduleId]: { 
+          success: false, 
+          message: error.message || "Error al procesar el archivo. Revisa el formato." 
+        } 
+      }));
+    } finally {
+      setUploading(prev => ({ ...prev, [moduleId]: false }));
+    }
   };
 
   return (

@@ -1188,6 +1188,7 @@ export default function SuperAdminPerfiles() {
                   rut: data.rut,
                   empresa_id: data.empresa_id,
                   rol_id: data.rol_id,
+                  panel_inicio: data.panel_inicio || '/dashboard',
                   estado: data.estado,
                   email: emailToUse,
                   cambio_clave_pendiente: true
@@ -1292,6 +1293,19 @@ export default function SuperAdminPerfiles() {
                       <select name="tipo_prestador" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
                         <option value="INTERNO">Interno</option>
                         <option value="EXTERNO">Externo</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Panel de Inicio</label>
+                      <select name="panel_inicio" className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white">
+                        <option value="/dashboard">Dashboard General</option>
+                        <option value="/operaciones">Operaciones</option>
+                        <option value="/operaciones/portal-conductor">Portal Conductor</option>
+                        <option value="/flota">Gestión de Flota / OTs</option>
+                        <option value="/logistica">Logística</option>
+                        <option value="/compras">Compras</option>
+                        <option value="/finanzas">Finanzas</option>
+                        <option value="/configuracion">Configuración</option>
                       </select>
                     </div>
                     <div className="space-y-1.5">

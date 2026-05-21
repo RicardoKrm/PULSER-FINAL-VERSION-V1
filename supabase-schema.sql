@@ -294,6 +294,8 @@ CREATE TABLE IF NOT EXISTS public.usuario_aplicacion (
     email TEXT UNIQUE,
     telefono TEXT,
     estado TEXT DEFAULT 'Activo',
+    panel_inicio TEXT DEFAULT '/dashboard',
+    cambio_clave_pendiente BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
