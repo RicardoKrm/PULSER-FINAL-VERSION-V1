@@ -31,6 +31,8 @@ import PizarraMantenimiento from './pages/flota/Mantenimiento';
 import PizarraProgramacion from './pages/flota/PizarraProgramacion';
 import GestionOrdenesTrabajo from './pages/flota/OrdenesTrabajo';
 import OrdenesTrabajoDetail from './pages/flota/OrdenesTrabajoDetail';
+import BibliotecaExplorador from './pages/biblioteca/BibliotecaExplorador';
+import BibliotecaSubir from './pages/biblioteca/BibliotecaSubir';
 import GestionPautas from './pages/configuracion/GestionPautas';
 import GestionTareas from './pages/configuracion/GestionTareas';
 import Vehiculos from './pages/configuracion/Vehiculos';
@@ -138,6 +140,8 @@ const router = createBrowserRouter([
       { path: "finanzas/presupuestos", element: <Presupuestos /> },
       { path: "finanzas/trazabilidad", element: <Trazabilidad /> },
       { path: "finanzas/evaluacion-empresa", element: <EvaluacionEmpresa /> },
+      { path: "biblioteca/explorador", element: <BibliotecaExplorador /> },
+      { path: "biblioteca/subir", element: <BibliotecaSubir /> },
       { path: "configuracion/precio-combustible", element: <PrecioCombustible /> },
       { path: "logistica/suministros", element: <GestionSuministros /> },
       { path: "logistica/bodegas", element: <GestionBodegas /> },

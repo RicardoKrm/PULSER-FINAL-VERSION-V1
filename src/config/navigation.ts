@@ -131,6 +131,15 @@ export const navigation = [
     ],
   },
   {
+    title: 'Biblioteca Técnica',
+    icon: BookOpen,
+    href: '/biblioteca',
+    submodules: [
+      { title: 'Explorar Documentos', icon: Search, href: '/biblioteca/explorador' },
+      { title: 'Subir Documento', icon: FileCheck, href: '/biblioteca/subir' },
+    ],
+  },
+  {
     title: 'Configuración y Herramientas',
     icon: Settings,
     href: '/configuracion',
