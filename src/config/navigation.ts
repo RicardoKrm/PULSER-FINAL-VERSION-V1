@@ -47,6 +47,7 @@ export const navigation = [
       { title: 'Gestión de Empresas', icon: Briefcase, href: '/super-admin/empresas' },
       { title: 'Gestión de Perfiles y Permisos', icon: Users, href: '/super-admin/perfiles' },
       { title: 'Visión de Evolución', icon: TrendingUp, href: '/super-admin/vision-evolucion' },
+      { title: 'Log de Actividad', icon: Activity, href: '/super-admin/actividad' },
     ],
   },
   {
