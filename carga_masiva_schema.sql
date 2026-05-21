@@ -75,17 +75,20 @@ ADD COLUMN IF NOT EXISTS apellidos TEXT;
 
 -- Vehículo
 ALTER TABLE public.vehiculo 
+ADD COLUMN IF NOT EXISTS tipo_vehiculo TEXT,
+ADD COLUMN IF NOT EXISTS empresa_nombre TEXT,
 ADD COLUMN IF NOT EXISTS norma_euro TEXT,
 ADD COLUMN IF NOT EXISTS tipo_aceite TEXT,
-ADD COLUMN IF NOT EXISTS km_ult_mantencion NUMERIC(10,2),
-ADD COLUMN IF NOT EXISTS fecha_ult_mantencion DATE,
-ADD COLUMN IF NOT EXISTS tipo_ult_pauta TEXT,
+ADD COLUMN IF NOT EXISTS km_ultima_mantencion NUMERIC(10,2),
+ADD COLUMN IF NOT EXISTS fecha_ultima_mantencion TEXT,
+ADD COLUMN IF NOT EXISTS tipo_ultimo_mant TEXT,
 ADD COLUMN IF NOT EXISTS razon_social TEXT,
 ADD COLUMN IF NOT EXISTS rut TEXT,
 ADD COLUMN IF NOT EXISTS chasis TEXT,
 ADD COLUMN IF NOT EXISTS motor TEXT,
 ADD COLUMN IF NOT EXISTS capacidad_carga NUMERIC(10,2),
 ADD COLUMN IF NOT EXISTS aplicacion TEXT,
+ADD COLUMN IF NOT EXISTS intervalo_km NUMERIC(10,2),
 ADD COLUMN IF NOT EXISTS en_operacion_activa BOOLEAN DEFAULT true;
 
 -- Inventario / Insumo
@@ -147,4 +150,9 @@ ADD COLUMN IF NOT EXISTS costo_total NUMERIC(12,2);
 ALTER TABLE public.operacion_reserva
 ADD COLUMN IF NOT EXISTS codigo_reserva TEXT UNIQUE,
 ADD COLUMN IF NOT EXISTS cliente TEXT;
+
+-- Usuario Aplicación / Configuración Login
+ALTER TABLE public.usuario_aplicacion
+ADD COLUMN IF NOT EXISTS panel_inicio TEXT DEFAULT '/dashboard';
+
 

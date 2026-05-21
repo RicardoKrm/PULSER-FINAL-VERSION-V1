@@ -48,7 +48,25 @@ const MODULES: UploadModule[] = [
     description: 'Importar vehículos nuevos y actualizar flota existente con su información base.',
     icon: Truck,
     template: [
-      { NumeroInterno: '101', Patente: 'AB-CD-12', NormaEuro: 'Euro V', Modelo: 'FH 500', TipoAceite: '15W40', KilometrajeActual: 10000, IntervaloMantencionKM: 20000, KmUltMantencion: 8000, FechaUltMantencion: '2023-10-01', TipoUltPauta: 'Preventiva', RazonSocial: 'Empresa Norte S.A.', RUT: '76123456-7', Chasis: 'CH-123456', Motor: 'M-123456', CapacidadCarga: 20000, Aplicacion: 'Larga distancia', EnOperacionActiva: 'Sí' }
+      {
+        numero_interno: 1,
+        patente: 'SXDR14',
+        tipo_vehiculo: 'MINIBUS',
+        empresa: 'Transportes alvimar',
+        marca: 'M. BENZ',
+        modelo: 'SPRINTER VS30.2',
+        norma_euro: 'EURO V',
+        tipo_aceite: 'SINTÉTICO',
+        chasis: '8AC907645RE232278',
+        motor: '651958W0153260',
+        razon_social: '76.506.145-8', 
+        kilometraje_actual: 153304,
+        aplicacion: 'CARRETERA',
+        intervalo_km: 10000,
+        km_ultima_mantencion: 136100,
+        fecha_ultima_mantencion: '15-07-25',
+        tipo_ultimo_mant: 'SM1'
+      }
     ]
   },
   {

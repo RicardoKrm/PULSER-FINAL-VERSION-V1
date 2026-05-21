@@ -29,6 +29,11 @@ export default function SuperAdminPerfiles() {
       perms: ['Ver Vehículos', 'Crear/Editar Vehículos', 'Asignar Conductores', 'Archivar Vehículos'] 
     },
     { 
+      section: 'Módulo de Operaciones', 
+      requiredPerms: ['Operaciones y Servicios'], 
+      perms: ['Ver Reservas', 'Crear Reservas', 'Ver Programación', 'Aprobar Servicios', 'Portal Conductor'] 
+    },
+    { 
       section: 'Módulo de Mantenimiento', 
       requiredPerms: ['Gestión de Flota:Pizarra de Mantenimiento', 'Gestión de Flota:Órdenes de Trabajo (OT)'], 
       perms: ['Ver Órdenes de Trabajo', 'Crear Órdenes', 'Aprobar Órdenes', 'Cerrar Órdenes', 'Aprobar Mantenciones Diarias'] 
@@ -44,10 +49,15 @@ export default function SuperAdminPerfiles() {
       perms: ['Ver Dashboards', 'Exportar Data', 'Ver Costos', 'Aprobar Presupuestos'] 
     },
     { 
-      section: 'Gestión de Bodega', 
+      section: 'Gestión de Bodega y Logística', 
       requiredPerms: ['Logística y Suministros:Gestión de Bodegas', 'Logística y Suministros:Gestión de Suministros'], 
-      perms: ['Ver Inventario', 'Ingresar Stock', 'Realizar Salida', 'Ajustes Manuales'] 
+      perms: ['Ver Inventario', 'Ingresar Stock', 'Realizar Salida', 'Ajustes Manuales', 'Ver Auditorías'] 
     },
+    {
+      section: 'Compras y Proveedores',
+      requiredPerms: ['Compras y Proveedores'],
+      perms: ['Ver Cotizaciones', 'Ingresar Órdenes de Compra', 'Aprobar Facturas', 'Gestión de Proveedores']
+    }
   ];
 
   const handleToggleCargoModule = (groupSection: string, subPerms: string[]) => {

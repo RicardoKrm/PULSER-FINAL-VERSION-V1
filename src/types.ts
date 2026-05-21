@@ -15,6 +15,10 @@ export interface Collaborator {
   email?: string;
   sueldoBase?: number;
   valorHH?: number;
+  departamento?: string;
+  sexo?: 'HOMBRE' | 'MUJER' | 'OTRO';
+  prestadorServicio?: 'INTERNO' | 'EXTERNO';
+  panelInicio?: string;
 }
 
 export interface ReservaTurismo {

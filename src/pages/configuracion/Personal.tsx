@@ -25,13 +25,25 @@ import Swal from 'sweetalert2';
 import { Collaborator } from '../../types';
 import { useAppContext } from '../../context/AppContext';
 
-const AVAILABLE_ROLES = [
-  'Administrador',
-  'Mecánico',
-  'Conductor',
-  'Supervisor Operaciones',
-  'Prevencionista',
-  'Despachador'
+const DEPARTMENTS_ROLES: Record<string, string[]> = {
+  'Super Administración': ['Administrador'],
+  'Operaciones y Servicios': ['Supervisor Operaciones', 'Programador', 'Despachador', 'Conductor'],
+  'Gestión de Flota': ['Jefe de Flota', 'Supervisor Mantenimiento', 'Mecánico', 'Pañolero'],
+  'Logística y Suministros': ['Jefe de Bodega', 'Auditor de Logística', 'Operario de Suministros'],
+  'Compras y Proveedores': ['Comprador', 'Analista de Compras', 'Encargado de Proveedores'],
+  'Finanzas': ['Analista Financiero', 'Contador', 'Gestor de Pagos'],
+  'Configuración y Herramientas': ['Prevencionista']
+};
+
+const AVAILABLE_PANELS = [
+  { label: 'Dashboard General', value: '/dashboard' },
+  { label: 'Operaciones', value: '/operaciones' },
+  { label: 'Portal Conductor', value: '/operaciones/portal-conductor' },
+  { label: 'Gestión de Flota / OTs', value: '/flota' },
+  { label: 'Logística', value: '/logistica' },
+  { label: 'Compras', value: '/compras' },
+  { label: 'Finanzas', value: '/finanzas' },
+  { label: 'Configuración', value: '/configuracion' }
 ];
 
 export default function Personal() {
@@ -41,11 +53,15 @@ export default function Personal() {
   const [isAssignRoleModalOpen, setIsAssignRoleModalOpen] = useState(false);
   const [selectedUserForRole, setSelectedUserForRole] = useState<Collaborator | null>(null);
   const [selectedNewRole, setSelectedNewRole] = useState('');
+  const [selectedNewDepartment, setSelectedNewDepartment] = useState('');
 
   const [newUserName, setNewUserName] = useState('');
   const [newUserLastName, setNewUserLastName] = useState('');
   const [newUserRUT, setNewUserRUT] = useState('');
   const [newUserRole, setNewUserRole] = useState('');
+  const [newUserDepartment, setNewUserDepartment] = useState('Operaciones y Servicios');
+  const [newUserPanel, setNewUserPanel] = useState('/dashboard');
+  const [newUserSexo, setNewUserSexo] = useState<'HOMBRE' | 'MUJER' | 'OTRO'>('HOMBRE');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPhone, setNewUserPhone] = useState('');
 
@@ -123,7 +139,7 @@ export default function Personal() {
     const fullName = `${newUserName} ${newUserLastName}`.trim();
     const isMec = newUserRole.includes('Mecánic');
     const isCond = newUserRole.includes('Conductor');
-    const isSup = newUserRole.includes('Supervisor') || newUserRole === 'Administrador';
+    const isSup = newUserRole.includes('Supervisor') || newUserRole === 'Administrador' || newUserRole === 'Jefe';
 
     const newUser: Collaborator = {
       id: Math.random().toString(36).substr(2, 9),
@@ -132,6 +148,9 @@ export default function Personal() {
       rut: newUserRUT,
       role: newUserRole || 'Empleado',
       roleBadgeText: newUserRole || 'Empleado',
+      departamento: newUserDepartment,
+      panelInicio: newUserPanel,
+      sexo: newUserSexo,
       phone: newUserPhone,
       email: newUserEmail,
       status: 'ACTIVO',
@@ -153,7 +172,7 @@ export default function Personal() {
 
     Swal.fire({
       title: '¡Colaborador Creado!',
-      text: 'El nuevo colaborador ha sido registrado.',
+      text: `El colaborador ha sido registrado y su panel de inicio es ${AVAILABLE_PANELS.find(p => p.value === newUserPanel)?.label}.`,
       icon: 'success',
       confirmButtonColor: '#4f46e5'
     });
@@ -420,7 +439,7 @@ export default function Personal() {
               </div>
               <div>
                  <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Sexo</label>
-                 <select className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100">
+                 <select value={newUserSexo} onChange={e => setNewUserSexo(e.target.value as any)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100">
                     <option value="HOMBRE">Hombre</option>
                     <option value="MUJER">Mujer</option>
                     <option value="OTRO">Otro</option>
@@ -438,33 +457,34 @@ export default function Personal() {
            {/* Divisor */}
            <div className="flex items-center gap-4 py-2">
              <div className="h-px bg-slate-200 dark:bg-slate-800 flex-1" />
-             <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Organización</span>
+             <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Organización y Rol</span>
              <div className="h-px bg-slate-200 dark:bg-slate-800 flex-1" />
            </div>
 
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                 <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Empresa</label>
-                 <input type="text" className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" placeholder="Ej. Transportes SPA" />
-              </div>
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
                  <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Departamento</label>
-                 <input type="text" className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" placeholder="Ej. Operaciones" />
+                 <select value={newUserDepartment} onChange={e => { setNewUserDepartment(e.target.value); setNewUserRole(''); }} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100">
+                    {Object.keys(DEPARTMENTS_ROLES).map(dept => (
+                       <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                 </select>
               </div>
               <div>
                  <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Cargo / Rol</label>
                  <select value={newUserRole} onChange={e => setNewUserRole(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100">
                     <option value="">Seleccione un rol...</option>
-                    {AVAILABLE_ROLES.map(role => (
+                    {DEPARTMENTS_ROLES[newUserDepartment]?.map(role => (
                        <option key={role} value={role}>{role}</option>
                     ))}
                  </select>
               </div>
               <div>
-                 <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Prestador de servicio</label>
-                 <select className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100">
-                    <option value="INTERNO">Interno</option>
-                    <option value="EXTERNO">Externo</option>
+                 <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Panel de Inicio</label>
+                 <select value={newUserPanel} onChange={e => setNewUserPanel(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold text-indigo-700 dark:text-indigo-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
+                    {AVAILABLE_PANELS.map(panel => (
+                       <option key={panel.value} value={panel.value}>{panel.label}</option>
+                    ))}
                  </select>
               </div>
            </div>
@@ -531,24 +551,40 @@ export default function Personal() {
              </div>
            )}
 
-           <div>
-              <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3 border-b border-slate-100 dark:border-slate-800 pb-2">Seleccionar Nuevo Rol</label>
-              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                 {AVAILABLE_ROLES.map(role => (
-                    <label key={role} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${selectedNewRole === role ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
-                       <input 
-                         type="radio" 
-                         name="roleAssignment" 
-                         value={role} 
-                         checked={selectedNewRole === role} 
-                         onChange={() => setSelectedNewRole(role)}
-                         className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
-                       />
-                       <span className={`font-bold text-sm ${selectedNewRole === role ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'}`}>{role}</span>
-                    </label>
-                 ))}
-              </div>
-           </div>
+            <div>
+               <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3 pb-2 border-b border-slate-100 dark:border-slate-800">1. Departamentos Operativos</label>
+               <div className="flex flex-wrap gap-2 mb-4">
+                  {Object.keys(DEPARTMENTS_ROLES).map(dept => (
+                     <button
+                        key={dept}
+                        onClick={() => setSelectedNewDepartment(dept)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${selectedNewDepartment === dept ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                     >
+                        {dept}
+                     </button>
+                  ))}
+               </div>
+               {selectedNewDepartment && (
+                  <>
+                     <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3 border-b border-slate-100 dark:border-slate-800 pb-2">2. Seleccionar Nuevo Rol en {selectedNewDepartment}</label>
+                     <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                        {DEPARTMENTS_ROLES[selectedNewDepartment].map(role => (
+                           <label key={role} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${selectedNewRole === role ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
+                              <input 
+                                type="radio" 
+                                name="roleAssignment" 
+                                value={role} 
+                                checked={selectedNewRole === role} 
+                                onChange={() => setSelectedNewRole(role)}
+                                className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                              />
+                              <span className={`font-bold text-sm ${selectedNewRole === role ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'}`}>{role}</span>
+                           </label>
+                        ))}
+                     </div>
+                  </>
+               )}
+            </div>
 
            <div className="flex justify-end gap-3 pt-6 border-t border-slate-200 dark:border-slate-800">
              <Button variant="outline" onClick={() => setIsAssignRoleModalOpen(false)}>Cancelar</Button>

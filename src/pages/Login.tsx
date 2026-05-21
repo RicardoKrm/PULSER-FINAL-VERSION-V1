@@ -24,7 +24,15 @@ export default function Login() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        navigate('/dashboard');
+        // Redirigir al panel guardado en la base de datos o por defecto a dashboard
+        supabase.from('usuario_aplicacion').select('panel_inicio').eq('auth_user_id', session.user.id).single()
+          .then(({ data }) => {
+            if (data && data.panel_inicio) {
+              navigate(data.panel_inicio);
+            } else {
+              navigate('/dashboard');
+            }
+          });
       }
     });
   }, [navigate]);
@@ -46,7 +54,19 @@ export default function Login() {
       }
 
       if (data.session) {
-        navigate('/dashboard');
+        // Find panel_inicio in table usuario_aplicacion
+        const { data: profile } = await supabase
+          .from('usuario_aplicacion')
+          .select('panel_inicio')
+          .eq('auth_user_id', data.session.user.id)
+          .single();
+          
+        if (profile && profile.panel_inicio) {
+          navigate(profile.panel_inicio);
+        } else {
+          // Default start panel
+          navigate('/dashboard');
+        }
       }
     } catch (error: any) {
       console.error('Error en login:', error);
