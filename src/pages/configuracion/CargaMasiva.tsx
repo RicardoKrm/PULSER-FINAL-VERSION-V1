@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { 
   Upload, 
   FileText, 
@@ -9,15 +9,27 @@ import {
   Users,
   CheckCircle2,
   XCircle,
-  Loader2
+  Loader2,
+  Building2,
+  Wrench,
+  Route,
+  Fuel,
+  Disc,
+  FolderOpen,
+  Warehouse,
+  CalendarCheck,
+  FileSignature,
+  Box
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { exportToExcel } from '../../lib/excelExport';
 
 interface UploadModule {
   id: string;
   title: string;
   description: string;
   icon: React.ElementType;
+  template?: any[];
 }
 
 const MODULES: UploadModule[] = [
@@ -25,37 +37,155 @@ const MODULES: UploadModule[] = [
     id: 'empleados',
     title: 'Personal y Cargos',
     description: 'Carga masiva de conductores, técnicos y administrativos desde archivo Excel.',
-    icon: Users
+    icon: Users,
+    template: [
+      { Rut: '12345678-9', Nombres: 'Juan', Apellidos: 'Pérez', Cargo: 'Conductor', Telefono: '+56912345678', Email: 'juan@empresa.com' }
+    ]
   },
   {
     id: 'vehiculos',
     title: 'Vehículos de Flota',
     description: 'Importar vehículos nuevos y actualizar flota existente con su información base.',
-    icon: Truck
+    icon: Truck,
+    template: [
+      { NumeroInterno: '101', Patente: 'AB-CD-12', NormaEuro: 'Euro V', Modelo: 'FH 500', TipoAceite: '15W40', KilometrajeActual: 10000, IntervaloMantencionKM: 20000, KmUltMantencion: 8000, FechaUltMantencion: '2023-10-01', TipoUltPauta: 'Preventiva', RazonSocial: 'Empresa Norte S.A.', RUT: '76123456-7', Chasis: 'CH-123456', Motor: 'M-123456', CapacidadCarga: 20000, Aplicacion: 'Larga distancia', EnOperacionActiva: 'Sí' }
+    ]
   },
   {
     id: 'inventario',
     title: 'Inventario de Repuestos',
     description: 'Carga de catálogo de repuestos, precios, stock inicial y proveedores.',
-    icon: Package
+    icon: Package,
+    template: [
+      { Codigo: 'FIL-123', Nombre: 'Filtro de Aceite', Categoria: 'Filtros', StockInicial: 50, PrecioUnitario: 12500, ProveedorPrincipal: 'Repsol SA' }
+    ]
   },
   {
     id: 'pautas',
     title: 'Pautas de Mantenimiento',
     description: 'Creación de pautas y reglas de mantenimiento preventivo por modelo y kilometraje.',
-    icon: FileText
+    icon: FileText,
+    template: [
+      { NombrePauta: 'Mantención 20.000 KM', ModeloVehiculo: 'FH 500', Tipo: 'Preventiva', KMEjecucion: 20000 }
+    ]
   },
   {
     id: 'tareas',
     title: 'Catálogo de Tareas',
     description: 'Listado de tareas estándar de mantenimiento, con tiempos y costos predeterminados.',
-    icon: ClipboardList
+    icon: ClipboardList,
+    template: [
+      { CodigoTarea: 'T-001', Descripcion: 'Cambio de Aceite Motor', TiempoEstimadoHoras: 1.5, CostoBaseManoObra: 25000 }
+    ]
   },
   {
     id: 'fallas',
     title: 'Tipos de Falla',
     description: 'Carga del catálogo de fallas comunes, sistemas afectados y criticidad.',
-    icon: AlertCircle
+    icon: AlertCircle,
+    template: [
+      { CodigoFalla: 'F-101', Descripcion: 'Fuga de líquido de frenos', SistemaAfectado: 'Frenos', Criticidad: 'Alta' }
+    ]
+  },
+  {
+    id: 'proveedores',
+    title: 'Directorio de Proveedores',
+    description: 'Carga de empresas, contactos, condiciones comerciales y evaluaciones base.',
+    icon: Building2,
+    template: [
+      { Rut: '76123456-7', RazonSocial: 'Neumáticos del Sur S.A.', Contacto: 'Ventas', Telefono: '555-1234', Email: 'ventas@neumaticosdelsur.cl', TipoServicio: 'Insumos' }
+    ]
+  },
+  {
+    id: 'kits',
+    title: 'Kits y Herramientas',
+    description: 'Carga de herramientas asignables o kits de mantenimiento prediseñados.',
+    icon: Wrench,
+    template: [
+      { CodigoKit: 'KIT-01', Nombre: 'Kit Cambio Aceite Básico', Componente: 'Filtro Aceite', Cantidad: 1 },
+      { CodigoKit: 'KIT-01', Nombre: 'Kit Cambio Aceite Básico', Componente: 'Aceite 15W40 (Lts)', Cantidad: 20 }
+    ]
+  },
+  {
+    id: 'rutas',
+    title: 'Gestión de Rutas',
+    description: 'Carga masiva de trayectos, distancias, tiempos estimados y tarifas base.',
+    icon: Route,
+    template: [
+      { CodigoRuta: 'R-001', Origen: 'Santiago', Destino: 'Antofagasta', DistanciaKM: 1350, TiempoEstimadoHoras: 18, TarifaBase: 850000 }
+    ]
+  },
+  {
+    id: 'neumaticos',
+    title: 'Inventario de Neumáticos',
+    description: 'Ingreso inicial de neumáticos, medidas, marcas, estado y asignación actual.',
+    icon: Disc,
+    template: [
+      { CodigoInterno: 'N-101', Marca: 'Michelin', Modelo: 'X Multi D', Medida: '295/80 R22.5', Estado: 'Nuevo', PatenteAsignada: 'AB-CD-12', Posicion: 'Eje 1 Izq Exterior' }
+    ]
+  },
+  {
+    id: 'combustible',
+    title: 'Registros de Combustible',
+    description: 'Carga histórica de repostajes, odómetro, litros, costos y proveedores vinculados.',
+    icon: Fuel,
+    template: [
+      { Fecha: '2023-10-25 14:30', Patente: 'AB-CD-12', Odometro: 12500, Litros: 450, CostoTotal: 495000, Proveedor: 'Copec', Conductor: 'Juan Pérez' }
+    ]
+  },
+  {
+    id: 'contratos',
+    title: 'Contratos Comerciales',
+    description: 'Sincronización de acuerdos, fechas de vigencia, renovaciones y tarifas.',
+    icon: FileSignature,
+    template: [
+      { CodigoContrato: 'CONT-2023-01', Cliente: 'Minera XYZ', FechaInicio: '2023-01-01', FechaFin: '2025-12-31', MontoMensual: 15000000 }
+    ]
+  },
+  {
+    id: 'documental',
+    title: 'Control Documental',
+    description: 'Migración inicial de registros documentales y sus estados de vencimiento.',
+    icon: FolderOpen,
+    template: [
+      { Entidad: 'Vehículo', Referencia: 'AB-CD-12', TipoDocumento: 'Revisión Técnica', FechaEmision: '2023-05-10', FechaVencimiento: '2024-05-10' }
+    ]
+  },
+  {
+    id: 'bodegas',
+    title: 'Directorio de Bodegas',
+    description: 'Creación de múltiples sucursales, almacenes y sus datos de ubicación.',
+    icon: Warehouse,
+    template: [
+      { CodigoBodega: 'BOD-NTE-01', Nombre: 'Bodega Central Antofagasta', Dirección: 'Av. Pedro Aguirre Cerda 1234', Encargado: 'Carlos Silva' }
+    ]
+  },
+  {
+    id: 'suministros',
+    title: 'Catálogo de Suministros',
+    description: 'Carga de EPP, consumibles y materiales varios que requiere la operación.',
+    icon: Box,
+    template: [
+      { CodigoSuministro: 'EPP-001', Nombres: 'Casco de Seguridad', Tipo: 'EPP', Stock: 100, PrecioUnitario: 5000 }
+    ]
+  },
+  {
+    id: 'ots',
+    title: 'Historial de Órdenes de Trabajo',
+    description: 'Importar backlog u órdenes pasadas, cerradas o en curso con costos pre-calculados.',
+    icon: ClipboardList,
+    template: [
+      { NumeroOT: 'OT-1005', Patente: 'AB-CD-12', FechaCreacion: '2023-10-20', Estado: 'Cerrada', TipoMantenimiento: 'Preventivo', CostoTotal: 150000 }
+    ]
+  },
+  {
+    id: 'reservas',
+    title: 'Historial de Reservas',
+    description: 'Carga de servicios, pasajes, encomiendas y planificaciones previas.',
+    icon: CalendarCheck,
+    template: [
+      { CodigoReserva: 'RES-9001', Cliente: 'Empresa ABC', FechaServicio: '2023-11-05', Origen: 'Santiago', Destino: 'Valparaíso', Pasajeros: 4 }
+    ]
   }
 ];
 
@@ -221,9 +351,18 @@ export default function CargaMasiva() {
                 )}
 
                 <div className="flex justify-between items-center gap-4 mt-auto pt-2">
-                  <a href="#" className="text-xs font-bold text-cyan-600 hover:text-cyan-700 hover:underline">
+                  <button 
+                    onClick={() => {
+                      if (mod.template) {
+                        exportToExcel(mod.template, `Plantilla_${mod.title.replace(/ /g, '_')}`);
+                      } else {
+                        alert("Plantilla no disponible para este módulo");
+                      }
+                    }}
+                    className="text-xs font-bold text-cyan-600 hover:text-cyan-700 hover:underline bg-transparent border-none cursor-pointer"
+                  >
                     Descargar Plantilla
-                  </a>
+                  </button>
                   <Button 
                     disabled={!selectedFile || isUploading}
                     onClick={() => handleUpload(mod.id)}
