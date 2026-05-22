@@ -107,34 +107,46 @@ export default function PizarraMantenimiento() {
                  const int1 = p.intervalo_1 || 0;
                  const int2 = p.intervalo_2 || 0;
                  
-                 const pautaName = String(p.nombre).toUpperCase();
-                 const isRodaje = pautaName.startsWith('SI') || pautaName.startsWith('R');
+                 const pautaName = String(p.nombre);
                  
-                 if (isRodaje) {
-                    if (int1 > 0) {
-                      pautasSecuencia.push({ iteracion_km: km_ini > 0 ? km_ini : int1, nombre: p.nombre });
-                    }
-                 } else {
-                    if (int1 > 0) {
-                       let nextKm = km_ini > 0 ? km_ini : int1;
-                       let useInt1 = true;
-                       
-                       while (nextKm <= 3000000) {
-                          pautasSecuencia.push({ iteracion_km: nextKm, nombre: p.nombre });
+                 // 1. Inicia en el kilometraje_inicial
+                 let currentKm = km_ini;
+                 pautasSecuencia.push({ iteracion_km: currentKm, nombre: pautaName });
+
+                 // 2. Si tiene intervalo 1 y NO es Rodaje
+                 const pautaNameUpper = pautaName.toUpperCase().trim();
+                 const isRodaje = pautaNameUpper.startsWith('SI') || pautaNameUpper.startsWith('R') || pautaNameUpper.includes('INICIAL');
+
+                 if (int1 > 0 && !isRodaje) {
+                     let useInt1 = true;
+                     let nextKm = currentKm + (useInt1 ? int1 : int2 || int1);
+
+                     // 3. Iterar hasta kmActual + 500000
+                     while (nextKm <= kmsActuales + 500000) {
+                          pautasSecuencia.push({ iteracion_km: nextKm, nombre: pautaName });
                           
                           if (int2 > 0) {
-                            nextKm += useInt1 ? int2 : int1;
-                            useInt1 = !useInt1;
+                              useInt1 = !useInt1;
+                              nextKm += (useInt1 ? int1 : int2);
                           } else {
-                            nextKm += int1;
+                              nextKm += int1;
                           }
-                       }
-                    }
+                     }
                  }
               });
               
-              // Sort sequence mathematically
+              // 4. Sort sequence mathematically
               pautasSecuencia.sort((a, b) => a.iteracion_km - b.iteracion_km);
+              
+              // 5. Remove duplicates by iteracion_km (keeping the first one, might want to be careful with which one, but prompt says "conserva solo uno")
+              const uniqueKms = new Set();
+              pautasSecuencia = pautasSecuencia.filter(item => {
+                   if (!uniqueKms.has(item.iteracion_km)) {
+                        uniqueKms.add(item.iteracion_km);
+                        return true;
+                   }
+                   return false;
+              });
             }
 
             return {

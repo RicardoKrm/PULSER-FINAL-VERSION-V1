@@ -70,85 +70,63 @@ export function calcularDatosPizarra(vehiculo: VehiculoDB): FilaPizarraMantenimi
     let proximoHitoVencimiento = 0;
     
     if (vehiculo.pautasSecuencia && vehiculo.pautasSecuencia.length > 0) {
-        // Encontrar la próxima pauta basada estrictamente en el kilometraje actual
-        const pautasFuturas = vehiculo.pautasSecuencia.filter(p => p.iteracion_km > kmActual);
-        
-        // Encontrar la última pauta que se debió haber hecho
-        const pautasPasadas = vehiculo.pautasSecuencia.filter(p => p.iteracion_km <= kmActual);
-        
-        // Asignar el próximo hito basado en la secuencia matemática
-        if (pautasFuturas.length > 0) {
-            proximoHitoVencimiento = pautasFuturas[0].iteracion_km;
-            tipoProximoMantencion = pautasFuturas[0].nombre;
-        } else {
-            // Fallback si superamos la secuencia: usar el último + intervalo genérico
-            proximoHitoVencimiento = (Math.round(kmActual / intervalo) * intervalo) + intervalo;
+        // --- Cálculo de Pauta Vencida ---
+        const hasHistoryOrPastPhase = kmUltimo > 0 || kmActual > (intervalo * 1.5);
+        let pautasOmitidas = vehiculo.pautasSecuencia.filter(
+             p => p.iteracion_km > kmUltimo && p.iteracion_km <= kmActual
+        );
+
+        if (hasHistoryOrPastPhase && pautasOmitidas.length > 0) {
+             pautasOmitidas = pautasOmitidas.filter(p => {
+                  const name = (p.nombre || '').toUpperCase().trim();
+                  return !(name.startsWith('SI') || name.startsWith('R') || name.includes('INICIAL'));
+             });
         }
 
-        // Revisar si estamos vencidos (si hay pautas pasadas mayores al último mantenimiento conocido)
-        if (kmUltimo > 0) {
-            // "Ventana de búsqueda": buscamos hitos omitidos estrictamente mayores al km_ultimo
-            // Aplicamos una tolerancia de -2% del intervalo en caso de que kmUltimo haya sido ligeramente adelantado
-            const margenTolerancia = intervalo * 0.02;
-            const pautasOmitidasRaw = pautasPasadas.filter(p => p.iteracion_km > (kmUltimo + margenTolerancia));
-            
-            if (pautasOmitidasRaw.length > 0) {
-                // Filtro de Pautas Iniciales (Rodaje)
-                // Si el camión ya pasó su etapa inicial (ej. > 2 intervalos estándar), ignorar hitos "iniciales" perdidos
-                const isPastInitialPhase = kmActual > (intervalo * 1.5); 
-                
-                const pautasOmitidasFilt = pautasOmitidasRaw.filter(p => {
-                     if (!isPastInitialPhase) return true;
-                     const name = (p.nombre || '').toUpperCase();
-                     const isRodaje = name.startsWith('SI') || name.startsWith('R') || name.includes('INICIAL');
-                     return !isRodaje;
-                });
-
-                if (pautasOmitidasFilt.length > 0) {
-                    const primerPautaOmitida = pautasOmitidasFilt[0];
-                    kmVencido = kmActual - primerPautaOmitida.iteracion_km;
-                    estatus = "VENCIDO";
-                    
-                    // Deduplicar pautas y limpiarlas
-                    const pautasUnicas = Array.from(new Set(pautasOmitidasFilt.map(p => p.nombre.split('-')[0].trim())));
-                    pautaVencidaStr = pautasUnicas.join(', ');
-                } else {
-                     // Falsos positivos de rodaje ignorados, verificar estatus PROXIMO normalmente
-                     const kmsFaltantes = proximoHitoVencimiento - kmActual;
-                     if (kmsFaltantes > 0 && kmsFaltantes <= (intervalo * 0.25)) {
-                         estatus = "PROXIMO";
-                     }
-                }
-            } else {
-                // No hay pautas omitidas, verificar estatus PROXIMO
-                const kmsFaltantes = proximoHitoVencimiento - kmActual;
-                if (kmsFaltantes > 0 && kmsFaltantes <= (intervalo * 0.25)) {
-                    estatus = "PROXIMO";
-                }
-            }
-        } else {
-             // Caso en que aún no ha tenido mantenciones reportadas pero ya superó pautas
-             const isPastInitialPhase = kmActual > (intervalo * 1.5);
+        if (pautasOmitidas.length > 0) {
+             const pautasFormateadas = pautasOmitidas.map(p => p.nombre.split('-')[0].trim());
+             const pautasUnicas = Array.from(new Set(pautasFormateadas));
+             pautaVencidaStr = pautasUnicas.join(', ');
              
-             const pautasOmitidasFilt = pautasPasadas.filter(p => {
-                  if (!isPastInitialPhase) return true;
-                  const name = (p.nombre || '').toUpperCase();
-                  const isRodaje = name.startsWith('SI') || name.startsWith('R') || name.includes('INICIAL');
-                  return !isRodaje;
-             });
+             // Si hay pautas vencidas, el vehículo está VENCIDO y calculamos su km vencido desde la primera pauta omitida.
+             kmVencido = kmActual - pautasOmitidas[0].iteracion_km;
+             estatus = "VENCIDO";
+        }
 
-             if (pautasOmitidasFilt.length > 0) {
-                 const primerPautaOmitida = pautasOmitidasFilt[0];
-                 kmVencido = kmActual - primerPautaOmitida.iteracion_km;
-                 estatus = "VENCIDO";
-                 
-                 const pautasUnicas = Array.from(new Set(pautasOmitidasFilt.map(p => p.nombre.split('-')[0].trim())));
-                 pautaVencidaStr = pautasUnicas.join(', ');
-             } else {
-                const kmsFaltantes = proximoHitoVencimiento - kmActual;
-                if (kmsFaltantes > 0 && kmsFaltantes <= (intervalo * 0.25)) {
-                    estatus = "PROXIMO";
-                }
+        // --- Cálculo de Tipo Próx. Mant. ---
+        let pautasFuturas = vehiculo.pautasSecuencia.filter(p => p.iteracion_km > kmActual);
+        
+        // Excepción de Rodaje: Si el camión ya pasó su fase inicial, ignora SI y R
+        if (pautasFuturas.length > 0) {
+             if (hasHistoryOrPastPhase) {
+                  const pautasFiltradas = pautasFuturas.filter(p => {
+                       const name = (p.nombre || '').toUpperCase().trim();
+                       return !(name.startsWith('SI') || name.startsWith('R') || name.includes('INICIAL'));
+                  });
+                  // Si después de filtrar nos quedamos vacíos (no debería pasar), usamos las sin filtrar
+                  if (pautasFiltradas.length > 0) {
+                       pautasFuturas = pautasFiltradas;
+                  }
+             }
+
+             proximoHitoVencimiento = pautasFuturas[0].iteracion_km;
+             tipoProximoMantencion = pautasFuturas[0].nombre.split('-')[0].trim();
+             
+             // Verificar estatus PROXIMO si no estaba vencido
+             if (estatus !== "VENCIDO") {
+                 const kmsFaltantes = proximoHitoVencimiento - kmActual;
+                 if (kmsFaltantes > 0 && kmsFaltantes <= (intervalo * 0.25)) {
+                     estatus = "PROXIMO";
+                 }
+             }
+        } else {
+             // Fallback si superamos la secuencia generada genéricamente
+             proximoHitoVencimiento = (Math.round(kmActual / intervalo) * intervalo) + intervalo;
+             if (estatus !== "VENCIDO") {
+                  const kmsFaltantes = proximoHitoVencimiento - kmActual;
+                  if (kmsFaltantes > 0 && kmsFaltantes <= (intervalo * 0.25)) {
+                      estatus = "PROXIMO";
+                  }
              }
         }
     } else {
