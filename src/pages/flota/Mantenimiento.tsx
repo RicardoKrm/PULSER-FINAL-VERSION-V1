@@ -62,6 +62,7 @@ export default function PizarraMantenimiento() {
       try {
         const { data, error } = await supabase.from('vehiculo').select('*');
         if (error) throw error;
+        console.log("FETCHED VEHICULOS DB:", data);
         if (data) {
           const vehiculosDb = data.map(v => {
             const detalles = v.detalles || {};

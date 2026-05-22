@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
 import { 
   Users, 
   Briefcase,
@@ -48,6 +49,34 @@ const AVAILABLE_PANELS = [
 export default function Personal() {
   const { personal: users, setPersonal: setUsers } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    const fetchColaboradores = async () => {
+      const { data, error } = await supabase.from('colaborador').select('*');
+      if (error) {
+        console.error('Error fetching colaboradores:', error);
+      } else if (data) {
+        const mappedUsers = data.map(c => ({
+          id: c.id,
+          initials: (c.nombre?.substring(0, 2) || '').toUpperCase(),
+          name: c.nombre || '',
+          rut: c.rut || '',
+          role: c.rol || 'Empleado',
+          roleBadgeText: c.rol || 'Empleado',
+          department: c.detalles?.departamento || '-',
+          status: (c.estado || 'ACTIVO').toUpperCase(),
+          email: c.email || '',
+          phone: c.telefono || '',
+          sueldoBase: c.detalles?.sueldo_base || undefined,
+          valorHH: c.detalles?.valor_hh || undefined,
+          prestadorServicio: c.detalles?.prestador_de_servicio || 'INTERNO'
+        }));
+        setUsers(mappedUsers);
+      }
+    };
+    fetchColaboradores();
+  }, [setUsers]);
+
   const [isModalColaboradorOpen, setIsModalColaboradorOpen] = useState(false);
   const [isAssignRoleModalOpen, setIsAssignRoleModalOpen] = useState(false);
   const [selectedUserForRole, setSelectedUserForRole] = useState<Collaborator | null>(null);
