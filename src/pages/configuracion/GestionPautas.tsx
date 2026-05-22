@@ -51,6 +51,7 @@ export default function GestionPautas() {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isModeloModalOpen, setIsModeloModalOpen] = useState(false);
+  const [editingPautaId, setEditingPautaId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
   // Form state Pauta
@@ -124,25 +125,31 @@ export default function GestionPautas() {
     if (!nombre || !modeloVehiculoId || !currentCompany?.id) return;
 
     try {
-      const { data, error } = await supabase.from('mantenimiento_pauta').insert([{
+      const payload = {
         empresa_id: currentCompany.id,
         nombre,
         modelo_vehiculo_id: modeloVehiculoId,
         kilometraje_inicial: Number(kilometrajeInicial) || 0,
         intervalo_1: Number(intervalo1) || 0,
         intervalo_2: intervalo2 ? Number(intervalo2) : null,
-        tareas: selectedTareas, // stored as jsonb
+        tareas: selectedTareas,
         tipo_aplicacion: tipoAplicacion,
         tipo_aceite: tipoAceite,
         color: 'bg-blue-500',
         estado: 'Activo'
-      }]);
+      };
 
-      if (error) throw error;
+      if (editingPautaId) {
+        const { error } = await supabase.from('mantenimiento_pauta').update(payload).eq('id', editingPautaId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('mantenimiento_pauta').insert([payload]);
+        if (error) throw error;
+      }
       
       Swal.fire({
         title: '¡Guardado!', 
-        text: 'La pauta ha sido registrada exitosamente.', 
+        text: 'La pauta ha sido guardada exitosamente.', 
         icon: 'success',
         confirmButtonColor: '#4f46e5'
       });
@@ -151,9 +158,25 @@ export default function GestionPautas() {
       resetPautaForm();
       fetchData();
     } catch (err: any) {
-      console.error('Error creating pauta:', err);
-      Swal.fire('Error', 'No se pudo crear la pauta.', 'error');
+      console.error('Error saving pauta:', err);
+      Swal.fire('Error', 'No se pudo guardar la pauta.', 'error');
     }
+  };
+
+  const handleEditPauta = (pauta: Pauta) => {
+    const selectedModel = modelos.find(m => m.nombre === pauta.modeloVehiculo);
+    if (selectedModel) setModeloVehiculoId(selectedModel.id);
+    
+    setEditingPautaId(pauta.id);
+    setNombre(pauta.nombre);
+    setKilometrajeInicial(pauta.kilometrajeInicial);
+    setIntervalo1(pauta.intervalo1);
+    setIntervalo2(pauta.intervalo2 || '');
+    setSelectedTareas(pauta.tareas || []);
+    setTipoAplicacion(pauta.tipoAplicacion);
+    setTipoAceite(pauta.tipoAceite);
+    
+    setIsModalOpen(true);
   };
 
   const handleSubmitModelo = async (e: React.FormEvent) => {
@@ -183,6 +206,7 @@ export default function GestionPautas() {
   };
 
   const resetPautaForm = () => {
+    setEditingPautaId(null);
     setNombre('');
     setModeloVehiculoId('');
     setKilometrajeInicial('');
@@ -285,7 +309,7 @@ export default function GestionPautas() {
                   <h3 className="text-lg font-black text-slate-800 dark:text-slate-100 leading-tight pr-4">{pauta.nombre}</h3>
                </div>
                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+                  <button onClick={() => handleEditPauta(pauta)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
                      <Edit3 className="w-4 h-4" />
                   </button>
                   <button onClick={() => handleDelete(pauta.id, pauta.nombre)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors">
@@ -337,8 +361,11 @@ export default function GestionPautas() {
       {/* Modal - Nueva Pauta */}
       <Modal 
         isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)}
-        title="Crear Nueva Pauta de Mantenimiento"
+        onClose={() => {
+          setIsModalOpen(false);
+          resetPautaForm();
+        }}
+        title={editingPautaId ? "Editar Pauta de Mantenimiento" : "Crear Nueva Pauta de Mantenimiento"}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
            <div>

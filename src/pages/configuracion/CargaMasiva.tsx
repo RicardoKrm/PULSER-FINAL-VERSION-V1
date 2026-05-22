@@ -111,12 +111,24 @@ const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any
     mapConfig: (r: any) => ({ codigo: r.Codigo, nombre: r.Nombre, categoria: r.Categoria, stock: r.StockInicial, precio_unitario: r.PrecioUnitario, proveedor_principal: r.ProveedorPrincipal }) 
   },
   pautas: { 
-    table: 'pauta_mantenimiento', 
-    mapConfig: (r: any) => ({ nombre_pauta: r.NombrePauta, modelo_vehiculo: r.ModeloVehiculo, tipo: r.Tipo, km_ejecucion: r.KMEjecucion }) 
+    table: 'mantenimiento_pauta', 
+    mapConfig: (r: any) => ({ 
+      nombre: r.Nombre, 
+      kilometraje_inicial: r.KilometrajeInicial || 0,
+      intervalo_1: r.Intervalo1,
+      intervalo_2: r.Intervalo2 || null,
+      tipo_aplicacion: r.TipoAplicacion,
+      tipo_aceite: r.TipoAceite
+      // Se omite modelo_vehiculo_id y tareas por la complejidad de FK en carga masiva
+    }) 
   },
   tareas: { 
-    table: 'tarea_estandar', 
-    mapConfig: (r: any) => ({ codigo_tarea: r.CodigoTarea, descripcion: r.Descripcion, tiempo_estimado_horas: r.TiempoEstimadoHoras, costo_base_mano_obra: r.CostoBaseManoObra }) 
+    table: 'mantenimiento_tarea', 
+    mapConfig: (r: any) => ({ 
+      descripcion: r.Descripcion, 
+      tiempo_estandar_minutos: r.TiempoEstimadoMinutos, 
+      costo_mano_obra: r.CostoBaseManoObra 
+    }) 
   },
   fallas: { 
     table: 'tipo_falla', 
@@ -227,7 +239,7 @@ const MODULES: UploadModule[] = [
     description: 'Creación de pautas y reglas de mantenimiento preventivo por modelo y kilometraje.',
     icon: FileText,
     template: [
-      { NombrePauta: 'Mantención 20.000 KM', ModeloVehiculo: 'FH 500', Tipo: 'Preventiva', KMEjecucion: 20000 }
+      { Nombre: 'Mantención 20.000 KM', KilometrajeInicial: 0, Intervalo1: 15000, Intervalo2: 30000, TipoAplicacion: 'Preventiva', TipoAceite: '15W40' }
     ]
   },
   {
@@ -236,7 +248,7 @@ const MODULES: UploadModule[] = [
     description: 'Listado de tareas estándar de mantenimiento, con tiempos y costos predeterminados.',
     icon: ClipboardList,
     template: [
-      { CodigoTarea: 'T-001', Descripcion: 'Cambio de Aceite Motor', TiempoEstimadoHoras: 1.5, CostoBaseManoObra: 25000 }
+      { Descripcion: 'Cambio de Aceite Motor', TiempoEstimadoMinutos: 45, CostoBaseManoObra: 25000 }
     ]
   },
   {
