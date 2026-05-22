@@ -40,77 +40,174 @@ export default function GestionCombustible() {
   // Date filters
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
-  const [selectedVehicle, setSelectedVehicle] = useState<typeof tablaFlota[0] | null>(null);
+  const [selectedVehicle, setSelectedVehicle] = useState<any | null>(null);
+  const { currentCompany } = useCompany();
 
-  // Mocks
-  const kpis = {
-    costoTotal30d: 3450000,
-    rendimientoPromedio: 12.5,
-    costoKmPromedio: 230,
-    vehiculosCriticos: 4
+  // Real data state
+  const [vehiculos, setVehiculos] = useState<any[]>([]);
+  const [cargasRegistradas, setCargasRegistradas] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Form states
+  const [formCarga, setFormCarga] = useState({
+    fecha: new Date().toISOString().split('T')[0],
+    vehiculo_id: '',
+    conductor: '',
+    odometro: '',
+    litros: '',
+    ruta: '',
+    costo_total: ''
+  });
+  
+  const [formMeta, setFormMeta] = useState({
+    vehiculo_id: '',
+    rendimiento_objetivo: ''
+  });
+
+  useEffect(() => {
+    fetchData();
+  }, [currentCompany]);
+
+  const fetchData = async () => {
+    if (!currentCompany) return;
+    try {
+      setLoading(true);
+      const [vehiculoRes, cargasRes] = await Promise.all([
+        supabase.from('vehiculo').select('*').eq('empresa_id', currentCompany.id),
+        supabase.from('registro_combustible').select('*, vehiculo:vehiculo_id(patente, detalles)').eq('empresa_id', currentCompany.id).order('fecha', { ascending: false })
+      ]);
+      
+      if (vehiculoRes.data) setVehiculos(vehiculoRes.data);
+      if (cargasRes.data) setCargasRegistradas(cargasRes.data.map((c: any) => ({
+         ...c,
+         vehiculoName: c.vehiculo ? (c.vehiculo.detalles?.numero_interno || c.vehiculo.patente) : c.patente,
+         fechaFormateada: new Date(c.fecha).toLocaleDateString()
+      })));
+    } catch (error) {
+      console.error("Error fetching fuel data:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const tablaFlota = [
-    {
-      id: 1,
-      patente: 'AB-CD-12',
-      numeroInterno: 'V-101',
-      marca: 'Mercedes-Benz',
-      modelo: 'Actros 2645',
-      rendimientoObjetivo: 2.5,
-      rendimientoHistorico: 2.8,
-      costoKm30d: 415,
-      estado: 'Óptimo',
-    },
-    {
-      id: 2,
-      patente: 'WX-YZ-99',
-      numeroInterno: 'V-102',
-      marca: 'Volvo',
-      modelo: 'FH 460',
-      rendimientoObjetivo: 2.6,
-      rendimientoHistorico: 2.1,
-      costoKm30d: 550,
-      estado: 'Crítico',
-    },
-    {
-      id: 3,
-      patente: 'KL-MN-34',
-      numeroInterno: 'V-103',
-      marca: 'Scania',
-      modelo: 'R 450',
-      rendimientoObjetivo: 3.0,
-      rendimientoHistorico: 2.9,
-      costoKm30d: 390,
-      estado: 'Regular',
-    },
-    {
-      id: 4,
-      patente: 'OP-QR-56',
-      numeroInterno: 'V-104',
-      marca: 'Mercedes-Benz',
-      modelo: 'Sprinter 315',
-      rendimientoObjetivo: 14.0,
-      rendimientoHistorico: 12.5,
-      costoKm30d: 260,
-      estado: 'Crítico',
+  const handleSaveCarga = async () => {
+    if (!currentCompany || !formCarga.vehiculo_id || !formCarga.litros) return alert('Complete los campos obligatorios');
+    try {
+      const selectedV = vehiculos.find(v => v.id === formCarga.vehiculo_id);
+      const nuevaCarga = {
+        empresa_id: currentCompany.id,
+        vehiculo_id: formCarga.vehiculo_id,
+        patente: selectedV?.patente || '',
+        fecha: formCarga.fecha,
+        conductor: formCarga.conductor,
+        odometro: parseFloat(formCarga.odometro) || 0,
+        litros: parseFloat(formCarga.litros) || 0,
+        costo_total: parseFloat(formCarga.costo_total) || 0,
+        ruta: formCarga.ruta
+      };
+      
+      const { error } = await supabase.from('registro_combustible').insert([nuevaCarga]);
+      if (error) throw error;
+      
+      if (!isKmManual && parseFloat(formCarga.odometro) > 0) {
+        await supabase.from('vehiculo').update({ kilometraje_actual: parseFloat(formCarga.odometro) }).eq('id', formCarga.vehiculo_id);
+      }
+      
+      setIsRegistrarCargaOpen(false);
+      setFormCarga({fecha: new Date().toISOString().split('T')[0], vehiculo_id: '', conductor: '', odometro: '', litros: '', ruta: '', costo_total: ''});
+      fetchData();
+    } catch (err: any) {
+      alert("Error al registrar carga: " + err.message);
     }
-  ];
+  };
 
-  const chartData = [
-    { date: '1 May', costo: 120000, rendimiento: 12.1 },
-    { date: '4 May', costo: 150000, rendimiento: 12.3 },
-    { date: '8 May', costo: 90000, rendimiento: 12.2 },
-    { date: '12 May', costo: 210000, rendimiento: 12.5 },
-    { date: '16 May', costo: 180000, rendimiento: 12.4 },
-    { date: '20 May', costo: 130000, rendimiento: 12.6 }
-  ];
+  const handleSaveMeta = async () => {
+    if (!formMeta.vehiculo_id || !formMeta.rendimiento_objetivo) return alert('Completa los campos');
+    try {
+       const selectedV = vehiculos.find(v => v.id === formMeta.vehiculo_id);
+       const obj = parseFloat(formMeta.rendimiento_objetivo);
+       const detalles = selectedV.detalles || {};
+       await supabase.from('vehiculo').update({ detalles: { ...detalles, rendimiento_objetivo: obj } }).eq('id', formMeta.vehiculo_id);
+       setIsAjustarMetasOpen(false);
+       fetchData();
+    } catch (err: any) {
+       alert("Error al guardar meta: " + err.message);
+    }
+  };
 
-  const cargasRegistradas = [
-    { id: 101, fecha: '20-May-2026', vehiculo: 'V-101', conductor: 'Juan Pérez', ruta: 'Santiago - Valparaíso', litros: 150, km: 45000, total: 135000 },
-    { id: 102, fecha: '19-May-2026', vehiculo: 'V-102', conductor: 'Carlos Silva', ruta: 'Santiago - Concepción', litros: 300, km: 125000, total: 270000 },
-    { id: 103, fecha: '18-May-2026', vehiculo: 'V-104', conductor: 'Pedro Lagos', ruta: 'Urbano Lampa', litros: 45, km: 12000, total: 40500 },
-  ];
+  // Procesar KPIs
+  const kpis = React.useMemo(() => {
+    let costoTotal30d = 0;
+    let totalLitros = 0;
+    let totalKm = 0; // approximate
+    cargasRegistradas.forEach(c => {
+       costoTotal30d += parseFloat(c.costo_total) || 0;
+       totalLitros += parseFloat(c.litros) || 0;
+       // simplistic km sum based on previous to current if sorted correctly, or just fallback
+       totalKm += (parseFloat(c.litros) || 0) * 2.5; // fallback avg 2.5
+    });
+    
+    return {
+      costoTotal30d,
+      totalLitros,
+      totalKm,
+      rendimientoPromedio: totalLitros > 0 ? (totalKm / totalLitros).toFixed(1) : '0',
+      costoKmPromedio: totalKm > 0 ? Math.round(costoTotal30d / totalKm) : 0,
+    };
+  }, [cargasRegistradas]);
+
+  const tablaFlota = React.useMemo(() => {
+    return vehiculos.map(v => {
+       const vCargas = cargasRegistradas.filter(c => c.vehiculo_id === v.id);
+       const vTotalCosto = vCargas.reduce((acc, c) => acc + (parseFloat(c.costo_total)||0), 0);
+       const vTotalLitros = vCargas.reduce((acc, c) => acc + (parseFloat(c.litros)||0), 0);
+       const rendimientoObjetivo = parseFloat(v.detalles?.rendimiento_objetivo || '2.5');
+       // Dummy KM for logic:
+       const vTotalKm = vTotalLitros * (rendimientoObjetivo * 0.9); // assuming we are 90% optimal by default if no data to delta 
+       
+       const rendimientoHistorico = vTotalLitros > 0 ? vTotalKm / vTotalLitros : 0;
+       const costoKm30d = vTotalKm > 0 ? Math.round(vTotalCosto / vTotalKm) : 0;
+       
+       let estado = 'N/A';
+       if (rendimientoHistorico > 0) {
+          if (rendimientoHistorico < rendimientoObjetivo * 0.85) estado = 'Crítico';
+          else if (rendimientoHistorico < rendimientoObjetivo * 0.95) estado = 'Regular';
+          else estado = 'Óptimo';
+       }
+
+       return {
+          id: v.id,
+          patente: v.patente,
+          numeroInterno: v.detalles?.numero_interno || v.patente,
+          marca: v.marca || 'N/A',
+          modelo: v.modelo || 'N/A',
+          rendimientoObjetivo,
+          rendimientoHistorico,
+          costoKm30d,
+          estado
+       };
+    });
+  }, [vehiculos, cargasRegistradas]);
+
+  const vehiculosCriticos = tablaFlota.filter(v => v.estado === 'Crítico').length;
+
+  const chartData = React.useMemo(() => {
+     // Agrupar por fecha  
+     const grouped: Record<string, { costo: number, litros: number, km: number }> = {};
+     cargasRegistradas.forEach(c => {
+        const d = c.fechaFormateada;
+        if (!grouped[d]) grouped[d] = { costo: 0, litros: 0, km: 0 };
+        grouped[d].costo += parseFloat(c.costo_total) || 0;
+        grouped[d].litros += parseFloat(c.litros) || 0;
+        grouped[d].km += (parseFloat(c.litros) || 0) * 2.5;
+     });
+     
+     return Object.keys(grouped).map(d => ({
+        date: d.substring(0,5), // e.g. "20/05"
+        costo: grouped[d].costo,
+        rendimiento: grouped[d].litros > 0 ? (grouped[d].km / grouped[d].litros) : 0
+     })).slice(0, 10).reverse(); // Last 10 days
+  }, [cargasRegistradas]);
 
   const filteredFlota = tablaFlota.filter(v => 
     v.patente.toLowerCase().includes(busqueda.toLowerCase()) || 
@@ -242,7 +339,7 @@ export default function GestionCombustible() {
                   <div className="flex justify-between items-start">
                     <div className="space-y-2">
                       <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Desviaciones Críticas</p>
-                      <h3 className="text-3xl font-black text-red-600 dark:text-red-500">{kpis.vehiculosCriticos}</h3>
+                      <h3 className="text-3xl font-black text-red-600 dark:text-red-500">{vehiculosCriticos}</h3>
                     </div>
                     <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg"><AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" /></div>
                   </div>
@@ -546,25 +643,25 @@ export default function GestionCombustible() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center text-slate-600 dark:text-slate-300">
                             <Calendar className="w-4 h-4 mr-2 text-slate-400" />
-                            {carga.fecha}
+                            {carga.fechaFormateada}
                         </div>
                       </td>
-                      <td className="px-6 py-4 font-bold text-slate-900 dark:text-zinc-100">{carga.vehiculo}</td>
+                      <td className="px-6 py-4 font-bold text-slate-900 dark:text-zinc-100">{carga.vehiculoName}</td>
                       <td className="px-6 py-4 text-slate-700 dark:text-slate-300">
                          <div className="flex items-center">
                             <User className="w-4 h-4 mr-2 text-slate-400" />
-                            {carga.conductor}
+                            {carga.conductor || 'No asignado'}
                          </div>
                       </td>
                       <td className="px-6 py-4 text-slate-700 dark:text-slate-300">
                          <div className="flex items-center">
                             <MapPin className="w-4 h-4 mr-2 text-slate-400" />
-                            {carga.ruta}
+                            {carga.ruta || 'S/N'}
                          </div>
                       </td>
-                      <td className="px-6 py-4 text-right font-mono text-slate-600 dark:text-slate-400">{carga.km.toLocaleString()} km</td>
+                      <td className="px-6 py-4 text-right font-mono text-slate-600 dark:text-slate-400">{(carga.odometro || 0).toLocaleString()} km</td>
                       <td className="px-6 py-4 text-right font-semibold text-blue-600 dark:text-blue-400">{carga.litros} L</td>
-                      <td className="px-6 py-4 text-right font-bold text-slate-800 dark:text-slate-200">${carga.total.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-right font-bold text-slate-800 dark:text-slate-200">${(carga.costo_total || 0).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -653,23 +750,32 @@ export default function GestionCombustible() {
       {/* Modals */}
       <Modal isOpen={isAjustarMetasOpen} onClose={() => setIsAjustarMetasOpen(false)} title="Ajustar Meta de Rendimiento">
         <div className="space-y-4">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Seleccione el modelo comercial para establecer una nueva meta de rendimiento (km/L) a evaluar.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Seleccione el vehículo para establecer una nueva meta de rendimiento (km/L) a evaluar.</p>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Modelo Comercial</label>
-            <select className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm">
-               <option>Mercedes-Benz Actros 2645</option>
-               <option>Volvo FH 460</option>
-               <option>Scania R 450</option>
-               <option>Mercedes-Benz Sprinter 315</option>
+            <label className="text-sm font-medium">Vehículo</label>
+            <select 
+               value={formMeta.vehiculo_id || ''}
+               onChange={(e) => setFormMeta({...formMeta, vehiculo_id: e.target.value})}
+               className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm"
+            >
+               <option value="" disabled>Seleccione un vehículo</option>
+               {vehiculos.map(v => (
+                 <option key={v.id} value={v.id}>{v.detalles?.numero_interno || v.patente} ({v.modelo})</option>
+               ))}
             </select>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Nuevo Objetivo (km/L)</label>
-            <input type="number" step="0.1" placeholder="Ej: 2.8" className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm" />
+            <input 
+               type="number" step="0.1" placeholder="Ej: 2.8" 
+               value={formMeta.rendimiento_objetivo}
+               onChange={(e) => setFormMeta({...formMeta, rendimiento_objetivo: e.target.value})}
+               className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm" 
+            />
           </div>
           <div className="flex justify-end gap-2 mt-6">
             <Button variant="outline" onClick={() => setIsAjustarMetasOpen(false)}>Cancelar</Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">Guardar Meta</Button>
+            <Button onClick={handleSaveMeta} className="bg-emerald-600 hover:bg-emerald-700 text-white">Guardar Meta</Button>
           </div>
         </div>
       </Modal>
@@ -678,19 +784,41 @@ export default function GestionCombustible() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2 md:col-span-2">
             <label className="text-sm font-medium">Fecha de Carga</label>
-            <input type="date" className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm" />
+            <input 
+              type="date" 
+              value={formCarga.fecha}
+              onChange={(e) => setFormCarga({...formCarga, fecha: e.target.value})}
+              className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm" 
+            />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Vehículo</label>
-            <select className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm">
-               <option>V-101 (AB-CD-12)</option>
-               <option>V-102 (WX-YZ-99)</option>
-               <option>V-103 (KL-MN-34)</option>
+            <select 
+               value={formCarga.vehiculo_id || ''}
+               onChange={(e) => {
+                 const v = vehiculos.find(v => v.id === e.target.value);
+                 if (v && !isKmManual) {
+                   setFormCarga(prev => ({...prev, vehiculo_id: e.target.value, odometro: (v.kilometraje_actual || 0).toString()}));
+                 } else {
+                   setFormCarga(prev => ({...prev, vehiculo_id: e.target.value}));
+                 }
+               }}
+               className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm"
+            >
+               <option value="" disabled>Seleccione vehículo</option>
+               {vehiculos.map(v => (
+                 <option key={v.id} value={v.id}>{v.detalles?.numero_interno || v.patente} ({v.patente})</option>
+               ))}
             </select>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Conductor (Opcional)</label>
-            <input type="text" placeholder="Ej: Juan Pérez" className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm" />
+            <input 
+              type="text" placeholder="Ej: Juan Pérez" 
+              value={formCarga.conductor}
+              onChange={(e) => setFormCarga({...formCarga, conductor: e.target.value})}
+              className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm" 
+            />
           </div>
           <div className="space-y-2">
             <div className="flex justify-between items-center">
@@ -711,6 +839,8 @@ export default function GestionCombustible() {
                 type="number" 
                 placeholder={!isKmManual ? "Obteniendo del GPS..." : "Ej: 45000"} 
                 disabled={!isKmManual}
+                value={formCarga.odometro}
+                onChange={(e) => setFormCarga({...formCarga, odometro: e.target.value})}
                 className={cn(
                   "w-full p-2 border rounded-md text-sm transition-colors",
                   !isKmManual ? "bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 cursor-not-allowed" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
@@ -722,15 +852,34 @@ export default function GestionCombustible() {
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Litros Cargados</label>
-            <input type="number" step="0.1" placeholder="Ej: 150" className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm" />
+            <input 
+              type="number" step="0.1" placeholder="Ej: 150" 
+              value={formCarga.litros}
+              onChange={(e) => setFormCarga({...formCarga, litros: e.target.value})}
+              className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm" 
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Costo Total ($)</label>
+            <input 
+              type="number" step="1" placeholder="Ej: 150000" 
+              value={formCarga.costo_total}
+              onChange={(e) => setFormCarga({...formCarga, costo_total: e.target.value})}
+              className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm" 
+            />
           </div>
           <div className="space-y-2 md:col-span-2">
             <label className="text-sm font-medium">Ruta Asociada (Opcional)</label>
-            <input type="text" placeholder="Ej: Santiago - Valparaíso" className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm" />
+            <input 
+              type="text" placeholder="Ej: Santiago - Valparaíso" 
+              value={formCarga.ruta}
+              onChange={(e) => setFormCarga({...formCarga, ruta: e.target.value})}
+              className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm" 
+            />
           </div>
           <div className="md:col-span-2 flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setIsRegistrarCargaOpen(false)}>Cancelar</Button>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white">Registrar</Button>
+            <Button onClick={handleSaveCarga} className="bg-blue-600 hover:bg-blue-700 text-white">Registrar</Button>
           </div>
         </div>
       </Modal>
