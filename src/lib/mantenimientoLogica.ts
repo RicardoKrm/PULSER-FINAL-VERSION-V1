@@ -134,7 +134,7 @@ export function calcularDatosPizarra(vehiculo: VehiculoDB): FilaPizarraMantenimi
             if (diferenciaVencida > 0) {
                 kmVencido = diferenciaVencida;
                 estatus = "VENCIDO";
-                pautaVencidaStr = "Pauta Vencida Detectada";
+                pautaVencidaStr = "Mant. Rutinario";
             } else if (kmsFaltantes > 0 && kmsFaltantes <= (intervalo * 0.25)) {
                 estatus = "PROXIMO";
             }

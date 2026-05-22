@@ -89,8 +89,16 @@ export default function PizarraMantenimiento() {
 
             if (pautasData) {
               const pautasDelVehiculo = pautasData.filter(p => {
-                 const isModelMatch = p.modelo?.nombre === v.modelo;
-                 const isOilMatch = !p.tipo_aceite || (v.tipo_aceite && String(p.tipo_aceite).toUpperCase() === String(v.tipo_aceite).toUpperCase());
+                 const normalizeStr = (s: any) => String(s || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
+                 const vehModelo = normalizeStr(v.modelo);
+                 const pModelo = normalizeStr(p.modelo?.nombre);
+                 
+                 const vehAciete = normalizeStr(v.tipo_aceite);
+                 const pAciete = normalizeStr(p.tipo_aceite);
+
+                 const isModelMatch = vehModelo === pModelo;
+                 const isOilMatch = !pAciete || (vehAciete && pAciete === vehAciete);
+                 
                  return isModelMatch && isOilMatch;
               });
 

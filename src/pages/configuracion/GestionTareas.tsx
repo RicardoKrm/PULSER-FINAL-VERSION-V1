@@ -33,8 +33,8 @@ export default function GestionTareas() {
   
   // Form state
   const [descripcion, setDescripcion] = useState('');
-  const [tiempoEstandarMinutos, setTiempoEstandarMinutos] = useState<number>(60);
-  const [costoManoObra, setCostoManoObra] = useState<number>(25000);
+  const [tiempoEstandarMinutos, setTiempoEstandarMinutos] = useState<number | ''>(60);
+  const [costoManoObra, setCostoManoObra] = useState<number | ''>(25000);
   const [color, setColor] = useState('bg-blue-500');
 
   useEffect(() => {
@@ -101,8 +101,8 @@ export default function GestionTareas() {
           .from('mantenimiento_tarea')
           .update({
             descripcion,
-            tiempo_estandar_minutos: tiempoEstandarMinutos,
-            costo_mano_obra: costoManoObra,
+            tiempo_estandar_minutos: tiempoEstandarMinutos || 0,
+            costo_mano_obra: costoManoObra || 0,
             color
           })
           .eq('id', editingTareaId);
@@ -112,8 +112,8 @@ export default function GestionTareas() {
         setTareas(tareas.map(t => t.id === editingTareaId ? {
           ...t,
           descripcion,
-          tiempoEstandarMinutos: tiempoEstandarMinutos,
-          costoManoObra: costoManoObra,
+          tiempoEstandarMinutos: Number(tiempoEstandarMinutos) || 0,
+          costoManoObra: Number(costoManoObra) || 0,
           color
         } : t));
         
@@ -129,8 +129,8 @@ export default function GestionTareas() {
           .insert([{
             empresa_id: currentCompany.id,
             descripcion,
-            tiempo_estandar_minutos: tiempoEstandarMinutos,
-            costo_mano_obra: costoManoObra,
+            tiempo_estandar_minutos: tiempoEstandarMinutos || 0,
+            costo_mano_obra: costoManoObra || 0,
             color,
             estado: 'Activo'
           }])
@@ -327,7 +327,7 @@ export default function GestionTareas() {
                  <input 
                    type="number"
                    value={tiempoEstandarMinutos}
-                   onChange={(e) => setTiempoEstandarMinutos(Number(e.target.value))}
+                   onChange={(e) => setTiempoEstandarMinutos(e.target.value === '' ? '' : Number(e.target.value))}
                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-white transition-all"
                  />
               </div>
@@ -336,7 +336,7 @@ export default function GestionTareas() {
                  <input 
                    type="number"
                    value={costoManoObra}
-                   onChange={(e) => setCostoManoObra(Number(e.target.value))}
+                   onChange={(e) => setCostoManoObra(e.target.value === '' ? '' : Number(e.target.value))}
                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-white transition-all"
                  />
               </div>
