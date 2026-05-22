@@ -104,6 +104,7 @@ export default function GestionPautas() {
           intervalo1: p.intervalo_1,
           intervalo2: p.intervalo_2,
           tareas: Array.isArray(p.tareas) ? p.tareas : [],
+          archivoPdf: p.archivo_pdf,
           tipoAplicacion: p.tipo_aplicacion || '',
           tipoAceite: p.tipo_aceite || '',
           color: p.color,
@@ -125,7 +126,30 @@ export default function GestionPautas() {
     if (!nombre || !modeloVehiculoId || !currentCompany?.id) return;
 
     try {
-      const payload = {
+      let archivoPdfUrl = undefined;
+
+      if (archivoPdf) {
+        const fileExt = archivoPdf.name.split('.').pop();
+        const fileName = `${currentCompany.id}_${Date.now()}.${fileExt}`;
+        const filePath = `pautas/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('pautas_documentos')
+          .upload(filePath, archivoPdf);
+
+        if (uploadError) {
+           console.error("Upload error", uploadError);
+           Swal.fire('Advertencia', 'Pauta guardada, pero hubo un error al subir el PDF. Asegúrate de que el bucket "pautas_documentos" esté creado de forma pública en Supabase.', 'warning');
+        } else {
+           const { data: publicUrlData } = supabase.storage
+             .from('pautas_documentos')
+             .getPublicUrl(filePath);
+             
+           archivoPdfUrl = publicUrlData.publicUrl;
+        }
+      }
+
+      const payload: any = {
         empresa_id: currentCompany.id,
         nombre,
         modelo_vehiculo_id: modeloVehiculoId,
@@ -138,6 +162,10 @@ export default function GestionPautas() {
         color: 'bg-blue-500',
         estado: 'Activo'
       };
+
+      if (archivoPdfUrl) {
+        payload.archivo_pdf = archivoPdfUrl;
+      }
 
       if (editingPautaId) {
         const { error } = await supabase.from('mantenimiento_pauta').update(payload).eq('id', editingPautaId);
@@ -327,6 +355,19 @@ export default function GestionPautas() {
                 <Settings className="w-4 h-4 text-slate-400" />
                 <span>Intervalo: {pauta.intervalo1.toLocaleString()} KM</span>
               </div>
+              {pauta.archivoPdf && (
+                <div className="flex items-center gap-2 mt-2">
+                  <a 
+                    href={pauta.archivoPdf}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline"
+                  >
+                    <FileText className="w-3 h-3" />
+                    Ver PDF Adjunto
+                  </a>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800/50 mt-auto">

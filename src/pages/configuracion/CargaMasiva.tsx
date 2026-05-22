@@ -113,21 +113,21 @@ const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any
   pautas: { 
     table: 'mantenimiento_pauta', 
     mapConfig: (r: any) => ({ 
-      nombre: r.Nombre, 
-      kilometraje_inicial: r.KilometrajeInicial || 0,
-      intervalo_1: r.Intervalo1,
-      intervalo_2: r.Intervalo2 || null,
-      tipo_aplicacion: r.TipoAplicacion,
-      tipo_aceite: r.TipoAceite
-      // Se omite modelo_vehiculo_id y tareas por la complejidad de FK en carga masiva
+      nombre: r.nombre_pauta || r.NombrePauta || r.Nombre, 
+      kilometraje_inicial: r.cronograma_en_km || r.KilometrajeInicial || 0,
+      intervalo_1: r.intervalo_km || r.Intervalo1 || 0,
+      intervalo_2: r.intervalo_km_2 || r.Intervalo2 || null,
+      tipo_aplicacion: r.descrip_1_pauta || r.TipoAplicacion,
+      tipo_aceite: r.tipo_aceite || r.TipoAceite,
+      _modelo_nombre: r.nombre_modelo_vehiculo || r.ModeloVehiculo
     }) 
   },
   tareas: { 
     table: 'mantenimiento_tarea', 
     mapConfig: (r: any) => ({ 
-      descripcion: r.Descripcion, 
-      tiempo_estandar_minutos: r.TiempoEstimadoMinutos, 
-      costo_mano_obra: r.CostoBaseManoObra 
+      descripcion: r.descripcion || r.Descripcion || r.DescripcionTarea, 
+      tiempo_estandar_minutos: r.tiempo_minutos || r.TiempoEstimadoMinutos || 60, 
+      costo_mano_obra: r.costo_mano_obra || r.CostoBaseManoObra || 0 
     }) 
   },
   fallas: { 
@@ -239,7 +239,15 @@ const MODULES: UploadModule[] = [
     description: 'Creación de pautas y reglas de mantenimiento preventivo por modelo y kilometraje.',
     icon: FileText,
     template: [
-      { Nombre: 'Mantención 20.000 KM', KilometrajeInicial: 0, Intervalo1: 15000, Intervalo2: 30000, TipoAplicacion: 'Preventiva', TipoAceite: '15W40' }
+      {
+        nombre_pauta: 'SM1',
+        descrip_1_pauta: 'INICIAL X ÚNICA VEZ',
+        nombre_modelo_vehiculo: 'O 500 RS E III',
+        tipo_aceite: 'MINERAL',
+        cronograma_en_km: 5000,
+        intervalo_km: 30000,
+        intervalo_km_2: ''
+      }
     ]
   },
   {
@@ -248,7 +256,7 @@ const MODULES: UploadModule[] = [
     description: 'Listado de tareas estándar de mantenimiento, con tiempos y costos predeterminados.',
     icon: ClipboardList,
     template: [
-      { Descripcion: 'Cambio de Aceite Motor', TiempoEstimadoMinutos: 45, CostoBaseManoObra: 25000 }
+      { descripcion: 'Cambio de Aceite Motor', tiempo_minutos: 45, costo_mano_obra: 25000 }
     ]
   },
   {
@@ -440,7 +448,7 @@ export default function CargaMasiva() {
       const mappedData = jsonData.map(config.mapConfig);
 
       // Limpieza de undefined properties que fallen en Supabase
-      const cleanData = mappedData.map(row => {
+      let cleanData = mappedData.map(row => {
         const newRow: any = {};
         if (currentCompany) {
           newRow.empresa_id = currentCompany.id;
@@ -450,6 +458,37 @@ export default function CargaMasiva() {
         }
         return newRow;
       });
+
+      if (moduleId === 'pautas') {
+        const { data: modelos } = await supabase.from('mantenimiento_modelo_vehiculo')
+          .select('id, nombre')
+          .eq('empresa_id', currentCompany?.id);
+        const modeloMap = new Map();
+        if (modelos) {
+          modelos.forEach(m => modeloMap.set(m.nombre.toUpperCase(), m.id));
+        }
+
+        for (const row of cleanData) {
+          const modeloNombre = row._modelo_nombre;
+          delete row._modelo_nombre; // Eliminamos la propiedad temporal
+          if (modeloNombre) {
+            const upperName = String(modeloNombre).toUpperCase();
+            if (modeloMap.has(upperName)) {
+              row.modelo_vehiculo_id = modeloMap.get(upperName);
+            } else {
+              // Si no existe el modelo, lo creamos dinámicamente
+              const { data: newModelo } = await supabase.from('mantenimiento_modelo_vehiculo')
+                .insert({ empresa_id: currentCompany?.id, nombre: modeloNombre })
+                .select()
+                .single();
+              if (newModelo) {
+                 modeloMap.set(upperName, newModelo.id);
+                 row.modelo_vehiculo_id = newModelo.id;
+              }
+            }
+          }
+        }
+      }
 
       const { error } = await supabase.from(config.table).insert(cleanData);
 
