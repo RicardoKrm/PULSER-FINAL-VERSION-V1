@@ -59,7 +59,33 @@ const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any
   },
   vehiculos: { 
     table: 'vehiculo', 
-    mapConfig: (r: any) => ({ ...r }) 
+    mapConfig: (r: any) => ({
+      numero_interno: r.numero_interno?.toString() || '',
+      patente: r.patente,
+      tipo_vehiculo: r.tipo_vehiculo || r.tipo_vehículo || r.tipo,
+      tipo: r.tipo_vehiculo || r.tipo_vehículo || r.tipo,
+      marca: r.marca,
+      modelo: r.modelo,
+      estado: r.estado || 'OPERATIVO',
+      kilometraje_actual: r.kilometraje_actual ? parseFloat(r.kilometraje_actual.toString().replace(/[^0-9.-]+/g,"")) : undefined,
+      norma_euro: r.norma_euro,
+      tipo_aceite: r.tipo_aceite,
+      chasis: r.chasis,
+      motor: r.motor,
+      razon_social: r.razon_social || r.empresa,
+      empresa_nombre: r.empresa || r.razon_social,
+      rut: r.rut,
+      capacidad_carga: r.capacidad_carga,
+      aplicacion: r.aplicacion,
+      intervalo_km: r.intervalo_km ? parseFloat(r.intervalo_km.toString().replace(/[^0-9.-]+/g,"")) : undefined,
+      km_ultima_mantencion: r.km_ultima_mantencion ? parseFloat(r.km_ultima_mantencion.toString().replace(/[^0-9.-]+/g,"")) : undefined,
+      km_ult_mantencion: r.km_ultima_mantencion ? parseFloat(r.km_ultima_mantencion.toString().replace(/[^0-9.-]+/g,"")) : undefined,
+      fecha_ultima_mantencion: r.fecha_ultima_mantencion,
+      fecha_ult_mantencion: r.fecha_ultima_mantencion,
+      tipo_ultimo_mant: r.tipo_ultimo_mant || r.tipo_ult_pauta,
+      tipo_ult_pauta: r.tipo_ultimo_mant || r.tipo_ult_pauta,
+      detalles: {}
+    })
   },
   inventario: { 
     table: 'insumo', 
