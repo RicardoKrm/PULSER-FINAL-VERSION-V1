@@ -29,6 +29,7 @@ export default function GestionTareas() {
   const [tareas, setTareas] = useState<Tarea[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingTareaId, setEditingTareaId] = useState<string | null>(null);
   
   // Form state
   const [descripcion, setDescripcion] = useState('');
@@ -39,6 +40,28 @@ export default function GestionTareas() {
   useEffect(() => {
     fetchTareas();
   }, [currentCompany?.id]);
+
+  const resetForm = () => {
+    setEditingTareaId(null);
+    setDescripcion('');
+    setTiempoEstandarMinutos(60);
+    setCostoManoObra(25000);
+    setColor('bg-blue-500');
+  };
+
+  const handleOpenNew = () => {
+    resetForm();
+    setIsModalOpen(true);
+  };
+
+  const handleEditClick = (tarea: Tarea) => {
+    setEditingTareaId(tarea.id);
+    setDescripcion(tarea.descripcion);
+    setTiempoEstandarMinutos(tarea.tiempoEstandarMinutos);
+    setCostoManoObra(tarea.costoManoObra);
+    setColor(tarea.color);
+    setIsModalOpen(true);
+  };
 
   const fetchTareas = async () => {
     if (!currentCompany?.id) return;
@@ -73,48 +96,74 @@ export default function GestionTareas() {
     if (!descripcion || !currentCompany?.id) return;
 
     try {
-      const { data, error } = await supabase
-        .from('mantenimiento_tarea')
-        .insert([{
-          empresa_id: currentCompany.id,
+      if (editingTareaId) {
+        const { error } = await supabase
+          .from('mantenimiento_tarea')
+          .update({
+            descripcion,
+            tiempo_estandar_minutos: tiempoEstandarMinutos,
+            costo_mano_obra: costoManoObra,
+            color
+          })
+          .eq('id', editingTareaId);
+
+        if (error) throw error;
+        
+        setTareas(tareas.map(t => t.id === editingTareaId ? {
+          ...t,
           descripcion,
-          tiempo_estandar_minutos: tiempoEstandarMinutos,
-          costo_mano_obra: costoManoObra,
-          color,
-          estado: 'Activo'
-        }])
-        .select();
+          tiempoEstandarMinutos: tiempoEstandarMinutos,
+          costoManoObra: costoManoObra,
+          color
+        } : t));
+        
+        Swal.fire({
+          title: '¡Actualizado!', 
+          text: 'La tarea ha sido actualizada exitosamente.', 
+          icon: 'success',
+          confirmButtonColor: '#4f46e5'
+        });
+      } else {
+        const { data, error } = await supabase
+          .from('mantenimiento_tarea')
+          .insert([{
+            empresa_id: currentCompany.id,
+            descripcion,
+            tiempo_estandar_minutos: tiempoEstandarMinutos,
+            costo_mano_obra: costoManoObra,
+            color,
+            estado: 'Activo'
+          }])
+          .select();
 
-      if (error) throw error;
+        if (error) throw error;
 
-      if (data && data.length > 0) {
-        const newDbTarea = data[0];
-        const newTarea: Tarea = {
-          id: newDbTarea.id,
-          descripcion: newDbTarea.descripcion,
-          tiempoEstandarMinutos: newDbTarea.tiempo_estandar_minutos,
-          costoManoObra: newDbTarea.costo_mano_obra,
-          color: newDbTarea.color,
-          estado: newDbTarea.estado
-        };
-        setTareas([newTarea, ...tareas]);
+        if (data && data.length > 0) {
+          const newDbTarea = data[0];
+          const newTarea: Tarea = {
+            id: newDbTarea.id,
+            descripcion: newDbTarea.descripcion,
+            tiempoEstandarMinutos: newDbTarea.tiempo_estandar_minutos,
+            costoManoObra: newDbTarea.costo_mano_obra,
+            color: newDbTarea.color,
+            estado: newDbTarea.estado
+          };
+          setTareas([newTarea, ...tareas]);
+        }
+        
+        Swal.fire({
+          title: '¡Guardado!', 
+          text: 'La tarea ha sido registrada exitosamente.', 
+          icon: 'success',
+          confirmButtonColor: '#4f46e5'
+        });
       }
       
-      Swal.fire({
-        title: '¡Guardado!', 
-        text: 'La tarea ha sido registrada exitosamente.', 
-        icon: 'success',
-        confirmButtonColor: '#4f46e5'
-      });
-      
       setIsModalOpen(false);
-      setDescripcion('');
-      setTiempoEstandarMinutos(60);
-      setCostoManoObra(25000);
-      setColor('bg-blue-500');
+      resetForm();
     } catch (err: any) {
-       console.error("Error creating tarea:", err);
-       Swal.fire('Error', 'Hubo un error al crear la tarea.', 'error');
+       console.error("Error saving tarea:", err);
+       Swal.fire('Error', 'Hubo un error al guardar la tarea.', 'error');
     }
   };
 
@@ -164,7 +213,7 @@ export default function GestionTareas() {
         <div className="flex flex-wrap gap-3">
           <Button 
             className="flex items-center gap-2 font-bold px-6 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/20"
-            onClick={() => setIsModalOpen(true)}
+            onClick={handleOpenNew}
           >
             <Plus className="w-5 h-5" /> Nueva Tarea
           </Button>
@@ -203,7 +252,7 @@ export default function GestionTareas() {
                   <h3 className="text-lg font-black text-slate-800 dark:text-slate-100 leading-tight pr-4">{tarea.descripcion}</h3>
                </div>
                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+                  <button onClick={() => handleEditClick(tarea)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
                      <Edit3 className="w-4 h-4" />
                   </button>
                   <button onClick={() => handleDelete(tarea.id, tarea.descripcion)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors">
@@ -253,11 +302,11 @@ export default function GestionTareas() {
          </div>
       )}
 
-      {/* Modal - Nueva Tarea */}
+      {/* Modal - Nueva/Editar Tarea */}
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)}
-        title="Crear Nueva Tarea"
+        title={editingTareaId ? "Editar Tarea" : "Crear Nueva Tarea"}
       >
         <form onSubmit={handleSubmit} className="space-y-6">
            <div>
@@ -310,7 +359,7 @@ export default function GestionTareas() {
            <div className="flex justify-end gap-3 pt-6 border-t border-slate-200 dark:border-slate-800">
              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
              <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 shadow-sm shadow-indigo-600/20">
-               Crear Tarea
+               {editingTareaId ? "Actualizar Tarea" : "Crear Tarea"}
              </Button>
            </div>
         </form>

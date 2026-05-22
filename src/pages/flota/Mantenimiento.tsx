@@ -867,15 +867,15 @@ export default function PizarraMantenimiento() {
           <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
             <div className="flex justify-between items-center mb-2">
               <span className="font-medium">Mantenimiento Preventivo</span>
-              <span className="font-bold text-slate-700 dark:text-slate-300">$8.500.000</span>
+              <span className="font-bold text-slate-700 dark:text-slate-300">$0</span>
             </div>
             <div className="flex justify-between items-center mb-2">
               <span className="font-medium">Mantenimiento Correctivo</span>
-              <span className="font-bold text-slate-700 dark:text-slate-300">$4.000.000</span>
+              <span className="font-bold text-slate-700 dark:text-slate-300">$0</span>
             </div>
             <div className="border-t border-slate-200 dark:border-slate-700 my-2 pt-2 flex justify-between items-center">
               <span className="font-bold">Total Acumulado</span>
-              <span className="font-bold text-orange-600">$12.500.000</span>
+              <span className="font-bold text-orange-600">$0</span>
             </div>
           </div>
         </div>
@@ -887,15 +887,15 @@ export default function PizarraMantenimiento() {
           <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
             <div className="flex justify-between items-center mb-2">
               <span className="font-medium">Costo Total Mant.</span>
-              <span className="font-bold text-slate-700 dark:text-slate-300">$12.500.000</span>
+              <span className="font-bold text-slate-700 dark:text-slate-300">$0</span>
             </div>
             <div className="flex justify-between items-center mb-2">
               <span className="font-medium">KM Acumulados</span>
-              <span className="font-bold text-slate-700 dark:text-slate-300">862.068 km</span>
+              <span className="font-bold text-slate-700 dark:text-slate-300">0 km</span>
             </div>
             <div className="border-t border-slate-200 dark:border-slate-700 my-2 pt-2 flex justify-between items-center">
               <span className="font-bold">Costo Promedio</span>
-              <span className="font-bold text-purple-600">$14.5 / km</span>
+              <span className="font-bold text-purple-600">$0 / km</span>
             </div>
           </div>
         </div>
