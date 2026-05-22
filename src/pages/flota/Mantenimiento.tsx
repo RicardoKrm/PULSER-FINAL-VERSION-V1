@@ -63,18 +63,71 @@ export default function PizarraMantenimiento() {
     const fetchVehiculos = async () => {
       if (!currentCompany?.id) return;
       try {
-        const { data, error } = await supabase.from('vehiculo').select('*').eq('empresa_id', currentCompany.id);
-        if (error) throw error;
-        console.log("FETCHED VEHICULOS DB:", data);
-        if (data) {
-          const vehiculosDb = data.map(v => {
+        const { data: vehiculosData, error: vehiculosError } = await supabase.from('vehiculo').select('*').eq('empresa_id', currentCompany.id);
+        const { data: pautasData } = await supabase.from('mantenimiento_pauta').select('*, modelo:mantenimiento_modelo_vehiculo(nombre)').eq('empresa_id', currentCompany.id);
+
+        if (vehiculosError) throw vehiculosError;
+        
+        console.log("FETCHED VEHICULOS DB:", vehiculosData);
+        if (vehiculosData) {
+          const vehiculosDb = vehiculosData.map(v => {
             const detalles = v.detalles || {};
             // Parse correct types
             const kmsActuales = typeof v.kilometraje_actual === 'number' ? v.kilometraje_actual : parseFloat(String(v.kilometraje_actual).replace(/[^0-9.-]+/g, '')) || 0;
-            const kmUltMant = typeof detalles.km_ultima_mantencion === 'number' ? detalles.km_ultima_mantencion : parseFloat(String(detalles.km_ultima_mantencion).replace(/[^0-9.-]+/g, '')) || 0;
-            const kmInterv = typeof detalles.intervalo_km === 'number' ? detalles.intervalo_km : parseFloat(String(detalles.intervalo_km).replace(/[^0-9.-]+/g, '')) || 10000;
             
-            const pautasSecuenciaStr = detalles.tipo_ultimo_mant || detalles.tipo_ult_pauta || '';
+            // Look at root first, then detalles as fallback
+            const rawKmUlt = v.km_ultima_mantencion !== undefined ? v.km_ultima_mantencion : (detalles.km_ultima_mantencion !== undefined ? detalles.km_ultima_mantencion : 0);
+            const kmUltMant = typeof rawKmUlt === 'number' ? rawKmUlt : parseFloat(String(rawKmUlt).replace(/[^0-9.-]+/g, '')) || 0;
+            
+            const rawInterval = v.intervalo_km !== undefined ? v.intervalo_km : (detalles.intervalo_km !== undefined ? detalles.intervalo_km : 10000);
+            const kmInterv = typeof rawInterval === 'number' ? rawInterval : parseFloat(String(rawInterval).replace(/[^0-9.-]+/g, '')) || 10000;
+            
+            const pautasSecuenciaStr = v.tipo_ultimo_mant || v.tipo_ult_pauta || detalles.tipo_ultimo_mant || detalles.tipo_ult_pauta || '';
+            const fechaUltMant = v.fecha_ultima_mantencion || v.fecha_ult_mantencion || detalles.fecha_ultima_mantencion || null;
+
+            let pautasSecuencia: { iteracion_km: number; nombre: string }[] = [];
+
+            if (pautasData) {
+              const pautasDelVehiculo = pautasData.filter(p => {
+                 const isModelMatch = p.modelo?.nombre === v.modelo;
+                 const isOilMatch = !p.tipo_aceite || (v.tipo_aceite && String(p.tipo_aceite).toUpperCase() === String(v.tipo_aceite).toUpperCase());
+                 return isModelMatch && isOilMatch;
+              });
+
+              pautasDelVehiculo.forEach(p => {
+                 const km_ini = p.kilometraje_inicial || 0;
+                 const int1 = p.intervalo_1 || 0;
+                 const int2 = p.intervalo_2 || 0;
+                 
+                 const pautaName = String(p.nombre).toUpperCase();
+                 const isRodaje = pautaName.startsWith('SI') || pautaName.startsWith('R');
+                 
+                 if (isRodaje) {
+                    if (int1 > 0) {
+                      pautasSecuencia.push({ iteracion_km: km_ini > 0 ? km_ini : int1, nombre: p.nombre });
+                    }
+                 } else {
+                    if (int1 > 0) {
+                       let nextKm = km_ini > 0 ? km_ini : int1;
+                       let useInt1 = true;
+                       
+                       while (nextKm <= 3000000) {
+                          pautasSecuencia.push({ iteracion_km: nextKm, nombre: p.nombre });
+                          
+                          if (int2 > 0) {
+                            nextKm += useInt1 ? int2 : int1;
+                            useInt1 = !useInt1;
+                          } else {
+                            nextKm += int1;
+                          }
+                       }
+                    }
+                 }
+              });
+              
+              // Sort sequence mathematically
+              pautasSecuencia.sort((a, b) => a.iteracion_km - b.iteracion_km);
+            }
 
             return {
               id: v.id,
@@ -83,11 +136,11 @@ export default function PizarraMantenimiento() {
               kilometrajeActual: kmsActuales,
               fechaActualizacionKm: v.updated_at ? new Date(v.updated_at) : new Date(),
               intervaloMantencionKm: kmInterv,
-              kmPromedioDia: detalles.kmPromedioDia || 0,
+              kmPromedioDia: v.km_promedio_dia || detalles.kmPromedioDia || 0,
               kmUltimaMantencion: kmUltMant,
-              fechaUltimaMantencion: detalles.fecha_ultima_mantencion ? new Date(detalles.fecha_ultima_mantencion) : null,
+              fechaUltimaMantencion: fechaUltMant ? new Date(fechaUltMant) : null,
               tipoUltimaPauta: pautasSecuenciaStr,
-              pautasSecuencia: [] // Default for now
+              pautasSecuencia
             };
           });
 
