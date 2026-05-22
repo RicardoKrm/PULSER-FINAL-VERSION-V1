@@ -36,6 +36,25 @@ interface UploadModule {
   template?: any[];
 }
 
+const parseExcelDate = (excelDate: any) => {
+  if (excelDate === null || excelDate === undefined || excelDate === '') return undefined;
+  if (typeof excelDate === 'number') {
+    const date = new Date(Math.round((excelDate - 25569) * 86400 * 1000));
+    return date.toISOString().split('T')[0]; // Return YYYY-MM-DD
+  }
+  if (typeof excelDate === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}/.test(excelDate)) return excelDate.substring(0, 10);
+    const parts = excelDate.split(/[-/]/);
+    if (parts.length === 3) {
+      let [d, m, y] = parts;
+      if (y.length === 2) y = `20${y}`;
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    return excelDate;
+  }
+  return undefined;
+};
+
 const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any }> = {
   empleados: { 
     table: 'colaborador', 
@@ -80,8 +99,8 @@ const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any
       intervalo_km: r.intervalo_km ? parseFloat(r.intervalo_km.toString().replace(/[^0-9.-]+/g,"")) : undefined,
       km_ultima_mantencion: r.km_ultima_mantencion ? parseFloat(r.km_ultima_mantencion.toString().replace(/[^0-9.-]+/g,"")) : undefined,
       km_ult_mantencion: r.km_ultima_mantencion ? parseFloat(r.km_ultima_mantencion.toString().replace(/[^0-9.-]+/g,"")) : undefined,
-      fecha_ultima_mantencion: r.fecha_ultima_mantencion,
-      fecha_ult_mantencion: r.fecha_ultima_mantencion,
+      fecha_ultima_mantencion: parseExcelDate(r.fecha_ultima_mantencion),
+      fecha_ult_mantencion: parseExcelDate(r.fecha_ultima_mantencion),
       tipo_ultimo_mant: r.tipo_ultimo_mant || r.tipo_ult_pauta,
       tipo_ult_pauta: r.tipo_ultimo_mant || r.tipo_ult_pauta,
       detalles: {}
