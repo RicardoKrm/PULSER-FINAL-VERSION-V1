@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
 import { 
   Plus, 
   Trash2, 
@@ -22,16 +24,9 @@ interface Tarea {
   estado: 'Activo' | 'Inactivo';
 }
 
-const INITIAL_DATA: Tarea[] = [
-  { id: '1', descripcion: 'Cambio de Aceite Motor', tiempoEstandarMinutos: 45, costoManoObra: 15000, color: 'bg-emerald-500', estado: 'Activo' },
-  { id: '2', descripcion: 'Reemplazo Pastillas de Freno', tiempoEstandarMinutos: 90, costoManoObra: 35000, color: 'bg-blue-500', estado: 'Activo' },
-  { id: '3', descripcion: 'Alineación y Balanceo', tiempoEstandarMinutos: 60, costoManoObra: 25000, color: 'bg-amber-500', estado: 'Activo' },
-  { id: '4', descripcion: 'Escáner Electrónico', tiempoEstandarMinutos: 30, costoManoObra: 12000, color: 'bg-indigo-500', estado: 'Activo' },
-  { id: '5', descripcion: 'Cambio de Embrague', tiempoEstandarMinutos: 360, costoManoObra: 120000, color: 'bg-rose-500', estado: 'Inactivo' },
-];
-
 export default function GestionTareas() {
-  const [tareas, setTareas] = useState<Tarea[]>(INITIAL_DATA);
+  const { currentCompany } = useCompany();
+  const [tareas, setTareas] = useState<Tarea[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -41,37 +36,86 @@ export default function GestionTareas() {
   const [costoManoObra, setCostoManoObra] = useState<number>(25000);
   const [color, setColor] = useState('bg-blue-500');
 
+  useEffect(() => {
+    fetchTareas();
+  }, [currentCompany?.id]);
+
+  const fetchTareas = async () => {
+    if (!currentCompany?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from('mantenimiento_tarea')
+        .select('*')
+        .eq('empresa_id', currentCompany.id);
+      
+      if (error) throw error;
+      if (data) {
+        setTareas(data.map(t => ({
+          id: t.id,
+          descripcion: t.descripcion,
+          tiempoEstandarMinutos: t.tiempo_estandar_minutos,
+          costoManoObra: t.costo_mano_obra,
+          color: t.color,
+          estado: t.estado as 'Activo' | 'Inactivo'
+        })));
+      }
+    } catch (err) {
+      console.error('Error fetching tareas:', err);
+    }
+  };
+
   const filteredTareas = tareas.filter(t => 
     t.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!descripcion) return;
+    if (!descripcion || !currentCompany?.id) return;
 
-    const newTarea: Tarea = {
-      id: Date.now().toString(),
-      descripcion,
-      tiempoEstandarMinutos,
-      costoManoObra,
-      color,
-      estado: 'Activo'
-    };
+    try {
+      const { data, error } = await supabase
+        .from('mantenimiento_tarea')
+        .insert([{
+          empresa_id: currentCompany.id,
+          descripcion,
+          tiempo_estandar_minutos: tiempoEstandarMinutos,
+          costo_mano_obra: costoManoObra,
+          color,
+          estado: 'Activo'
+        }])
+        .select();
 
-    setTareas([newTarea, ...tareas]);
-    
-    Swal.fire({
-      title: '¡Guardado!', 
-      text: 'La tarea ha sido registrada exitosamente.', 
-      icon: 'success',
-      confirmButtonColor: '#4f46e5'
-    });
-    
-    setIsModalOpen(false);
-    setDescripcion('');
-    setTiempoEstandarMinutos(60);
-    setCostoManoObra(25000);
-    setColor('bg-blue-500');
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const newDbTarea = data[0];
+        const newTarea: Tarea = {
+          id: newDbTarea.id,
+          descripcion: newDbTarea.descripcion,
+          tiempoEstandarMinutos: newDbTarea.tiempo_estandar_minutos,
+          costoManoObra: newDbTarea.costo_mano_obra,
+          color: newDbTarea.color,
+          estado: newDbTarea.estado
+        };
+        setTareas([newTarea, ...tareas]);
+      }
+      
+      Swal.fire({
+        title: '¡Guardado!', 
+        text: 'La tarea ha sido registrada exitosamente.', 
+        icon: 'success',
+        confirmButtonColor: '#4f46e5'
+      });
+      
+      setIsModalOpen(false);
+      setDescripcion('');
+      setTiempoEstandarMinutos(60);
+      setCostoManoObra(25000);
+      setColor('bg-blue-500');
+    } catch (err: any) {
+       console.error("Error creating tarea:", err);
+       Swal.fire('Error', 'Hubo un error al crear la tarea.', 'error');
+    }
   };
 
   const handleDelete = (id: string, name: string) => {
@@ -84,10 +128,17 @@ export default function GestionTareas() {
       cancelButtonColor: '#64748b',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar'
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
-        setTareas(tareas.filter(t => t.id !== id));
-        Swal.fire('Eliminada!', 'La tarea fue borrada exitosamente.', 'success');
+        try {
+          const { error } = await supabase.from('mantenimiento_tarea').delete().eq('id', id);
+          if (error) throw error;
+          setTareas(tareas.filter(t => t.id !== id));
+          Swal.fire('Eliminada!', 'La tarea fue borrada exitosamente.', 'success');
+        } catch (err) {
+          console.error("Error deleting tarea:", err);
+          Swal.fire('Error', 'Hubo un error al eliminar la tarea.', 'error');
+        }
       }
     });
   };

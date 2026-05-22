@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
 import { 
   Plus, 
   Trash2, 
@@ -7,7 +9,8 @@ import {
   FileText,
   Activity,
   Car,
-  Settings
+  Settings,
+  X
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
@@ -17,65 +20,178 @@ interface Pauta {
   id: string;
   nombre: string;
   modeloVehiculo: string;
-  kmAplicacion: number;
-  tipo: string;
+  kilometrajeInicial: number;
+  intervalo1: number;
+  intervalo2?: number;
+  tareas: string[]; // now an array of task IDs or descriptions
+  archivoPdf?: string;
+  tipoAplicacion: string;
+  tipoAceite: string;
   color: string;
   estado: 'Activo' | 'Inactivo';
 }
 
-const INITIAL_DATA: Pauta[] = [
-  { id: '1', nombre: 'Pauta Preventiva 15K', modeloVehiculo: 'Volvo FH16', kmAplicacion: 15000, tipo: 'PREVENTIVA', color: 'bg-emerald-500', estado: 'Activo' },
-  { id: '2', nombre: 'Revisión General 50K', modeloVehiculo: 'Scania R500', kmAplicacion: 50000, tipo: 'GENERAL', color: 'bg-blue-500', estado: 'Activo' },
-  { id: '3', nombre: 'Cambio de Componentes 100K', modeloVehiculo: 'Todos', kmAplicacion: 100000, tipo: 'MAYOR', color: 'bg-rose-500', estado: 'Activo' },
-  { id: '4', nombre: 'Inspección de Sistemas', modeloVehiculo: 'Sprinter 315', kmAplicacion: 5000, tipo: 'INSPECCIÓN', color: 'bg-amber-500', estado: 'Inactivo' },
-];
+interface ModeloVehiculo {
+  id: string;
+  nombre: string;
+  marca: string;
+  anio: number;
+}
+
+interface Tarea {
+  id: string;
+  descripcion: string;
+}
 
 export default function GestionPautas() {
-  const [pautas, setPautas] = useState<Pauta[]>(INITIAL_DATA);
+  const { currentCompany } = useCompany();
+  const [pautas, setPautas] = useState<Pauta[]>([]);
+  const [modelos, setModelos] = useState<ModeloVehiculo[]>([]);
+  const [tareasDisponibles, setTareasDisponibles] = useState<Tarea[]>([]);
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModeloModalOpen, setIsModeloModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Form state
+  // Form state Pauta
   const [nombre, setNombre] = useState('');
-  const [modeloVehiculo, setModeloVehiculo] = useState('Todos');
-  const [kmAplicacion, setKmAplicacion] = useState(10000);
-  const [tipo, setTipo] = useState('PREVENTIVA');
-  const [color, setColor] = useState('bg-emerald-500');
+  const [modeloVehiculoId, setModeloVehiculoId] = useState('');
+  const [kilometrajeInicial, setKilometrajeInicial] = useState<number | ''>('');
+  const [intervalo1, setIntervalo1] = useState<number | ''>('');
+  const [intervalo2, setIntervalo2] = useState<number | ''>('');
+  const [selectedTareas, setSelectedTareas] = useState<string[]>([]);
+  const [archivoPdf, setArchivoPdf] = useState<File | null>(null);
+  const [tipoAplicacion, setTipoAplicacion] = useState('');
+  const [tipoAceite, setTipoAceite] = useState('');
+
+  // Form state Modelo
+  const [nombreModelo, setNombreModelo] = useState('');
+  const [marcaModelo, setMarcaModelo] = useState('');
+  const [anioModelo, setAnioModelo] = useState<number | ''>('');
+
+  useEffect(() => {
+    fetchData();
+  }, [currentCompany?.id]);
+
+  const fetchData = async () => {
+    if (!currentCompany?.id) return;
+    try {
+      const [pautasRes, modelosRes, tareasRes] = await Promise.all([
+        supabase.from('mantenimiento_pauta').select('*, modelo:mantenimiento_modelo_vehiculo(nombre)').eq('empresa_id', currentCompany.id),
+        supabase.from('mantenimiento_modelo_vehiculo').select('*').eq('empresa_id', currentCompany.id),
+        supabase.from('mantenimiento_tarea').select('id, descripcion').eq('empresa_id', currentCompany.id).eq('estado', 'Activo')
+      ]);
+
+      if (modelosRes.data) {
+        setModelos(modelosRes.data.map(m => ({
+          id: m.id, nombre: m.nombre, marca: m.marca || '', anio: m.anio || 0
+        })));
+      }
+
+      if (tareasRes.data) {
+        setTareasDisponibles(tareasRes.data.map(t => ({
+          id: t.id, descripcion: t.descripcion
+        })));
+      }
+
+      if (pautasRes.data) {
+        setPautas(pautasRes.data.map(p => ({
+          id: p.id,
+          nombre: p.nombre,
+          modeloVehiculo: p.modelo?.nombre || 'Desconocido',
+          kilometrajeInicial: p.kilometraje_inicial,
+          intervalo1: p.intervalo_1,
+          intervalo2: p.intervalo_2,
+          tareas: Array.isArray(p.tareas) ? p.tareas : [],
+          tipoAplicacion: p.tipo_aplicacion || '',
+          tipoAceite: p.tipo_aceite || '',
+          color: p.color,
+          estado: p.estado as any
+        })));
+      }
+    } catch (err) {
+      console.error('Error fetching data:', err);
+    }
+  };
 
   const filteredPautas = pautas.filter(p => 
     p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.modeloVehiculo.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nombre) return;
+    if (!nombre || !modeloVehiculoId || !currentCompany?.id) return;
 
-    const newPauta: Pauta = {
-      id: Date.now().toString(),
-      nombre,
-      modeloVehiculo,
-      kmAplicacion,
-      tipo,
-      color,
-      estado: 'Activo'
-    };
+    try {
+      const { data, error } = await supabase.from('mantenimiento_pauta').insert([{
+        empresa_id: currentCompany.id,
+        nombre,
+        modelo_vehiculo_id: modeloVehiculoId,
+        kilometraje_inicial: Number(kilometrajeInicial) || 0,
+        intervalo_1: Number(intervalo1) || 0,
+        intervalo_2: intervalo2 ? Number(intervalo2) : null,
+        tareas: selectedTareas, // stored as jsonb
+        tipo_aplicacion: tipoAplicacion,
+        tipo_aceite: tipoAceite,
+        color: 'bg-blue-500',
+        estado: 'Activo'
+      }]);
 
-    setPautas([newPauta, ...pautas]);
-    
-    Swal.fire({
-      title: '¡Guardado!', 
-      text: 'La pauta ha sido registrada exitosamente.', 
-      icon: 'success',
-      confirmButtonColor: '#4f46e5'
-    });
-    
-    setIsModalOpen(false);
+      if (error) throw error;
+      
+      Swal.fire({
+        title: '¡Guardado!', 
+        text: 'La pauta ha sido registrada exitosamente.', 
+        icon: 'success',
+        confirmButtonColor: '#4f46e5'
+      });
+      
+      setIsModalOpen(false);
+      resetPautaForm();
+      fetchData();
+    } catch (err: any) {
+      console.error('Error creating pauta:', err);
+      Swal.fire('Error', 'No se pudo crear la pauta.', 'error');
+    }
+  };
+
+  const handleSubmitModelo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nombreModelo || !currentCompany?.id) return;
+
+    try {
+      const { data, error } = await supabase.from('mantenimiento_modelo_vehiculo').insert([{
+        empresa_id: currentCompany.id,
+        nombre: nombreModelo,
+        marca: marcaModelo,
+        anio: Number(anioModelo) || null
+      }]);
+
+      if (error) throw error;
+
+      Swal.fire('Guardado', 'Modelo creado correctamente', 'success');
+      setIsModeloModalOpen(false);
+      setNombreModelo('');
+      setMarcaModelo('');
+      setAnioModelo('');
+      fetchData();
+    } catch (err) {
+      console.error('Error creating modelo:', err);
+      Swal.fire('Error', 'No se pudo crear el modelo.', 'error');
+    }
+  };
+
+  const resetPautaForm = () => {
     setNombre('');
-    setModeloVehiculo('Todos');
-    setKmAplicacion(10000);
-    setTipo('PREVENTIVA');
-    setColor('bg-emerald-500');
+    setModeloVehiculoId('');
+    setKilometrajeInicial('');
+    setIntervalo1('');
+    setIntervalo2('');
+    setSelectedTareas([]);
+    setArchivoPdf(null);
+    setTipoAplicacion('');
+    setTipoAceite('');
   };
 
   const handleDelete = (id: string, name: string) => {
@@ -88,12 +204,25 @@ export default function GestionPautas() {
       cancelButtonColor: '#64748b',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar'
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
-        setPautas(pautas.filter(p => p.id !== id));
-        Swal.fire('Eliminado!', 'La pauta fue borrada exitosamente.', 'success');
+        try {
+          const { error } = await supabase.from('mantenimiento_pauta').delete().eq('id', id);
+          if (error) throw error;
+          setPautas(pautas.filter(p => p.id !== id));
+          Swal.fire('Eliminado!', 'La pauta fue borrada exitosamente.', 'success');
+        } catch (err) {
+          console.error("Error deleting pauta", err);
+          Swal.fire('Error', 'Hubo un error', 'error');
+        }
       }
     });
+  };
+
+  const toggleTarea = (tareaId: string) => {
+    setSelectedTareas(prev => 
+      prev.includes(tareaId) ? prev.filter(t => t !== tareaId) : [...prev, tareaId]
+    );
   };
 
   const colors = [
@@ -172,20 +301,16 @@ export default function GestionPautas() {
               </div>
               <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400">
                 <Settings className="w-4 h-4 text-slate-400" />
-                <span>{pauta.kmAplicacion.toLocaleString()} KM</span>
+                <span>Intervalo: {pauta.intervalo1.toLocaleString()} KM</span>
               </div>
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800/50 mt-auto">
-               <div className="flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-slate-400" />
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Tipo:</span>
-                  <span className={`text-[11px] font-black uppercase tracking-wider ${
-                     pauta.tipo === 'PREVENTIVA' ? 'text-emerald-600 dark:text-emerald-500' :
-                     pauta.tipo === 'GENERAL' ? 'text-blue-600 dark:text-blue-500' :
-                     pauta.tipo === 'MAYOR' ? 'text-rose-600 dark:text-rose-500' :
-                     'text-amber-600 dark:text-amber-500'
-                  }`}>{pauta.tipo}</span>
+               <div className="flex items-center gap-2 max-w-[60%]">
+                  <Activity className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                  <span className={`text-[11px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-500 truncate`} title={pauta.tipoAplicacion}>
+                     {pauta.tipoAplicacion || 'N/A'}
+                  </span>
                </div>
                <div>
                   <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-md ${
@@ -213,77 +338,180 @@ export default function GestionPautas() {
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)}
-        title="Crear Pauta de Mantenimiento"
+        title="Crear Nueva Pauta de Mantenimiento"
       >
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
            <div>
-              <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Nombre de la Pauta *</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nombre</label>
               <input 
                 type="text" 
                 required
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-white transition-all" 
-                placeholder="Ej. Cambio de Aceite y Filtros 10K" 
+                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:text-white transition-all" 
               />
            </div>
 
-           <div className="grid grid-cols-2 gap-4">
-              <div>
-                 <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Modelo de Vehículo</label>
-                 <input 
-                   type="text"
-                   value={modeloVehiculo}
-                   onChange={(e) => setModeloVehiculo(e.target.value)}
-                   className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-white transition-all"
-                   placeholder="Ej. Volvo FH16"
-                 />
-              </div>
-              <div>
-                 <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">KMs de Aplicación</label>
-                 <input 
-                   type="number"
-                   value={kmAplicacion}
-                   onChange={(e) => setKmAplicacion(Number(e.target.value))}
-                   className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-white transition-all"
-                 />
-              </div>
-           </div>
-
-           <div className="grid grid-cols-2 gap-4">
-              <div>
-                 <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Tipo de Mantenimiento</label>
+           <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Modelo vehiculo</label>
+              <div className="flex gap-2">
                  <select 
-                   value={tipo}
-                   onChange={(e) => setTipo(e.target.value)}
-                   className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-white transition-all"
+                   value={modeloVehiculoId}
+                   onChange={(e) => setModeloVehiculoId(e.target.value)}
+                   required
+                   className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:text-white transition-all"
                  >
-                    <option value="PREVENTIVA">Preventiva</option>
-                    <option value="GENERAL">General</option>
-                    <option value="MAYOR">Mayor</option>
-                    <option value="INSPECCIÓN">Inspección</option>
-                 </select>
-              </div>
-              <div>
-                 <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Color Base</label>
-                 <div className="flex gap-2 bg-slate-50 dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 flex-wrap justify-between items-center h-[42px]">
-                    {colors.slice(0, 7).map(c => (
-                       <button
-                         key={c}
-                         type="button"
-                         onClick={() => setColor(c)}
-                         className={`w-5 h-5 rounded-full ${c} ${color === c ? 'ring-2 ring-offset-1 ring-slate-800 dark:ring-white dark:ring-offset-slate-900' : ''}`}
-                       />
+                    <option value="">---------</option>
+                    {modelos.map(m => (
+                       <option key={m.id} value={m.id}>{m.nombre}</option>
                     ))}
-                 </div>
+                 </select>
+                 <button 
+                   type="button"
+                   onClick={() => setIsModeloModalOpen(true)}
+                   title="Crear Nuevo Modelo"
+                   className="px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 rounded-md transition-colors flex items-center justify-center"
+                 >
+                    <Plus className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+                 </button>
               </div>
            </div>
 
-           <div className="flex justify-end gap-3 pt-6 border-t border-slate-200 dark:border-slate-800">
-             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
-             <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 shadow-sm shadow-indigo-600/20">
-               Crear Pauta
-             </Button>
+           <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Kilometraje Inicial</label>
+              <input 
+                type="number"
+                value={kilometrajeInicial}
+                onChange={(e) => setKilometrajeInicial(e.target.value === '' ? '' : Number(e.target.value))}
+                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:text-white transition-all"
+              />
+           </div>
+
+           <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Intervalo 1 (KM)</label>
+              <input 
+                type="number"
+                value={intervalo1}
+                required
+                onChange={(e) => setIntervalo1(e.target.value === '' ? '' : Number(e.target.value))}
+                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:text-white transition-all"
+              />
+           </div>
+
+           <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Intervalo 2 (KM) - Opcional</label>
+              <input 
+                type="number"
+                value={intervalo2}
+                onChange={(e) => setIntervalo2(e.target.value === '' ? '' : Number(e.target.value))}
+                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:text-white transition-all"
+              />
+           </div>
+
+           <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tareas</label>
+              <div className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md max-h-48 overflow-y-auto p-2">
+                 {tareasDisponibles.length === 0 ? (
+                    <p className="text-xs text-slate-500 p-2 text-center">No hay tareas disponibles. Crea tareas en Gestión de Tareas.</p>
+                 ) : (
+                    tareasDisponibles.map(t => (
+                       <label key={t.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedTareas.includes(t.id)}
+                            onChange={() => toggleTarea(t.id)}
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700" 
+                          />
+                          <span className="text-sm text-slate-700 dark:text-slate-300">{t.descripcion}</span>
+                       </label>
+                    ))
+                 )}
+              </div>
+           </div>
+
+           <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Archivo pdf</label>
+              <input 
+                type="file"
+                accept=".pdf"
+                onChange={(e) => setArchivoPdf(e.target.files && e.target.files.length > 0 ? e.target.files[0] : null)}
+                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:text-white transition-all file:mr-4 file:py-1 file:px-3 file:rounded file:border file:border-slate-300 file:bg-slate-100 dark:file:bg-slate-800 dark:file:border-slate-700 file:text-slate-700 dark:file:text-slate-300 hover:file:bg-slate-200"
+              />
+           </div>
+
+           <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tipo aplicacion</label>
+              <input 
+                type="text"
+                value={tipoAplicacion}
+                onChange={(e) => setTipoAplicacion(e.target.value)}
+                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:text-white transition-all"
+              />
+           </div>
+
+           <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tipo aceite</label>
+              <input 
+                type="text"
+                value={tipoAceite}
+                onChange={(e) => setTipoAceite(e.target.value)}
+                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:text-white transition-all"
+              />
+           </div>
+
+           <div className="flex justify-end gap-3 pt-4">
+             <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors">
+                Cancelar
+             </button>
+             <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-md shadow-sm transition-colors">
+               Guardar Pauta
+             </button>
+           </div>
+        </form>
+      </Modal>
+
+      {/* Modal - Nuevo Modelo */}
+      <Modal 
+        isOpen={isModeloModalOpen} 
+        onClose={() => setIsModeloModalOpen(false)}
+        title="Crear Nuevo Modelo de Vehículo"
+      >
+        <form onSubmit={handleSubmitModelo} className="space-y-4">
+           <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nombre del Modelo</label>
+              <input 
+                type="text" 
+                required
+                value={nombreModelo}
+                onChange={(e) => setNombreModelo(e.target.value)}
+                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:text-white transition-all" 
+              />
+           </div>
+           <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Marca (Opcional)</label>
+              <input 
+                type="text" 
+                value={marcaModelo}
+                onChange={(e) => setMarcaModelo(e.target.value)}
+                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:text-white transition-all" 
+              />
+           </div>
+           <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Año (Opcional)</label>
+              <input 
+                type="number" 
+                value={anioModelo}
+                onChange={(e) => setAnioModelo(e.target.value === '' ? '' : Number(e.target.value))}
+                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:text-white transition-all" 
+              />
+           </div>
+           <div className="flex justify-end gap-3 pt-4">
+             <button type="button" onClick={() => setIsModeloModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors">
+                Cancelar
+             </button>
+             <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-md shadow-sm transition-colors">
+               Guardar Modelo
+             </button>
            </div>
         </form>
       </Modal>
