@@ -39,7 +39,23 @@ interface UploadModule {
 const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any }> = {
   empleados: { 
     table: 'colaborador', 
-    mapConfig: (r: any) => ({ rut: r.Rut, nombres: r.Nombres, apellidos: r.Apellidos, cargos: r.Cargo, telefono: r.Telefono, email: r.Email }) 
+    mapConfig: (r: any) => ({
+      rut: r.Rut || r.RUT || '',
+      nombre: (`${r.Nombre || r.Nombres || ''} ${r.Ap_Paterno || r.Apellidos || ''} ${r.Ap_Materno || ''}`).trim(),
+      rol: r.Cargo || r.Rol || '',
+      estado: r.Estado || 'ACTIVO',
+      detalles: {
+        nombres: r.Nombre || r.Nombres || '',
+        apellido_paterno: r.Ap_Paterno || '',
+        apellido_materno: r.Ap_Materno || '',
+        sexo: r.Sexo || 'HOMBRE',
+        departamento: r.Departament || r.Departamento || '',
+        sueldo_base: parseFloat((r.Sueldo_Base || '0').toString().replace(/[^0-9.-]+/g,"")),
+        valor_hh: parseFloat((r['HH_$'] || r.Valor_HH || '0').toString().replace(/[^0-9.-]+/g,"")),
+        hh_extras: parseFloat((r.HH_Extras || '0').toString().replace(/[^0-9.-]+/g,"")),
+        prestador_de_servicio: r.Prestador_de_servicio || r.Prestador_de_s || ''
+      }
+    })
   },
   vehiculos: { 
     table: 'vehiculo', 
@@ -121,7 +137,7 @@ const MODULES: UploadModule[] = [
     description: 'Carga masiva de conductores, técnicos y administrativos desde archivo Excel.',
     icon: Users,
     template: [
-      { Rut: '12345678-9', Nombres: 'Juan', Apellidos: 'Pérez', Cargo: 'Conductor', Telefono: '+56912345678', Email: 'juan@empresa.com' }
+      { Rut: '10.001.002-1', Prestador_de_servicio: 'EXTERNO', Ap_Paterno: 'AEDO', Ap_Materno: 'ZAMBRA', Nombre: 'CARLOS', Sexo: 'HOMBRE', Estado: 'ACTIVO', Cargo: 'ELECTRICO', Departament: 'MANTENCION', Sueldo_Base: 1257210, 'HH_$': 7143, HH_Extras: 10001 }
     ]
   },
   {

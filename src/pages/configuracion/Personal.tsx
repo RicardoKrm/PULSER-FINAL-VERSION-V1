@@ -26,7 +26,6 @@ import { Collaborator } from '../../types';
 import { useAppContext } from '../../context/AppContext';
 
 const DEPARTMENTS_ROLES: Record<string, string[]> = {
-  'Super Administración': ['Administrador'],
   'Operaciones y Servicios': ['Supervisor Operaciones', 'Programador', 'Despachador', 'Conductor'],
   'Gestión de Flota': ['Jefe de Flota', 'Supervisor Mantenimiento', 'Mecánico', 'Pañolero'],
   'Logística y Suministros': ['Jefe de Bodega', 'Auditor de Logística', 'Operario de Suministros'],
@@ -461,7 +460,7 @@ export default function Personal() {
              <div className="h-px bg-slate-200 dark:bg-slate-800 flex-1" />
            </div>
 
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                  <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Departamento</label>
                  <select value={newUserDepartment} onChange={e => { setNewUserDepartment(e.target.value); setNewUserRole(''); }} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100">
@@ -485,6 +484,13 @@ export default function Personal() {
                     {AVAILABLE_PANELS.map(panel => (
                        <option key={panel.value} value={panel.value}>{panel.label}</option>
                     ))}
+                 </select>
+              </div>
+              <div>
+                 <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Prestador de servicio</label>
+                 <select className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100">
+                    <option>INTERNO</option>
+                    <option>EXTERNO</option>
                  </select>
               </div>
            </div>
