@@ -116,8 +116,8 @@ const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any
       nombre: r.nombre_pauta || r.NombrePauta || r.Nombre, 
       kilometraje_inicial: r.cronograma_en_km || r.KilometrajeInicial || 0,
       intervalo_1: r.intervalo_km || r.Intervalo1 || 0,
-      intervalo_2: r.intervalo_km_2 || r.Intervalo2 || null,
-      tipo_aplicacion: r.descrip_1_pauta || r.TipoAplicacion,
+      intervalo_2: r['intervalo_km 2'] || r.intervalo_km_2 || r.Intervalo2 || null,
+      tipo_aplicacion: r.tipo_aplicacion || r.TipoAplicacion || r['descrip_1°_pauta'] || r.descrip_1_pauta,
       tipo_aceite: r.tipo_aceite || r.TipoAceite,
       _modelo_nombre: r.nombre_modelo_vehiculo || r.ModeloVehiculo
     }) 
@@ -241,7 +241,7 @@ const MODULES: UploadModule[] = [
     template: [
       {
         nombre_pauta: 'SM1',
-        descrip_1_pauta: 'INICIAL X ÚNICA VEZ',
+        ['descrip_1°_pauta']: 'INICIAL X ÚNICA VEZ',
         nombre_modelo_vehiculo: 'O 500 RS E III',
         tipo_aceite: 'MINERAL',
         cronograma_en_km: 5000,
