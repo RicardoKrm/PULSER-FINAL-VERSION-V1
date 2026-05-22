@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
 import { 
   Users, 
   Briefcase,
@@ -47,12 +48,14 @@ const AVAILABLE_PANELS = [
 ];
 
 export default function Personal() {
+  const { currentCompany } = useCompany();
   const { personal: users, setPersonal: setUsers } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const fetchColaboradores = async () => {
-      const { data, error } = await supabase.from('colaborador').select('*');
+      if (!currentCompany?.id) return;
+      const { data, error } = await supabase.from('colaborador').select('*').eq('empresa_id', currentCompany.id);
       if (error) {
         console.error('Error fetching colaboradores:', error);
       } else if (data) {
@@ -75,7 +78,7 @@ export default function Personal() {
       }
     };
     fetchColaboradores();
-  }, [setUsers]);
+  }, [setUsers, currentCompany?.id]);
 
   const [isModalColaboradorOpen, setIsModalColaboradorOpen] = useState(false);
   const [isAssignRoleModalOpen, setIsAssignRoleModalOpen] = useState(false);

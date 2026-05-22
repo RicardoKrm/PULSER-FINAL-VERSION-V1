@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -16,6 +17,7 @@ import { Modal } from '../../components/ui/Modal';
 import { calcularDatosPizarra, FilaPizarraMantenimiento } from '../../lib/mantenimientoLogica';
 
 export default function PizarraMantenimiento() {
+  const { currentCompany } = useCompany();
   const [busqueda, setBusqueda] = useState('');
   const [mostrarFiltros, setMostrarFiltros] = useState(true);
   const [actionMenuOpen, setActionMenuOpen] = useState<string | number | null>(null);
@@ -59,8 +61,9 @@ export default function PizarraMantenimiento() {
 
   useEffect(() => {
     const fetchVehiculos = async () => {
+      if (!currentCompany?.id) return;
       try {
-        const { data, error } = await supabase.from('vehiculo').select('*');
+        const { data, error } = await supabase.from('vehiculo').select('*').eq('empresa_id', currentCompany.id);
         if (error) throw error;
         console.log("FETCHED VEHICULOS DB:", data);
         if (data) {
@@ -97,7 +100,7 @@ export default function PizarraMantenimiento() {
     };
 
     fetchVehiculos();
-  }, []);
+  }, [currentCompany?.id]);
 
   const [kpiModal, setKpiModal] = useState<string | null>(null);
 
