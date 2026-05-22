@@ -379,7 +379,9 @@ export default function Layout() {
                     title="Cambiar empresa activa (Workspace)"
                   >
                     {companies.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                      <option key={c.id} value={c.id} className="text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 font-medium">
+                        {c.name}
+                      </option>
                     ))}
                   </select>
                   <Building className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500 pointer-events-none" />
