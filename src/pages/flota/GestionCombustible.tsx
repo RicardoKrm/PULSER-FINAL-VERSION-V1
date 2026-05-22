@@ -175,6 +175,8 @@ export default function GestionCombustible() {
           if (rendimientoHistorico < rendimientoObjetivo * 0.85) estado = 'Crítico';
           else if (rendimientoHistorico < rendimientoObjetivo * 0.95) estado = 'Regular';
           else estado = 'Óptimo';
+       } else {
+          estado = 'Sin Datos';
        }
 
        return {
@@ -357,28 +359,35 @@ export default function GestionCombustible() {
               </CardHeader>
               <CardContent>
                 <div className="h-80 w-full mt-4">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart
-                      data={chartData}
-                      margin={{ top: 20, right: 20, bottom: 20, left: 10 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                      <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
-                      <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(value) => `${value / 1000}k`} />
-                      <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} type="number" domain={[10, 15]} tick={{ fontSize: 12, fill: '#64748b' }} />
-                      <RechartsTooltip 
-                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', color: '#0f172a' }}
-                         formatter={(value, name) => {
-                           if (name === 'Costo ($)') return [`$${(value as number).toLocaleString()}`, name];
-                           if (name === 'Rendimiento (km/L)') return [`${(value as number).toFixed(1)} km/L`, name];
-                           return [value, name];
-                         }}
-                      />
-                      <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                      <Bar yAxisId="left" dataKey="costo" name="Costo ($)" fill="#93c5fd" radius={[4, 4, 0, 0]} barSize={40} />
-                      <Line yAxisId="right" type="monotone" dataKey="rendimiento" name="Rendimiento (km/L)" stroke="#3b82f6" strokeWidth={3} dot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 8 }} />
-                    </ComposedChart>
-                  </ResponsiveContainer>
+                  {chartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart
+                        data={chartData}
+                        margin={{ top: 20, right: 20, bottom: 20, left: 10 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                        <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
+                        <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(value) => `${value / 1000}k`} />
+                        <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} type="number" domain={[10, 15]} tick={{ fontSize: 12, fill: '#64748b' }} />
+                        <RechartsTooltip 
+                           contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', color: '#0f172a' }}
+                           formatter={(value, name) => {
+                             if (name === 'Costo ($)') return [`$${(value as number).toLocaleString()}`, name];
+                             if (name === 'Rendimiento (km/L)') return [`${(value as number).toFixed(1)} km/L`, name];
+                             return [value, name];
+                           }}
+                        />
+                        <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                        <Bar yAxisId="left" dataKey="costo" name="Costo ($)" fill="#93c5fd" radius={[4, 4, 0, 0]} barSize={40} />
+                        <Line yAxisId="right" type="monotone" dataKey="rendimiento" name="Rendimiento (km/L)" stroke="#3b82f6" strokeWidth={3} dot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 8 }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                       <BarChart3 className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-3" />
+                       <p className="text-slate-500 font-medium">No hay suficientes datos registrados</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -389,28 +398,34 @@ export default function GestionCombustible() {
                   <CardTitle className="text-sm flex items-center"><AlertTriangle className="w-4 h-4 mr-2 text-amber-500"/>Alertas de Eficiencia</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {tablaFlota.filter(v => v.estado !== 'Óptimo').map(v => (
-                     <div key={v.id} className="flex flex-col gap-2 p-4 bg-slate-50 dark:bg-slate-800/50 border dark:border-slate-700 rounded-lg">
-                       <div className="flex justify-between items-center">
-                         <div>
-                           <span className="font-bold text-sm text-slate-800 dark:text-slate-200 block">{v.numeroInterno}</span>
-                           <span className="text-xs text-slate-500">{v.modelo}</span>
+                  {tablaFlota.filter(v => v.estado === 'Crítico' || v.estado === 'Regular').length > 0 ? (
+                    tablaFlota.filter(v => v.estado === 'Crítico' || v.estado === 'Regular').map(v => (
+                       <div key={v.id} className="flex flex-col gap-2 p-4 bg-slate-50 dark:bg-slate-800/50 border dark:border-slate-700 rounded-lg">
+                         <div className="flex justify-between items-center">
+                           <div>
+                             <span className="font-bold text-sm text-slate-800 dark:text-slate-200 block">{v.numeroInterno}</span>
+                             <span className="text-xs text-slate-500">{v.modelo}</span>
+                           </div>
+                           <Badge variant={v.estado === 'Crítico' ? 'destructive' : 'default'} className={v.estado === 'Regular' ? 'bg-amber-500 hover:bg-amber-600' : ''}>{v.estado}</Badge>
                          </div>
-                         <Badge variant={v.estado === 'Crítico' ? 'destructive' : 'default'} className={v.estado === 'Regular' ? 'bg-amber-500 hover:bg-amber-600' : ''}>{v.estado}</Badge>
+                         <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-2 rounded border dark:border-slate-700 text-xs mt-1">
+                           <div className="text-center w-full">
+                              <span className="block text-slate-500">Real</span>
+                              <span className={cn("font-bold text-sm", v.estado === 'Crítico' ? "text-red-500" : "text-amber-500")}>{v.rendimientoHistorico.toFixed(1)}</span>
+                           </div>
+                           <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-2"></div>
+                           <div className="text-center w-full">
+                              <span className="block text-slate-500">Meta</span>
+                              <span className="font-bold text-emerald-600 text-sm">{v.rendimientoObjetivo.toFixed(1)}</span>
+                           </div>
+                         </div>
                        </div>
-                       <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-2 rounded border dark:border-slate-700 text-xs mt-1">
-                         <div className="text-center w-full">
-                            <span className="block text-slate-500">Real</span>
-                            <span className={cn("font-bold text-sm", v.estado === 'Crítico' ? "text-red-500" : "text-amber-500")}>{v.rendimientoHistorico}</span>
-                         </div>
-                         <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-2"></div>
-                         <div className="text-center w-full">
-                            <span className="block text-slate-500">Meta</span>
-                            <span className="font-bold text-emerald-600 text-sm">{v.rendimientoObjetivo}</span>
-                         </div>
-                       </div>
-                     </div>
-                  ))}
+                    ))
+                  ) : (
+                    <div className="text-center text-slate-500 font-medium py-8 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-dashed dark:border-slate-700">
+                      Sin alertas por consumo
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -459,11 +474,11 @@ export default function GestionCombustible() {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                       <span className="text-slate-600 dark:text-slate-400">Total Litros</span>
-                      <span className="font-bold text-slate-900 dark:text-white">3,450 L</span>
+                      <span className="font-bold text-slate-900 dark:text-white">{(kpis.totalLitros || 0).toLocaleString()} L</span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                       <span className="text-slate-600 dark:text-slate-400">Precio Promedio (PMP)</span>
-                      <span className="font-bold text-slate-900 dark:text-white">$1,000 / L</span>
+                      <span className="font-bold text-slate-900 dark:text-white">${kpis.totalLitros > 0 ? Math.round(kpis.costoTotal30d / kpis.totalLitros).toLocaleString() : 0} / L</span>
                     </div>
                     <div className="flex justify-between items-center p-4 bg-blue-600 text-white rounded-lg shadow-inner">
                       <span className="font-medium">Total Estimado</span>
@@ -475,11 +490,11 @@ export default function GestionCombustible() {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                       <span className="text-slate-600 dark:text-slate-400">Kilómetros Totales</span>
-                      <span className="font-bold text-slate-900 dark:text-white">43,125 km</span>
+                      <span className="font-bold text-slate-900 dark:text-white">{(kpis.totalKm || 0).toLocaleString()} km</span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                       <span className="text-slate-600 dark:text-slate-400">Total Litros Consumidos</span>
-                      <span className="font-bold text-slate-900 dark:text-white">3,450 L</span>
+                      <span className="font-bold text-slate-900 dark:text-white">{(kpis.totalLitros || 0).toLocaleString()} L</span>
                     </div>
                     <div className="flex justify-between items-center p-4 bg-emerald-600 text-white rounded-lg shadow-inner">
                       <span className="font-medium">Promedio Global</span>
@@ -495,7 +510,7 @@ export default function GestionCombustible() {
                     </div>
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                       <span className="text-slate-600 dark:text-slate-400">Kilómetros Totales</span>
-                      <span className="font-bold text-slate-900 dark:text-white">43,125 km</span>
+                      <span className="font-bold text-slate-900 dark:text-white">{(kpis.totalKm || 0).toLocaleString()} km</span>
                     </div>
                     <div className="flex justify-between items-center p-4 bg-slate-800 dark:bg-slate-950 text-white rounded-lg shadow-inner">
                       <span className="font-medium">Costo por KM</span>
@@ -507,11 +522,11 @@ export default function GestionCombustible() {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                       <span className="text-slate-600 dark:text-slate-400">Flota Evaluada</span>
-                      <span className="font-bold text-slate-900 dark:text-white">42 Vehículos</span>
+                      <span className="font-bold text-slate-900 dark:text-white">{tablaFlota.length} Vehículos</span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                       <span className="text-slate-600 dark:text-slate-400 text-emerald-600">Dentro de Meta</span>
-                      <span className="font-bold text-slate-900 dark:text-white">38 Vehículos</span>
+                      <span className="font-bold text-slate-900 dark:text-white">{tablaFlota.filter(v => v.estado === 'Óptimo').length} Vehículos</span>
                     </div>
                     <div className="space-y-2 mt-4 border-t dark:border-slate-800 pt-4">
                       <p className="text-sm font-semibold text-red-600 flex items-center"><AlertTriangle className="w-4 h-4 mr-2" /> Vehículos Críticos</p>
@@ -583,9 +598,11 @@ export default function GestionCombustible() {
                         <span className={cn(
                           "font-bold px-2 py-1 rounded",
                           v.estado === 'Óptimo' ? "text-emerald-700 bg-emerald-50 dark:bg-emerald-900/30" : 
-                          v.estado === 'Regular' ? "text-amber-700 bg-amber-50 dark:bg-amber-900/30" : "text-red-700 bg-red-50 dark:bg-red-900/30"
+                          v.estado === 'Regular' ? "text-amber-700 bg-amber-50 dark:bg-amber-900/30" : 
+                          v.estado === 'Sin Datos' ? "text-slate-500 bg-slate-100 dark:bg-slate-800 dark:text-slate-400" :
+                          "text-red-700 bg-red-50 dark:bg-red-900/30"
                         )}>
-                          {v.rendimientoHistorico.toFixed(1)}
+                          {v.estado === 'Sin Datos' ? '-' : v.rendimientoHistorico.toFixed(1)}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-center font-bold text-slate-700 dark:text-slate-300">
@@ -596,7 +613,9 @@ export default function GestionCombustible() {
                             <div className={cn(
                                 "w-3 h-3 rounded-full shadow-inner",
                                 v.estado === 'Óptimo' ? "bg-emerald-500" : 
-                                v.estado === 'Regular' ? "bg-amber-500" : "bg-red-500"
+                                v.estado === 'Regular' ? "bg-amber-500" : 
+                                v.estado === 'Sin Datos' ? "bg-slate-300 dark:bg-slate-600" :
+                                "bg-red-500"
                             )}></div>
                          </div>
                       </td>
@@ -712,10 +731,10 @@ export default function GestionCombustible() {
                   <p className="text-xs text-slate-500 mt-2">Promedio flota meta: <strong className="ml-1 text-slate-700 dark:text-slate-300">${kpis.costoKmPromedio}</strong></p>
                 </div>
                 <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border dark:border-slate-700 shadow-sm relative overflow-hidden">
-                   <div className="absolute right-0 top-0 w-2 h-full bg-amber-500"></div>
+                   <div className="absolute right-0 top-0 w-2 h-full bg-slate-300 dark:bg-slate-700"></div>
                    <p className="text-sm text-slate-500 mb-1 flex items-center gap-1"><MapPin className="w-3 h-3"/> Telemetría GPS</p>
-                   <p className="text-3xl font-black text-amber-600">3 Alertas</p>
-                   <p className="text-xs text-slate-500 mt-2">Excesos de RPM y Ralentí</p>
+                   <p className="text-3xl font-black text-slate-500">Sin Datos</p>
+                   <p className="text-xs text-slate-500 mt-2">Conecte GPS para alertas</p>
                 </div>
               </div>
 
@@ -723,25 +742,15 @@ export default function GestionCombustible() {
                  <AlertTriangle className="w-5 h-5 text-slate-400" /> Insights y Diagnóstico
               </h3>
               <div className="grid md:grid-cols-2 gap-6">
-                 <div className="p-5 border dark:border-slate-700 border-l-4 border-l-purple-500 rounded-lg bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow">
-                   <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2"><User className="w-4 h-4 text-purple-500"/> Comportamiento Conducción</h4>
-                   <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed">
-                     El sistema GPS reporta que el conductor <strong className="text-purple-600 dark:text-purple-400">Juan Pérez</strong> originó el <strong>65%</strong> de las variaciones negativas de consumo debido a tiempos excesivos de ralentí.
-                   </p>
-                   <div className="mt-4 p-2 bg-purple-50 dark:bg-purple-900/10 rounded border border-purple-100 dark:border-purple-900 flex gap-2">
-                      <TrendingUp className="w-4 h-4 text-purple-600 mt-0.5" />
-                      <p className="text-xs text-purple-800 dark:text-purple-200 font-medium">Recomendación: Asignar capacitación en conducción eficiente.</p>
-                   </div>
+                 <div className="p-5 border border-dashed dark:border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900/50 flex flex-col items-center justify-center text-center">
+                   <User className="w-8 h-8 text-slate-300 dark:text-slate-600 mb-2"/>
+                   <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">Comportamiento Conducción</h4>
+                   <p className="text-slate-500 text-xs mt-2">No hay suficientes datos de telemetría y rendimiento para generar insights sobre los conductores asociados a este vehículo.</p>
                  </div>
-                 <div className="p-5 border dark:border-slate-700 border-l-4 border-l-orange-500 rounded-lg bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow">
-                   <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2"><MapPin className="w-4 h-4 text-orange-500"/> Análisis de Ruta</h4>
-                   <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed">
-                     La ruta <strong className="text-orange-600 dark:text-orange-400">Santiago - Valparaíso</strong> presenta un costo por kilómetro <strong>12% mayor</strong> al promedio histórico debido a los desniveles.
-                   </p>
-                   <div className="mt-4 p-2 bg-orange-50 dark:bg-orange-900/10 rounded border border-orange-100 dark:border-orange-900 flex gap-2">
-                       <Filter className="w-4 h-4 text-orange-600 mt-0.5" />
-                       <p className="text-xs text-orange-800 dark:text-orange-200 font-medium">Recomendación: Evaluar limitador de RPM en rutas de pendiente.</p>
-                   </div>
+                 <div className="p-5 border border-dashed dark:border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900/50 flex flex-col items-center justify-center text-center">
+                   <MapPin className="w-8 h-8 text-slate-300 dark:text-slate-600 mb-2"/>
+                   <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">Análisis de Ruta</h4>
+                   <p className="text-slate-500 text-xs mt-2">Se requieren registros de consumo consistentes vinculados a rutas específicas para identificar desviaciones y generar recomendaciones operativas.</p>
                  </div>
               </div>
             </CardContent>
