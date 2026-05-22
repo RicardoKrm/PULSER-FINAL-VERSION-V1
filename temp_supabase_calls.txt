@@ -1,0 +1,89 @@
+src/pages/configuracion/CargaMasiva.tsx:381:      const { error } = await supabase.from(config.table).insert(cleanData);
+src/pages/configuracion/AsignacionPermisos.tsx:20:        const { data, error } = await supabase.from('cargo').select('nombre, perfil, permisos');
+src/pages/configuracion/GestionRutas.tsx:55:      let query = supabase.from('operacion_ruta').select('*').order('created_at', { ascending: false });
+src/pages/configuracion/GestionRutas.tsx:81:    const { error } = await supabase.from('operacion_ruta').insert([{
+src/pages/configuracion/GestionRutas.tsx:107:      const { error } = await supabase.from('operacion_ruta').delete().eq('id', id);
+src/pages/operaciones/ControlDocumental.tsx:47:      const { data, error } = await supabase.from('operacion_documento').insert([newDoc]).select();
+src/pages/operaciones/ControlDocumental.tsx:62:      const { data, error } = await supabase.from('operacion_documento').select('*').eq('entidad_id', entityId).order('created_at', { ascending: false });
+src/pages/operaciones/ControlDocumental.tsx:73:      const { error } = await supabase.from('operacion_documento').delete().eq('id', docId);
+src/pages/operaciones/ControlDocumental.tsx:106:      let dQuery = supabase.from('colaborador').select('id, nombre, rut, rol, telefono, detalles');
+src/pages/operaciones/ControlDocumental.tsx:107:      let vQuery = supabase.from('vehiculo').select('id, patente, marca, modelo, anio, kilometraje_actual, tipo, detalles');
+src/pages/operaciones/ControlDocumental.tsx:142:      const res = await supabase.from(table).select('detalles').eq('id', entityId).single();
+src/pages/operaciones/ControlDocumental.tsx:150:      const { error } = await supabase.from(table).update({
+src/pages/operaciones/ControlDocumental.tsx:204:      const { data, error } = await supabase.from('colaborador').insert([{
+src/pages/operaciones/ControlDocumental.tsx:232:      const { data, error } = await supabase.from('vehiculo').insert([{
+src/pages/operaciones/GPS.tsx:88:          supabase.from('vehiculo').select('id, patente, kilometraje_actual, detalles').eq('empresa_id', activeCompanyId),
+src/pages/operaciones/GPS.tsx:89:          supabase.from('empresa').select('detalles').eq('id', activeCompanyId).single()
+src/pages/operaciones/GPS.tsx:166:                 await supabase.from('vehiculo').update({ kilometraje_actual: newKm }).eq('id', v.id);
+src/pages/operaciones/Historial.tsx:29:      let query = supabase.from('operacion_programacion').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)').eq('estado', 'Realizado').order('fecha', { ascending: false });
+src/pages/operaciones/PortalConductor.tsx:36:      let query = supabase.from('operacion_programacion').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)').order('fecha', { ascending: true });
+src/pages/operaciones/PortalConductor.tsx:72:      await supabase.from('operacion_programacion').update({ estado: 'En Curso' }).eq('id', id);
+src/pages/operaciones/PortalConductor.tsx:81:      await supabase.from('operacion_programacion').update({ estado: 'Realizado' }).eq('id', id);
+src/pages/operaciones/PortalConductor.tsx:90:      await supabase.from('operacion_programacion').update({ estado: 'Pausado' }).eq('id', id);
+src/pages/operaciones/CrearServicio.tsx:98:      let contratosQ = supabase.from('operacion_contrato').select('id, cliente_razon_social').eq('activo', true);
+src/pages/operaciones/CrearServicio.tsx:99:      let vehiculosQ = supabase.from('vehiculo').select('id, patente');
+src/pages/operaciones/CrearServicio.tsx:100:      let colaboradoresQ = supabase.from('colaborador').select('id, nombre, estado').in('rol', ['Conductor', 'Chofer']);
+src/pages/operaciones/CrearServicio.tsx:119:          const { data: ua } = await supabase.from('usuario_aplicacion').select('empresa_id, empresa(id, nombre)').eq('email', userData.user.email);
+src/pages/operaciones/CrearServicio.tsx:127:            const { data: allEmpresas } = await supabase.from('empresa').select('id, nombre').eq('estado', 'Activo');
+src/pages/operaciones/CrearServicio.tsx:213:        const { error } = await supabase.from('operacion_servicio').update(serviceData).eq('id', editingServicio.id);
+src/pages/operaciones/CrearServicio.tsx:216:        const { error } = await supabase.from('operacion_servicio').insert([serviceData]);
+src/pages/operaciones/CrearServicio.tsx:236:        const { error } = await supabase.from('operacion_servicio').update({ estado: 'Anulado' }).eq('id', selectedServicio.id);
+src/pages/operaciones/CrearServicio.tsx:254:        const { error } = await supabase.from('operacion_servicio').delete().eq('id', selectedServicio.id);
+src/pages/operaciones/Contratos.tsx:149:            const { data: allEmpresas } = await supabase.from('empresa').select('id, nombre').eq('estado', 'Activo');
+src/pages/operaciones/Contratos.tsx:210:        await supabase.from('operacion_contrato_vehiculo').delete().eq('contrato_id', editingContratoId);
+src/pages/operaciones/Contratos.tsx:251:      const { error } = await supabase.from('operacion_contrato').delete().eq('id', id);
+src/pages/operaciones/Reservas.tsx:82:      let condQuery = supabase.from('colaborador').select('id, nombre, estado').in('rol', ['Conductor', 'Chofer']);
+src/pages/operaciones/Reservas.tsx:83:      let vehQuery = supabase.from('vehiculo').select('id, patente, marca, estado');
+src/pages/operaciones/Reservas.tsx:99:          const { data: ua } = await supabase.from('usuario_aplicacion').select('empresa_id, empresa(id, nombre)').eq('email', userData.user.email);
+src/pages/operaciones/Reservas.tsx:107:            const { data: allEmpresas } = await supabase.from('empresa').select('id, nombre').eq('estado', 'Activo');
+src/pages/operaciones/Reservas.tsx:283:      const { error } = await supabase.from('operacion_reserva').insert([reservationData]);
+src/pages/operaciones/Programacion.tsx:74:      let queryProg = supabase.from('operacion_programacion').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)');
+src/pages/operaciones/Programacion.tsx:75:      let queryServ = supabase.from('operacion_servicio').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)').eq('estado', 'Borrador');
+src/pages/operaciones/Programacion.tsx:76:      let queryCond = supabase.from('colaborador').select('id, nombre, estado, rol');
+src/pages/operaciones/Programacion.tsx:77:      let queryVehs = supabase.from('vehiculo').select('id, patente, estado');
+src/pages/operaciones/Programacion.tsx:78:      let queryRutas = supabase.from('operacion_ruta').select('id, nombre, origen, destino');
+src/pages/operaciones/Programacion.tsx:200:        const { data: progData, error: progErr } = await supabase.from('operacion_programacion').insert([{
+src/pages/operaciones/Programacion.tsx:216:        await supabase.from('operacion_servicio').update({ estado: 'Confirmado' }).eq('id', item.id);
+src/pages/operaciones/Programacion.tsx:241:         await supabase.from('operacion_programacion').update({ 
+src/pages/operaciones/Programacion.tsx:267:        await supabase.from('operacion_programacion').delete().eq('id', item.id);
+src/pages/operaciones/Programacion.tsx:269:        const { data: servData, error: servErr } = await supabase.from('operacion_servicio').insert([{
+src/pages/operaciones/Programacion.tsx:369:      const { data, error } = await supabase.from('operacion_servicio').insert([newServiceData]).select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)').single();
+src/pages/finanzas/HistorialFacturacion.tsx:21:      const { data: empData } = await supabase.from('empresa').select('id, detalles').eq('id', activeCompanyId).single();
+src/pages/finanzas/HistorialFacturacion.tsx:22:      const { data: vehData } = await supabase.from('vehiculo').select('id, patente, modelo, detalles').eq('empresa_id', activeCompanyId);
+src/pages/finanzas/EvaluacionEmpresa.tsx:22:      const { data: cData, error: cErr } = await supabase.from('operacion_contrato').select('*').eq('empresa_id', activeCompanyId);
+src/pages/finanzas/Presupuestos.tsx:33:      const { data: empData, error: empErr } = await supabase.from('empresa').select('id, detalles').eq('id', activeCompanyId).single();
+src/pages/finanzas/Presupuestos.tsx:34:      const { data: vehData, error: vehErr } = await supabase.from('vehiculo').select('id, patente, detalles').eq('empresa_id', activeCompanyId);
+src/pages/finanzas/Presupuestos.tsx:77:      const { data: empData } = await supabase.from('empresa').select('detalles').eq('id', activeCompanyId).single();
+src/pages/finanzas/Presupuestos.tsx:82:      const { error } = await supabase.from('empresa').update({ detalles: newDetalles }).eq('id', activeCompanyId);
+src/pages/finanzas/Presupuestos.tsx:114:          const { data: empData } = await supabase.from('empresa').select('detalles').eq('id', activeCompanyId).single();
+src/pages/finanzas/Presupuestos.tsx:121:          const { error } = await supabase.from('empresa').update({ detalles: newDetalles }).eq('id', activeCompanyId);
+src/pages/finanzas/EstadoPago.tsx:22:      const { data: empData, error: empErr } = await supabase.from('empresa').select('id, detalles').eq('id', activeCompanyId).single();
+src/pages/finanzas/EstadoPago.tsx:23:      const { data: vehData, error: vehErr } = await supabase.from('vehiculo').select('id, patente, modelo, detalles').eq('empresa_id', activeCompanyId);
+src/pages/finanzas/EstadoPago.tsx:61:         const { data, error } = await supabase.from(pago.entityType).select('detalles').eq('id', pago.fuenteId).single();
+src/pages/finanzas/EstadoPago.tsx:67:             await supabase.from(pago.entityType).update({ detalles: { ...currentDetalles, registros_financieros: newRegs } }).eq('id', pago.fuenteId);
+src/pages/Login.tsx:28:        supabase.from('usuario_aplicacion').select('panel_inicio').eq('auth_user_id', session.user.id).single()
+src/pages/Login.tsx:87:      const { error } = await supabase.from('tickets_ayuda').insert([{
+src/pages/super-admin/LogActividad.tsx:36:        supabase.from('empresa').select('id, nombre'),
+src/pages/super-admin/LogActividad.tsx:37:        supabase.from('usuario_aplicacion').select('id', { count: 'exact' }),
+src/pages/super-admin/LogActividad.tsx:38:        supabase.from('log_actividad').select(`
+src/pages/super-admin/Perfiles.tsx:113:          const { error } = await supabase.from('cargo').delete().eq('id', cargoObj.id);
+src/pages/super-admin/Perfiles.tsx:169:          const { data, error } = await supabase.from('cargo').insert([{
+src/pages/super-admin/Perfiles.tsx:238:      const { error } = await supabase.from('usuario_aplicacion').update({ estado: nuevoEstado }).eq('id', u.id);
+src/pages/super-admin/Perfiles.tsx:264:        const { error } = await supabase.from('usuario_aplicacion').delete().eq('id', u.id);
+src/pages/super-admin/Perfiles.tsx:300:      const { data, error } = await supabase.from('rol').select('*').order('created_at', { ascending: true });
+src/pages/super-admin/Perfiles.tsx:316:      const { data, error } = await supabase.from('cargo').select('*').order('created_at', { ascending: true });
+src/pages/super-admin/Perfiles.tsx:334:      let query = supabase.from('usuario_aplicacion')
+src/pages/super-admin/Perfiles.tsx:350:        const { data, error } = await supabase.from('empresa').select('id, nombre').order('nombre');
+src/pages/super-admin/Perfiles.tsx:374:      const { data, error } = await supabase.from('rol').insert([{
+src/pages/super-admin/Perfiles.tsx:1098:                          const { error } = await supabase.from('cargo').update({ permisos: perms }).eq('id', cargoObj.id);
+src/pages/super-admin/Perfiles.tsx:1185:                const { error } = await supabase.from('usuario_aplicacion').insert([{ 
+src/pages/super-admin/Empresas.tsx:34:      const { data, error } = await supabase.from('empresa').select('*').order('created_at', { ascending: false });
+src/pages/super-admin/Empresas.tsx:72:        const { error } = await supabase.from('empresa').update({
+src/pages/super-admin/Empresas.tsx:81:        const { error } = await supabase.from('empresa').insert([
+src/pages/super-admin/Empresas.tsx:104:      const { error } = await supabase.from('empresa').update({ estado: newStatus }).eq('id', id);
+src/pages/biblioteca/BibliotecaSubir.tsx:87:      const { error: dbError } = await supabase.from('biblioteca_documento').insert([{
+src/pages/biblioteca/BibliotecaExplorador.tsx:41:      let query = supabase.from('biblioteca_documento').select('*').order('created_at', { ascending: false });
+src/pages/biblioteca/BibliotecaExplorador.tsx:71:      await supabase.from('biblioteca_documento').update({ visitas: doc.visitas + 1 }).eq('id', doc.id);
+src/lib/supabase.ts:21:    await supabase.from('log_actividad').insert([{
+src/contexts/CompanyContext.tsx:53:        const { data } = await supabase.from('empresa').select('*').order('nombre', { ascending: true });
+src/contexts/CompanyContext.tsx:78:        const { data } = await supabase.from('empresa').select('*').eq('id', profile.empresa_id).single();

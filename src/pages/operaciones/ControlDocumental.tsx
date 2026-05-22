@@ -197,7 +197,7 @@ export default function ControlDocumental() {
 
   const handleSaveDriver = async (e: React.FormEvent) => {
     e.preventDefault();
-    const saveCompanyId = profile?.empresa_id;
+    const saveCompanyId = activeCompanyId;
     if (!saveCompanyId) return alert('No perteneces a una empresa asignada. Por favor contacta al administrador.');
     
     try {
@@ -225,7 +225,7 @@ export default function ControlDocumental() {
 
   const handleSaveVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
-    const saveCompanyId = profile?.empresa_id;
+    const saveCompanyId = activeCompanyId;
     if (!saveCompanyId) return alert('No perteneces a una empresa asignada. Por favor contacta al administrador.');
     
     try {

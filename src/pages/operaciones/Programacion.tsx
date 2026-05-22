@@ -53,7 +53,7 @@ const SCHEDULED_BLOCKS: any[] = [];
 const HOURS = Array.from({ length: 12 }, (_, i) => i + 8); // 8 to 19
 
 export default function Programacion() {
-  const { activeCompanyId } = useCompany();
+  const { activeCompanyId, currentCompany } = useCompany();
   const { profile } = useAuth();
   const [viewMode, setViewMode] = useState<'Día' | 'Semana' | 'Mes' | 'Tabla'>('Semana');
   const [currentDate, setCurrentDate] = useState<Date>(INIT_DATE);
@@ -76,6 +76,14 @@ export default function Programacion() {
       let queryCond = supabase.from('colaborador').select('id, nombre, estado, rol');
       let queryVehs = supabase.from('vehiculo').select('id, patente, estado');
       let queryRutas = supabase.from('operacion_ruta').select('id, nombre, origen, destino');
+
+      if (currentCompany) {
+        queryProg = queryProg.eq('empresa_id', currentCompany.id);
+        queryServ = queryServ.eq('empresa_id', currentCompany.id);
+        queryCond = queryCond.eq('empresa_id', currentCompany.id);
+        queryVehs = queryVehs.eq('empresa_id', currentCompany.id);
+        queryRutas = queryRutas.eq('empresa_id', currentCompany.id);
+      }
       
       const [resProg, resServ, resCond, resVehs, resRutas] = await Promise.all([queryProg, queryServ, queryCond, queryVehs, queryRutas]);
       

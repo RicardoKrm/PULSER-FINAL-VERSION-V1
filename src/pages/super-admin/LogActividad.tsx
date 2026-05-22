@@ -3,6 +3,7 @@ import { Card } from '../../components/ui/Card';
 import { Activity, Clock, Users, Building, ShieldAlert, FileText, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Badge } from '../../components/ui/Badge';
+import { useCompany } from '../../contexts/CompanyContext';
 
 interface LogEntry {
   id: string;
@@ -27,23 +28,36 @@ export default function LogActividad() {
     activeUsers: 0
   });
 
+  const { currentCompany } = useCompany();
+
   const fetchLogs = async () => {
     try {
       setLoading(true);
       
+      let logQuery = supabase.from('log_actividad').select(`
+        id,
+        accion,
+        modulo,
+        detalles,
+        created_at,
+        empresa:empresa_id (nombre),
+        usuario:usuario_id (nombre)
+      `).order('created_at', { ascending: false }).limit(200);
+
+      if (currentCompany) {
+        logQuery = logQuery.eq('empresa_id', currentCompany.id);
+      }
+
       // Fetch stats natively instead of from logs
+      let usrQuery = supabase.from('usuario_aplicacion').select('id', { count: 'exact' });
+      if (currentCompany) {
+          usrQuery = usrQuery.eq('empresa_id', currentCompany.id);
+      }
+
       const [empresaRes, usuarioRes, logRes] = await Promise.all([
         supabase.from('empresa').select('id, nombre'),
-        supabase.from('usuario_aplicacion').select('id', { count: 'exact' }),
-        supabase.from('log_actividad').select(`
-          id,
-          accion,
-          modulo,
-          detalles,
-          created_at,
-          empresa:empresa_id (nombre),
-          usuario:usuario_id (nombre)
-        `).order('created_at', { ascending: false }).limit(100)
+        usrQuery,
+        logQuery
       ]);
 
       if (logRes.error) throw logRes.error;

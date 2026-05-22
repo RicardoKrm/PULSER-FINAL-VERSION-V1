@@ -364,6 +364,28 @@ export default function Layout() {
               />
             </div>
 
+            {/* Tenant Context Selector para Super Admin */}
+            {useCompany().isSuperAdmin && companies.length > 0 && (
+              <div className="hidden sm:flex items-center ml-2">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mr-2 flex flex-col items-end leading-none">
+                  <span>Super Admin</span>
+                  <span>Mode</span>
+                </div>
+                <div className="relative group">
+                  <select
+                    value={activeCompanyId}
+                    onChange={(e) => setActiveCompanyId(e.target.value)}
+                    className="appearance-none bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 py-1.5 pl-3 pr-8 rounded-lg text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[200px] truncate cursor-pointer transition-colors"
+                    title="Cambiar empresa activa (Workspace)"
+                  >
+                    {companies.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                  <Building className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500 pointer-events-none" />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
@@ -526,7 +548,10 @@ export default function Layout() {
         </header>
 
         {/* Page Content */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+        <div 
+          key={useCompany().currentCompany?.id || 'empty-company'} 
+          className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8"
+        >
           <Outlet />
         </div>
       </main>
