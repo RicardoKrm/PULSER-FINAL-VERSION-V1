@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Plus, Search, Activity, CircleDashed, BarChart3, Truck, Trash, ChevronDown, AlertCircle, ChevronUp, DollarSign, X, Info, TrendingUp, AlertTriangle, ChevronRight, Box } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Modal } from '../../components/ui/Modal';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
 
 export default function GestionNeumaticos() {
   const queryParams = new URLSearchParams(window.location.search);
   const initialTab = (queryParams.get('tab') as 'dashboard' | 'inventario' | 'inspeccion') || 'dashboard';
   const [activeTab, setActiveTab] = useState<'dashboard' | 'inventario' | 'inspeccion'>(initialTab);
+  const { currentCompany } = useCompany();
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -63,6 +66,33 @@ export default function GestionNeumaticos() {
 
 function DashboardNeumaticos() {
   const [selectedKpi, setSelectedKpi] = useState<'cpk' | 'activos' | 'alertas' | 'ahorro' | null>(null);
+  const [stats, setStats] = useState({
+    cpkPromedio: 0,
+    neumaticosActivos: 0,
+    alertasCriticas: 0,
+    ahorroEstimado: 0
+  });
+  const { currentCompany } = useCompany();
+
+  useEffect(() => {
+    const loadDashboardInfo = async () => {
+      if (!currentCompany) return;
+      const { data, error } = await supabase
+        .from('neumatico')
+        .select('*')
+        .eq('empresa_id', currentCompany.id);
+
+      if (!error && data) {
+        setStats({
+          cpkPromedio: 0,
+          neumaticosActivos: data.filter(d => d.ubicacion !== 'DESECHO').length,
+          alertasCriticas: data.filter(d => d.profundidad_actual && d.profundidad_actual <= 3).length,
+          ahorroEstimado: 0
+        });
+      }
+    };
+    loadDashboardInfo();
+  }, [currentCompany]);
 
   return (
     <div className="space-y-6">
@@ -76,7 +106,7 @@ function DashboardNeumaticos() {
             <div className="flex justify-between items-start">
               <div className="space-y-2">
                 <p className="text-blue-100 text-sm font-medium">CPK Promedio Flota</p>
-                <h3 className="text-3xl font-black">$3.25 <span className="text-base font-medium text-blue-200">/ km</span></h3>
+                <h3 className="text-3xl font-black">${stats.cpkPromedio.toFixed(2)} <span className="text-base font-medium text-blue-200">/ km</span></h3>
               </div>
               <div className="p-3 bg-white/20 rounded-lg"><BarChart3 className="w-5 h-5 text-white" /></div>
             </div>
@@ -91,11 +121,10 @@ function DashboardNeumaticos() {
             <div className="flex justify-between items-start">
               <div className="space-y-2">
                 <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Neumáticos Activos</p>
-                <h3 className="text-3xl font-black text-slate-800 dark:text-slate-100">142</h3>
+                <h3 className="text-3xl font-black text-slate-800 dark:text-slate-100">{stats.neumaticosActivos}</h3>
               </div>
               <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-lg"><CircleDashed className="w-5 h-5 text-slate-600 dark:text-slate-300" /></div>
             </div>
-            <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-4 flex items-center"><ChevronUp className="w-3 h-3 mr-1"/> 92% estado óptimo</p>
           </CardContent>
         </Card>
 
@@ -107,7 +136,7 @@ function DashboardNeumaticos() {
             <div className="flex justify-between items-start">
               <div className="space-y-2">
                 <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Alertas Críticas</p>
-                <h3 className="text-3xl font-black text-red-600 dark:text-red-500">5</h3>
+                <h3 className="text-3xl font-black text-red-600 dark:text-red-500">{stats.alertasCriticas}</h3>
               </div>
               <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg"><AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" /></div>
             </div>
@@ -123,7 +152,7 @@ function DashboardNeumaticos() {
             <div className="flex justify-between items-start">
               <div className="space-y-2">
                 <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Ahorro Proyectado</p>
-                <h3 className="text-3xl font-black text-emerald-600 dark:text-emerald-500">$1.2M</h3>
+                <h3 className="text-3xl font-black text-emerald-600 dark:text-emerald-500">${stats.ahorroEstimado}</h3>
               </div>
               <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg"><DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /></div>
             </div>
@@ -135,74 +164,14 @@ function DashboardNeumaticos() {
       <div className="grid lg:grid-cols-3 gap-6">
         <Card className="col-span-full lg:col-span-2 shadow-sm">
           <CardHeader>
-            <CardTitle>Rentabilidad y Vida Útil por Modelo</CardTitle>
+            <CardTitle>Rentabilidad y Vida Útil (Sin Datos)</CardTitle>
           </CardHeader>
           <CardContent>
-                        {/* Gráfico Real (Recharts) */}
-            <div className="h-80 w-full mt-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart
-                  data={[
-                    { name: 'Michelin XZE2', vidaUtil: 150000, cpk: 3.00 },
-                    { name: 'BStone R268', vidaUtil: 135000, cpk: 3.11 },
-                    { name: 'GYear KMAX', vidaUtil: 120000, cpk: 3.29 },
-                    { name: 'FCargo SR-200', vidaUtil: 105000, cpk: 3.40 },
-                    { name: 'Pirelli Form', vidaUtil: 95000, cpk: 3.68 },
-                  ]}
-                  margin={{ top: 20, right: 20, bottom: 20, left: 10 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
-                  <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(value) => `${value / 1000}k`} />
-                  <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(value) => `${value}`} />
-                  <Tooltip 
-                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', color: '#0f172a' }}
-                     formatter={(value, name) => {
-                       if (name === 'Vida Útil (km)') return [`${value.toLocaleString()} km`, name];
-                       if (name === 'CPK ($/km)') return [`${(value as number).toFixed(2)}`, name];
-                       return [value, name];
-                     }}
-                  />
-                  <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                  <Bar yAxisId="left" dataKey="vidaUtil" name="Vida Útil (km)" radius={[4, 4, 0, 0]} barSize={40}>
-                    {
-                      [
-                        { name: 'Michelin XZE2', vidaUtil: 150000, cpk: 3.00 },
-                        { name: 'BStone R268', vidaUtil: 135000, cpk: 3.11 },
-                        { name: 'GYear KMAX', vidaUtil: 120000, cpk: 3.29 },
-                        { name: 'FCargo SR-200', vidaUtil: 105000, cpk: 3.40 },
-                        { name: 'Pirelli Form', vidaUtil: 95000, cpk: 3.68 },
-                      ].map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.cpk < 3.2 ? '#10b981' : entry.cpk < 3.5 ? '#f59e0b' : '#ef4444'} />
-                      ))
-                    }
-                  </Bar>
-                  <Line yAxisId="right" type="monotone" dataKey="cpk" name="CPK ($/km)" stroke="#3b82f6" strokeWidth={3} dot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 8 }} />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="mt-8 flex flex-col gap-4">
-               <div className="grid grid-cols-4 gap-4 text-xs font-bold text-slate-500 uppercase pb-2 border-b dark:border-slate-800">
-                 <div>Marca - Perfil</div>
-                 <div>Vida Útil Prom.</div>
-                 <div>Costo Prom.</div>
-                 <div className="text-right">CPK ($/km)</div>
-               </div>
-               {[
-                 { m: "Michelin XZE2", v: "150,000 km", c: "$450,000", cpk: "$3.00", color: "text-emerald-600 dark:text-emerald-400" },
-                 { m: "Bridgestone R268", v: "135,000 km", c: "$420,000", cpk: "$3.11", color: "text-emerald-600 dark:text-emerald-400" },
-                 { m: "Goodyear KMAX", v: "120,000 km", c: "$395,000", cpk: "$3.29", color: "text-amber-600 dark:text-amber-500" },
-                  { m: "FateCargo SR-200", v: "105,000 km", c: "$360,000", cpk: "$3.40", color: "text-orange-600 dark:text-orange-500" },
-                 { m: "Pirelli Formula", v: "95,000 km", c: "$350,000", cpk: "$3.68", color: "text-red-600 dark:text-red-500" }
-               ].map((it, i) => (
-                  <div key={i} className="grid grid-cols-4 gap-4 items-center border-b dark:border-slate-800 pb-3">
-                    <div className="font-semibold text-slate-800 dark:text-slate-200">{it.m}</div>
-                    <div className="text-slate-600 dark:text-slate-400">{it.v}</div>
-                    <div className="text-slate-600 dark:text-slate-400">{it.c}</div>
-                    <div className={cn("text-right font-black", it.color)}>{it.cpk}</div>
-                  </div>
-               ))}
+            <div className="h-80 w-full mt-4 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+              <div className="text-center">
+                <BarChart3 className="h-10 w-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+                <p className="text-slate-500 font-medium">No hay suficientes datos de neumáticos<br/> para generar el gráfico de rentabilidad.</p>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -212,20 +181,11 @@ function DashboardNeumaticos() {
                <CardTitle className="text-sm">Alertas de Inspección</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-               {[
-                 { pat: "KBCX-45", pos: "Pos 4", txt: "Baja presión (90 PSI)", t: "Hace 2 hrs" },
-                 { pat: "LDPJ-99", pos: "Pos 8, 9", txt: "Surco crítico (3mm), programar retiro", t: "Ayer" },
-                 { pat: "FRTY-12", pos: "Pos 2", txt: "Desgaste irregular detectado", t: "Ayer" }
-               ].map((a, i) => (
-                  <div key={i} className="flex gap-3 p-3 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-xl">
-                    <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-bold text-red-700 dark:text-red-400">{a.pat} - {a.pos}</p>
-                      <p className="text-xs text-red-600 dark:text-red-300 mt-0.5 leading-snug">{a.txt}</p>
-                      <p className="text-[10px] text-red-400 dark:text-red-500 mt-1.5 font-medium">{a.t}</p>
-                    </div>
-                  </div>
-               ))}
+               {stats.alertasCriticas === 0 && (
+                 <div className="text-center py-6 text-emerald-600 dark:text-emerald-500 font-medium bg-emerald-50 dark:bg-emerald-900/10 rounded-xl border border-emerald-100 dark:border-emerald-900/30">
+                    Sin alertas críticas recientes
+                 </div>
+               )}
             </CardContent>
           </Card>
         </div>
@@ -358,19 +318,58 @@ function DashboardNeumaticos() {
 function InventarioNeumaticos() {
   const [selectedNeu, setSelectedNeu] = useState<any | null>(null);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [inventory, setInventory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { currentCompany } = useCompany();
 
-  const inventory = [
-    { id: "NEU-001", marca: "Michelin", modelo: "X Multi Z", medida: "295/80R22.5", estado: "BUENO", statusColor: "text-blue-700 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400", ubicacion: "MONTADO", vehiculo: "#101", pos: "Delantero Izq", profActual: 12, profNueva: 16, km: 45000, costo: 450000, instalacion: "01/01/2023" },
-    { id: "NEU-002", marca: "Michelin", modelo: "X Multi Z", medida: "295/80R22.5", estado: "BUENO", statusColor: "text-blue-700 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400", ubicacion: "MONTADO", vehiculo: "#101", pos: "Delantero Der", profActual: 11.5, profNueva: 16, km: 45000, costo: 450000, instalacion: "01/01/2023" },
-    { id: "NEU-003", marca: "Bridgestone", modelo: "M729", medida: "295/80R22.5", estado: "REGULAR", statusColor: "text-amber-700 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800", ubicacion: "MONTADO", vehiculo: "#101", pos: "Trasero Izq Ext", profActual: 6, profNueva: 18, km: 120000, costo: 380000, instalacion: "15/06/2022" },
-    { id: "NEU-004", marca: "Bridgestone", modelo: "M729", medida: "295/80R22.5", estado: "REGULAR", statusColor: "text-amber-700 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800", ubicacion: "MONTADO", vehiculo: "#101", pos: "Trasero Izq Int", profActual: 5.8, profNueva: 18, km: 120000, costo: 380000, instalacion: "15/06/2022" },
-    { id: "NEU-005", marca: "Goodyear", modelo: "Wrangler", medida: "265/65R17", estado: "NUEVO", statusColor: "text-emerald-700 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400", ubicacion: "MONTADO", vehiculo: "#102", pos: "Delantero Izq", profActual: 9, profNueva: 9, km: 2000, costo: 210000, instalacion: "10/05/2026" },
-    { id: "NEU-006", marca: "Goodyear", modelo: "Wrangler", medida: "265/65R17", estado: "NUEVO", statusColor: "text-emerald-700 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400", ubicacion: "MONTADO", vehiculo: "#102", pos: "Delantero Der", profActual: 9, profNueva: 9, km: 2000, costo: 210000, instalacion: "10/05/2026" },
-    { id: "NEU-007", marca: "Michelin", modelo: "X Multi D", medida: "295/80R22.5", estado: "CRITICO", statusColor: "text-red-700 bg-red-100 dark:bg-red-900/30 dark:text-red-400", ubicacion: "MONTADO", vehiculo: "#103", pos: "Trasero Der Ext", profActual: 2.5, profNueva: 18, km: 180000, costo: 480000, instalacion: "10/11/2021" },
-    { id: "NEU-008", marca: "Pirelli", modelo: "FG88", medida: "13R22.5", estado: "NUEVO", statusColor: "text-emerald-700 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400", ubicacion: "BODEGA", vehiculo: "-", pos: "", profActual: 20, profNueva: 20, km: 0, costo: 420000, instalacion: "-" },
-    { id: "NEU-009", marca: "Pirelli", modelo: "FG88", medida: "13R22.5", estado: "NUEVO", statusColor: "text-emerald-700 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400", ubicacion: "BODEGA", vehiculo: "-", pos: "", profActual: 20, profNueva: 20, km: 0, costo: 420000, instalacion: "-" },
-    { id: "NEU-010", marca: "Michelin", modelo: "X Multi Z", medida: "295/80R22.5", estado: "BAJA", statusColor: "text-slate-700 bg-slate-200 dark:bg-slate-800 dark:text-slate-400", ubicacion: "DESECHO", vehiculo: "-", pos: "", profActual: 1, profNueva: 16, km: 210000, costo: 450000, instalacion: "-" },
-  ];
+  useEffect(() => {
+    const fetchInventory = async () => {
+      if (!currentCompany) return;
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('neumatico')
+          .select('*')
+          .eq('empresa_id', currentCompany.id)
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+
+        const mappedData = (data || []).map(item => {
+          let statusColorStr = "text-slate-700 bg-slate-200";
+          const e = (item.estado || '').toUpperCase();
+          if (e === 'NUEVO') statusColorStr = "text-emerald-700 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400";
+          else if (e === 'BUENO') statusColorStr = "text-blue-700 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400";
+          else if (e === 'REGULAR') statusColorStr = "text-amber-700 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400";
+          else if (e === 'CRITICO') statusColorStr = "text-red-700 bg-red-100 dark:bg-red-900/30 dark:text-red-400";
+
+          return {
+            id: item.codigo_interno,
+            marca: item.marca || '-',
+            modelo: item.modelo || '-',
+            medida: item.medida || '-',
+            estado: e || 'NUEVO',
+            statusColor: statusColorStr,
+            ubicacion: (item.ubicacion || 'BODEGA').toUpperCase(),
+            vehiculo: item.patente_asignada || '-',
+            pos: item.posicion || '',
+            profActual: item.profundidad_actual || 0,
+            profNueva: item.profundidad_nueva || 18,
+            km: item.km_acumulados || 0,
+            costo: item.costo || 0,
+            instalacion: item.fecha_instalacion || '-'
+          };
+        });
+
+        setInventory(mappedData);
+      } catch (err) {
+        console.error("Error fetching neumaticos:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchInventory();
+  }, [currentCompany]);
 
   const getProgressBarColor = (actual: number, max: number) => {
     const ratio = actual / max;
@@ -650,6 +649,17 @@ function InventarioNeumaticos() {
 function FormularioInspeccion() {
   const [numPositions, setNumPositions] = useState(6); // Default 6 wheels
   const positions = Array.from({length: numPositions}, (_, i) => i + 1);
+  const [vehiculos, setVehiculos] = useState<any[]>([]);
+  const { currentCompany } = useCompany();
+
+  useEffect(() => {
+    const fetchVehicles = async () => {
+      if (!currentCompany) return;
+      const { data } = await supabase.from('vehiculo').select('id, patente, modelo').eq('empresa_id', currentCompany.id);
+      if (data) setVehiculos(data);
+    }
+    fetchVehicles();
+  }, [currentCompany]);
 
   return (
     <Card className="border shadow-lg">
@@ -666,9 +676,10 @@ function FormularioInspeccion() {
            <div>
              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Vehículo / Placa</label>
              <select className="w-full p-2 border rounded-md dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-slate-100 text-sm">
-               <option>Seleccione equipo</option>
-               <option>Camión KBCX-45</option>
-               <option>Semirremolque SR-88</option>
+               <option value="">Seleccione equipo</option>
+               {vehiculos.map(v => (
+                 <option key={v.id} value={v.id}>{v.patente} {v.modelo ? `- ${v.modelo}` : ''}</option>
+               ))}
              </select>
            </div>
            <div>
