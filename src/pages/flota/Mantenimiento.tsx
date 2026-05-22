@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -57,8 +58,44 @@ export default function PizarraMantenimiento() {
   const [dataFlota, setDataFlota] = useState<FilaPizarraMantenimiento[]>([]);
 
   useEffect(() => {
-    // Vaciar la pizarra de programación
-    setDataFlota([]);
+    const fetchVehiculos = async () => {
+      try {
+        const { data, error } = await supabase.from('vehiculo').select('*');
+        if (error) throw error;
+        if (data) {
+          const vehiculosDb = data.map(v => {
+            const detalles = v.detalles || {};
+            // Parse correct types
+            const kmsActuales = typeof v.kilometraje_actual === 'number' ? v.kilometraje_actual : parseFloat(String(v.kilometraje_actual).replace(/[^0-9.-]+/g, '')) || 0;
+            const kmUltMant = typeof detalles.km_ultima_mantencion === 'number' ? detalles.km_ultima_mantencion : parseFloat(String(detalles.km_ultima_mantencion).replace(/[^0-9.-]+/g, '')) || 0;
+            const kmInterv = typeof detalles.intervalo_km === 'number' ? detalles.intervalo_km : parseFloat(String(detalles.intervalo_km).replace(/[^0-9.-]+/g, '')) || 10000;
+            
+            const pautasSecuenciaStr = detalles.tipo_ultimo_mant || detalles.tipo_ult_pauta || '';
+
+            return {
+              id: v.id,
+              numeroInterno: v.numero_interno?.toString() || '',
+              patente: v.patente || '',
+              kilometrajeActual: kmsActuales,
+              fechaActualizacionKm: v.updated_at ? new Date(v.updated_at) : new Date(),
+              intervaloMantencionKm: kmInterv,
+              kmPromedioDia: detalles.kmPromedioDia || 0,
+              kmUltimaMantencion: kmUltMant,
+              fechaUltimaMantencion: detalles.fecha_ultima_mantencion ? new Date(detalles.fecha_ultima_mantencion) : null,
+              tipoUltimaPauta: pautasSecuenciaStr,
+              pautasSecuencia: [] // Default for now
+            };
+          });
+
+          const pizarraData = vehiculosDb.map(v => calcularDatosPizarra(v));
+          setDataFlota(pizarraData);
+        }
+      } catch (err) {
+        console.error('Error fetching vehiculos for Pizarra:', err);
+      }
+    };
+
+    fetchVehiculos();
   }, []);
 
   const [kpiModal, setKpiModal] = useState<string | null>(null);

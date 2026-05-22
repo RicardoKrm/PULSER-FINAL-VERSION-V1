@@ -1,6 +1,6 @@
 // 1. Datos de entrada (Lo que viene de tu Base de Datos)
 export interface VehiculoDB {
-    id: number;
+    id: string | number;
     numeroInterno: string;
     patente: string; // PPU
     kilometrajeActual: number;
@@ -16,7 +16,7 @@ export interface VehiculoDB {
 
 // 2. Estructura exacta de las 16 columnas de salida para la tabla
 export interface FilaPizarraMantenimiento {
-    id: number; // Added so we can uniquely identify
+    id: string | number; // Added so we can uniquely identify
     // Identificación
     numeroInterno: string;          // 1. N° Int.
     ppu: string;                    // 2. PPU
