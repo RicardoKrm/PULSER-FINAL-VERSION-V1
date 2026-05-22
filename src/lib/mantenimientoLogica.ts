@@ -86,36 +86,64 @@ export function calcularDatosPizarra(vehiculo: VehiculoDB): FilaPizarraMantenimi
         }
 
         // Revisar si estamos vencidos (si hay pautas pasadas mayores al último mantenimiento conocido)
-        // NOTA: Si kmUltimo es 0 o null, asumiremos que no está vencido hasta que no pase la primera
-        if (kmUltimo > 0 && pautasPasadas.length > 0) {
-            const pautasOmitidas = pautasPasadas.filter(p => p.iteracion_km > kmUltimo);
+        if (kmUltimo > 0) {
+            // "Ventana de búsqueda": buscamos hitos omitidos estrictamente mayores al km_ultimo
+            // Aplicamos una tolerancia de -2% del intervalo en caso de que kmUltimo haya sido ligeramente adelantado
+            const margenTolerancia = intervalo * 0.02;
+            const pautasOmitidasRaw = pautasPasadas.filter(p => p.iteracion_km > (kmUltimo + margenTolerancia));
             
-            if (pautasOmitidas.length > 0) {
-                // Hay pautas omitidas!
-                const primerPautaOmitida = pautasOmitidas[0];
-                const diferenciaVencida = kmActual - primerPautaOmitida.iteracion_km;
+            if (pautasOmitidasRaw.length > 0) {
+                // Filtro de Pautas Iniciales (Rodaje)
+                // Si el camión ya pasó su etapa inicial (ej. > 2 intervalos estándar), ignorar hitos "iniciales" perdidos
+                const isPastInitialPhase = kmActual > (intervalo * 1.5); 
                 
-                if (diferenciaVencida > 0) {
-                   kmVencido = diferenciaVencida;
-                   estatus = "VENCIDO";
-                   pautaVencidaStr = pautasOmitidas.map(p => p.nombre.split('-')[0].trim()).join(', ');
+                const pautasOmitidasFilt = pautasOmitidasRaw.filter(p => {
+                     if (!isPastInitialPhase) return true;
+                     const name = (p.nombre || '').toUpperCase();
+                     const isRodaje = name.startsWith('SI') || name.startsWith('R') || name.includes('INICIAL');
+                     return !isRodaje;
+                });
+
+                if (pautasOmitidasFilt.length > 0) {
+                    const primerPautaOmitida = pautasOmitidasFilt[0];
+                    kmVencido = kmActual - primerPautaOmitida.iteracion_km;
+                    estatus = "VENCIDO";
+                    
+                    // Deduplicar pautas y limpiarlas
+                    const pautasUnicas = Array.from(new Set(pautasOmitidasFilt.map(p => p.nombre.split('-')[0].trim())));
+                    pautaVencidaStr = pautasUnicas.join(', ');
+                } else {
+                     // Falsos positivos de rodaje ignorados, verificar estatus PROXIMO normalmente
+                     const kmsFaltantes = proximoHitoVencimiento - kmActual;
+                     if (kmsFaltantes > 0 && kmsFaltantes <= (intervalo * 0.25)) {
+                         estatus = "PROXIMO";
+                     }
                 }
             } else {
                 // No hay pautas omitidas, verificar estatus PROXIMO
                 const kmsFaltantes = proximoHitoVencimiento - kmActual;
-                // Si la diferencia a la próxima pauta es menor al 25% del intervalo
                 if (kmsFaltantes > 0 && kmsFaltantes <= (intervalo * 0.25)) {
                     estatus = "PROXIMO";
                 }
             }
         } else {
-             // Caso en que aún no ha tenido mantenciones pero ya superó pautas
-             const pautasOmitidas = vehiculo.pautasSecuencia.filter(p => p.iteracion_km <= kmActual);
-             if (pautasOmitidas.length > 0) {
-                 const primerPautaOmitida = pautasOmitidas[0];
+             // Caso en que aún no ha tenido mantenciones reportadas pero ya superó pautas
+             const isPastInitialPhase = kmActual > (intervalo * 1.5);
+             
+             const pautasOmitidasFilt = pautasPasadas.filter(p => {
+                  if (!isPastInitialPhase) return true;
+                  const name = (p.nombre || '').toUpperCase();
+                  const isRodaje = name.startsWith('SI') || name.startsWith('R') || name.includes('INICIAL');
+                  return !isRodaje;
+             });
+
+             if (pautasOmitidasFilt.length > 0) {
+                 const primerPautaOmitida = pautasOmitidasFilt[0];
                  kmVencido = kmActual - primerPautaOmitida.iteracion_km;
                  estatus = "VENCIDO";
-                 pautaVencidaStr = pautasOmitidas.map(p => p.nombre.split('-')[0].trim()).join(', ');
+                 
+                 const pautasUnicas = Array.from(new Set(pautasOmitidasFilt.map(p => p.nombre.split('-')[0].trim())));
+                 pautaVencidaStr = pautasUnicas.join(', ');
              } else {
                 const kmsFaltantes = proximoHitoVencimiento - kmActual;
                 if (kmsFaltantes > 0 && kmsFaltantes <= (intervalo * 0.25)) {
@@ -134,7 +162,7 @@ export function calcularDatosPizarra(vehiculo: VehiculoDB): FilaPizarraMantenimi
             if (diferenciaVencida > 0) {
                 kmVencido = diferenciaVencida;
                 estatus = "VENCIDO";
-                pautaVencidaStr = "Mant. Rutinario";
+                pautaVencidaStr = `Mant. de ${proximoHitoVencimiento.toLocaleString('es-CL')} km`;
             } else if (kmsFaltantes > 0 && kmsFaltantes <= (intervalo * 0.25)) {
                 estatus = "PROXIMO";
             }
