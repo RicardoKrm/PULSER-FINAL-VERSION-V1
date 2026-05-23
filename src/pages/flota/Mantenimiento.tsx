@@ -52,6 +52,12 @@ export default function PizarraMantenimiento() {
   const [soloProximosOVencidos, setSoloProximosOVencidos] = useState(false);
   const [modalVehiculoOpen, setModalVehiculoOpen] = useState(false);
 
+  // States for Actualizar KM
+  const [modalKMOpen, setModalKMOpen] = useState(false);
+  const [vehiculoSeleccionadoKM, setVehiculoSeleccionadoKM] = useState<FilaPizarraMantenimiento | null>(null);
+  const [nuevoKM, setNuevoKM] = useState('');
+  const [fechaRegistroKM, setFechaRegistroKM] = useState('');
+
   const [filtroProxMantDesde, setFiltroProxMantDesde] = useState('');
   const [filtroProxMantHasta, setFiltroProxMantHasta] = useState('');
   const [filtroUltMantDesde, setFiltroUltMantDesde] = useState('');
@@ -59,19 +65,18 @@ export default function PizarraMantenimiento() {
 
   const [dataFlota, setDataFlota] = useState<FilaPizarraMantenimiento[]>([]);
 
-  useEffect(() => {
-    const fetchVehiculos = async () => {
-      if (!currentCompany?.id) return;
-      try {
-        const { data: vehiculosData, error: vehiculosError } = await supabase.from('vehiculo').select('*').eq('empresa_id', currentCompany.id);
-        const { data: pautasData } = await supabase.from('mantenimiento_pauta').select('*, modelo:mantenimiento_modelo_vehiculo(nombre)').eq('empresa_id', currentCompany.id);
+  const fetchVehiculos = async () => {
+    if (!currentCompany?.id) return;
+    try {
+      const { data: vehiculosData, error: vehiculosError } = await supabase.from('vehiculo').select('*').eq('empresa_id', currentCompany.id);
+      const { data: pautasData } = await supabase.from('mantenimiento_pauta').select('*, modelo:mantenimiento_modelo_vehiculo(nombre)').eq('empresa_id', currentCompany.id);
 
-        if (vehiculosError) throw vehiculosError;
-        
-        console.log("FETCHED VEHICULOS DB:", vehiculosData);
-        if (vehiculosData) {
-          const vehiculosDb = vehiculosData.map(v => {
-            const detalles = v.detalles || {};
+      if (vehiculosError) throw vehiculosError;
+      
+      console.log("FETCHED VEHICULOS DB:", vehiculosData);
+      if (vehiculosData) {
+        const vehiculosDb = vehiculosData.map(v => {
+          const detalles = v.detalles || {};
             // Parse correct types
             const kmsActuales = typeof v.kilometraje_actual === 'number' ? v.kilometraje_actual : parseFloat(String(v.kilometraje_actual).replace(/[^0-9.-]+/g, '')) || 0;
             
@@ -167,13 +172,69 @@ export default function PizarraMantenimiento() {
           const pizarraData = vehiculosDb.map(v => calcularDatosPizarra(v));
           setDataFlota(pizarraData);
         }
-      } catch (err) {
-        console.error('Error fetching vehiculos for Pizarra:', err);
-      }
-    };
+    } catch (err) {
+      console.error('Error fetching vehiculos for Pizarra:', err);
+    }
+  };
 
+  useEffect(() => {
     fetchVehiculos();
   }, [currentCompany?.id]);
+
+  const handleGuardarKM = async () => {
+    if (!vehiculoSeleccionadoKM || !nuevoKM || !fechaRegistroKM) return;
+    
+    // get old values
+    // Remove dots or commas if user typed thousands separator, then parse int
+    const cleanNuevoKM = nuevoKM.replace(/\./g, '').replace(/,/g, '');
+    const newKmVal = parseInt(cleanNuevoKM, 10);
+    
+    if (isNaN(newKmVal)) {
+        return;
+    }
+
+    const oldKmVal = vehiculoSeleccionadoKM.kilometrajeActual || 0;
+    
+    // get dates
+    const newDate = new Date(fechaRegistroKM);
+    const oldDateStr = vehiculoSeleccionadoKM.fechaActualizacionKm;
+    const oldDate = oldDateStr instanceof Date ? oldDateStr : new Date(oldDateStr || new Date());
+    
+    // calc differences
+    const diffTime = Math.abs(newDate.getTime() - oldDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    let baseKmPromedio = vehiculoSeleccionadoKM.kmPromedioDia || 0;
+
+    if (diffDays > 0 && newKmVal > oldKmVal) {
+        const diffKm = newKmVal - oldKmVal;
+        baseKmPromedio = diffKm / diffDays;
+    }
+
+    try {
+        const { data, error: selectErr } = await supabase.from('vehiculo').select('detalles').eq('id', vehiculoSeleccionadoKM.id).single();
+        if (selectErr) throw selectErr;
+
+        const existingDetalles = data?.detalles || {};
+        if (baseKmPromedio > 0) {
+            existingDetalles.kmPromedioDia = baseKmPromedio;
+        }
+
+        const payload: any = {
+            kilometraje_actual: newKmVal,
+            updated_at: newDate.toISOString(),
+            detalles: existingDetalles
+        };
+
+        const { error } = await supabase.from('vehiculo').update(payload).eq('id', vehiculoSeleccionadoKM.id);
+        if (error) throw error;
+        
+        setModalKMOpen(false);
+        fetchVehiculos();
+    } catch (e) {
+        console.error('Error updating KM:', e);
+    }
+  };
 
   const [kpiModal, setKpiModal] = useState<string | null>(null);
 
@@ -338,7 +399,17 @@ export default function PizarraMantenimiento() {
                           >
                             <FileSpreadsheet className="w-4 h-4 mr-2 text-slate-500" /> Ficha Técnica
                           </button>
-                          <button className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center">
+                          <button 
+                            className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setVehiculoSeleccionadoKM(vehiculo);
+                              setNuevoKM(vehiculo.kilometrajeActual?.toString() || '');
+                              setFechaRegistroKM(new Date().toISOString().split('T')[0]);
+                              setModalKMOpen(true);
+                              setActionMenuOpen(null);
+                            }}
+                          >
                             <Edit3 className="w-4 h-4 mr-2" /> Actualizar KM
                           </button>
                           <button 
@@ -804,7 +875,17 @@ export default function PizarraMantenimiento() {
                           >
                             <FileSpreadsheet className="w-4 h-4 mr-2 text-slate-500" /> Ficha Técnica
                           </button>
-                          <button className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center">
+                          <button 
+                            className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setVehiculoSeleccionadoKM(vehiculo);
+                              setNuevoKM(vehiculo.kilometrajeActual?.toString() || '');
+                              setFechaRegistroKM(new Date().toISOString().split('T')[0]);
+                              setModalKMOpen(true);
+                              setActionMenuOpen(null);
+                            }}
+                          >
                             <Edit3 className="w-4 h-4 mr-2" /> Actualizar KM
                           </button>
                           <button 
@@ -997,6 +1078,49 @@ export default function PizarraMantenimiento() {
                 )}
               </div>
             </div>
+          </div>
+        </Modal>
+      )}
+      
+      {modalKMOpen && vehiculoSeleccionadoKM && (
+        <Modal 
+          isOpen={modalKMOpen} 
+          onClose={() => setModalKMOpen(false)} 
+          title={`Actualizar KM para N° ${vehiculoSeleccionadoKM.numeroInterno || vehiculoSeleccionadoKM.patente}`}
+          size="sm"
+        >
+          <div className="space-y-4">
+             <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Nuevo Kilometraje
+                </label>
+                <input
+                  type="text"
+                  className="w-full h-10 px-3 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                  placeholder="Ej: 276.167 o 276167"
+                  value={nuevoKM}
+                  onChange={(e) => setNuevoKM(e.target.value)}
+                />
+             </div>
+             <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Fecha del Registro
+                </label>
+                <input
+                  type="date"
+                  className="w-full h-10 px-3 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                  value={fechaRegistroKM}
+                  onChange={(e) => setFechaRegistroKM(e.target.value)}
+                />
+             </div>
+             <div className="flex justify-end gap-3 mt-6">
+                <Button variant="secondary" onClick={() => setModalKMOpen(false)}>
+                   Cancelar
+                </Button>
+                <Button onClick={handleGuardarKM}>
+                   Guardar
+                </Button>
+             </div>
           </div>
         </Modal>
       )}
