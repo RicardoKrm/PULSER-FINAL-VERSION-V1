@@ -164,24 +164,33 @@ export function calcularDatosPizarra(vehiculo: VehiculoDB): FilaPizarraMantenimi
     }
 
     // --- 3. PROYECCIÓN DE FECHA Y SEMÁFORO (Predicción con KM/Día) ---
-    if (kmProximo !== null && vehiculo.kmPromedioDia > 0) {
-        const kmsParaPauta = kmProximo - kmActual;
+    if (kmProximo !== null && kmProximo > 0) {
+        // Paso 2: Calcular KMs faltantes
+        const kmsFaltantes = kmProximo - kmActual;
         
-        if (kmsParaPauta > 0) {
-            // Calculamos días faltantes y los sumamos a la fecha de hoy
-            const diasFaltantes = kmsParaPauta / vehiculo.kmPromedioDia;
-            fechaProxima = new Date();
-            fechaProxima.setDate(hoy.getDate() + Math.round(diasFaltantes));
-
-            // Si faltan 10 días o menos, se enciende el semáforo rojo
-            if (diasFaltantes <= 10) {
+        // Paso 3: Promedio KM Diario con condición de seguridad
+        const kmPromDia = (vehiculo.kmPromedioDia && vehiculo.kmPromedioDia > 0) ? vehiculo.kmPromedioDia : 1;
+        
+        if (kmsFaltantes <= 0) {
+            // Paso 6: Caso Vencido
+            fechaProxima = new Date(hoy);
+            semaforo10Dias = true;
+        } else {
+            // Paso 4: Calcular días restantes
+            const diasRestantes = Math.round(kmsFaltantes / kmPromDia);
+            
+            // Paso 5: Proyectar la fecha exacta
+            fechaProxima = new Date(hoy);
+            fechaProxima.setDate(fechaProxima.getDate() + diasRestantes);
+            
+            // Paso 7: Semáforo 10 días
+            if (diasRestantes <= 10 && diasRestantes >= 0) {
                 semaforo10Dias = true;
             }
-        } else {
-            // Si ya se pasó (kms negativos), la fecha debió ser hoy o antes
-            fechaProxima = hoy;
-            semaforo10Dias = true;
         }
+    } else {
+        // Si no hay km_prox_mant
+        fechaProxima = null;
     }
 
     // --- 4. RETORNO DEL OBJETO FORMATEADO PARA LA TABLA ---
