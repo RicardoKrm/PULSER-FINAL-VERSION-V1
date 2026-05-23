@@ -43,7 +43,11 @@ export default function Vehiculos() {
     (v.patente || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (v.marca || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (v.modelo || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ).sort((a, b) => {
+    const valA = a.numero_interno || (a.detalles ? a.detalles.numero_interno : '');
+    const valB = b.numero_interno || (b.detalles ? b.detalles.numero_interno : '');
+    return String(valA).localeCompare(String(valB), undefined, { numeric: true });
+  });
 
   const handleToggleEstado = async (vehiculo: any) => {
     const isActivo = vehiculo.estado === 'Activo';

@@ -79,7 +79,14 @@ export default function GestionCombustible() {
         supabase.from('registro_combustible').select('*, vehiculo:vehiculo_id(patente, detalles)').eq('empresa_id', currentCompany.id).order('fecha', { ascending: false })
       ]);
       
-      if (vehiculoRes.data) setVehiculos(vehiculoRes.data);
+      if (vehiculoRes.data) {
+        const dataSorted = [...vehiculoRes.data].sort((a, b) => {
+          const valA = a.numero_interno || (a.detalles ? a.detalles.numero_interno : '');
+          const valB = b.numero_interno || (b.detalles ? b.detalles.numero_interno : '');
+          return String(valA).localeCompare(String(valB), undefined, { numeric: true });
+        });
+        setVehiculos(dataSorted);
+      }
       if (cargasRes.data) setCargasRegistradas(cargasRes.data.map((c: any) => ({
          ...c,
          vehiculoName: c.vehiculo ? (c.vehiculo.detalles?.numero_interno || c.vehiculo.patente) : c.patente,

@@ -170,6 +170,7 @@ export default function PizarraMantenimiento() {
           });
 
           const pizarraData = vehiculosDb.map(v => calcularDatosPizarra(v));
+          pizarraData.sort((a,b) => String(a.numeroInterno).localeCompare(String(b.numeroInterno), undefined, {numeric: true}));
           setDataFlota(pizarraData);
         }
     } catch (err) {
@@ -202,13 +203,14 @@ export default function PizarraMantenimiento() {
     
     // calc differences
     const diffTime = Math.abs(newDate.getTime() - oldDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    // Evitar que diffDays sea 0 para que siempre actualice el promedio si el KM cambió el mismo día
+    const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
     
     let baseKmPromedio = vehiculoSeleccionadoKM.kmPromedioDia || 0;
 
-    if (diffDays > 0 && newKmVal > oldKmVal) {
+    if (newKmVal > oldKmVal) {
         const diffKm = newKmVal - oldKmVal;
-        baseKmPromedio = diffKm / diffDays;
+        baseKmPromedio = Math.round(diffKm / diffDays);
     }
 
     try {
@@ -227,12 +229,16 @@ export default function PizarraMantenimiento() {
         };
 
         const { error } = await supabase.from('vehiculo').update(payload).eq('id', vehiculoSeleccionadoKM.id);
-        if (error) throw error;
+        if (error) {
+            console.error("DB Update Error Payload:", payload);
+            throw error;
+        }
         
         setModalKMOpen(false);
         fetchVehiculos();
-    } catch (e) {
+    } catch (e: any) {
         console.error('Error updating KM:', e);
+        alert("Error al actualizar KM en la BD: " + (e.message || JSON.stringify(e)));
     }
   };
 

@@ -169,7 +169,7 @@ export function calcularDatosPizarra(vehiculo: VehiculoDB): FilaPizarraMantenimi
         const kmsFaltantes = kmProximo - kmActual;
         
         // Paso 3: Promedio KM Diario con condición de seguridad
-        const kmPromDia = (vehiculo.kmPromedioDia && vehiculo.kmPromedioDia > 0) ? vehiculo.kmPromedioDia : 1;
+        const kmPromDia = (vehiculo.kmPromedioDia && vehiculo.kmPromedioDia > 0) ? vehiculo.kmPromedioDia : 25;
         
         if (kmsFaltantes <= 0) {
             // Paso 6: Caso Vencido
