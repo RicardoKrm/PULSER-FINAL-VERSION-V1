@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import { useCompany } from '../contexts/CompanyContext';
+import Swal from 'sweetalert2';
 import { ReservaTurismo, Conductor, Vehiculo, OrdenDeTrabajo, PautaMantenimiento, TareaEstandar, TipoFalla, KitRepuesto, Usuario, Proveedor, Collaborator, Repuesto } from '../types';
 
 interface AppContextType {
@@ -277,11 +278,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const { error } = await supabase.from('orden_de_trabajo').insert([dbPayload]);
       if (error) {
         console.error("Error inserting work order to Supabase:", error);
+        setOrdenesTrabajo(prev => prev.filter(o => o.id !== finalId));
+        Swal.fire({
+          title: "Error al Guardar OT",
+          text: `La base de datos rechazó la OT: ${error.message}. Detalle: ${error.details || ''}`,
+          icon: "error",
+          confirmButtonColor: "#4f46e5"
+        });
       } else {
         console.log("Work order successfully persistent in Supabase database!");
+        Swal.fire({
+          title: "¡Guardado Exitoso!",
+          text: `La orden de trabajo ${finalOT.folio} se ha guardado correctamente en la base de datos.`,
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false
+        });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Exception during database insert:", err);
+      setOrdenesTrabajo(prev => prev.filter(o => o.id !== finalId));
+      Swal.fire({
+        title: "Error Inesperado",
+        text: `Ocurrió un error al intentar guardar la OT: ${err.message || err}`,
+        icon: "error",
+        confirmButtonColor: "#4f46e5"
+      });
     }
   };
 
@@ -298,6 +320,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const actualizarOrdenTrabajo = async (otActualizada: OrdenDeTrabajo) => {
+    const originalOts = [...ordenesTrabajo];
     setOrdenesTrabajo(prev => prev.map(ot => ot.id === otActualizada.id ? otActualizada : ot));
     try {
       const dbPayload = {
@@ -338,9 +361,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const { error } = await supabase.from('orden_de_trabajo').update(dbPayload).eq('id', otActualizada.id);
       if (error) {
         console.error("Error updating work order in database:", error);
+        setOrdenesTrabajo(originalOts);
+        Swal.fire({
+          title: "Error al Actualizar OT",
+          text: `La base de datos rechazó los cambios: ${error.message}`,
+          icon: "error",
+          confirmButtonColor: "#4f46e5"
+        });
+      } else {
+        console.log("Work order successfully updated in Supabase database!");
+        Swal.fire({
+          title: "¡Actualización Exitosa!",
+          text: `La orden de trabajo ${otActualizada.folio} se ha actualizado correctamente.`,
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false
+        });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setOrdenesTrabajo(originalOts);
+      Swal.fire({
+        title: "Error Inesperado",
+        text: `Ocurrió un error al intentar actualizar la OT: ${err.message || err}`,
+        icon: "error",
+        confirmButtonColor: "#4f46e5"
+      });
     }
   };
 
