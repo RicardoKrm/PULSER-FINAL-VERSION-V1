@@ -169,7 +169,6 @@ export default function Programacion() {
 
           let exactHour = p.hora || 10;
           let exactMinute = 0;
-          let timeStr = `${exactHour}:00`;
 
           if (p.realTimeStr) {
               const d = new Date(p.realTimeStr);
@@ -177,8 +176,11 @@ export default function Programacion() {
               // We'll use local hours for rendering.
               exactHour = d.getHours();
               exactMinute = d.getMinutes();
-              timeStr = `${exactHour.toString().padStart(2, '0')}:${exactMinute.toString().padStart(2, '0')}`;
           }
+
+          const ampm = exactHour >= 12 ? 'PM' : 'AM';
+          const displayHour = exactHour % 12 || 12;
+          let timeStr = `${displayHour}:${exactMinute.toString().padStart(2, '0')} ${ampm}`;
 
           return {
           id: p.id,
@@ -295,7 +297,7 @@ export default function Programacion() {
           conductor_id: progData.conductor_id,
           vehiculo_id: progData.vehiculo_id,
           notas: progData.notas,
-          timeStr: hour !== undefined ? `${hour}:00` : '10:00 AM',
+          timeStr: hour !== undefined ? `${hour % 12 || 12}:00 ${hour >= 12 ? 'PM' : 'AM'}` : '10:00 AM',
           colorClass: 'bg-indigo-50 border-indigo-200 text-indigo-800 dark:bg-indigo-500/10 dark:border-indigo-500/20 dark:text-indigo-300'
         }]);
       } catch (err) {
@@ -319,7 +321,7 @@ export default function Programacion() {
 
          setScheduled(prev => prev.map(s => 
            s.id === item.id 
-             ? { ...s, dateStr, hour: newHour, timeStr: `${newHour}:00` } 
+             ? { ...s, dateStr, hour: newHour, timeStr: `${newHour % 12 || 12}:00 ${newHour >= 12 ? 'PM' : 'AM'}` } 
              : s
          ));
       } catch (err) {
@@ -745,7 +747,9 @@ export default function Programacion() {
                   <div className="w-16 shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col sticky left-0 z-20">
                     {HOURS.map((hour) => (
                       <div key={hour} className="h-20 border-b border-slate-200 dark:border-slate-800 relative bg-white dark:bg-slate-900">
-                         <span className="absolute -top-2.5 right-2 text-[10px] text-slate-500 font-medium">{hour}:00</span>
+                         <span className="absolute -top-2.5 right-2 text-[10px] text-slate-500 font-medium">
+                           {hour === 0 ? '12:00 AM' : hour < 12 ? `${hour}:00 AM` : hour === 12 ? '12:00 PM' : `${hour - 12}:00 PM`}
+                         </span>
                       </div>
                     ))}
                   </div>
@@ -775,7 +779,7 @@ export default function Programacion() {
                                 <div 
                                   key={block.id}
                                   draggable={block.estadoRaw !== 'Realizado'}
-                                  onClick={() => setEditingBlock({ ...block, newConductor: block.conductor_id || '', newVehiculo: block.vehiculo_id || '', newTime: block.timeStr })}
+                                  onClick={() => setEditingBlock({ ...block, newConductor: block.conductor_id || '', newVehiculo: block.vehiculo_id || '', newTime: `${block.hour.toString().padStart(2, '0')}:${block.minute.toString().padStart(2, '0')}` })}
                                   onDragStart={(e) => handleDragStart(e, block, 'scheduled')}
                                   onMouseEnter={(e) => handleMouseEnterTooltip(e, block)}
                                   onMouseLeave={handleMouseLeaveTooltip}
@@ -835,7 +839,7 @@ export default function Programacion() {
                                 <div 
                                   key={block.id}
                                   draggable={block.estadoRaw !== 'Realizado'}
-                                  onClick={() => setEditingBlock({ ...block, newConductor: block.conductor_id || '', newVehiculo: block.vehiculo_id || '', newTime: block.timeStr })}
+                                  onClick={() => setEditingBlock({ ...block, newConductor: block.conductor_id || '', newVehiculo: block.vehiculo_id || '', newTime: `${block.hour.toString().padStart(2, '0')}:${block.minute.toString().padStart(2, '0')}` })}
                                   onDragStart={(e) => handleDragStart(e, block, 'scheduled')}
                                   onMouseEnter={(e) => handleMouseEnterTooltip(e, block)}
                                   onMouseLeave={handleMouseLeaveTooltip}
@@ -941,7 +945,7 @@ export default function Programacion() {
                                     !isCurrentMonth && "opacity-60"
                                   )}
                                 >
-                                  <div className="truncate"><span className="font-semibold opacity-90 mr-1">• {block.timeStr.split(' ')[0]}</span> {block.tipo}</div>
+                                  <div className="truncate"><span className="font-semibold opacity-90 mr-1">• {block.timeStr}</span> {block.tipo}</div>
                                   <span className="text-[8px] uppercase tracking-wider opacity-80 shrink-0">{block.estado}</span>
                                 </div>
                             ))}
@@ -1005,7 +1009,7 @@ export default function Programacion() {
                                     {block.timeStr} - {(() => {
                                       const endHour = block.hour + block.duration + Math.floor((block.minute + 0) / 60);
                                       const endMin = (block.minute + 0) % 60;
-                                      return `${endHour}:${endMin.toString().padStart(2, '0')}`;
+                                      return `${endHour % 12 || 12}:${endMin.toString().padStart(2, '0')} ${endHour >= 12 ? 'PM' : 'AM'}`;
                                     })()}
                                  </td>
                                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
