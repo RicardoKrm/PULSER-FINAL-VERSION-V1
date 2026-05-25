@@ -19,7 +19,8 @@ import {
   Warehouse,
   CalendarCheck,
   FileSignature,
-  Box
+  Box,
+  PauseCircle
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { exportToExcel } from '../../lib/excelExport';
@@ -143,6 +144,16 @@ const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any
         nombre: r.descripcion
       };
     } 
+  },
+  pausas: { 
+    table: 'tipo_pausa', 
+    mapConfig: (r: any) => ({
+      nombre: r['Nombre del Motivo'] || r.nombre_del_motivo || r.nombre || r.NombreDelMotivo,
+      descripcion: r.Descripción || r.descripcion || '',
+      color: 'bg-slate-500',
+      impacto: 'Medio',
+      estado: 'Activo'
+    }) 
   },
   proveedores: { 
     table: 'proveedor', 
@@ -276,6 +287,15 @@ const MODULES: UploadModule[] = [
     icon: AlertCircle,
     template: [
       { descripcion: 'MOTOR AGRIPADO', modelo_afectado: 'O 500 RS E III', criticidad: 'ALTA', causa: 'MECÁNICA', tfs_predeterminado_min: 20.00 }
+    ]
+  },
+  {
+    id: 'pausas',
+    title: 'Motivos de Pausa',
+    description: 'Carga de motivos para pausar ordenes de trabajo.',
+    icon: PauseCircle,
+    template: [
+      { 'Nombre del Motivo': 'A la espera de Especialista Externo', 'Descripción': 'Esperando personal externo.' }
     ]
   },
   {

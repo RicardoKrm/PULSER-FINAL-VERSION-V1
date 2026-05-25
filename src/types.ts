@@ -83,6 +83,8 @@ export interface Conductor {
 export interface Vehiculo {
   id: string;
   patente: string;
+  modelo?: string;
+  marca?: string;
 }
 
 export interface Tarea {

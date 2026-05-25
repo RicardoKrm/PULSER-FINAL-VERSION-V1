@@ -39,7 +39,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [reservasTurismo] = useState<ReservaTurismo[]>([]);
   const [ordenesTrabajo, setOrdenesTrabajo] = useState<OrdenDeTrabajo[]>([]);
   const [conductores] = useState<Conductor[]>([]);
-  const [vehiculos] = useState<Vehiculo[]>([]);
+  const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
   const [pautas, setPautas] = useState<PautaMantenimiento[]>([]);
   const [tareasEstandar, setTareasEstandar] = useState<TareaEstandar[]>([]);
   const [tiposFalla, setTiposFalla] = useState<TipoFalla[]>([]);
@@ -102,16 +102,57 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setTiposFalla([]);
       }
 
+      // Fetch Vehiculos
+      const { data: vehiculosData } = await supabase.from('vehiculo').select('*');
+      if (vehiculosData) {
+        setVehiculos(vehiculosData.map(v => ({
+          id: v.id,
+          patente: v.patente || v.numero_interno || 'Sin Patente',
+          modelo: v.modelo || '',
+          marca: v.marca || ''
+        })));
+      }
+
       // Fetch Pautas
-      const { data: pautasData } = await supabase.from('pauta_mantenimiento').select('*').eq('empresa_id', activeCompanyId);
+      const { data: pautasData } = await supabase.from('mantenimiento_pauta').select('*').eq('empresa_id', activeCompanyId);
       if (pautasData) {
-        setPautas(pautasData.map(p => ({ id: p.id, nombre: p.nombre, kmRecomendado: p.km_aplicacion } as any)));
+        setPautas(pautasData.map(p => ({ id: p.id, nombre: p.nombre, kmRecomendado: p.kilometraje_inicial || 0 } as any)));
       }
 
       // Fetch Repuestos
       const { data: repData } = await supabase.from('repuesto').select('*');
       if (repData) {
         setRepuestos(repData.map(r => ({ ...r, stock_actual: Number(r.stock_actual), costo_unitario: Number(r.costo_unitario) })));
+      }
+
+      // Fetch Kits
+      const { data: kitsData } = await supabase.from('kit_repuesto').select(`
+        id, nombre, descripcion,
+        kit_repuesto_detalle ( repuesto, cantidad )
+      `);
+      if (kitsData) {
+        setKitsRepuesto(kitsData.map(k => ({
+          id: k.id,
+          nombre: k.nombre,
+          descripcion: k.descripcion,
+          detalles: k.kit_repuesto_detalle || []
+        })));
+      }
+
+      // Fetch Personal
+      const { data: colabData } = await supabase.from('colaborador').select('*').eq('empresa_id', activeCompanyId);
+      if (colabData) {
+        setPersonal(colabData.map(c => ({
+          ...c,
+          name: c.nombre_completo || c.name || '',
+          email: c.email || '',
+          phone: c.telefono || '',
+          roleBadgeText: c.cargo || c.roleBadgeText || '',
+          // Add default avatar/stats for UI compatibility
+          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(c.nombre_completo || c.name || '')}&background=random`,
+          performanceScore: c.performanceScore || 0,
+          pendingTasks: c.pendingTasks || 0,
+        })));
       }
 
     };

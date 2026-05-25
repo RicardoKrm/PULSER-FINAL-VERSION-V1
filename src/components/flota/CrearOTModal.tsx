@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { useAppContext } from '../../context/AppContext';
@@ -13,8 +13,13 @@ interface CrearOTModalProps {
 
 export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, vehiculoPreseleccionadoId }) => {
   const { crearOrdenTrabajo, vehiculos, tiposFalla, pautas, kitsRepuesto, personal } = useAppContext();
-  const mecanicos = personal.filter(u => u.isMecanico || u.roleBadgeText === 'Mecánico');
+  const excludedRoles = ['super administrador', 'súper administrador', 'super admin', 'súper admin', 'administrador', 'gerente', 'administrativo'];
   
+  const personalOperativoList = personal.filter(u => {
+    const roleLower = (u.roleBadgeText || u.rol?.nombre || '').toLowerCase();
+    return !excludedRoles.some(r => roleLower.includes(r));
+  });
+
   // State for all fields
   const [formData, setFormData] = useState<Partial<OrdenDeTrabajo>>({
     vehiculoId: vehiculoPreseleccionadoId || '',
@@ -23,6 +28,18 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
     kilometrajeApertura: 0,
     fechaCreacion: new Date().toISOString(),
   });
+
+  const vehiculoSeleccionado = vehiculos.find(v => v.id === formData.vehiculoId);
+  
+  const filteredTiposFalla = useMemo(() => {
+    if (!vehiculoSeleccionado?.modelo) return tiposFalla;
+    return tiposFalla.filter(tf => {
+      const modeloFalla = (tf.modelo_afectado || '').toLowerCase();
+      // si no tiene modelo_afectado o es "general", lo mostramos. Si tiene, filtramos por modelo.
+      if (!modeloFalla || modeloFalla === 'general' || modeloFalla === 'todos' || modeloFalla === '') return true;
+      return vehiculoSeleccionado.modelo?.toLowerCase().includes(modeloFalla) || modeloFalla.includes(vehiculoSeleccionado.modelo?.toLowerCase() || '');
+    });
+  }, [tiposFalla, vehiculoSeleccionado]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -116,7 +133,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
               <label className="block text-sm font-medium">Vehículo</label>
               <select name="vehiculoId" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={formData.vehiculoId} onChange={handleChange} required>
                 <option value="">---------</option>
-                {vehiculos.map(v => <option key={v.id} value={v.id}>{v.patente}</option>)}
+                {vehiculos.map(v => <option key={v.id} value={v.id}>{v.patente}{v.modelo ? ` - ${v.modelo}` : ''}</option>)}
               </select>
             </div>
             <div>
@@ -172,7 +189,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
                   <label className="block text-sm font-medium">Tipo de Falla</label>
                   <select name="tipoFalla" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange}>
                       <option value="">---------</option>
-                      {tiposFalla.map(tf => <option key={tf.id} value={tf.nombre}>{tf.nombre}</option>)}
+                      {filteredTiposFalla.map(tf => <option key={tf.id} value={tf.nombre}>{tf.nombre}</option>)}
                   </select>
                 </div>
                 <div>
@@ -214,7 +231,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
               <label className="block text-sm font-medium">Personal Operativo</label>
               <select name="personalOperativo" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} required>
                   <option value="">---------</option>
-                  {mecanicos.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                  {personalOperativoList.map(m => <option key={m.id} value={m.name}>{m.name} ({m.roleBadgeText || m.rol?.nombre})</option>)}
               </select>
             </div>
             <div>
