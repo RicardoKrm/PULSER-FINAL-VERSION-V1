@@ -241,7 +241,7 @@ export default function CrearServicio() {
         subtipo: newSubtipo,
         origen: newOrigen,
         destino: newDestino,
-        fecha_servicio: newFecha || new Date().toISOString(),
+        fecha_servicio: newFecha ? new Date(newFecha).toISOString() : new Date().toISOString(),
         conductor_id: safeUUID(newConductor),
         vehiculo_id: safeUUID(newUnidad),
         estado: newConductor && newUnidad ? 'Programado' : 'Borrador',

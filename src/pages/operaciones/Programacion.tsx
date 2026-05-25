@@ -276,7 +276,8 @@ export default function Programacion() {
         if (progErr) throw progErr;
 
         // Modificamos el estado del servicio original a Confirmado y guardamos la fecha/hora nueva
-        const newFechaStr = `${dateStr}T${(hour !== undefined ? hour : 10).toString().padStart(2, '0')}:00:00.000Z`;
+        const localD = new Date(`${dateStr}T${(hour !== undefined ? hour : 10).toString().padStart(2, '0')}:00`);
+        const newFechaStr = localD.toISOString();
         await supabase.from('operacion_servicio').update({ estado: 'Confirmado', fecha_servicio: newFechaStr }).eq('id', item.id);
 
         setPendings(prev => prev.filter(p => p.id !== item.id));
@@ -311,7 +312,8 @@ export default function Programacion() {
 
          // Sincronizar fecha hacia atrás si tiene notas vinculadas al servicio.
          if (item.notas && item.notas.length > 20) {
-           const newFechaStr = `${dateStr}T${newHour.toString().padStart(2, '0')}:00:00.000Z`;
+           const localD = new Date(`${dateStr}T${newHour.toString().padStart(2, '0')}:00`);
+           const newFechaStr = localD.toISOString();
            await supabase.from('operacion_servicio').update({ fecha_servicio: newFechaStr }).eq('id', item.notas);
          }
 
@@ -853,7 +855,13 @@ export default function Programacion() {
                                     <div className="flex items-center justify-between w-full">
                                        <div className="flex items-center gap-1 opacity-80 text-[10px] font-medium">
                                          <Clock className="w-3 h-3 text-current" />
-                                         <span>{block.hour}:00 - {block.hour + block.duration}:00</span>
+                                         <span>
+                                            {block.timeStr} - {(() => {
+                                              const endHour = block.hour + block.duration + Math.floor((block.minute + 0) / 60);
+                                              const endMin = (block.minute + 0) % 60;
+                                              return `${endHour}:${endMin.toString().padStart(2, '0')}`;
+                                            })()}
+                                          </span>
                                        </div>
                                        <span className="font-bold text-[10px] tracking-wider opacity-80">{block.vehiculoPatente ? `🚐 ${block.vehiculoPatente}` : '🚐 Sin Vehículo'}</span>
                                     </div>
@@ -993,7 +1001,13 @@ export default function Programacion() {
                                <tr key={`tbl-${block.id}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
                                  <td className="px-4 py-3 font-medium text-blue-600 dark:text-blue-400">SRV-{block.id.replace('s','')}{(block.id.charCodeAt(block.id.length-1)*7).toString().padStart(3,'0')}</td>
                                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{block.dateStr}</td>
-                                 <td className="px-4 py-3 text-slate-700 dark:text-slate-300 font-mono text-xs">{block.timeStr} - {block.hour + block.duration}:00</td>
+                                 <td className="px-4 py-3 text-slate-700 dark:text-slate-300 font-mono text-xs">
+                                    {block.timeStr} - {(() => {
+                                      const endHour = block.hour + block.duration + Math.floor((block.minute + 0) / 60);
+                                      const endMin = (block.minute + 0) % 60;
+                                      return `${endHour}:${endMin.toString().padStart(2, '0')}`;
+                                    })()}
+                                 </td>
                                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
                                    <span className={`px-2 py-1 rounded text-xs font-semibold ${block.colorClass}`}>
                                       {block.tipo}
