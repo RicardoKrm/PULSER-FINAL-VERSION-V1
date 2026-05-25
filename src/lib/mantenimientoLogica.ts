@@ -194,12 +194,20 @@ export function calcularDatosPizarra(vehiculo: VehiculoDB): FilaPizarraMantenimi
     }
 
     // --- 4. RETORNO DEL OBJETO FORMATEADO PARA LA TABLA ---
+    const formatearDiaMesAno = (d: Date | null) => {
+        if (!d) return null;
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${day}-${month}-${year}`;
+    };
+
     return {
         id: vehiculo.id,
         numeroInterno: vehiculo.numeroInterno,
         ppu: vehiculo.patente,
         kmUltimoMantencion: kmUltimo,
-        fechaUltimoMantencion: vehiculo.fechaUltimaMantencion ? vehiculo.fechaUltimaMantencion.toISOString().split('T')[0] : "—",
+        fechaUltimoMantencion: vehiculo.fechaUltimaMantencion ? formatearDiaMesAno(vehiculo.fechaUltimaMantencion) || "—" : "—",
         tipoUltimoMantencion: vehiculo.tipoUltimaPauta || "N/A",
         
         cumplimiento: cumplimiento,
@@ -208,12 +216,12 @@ export function calcularDatosPizarra(vehiculo: VehiculoDB): FilaPizarraMantenimi
         pautaVencida: pautaVencidaStr,
         
         kmActual: kmActual,
-        fechaKmActual: vehiculo.fechaActualizacionKm.toISOString().split('T')[0],
+        fechaKmActual: formatearDiaMesAno(vehiculo.fechaActualizacionKm) as string,
         
         kmProximoMantencion: kmProximo,
         tipoProximoMantencion: tipoProximoMantencion,
         semaforoPeligro10Dias: semaforo10Dias,
-        fechaProximaMantencion: fechaProxima ? fechaProxima.toISOString().split('T')[0] : null
+        fechaProximaMantencion: formatearDiaMesAno(fechaProxima)
     };
 }
 

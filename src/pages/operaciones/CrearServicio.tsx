@@ -262,25 +262,46 @@ export default function CrearServicio() {
 
       if (saveError) throw saveError;
 
-      // Auto-programar si es nuevo
-      if (insertedServicioId && !editingServicio) {
-        const progDateStr = newFecha ? newFecha.split('T')[0] : new Date().toISOString().split('T')[0];
-        const { error: progSaveErr } = await supabase.from('operacion_programacion').insert([{
-          empresa_id: saveCompanyId,
-          tipo: newTipoCarga || 'Interprovincial',
-          origen: newOrigen,
-          destino: newDestino,
-          fecha: progDateStr,
-          hora: newFecha && newFecha.includes('T') ? parseInt(newFecha.split('T')[1].split(':')[0]) : 10,
-          duracion: 2,
-          conductor_id: safeUUID(newConductor),
-          vehiculo_id: safeUUID(newUnidad),
-          estado: safeUUID(newConductor) ? 'Asignado' : 'Pendiende',
-          notas: insertedServicioId
-        }]);
-        if (progSaveErr) console.error("Error inserting prog", progSaveErr);
-        // Y lo marcamos como confirmado
-        await supabase.from('operacion_servicio').update({ estado: 'Confirmado' }).eq('id', insertedServicioId);
+      const targetServicioId = editingServicio ? editingServicio.id : insertedServicioId;
+      
+      if (targetServicioId) {
+        const hasTimeAndDriver = safeUUID(newConductor) && newFecha && newFecha.includes('T');
+        
+        const { data: existingProg } = await supabase.from('operacion_programacion').select('id').eq('notas', targetServicioId).maybeSingle();
+
+        if (hasTimeAndDriver) {
+          const progDateStr = newFecha.split('T')[0];
+          const hora = parseInt(newFecha.split('T')[1].split(':')[0]);
+          
+          const progData = {
+            empresa_id: finalCompanyId,
+            tipo: newTipoCarga || 'Interprovincial',
+            origen: newOrigen,
+            destino: newDestino,
+            fecha: progDateStr,
+            hora: hora,
+            duracion: 2,
+            conductor_id: safeUUID(newConductor),
+            vehiculo_id: safeUUID(newUnidad),
+            estado: 'Asignado',
+            notas: targetServicioId
+          };
+
+          if (existingProg) {
+             const { error: progSaveErr } = await supabase.from('operacion_programacion').update(progData).eq('id', existingProg.id);
+             if (progSaveErr) console.error("Error updating prog", progSaveErr);
+          } else {
+             const { error: progSaveErr } = await supabase.from('operacion_programacion').insert([progData]);
+             if (progSaveErr) console.error("Error inserting prog", progSaveErr);
+          }
+          
+          await supabase.from('operacion_servicio').update({ estado: 'Confirmado' }).eq('id', targetServicioId);
+        } else {
+          // If it lacks driver/time but has an existing block on the board, delete it so it surfaces to Pendientes.
+          if (existingProg) {
+             await supabase.from('operacion_programacion').delete().eq('id', existingProg.id);
+          }
+        }
       }
 
       clearFormCache();
