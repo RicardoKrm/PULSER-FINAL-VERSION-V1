@@ -132,7 +132,14 @@ const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any
   },
   fallas: { 
     table: 'tipo_falla', 
-    mapConfig: (r: any) => ({ codigo_falla: r.CodigoFalla, descripcion: r.Descripcion, sistema_afectado: r.SistemaAfectado, criticidad: r.Criticidad }) 
+    mapConfig: (r: any) => ({
+      descripcion: r.descripcion,
+      modelo_afectado: r.modelo_afectado,
+      criticidad: r.criticidad,
+      causa: r.causa,
+      tfs_predeterminado_horas: r.tfs_predeterminado_n ? parseFloat(r.tfs_predeterminado_n.toString().replace(',', '.')) : undefined,
+      nombre: r.descripcion
+    }) 
   },
   proveedores: { 
     table: 'proveedor', 
@@ -265,7 +272,7 @@ const MODULES: UploadModule[] = [
     description: 'Carga del catálogo de fallas comunes, sistemas afectados y criticidad.',
     icon: AlertCircle,
     template: [
-      { CodigoFalla: 'F-101', Descripcion: 'Fuga de líquido de frenos', SistemaAfectado: 'Frenos', Criticidad: 'Alta' }
+      { descripcion: 'MOTOR AGRIPADO', modelo_afectado: 'O 500 RS E III', criticidad: 'ALTA', causa: 'MECÁNICA', tfs_predeterminado_n: 20.00 }
     ]
   },
   {

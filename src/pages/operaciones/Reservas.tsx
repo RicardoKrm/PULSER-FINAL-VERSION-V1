@@ -60,6 +60,7 @@ export default function ReservasTurismo() {
         tipoVehiculo: dbR.detalles?.tipoVehiculo || 'SUV',
         fecha: dbR.fecha_reserva ? new Date(dbR.fecha_reserva).toISOString().split('T')[0] : '',
         horaInicio: dbR.detalles?.horaInicio || '',
+        horaTermino: dbR.detalles?.horaTermino || '',
         conductorId: dbR.conductor_id || '',
         vehiculoId: dbR.vehiculo_id || '',
         finanzas: dbR.detalles?.finanzas || {

@@ -114,8 +114,12 @@ ADD COLUMN IF NOT EXISTS costo_base_mano_obra NUMERIC(12,2);
 -- Tipo de Falla
 ALTER TABLE public.tipo_falla
 ADD COLUMN IF NOT EXISTS codigo_falla TEXT UNIQUE,
-ADD COLUMN IF NOT EXISTS sistema_afectado TEXT,
-ADD COLUMN IF NOT EXISTS criticidad TEXT;
+ADD COLUMN IF NOT EXISTS descripcion TEXT,
+ADD COLUMN IF NOT EXISTS modelo_afectado TEXT,
+ADD COLUMN IF NOT EXISTS criticidad TEXT,
+ADD COLUMN IF NOT EXISTS causa TEXT,
+ADD COLUMN IF NOT EXISTS tfs_predeterminado_horas NUMERIC(10,2),
+ADD COLUMN IF NOT EXISTS empresa_id UUID REFERENCES public.empresa(id) ON DELETE CASCADE;
 
 -- Proveedor
 ALTER TABLE public.proveedor

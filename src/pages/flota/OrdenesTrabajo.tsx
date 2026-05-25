@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -9,6 +10,8 @@ import { CrearOTModal } from '../../components/flota/CrearOTModal';
 
 export default function GestionOrdenesTrabajo() {
   const { ordenesTrabajo, vehiculos, eliminarOrdenTrabajo } = useAppContext();
+  const { profile } = useAuth();
+  const isMecanico = profile?.rol?.nombre === 'Mecánico' || profile?.rol?.nombre === 'Mecanico';
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -19,6 +22,9 @@ export default function GestionOrdenesTrabajo() {
   const [filtroHasta, setFiltroHasta] = useState('');
 
   const otsFiltradas = ordenesTrabajo.filter(ot => {
+    // Seguridad de vistas (Roles)
+    if (isMecanico && ot.responsable_id !== profile?.id) return false;
+
     const vehiculo = vehiculos.find(v => v.id === ot.vehiculoId);
     const matchVehiculo = filtroVehiculo === 'Todos' || (vehiculo && vehiculo.patente === filtroVehiculo);
     const matchTipo = filtroTipo === 'Todos' || ot.tipo === filtroTipo;
@@ -32,10 +38,15 @@ export default function GestionOrdenesTrabajo() {
     return matchVehiculo && matchTipo && matchEstado && matchDesde && matchHasta;
   });
 
+  const [paginaActual, setPaginaActual] = useState(1);
+  const itemsPorPagina = 10;
+  
+  const otsPaginadas = otsFiltradas.slice((paginaActual - 1) * itemsPorPagina, paginaActual * itemsPorPagina);
+  const totalPaginas = Math.ceil(otsFiltradas.length / itemsPorPagina);
+  const isJefatura = profile?.rol?.nombre === 'Supervisor' || profile?.rol?.nombre === 'Administrador' || profile?.rol?.nombre === 'Súper Admin' || profile?.rol?.nombre === 'Dueño';
+
   const costoTotal = otsFiltradas.reduce((acc, ot) => {
-    const tareas = ot.tareasRealizadas.reduce((tAcc, t) => tAcc + t.costoBase, 0);
-    const insumos = ot.insumos.reduce((iAcc, i) => iAcc + i.precioUnitario * i.cantidad, 0);
-    return acc + tareas + insumos;
+    return acc + (ot.costoInsumos || 0) + (ot.costoManoObraTareas || 0) + (ot.costoManoObraHH || 0);
   }, 0);
 
   const getEstadoColor = (estado: string) => {
@@ -97,6 +108,11 @@ export default function GestionOrdenesTrabajo() {
         </div>
 
         <div className="overflow-auto mt-6">
+            {isJefatura && (
+               <div className="flex justify-end p-4 font-bold text-lg text-slate-700 dark:text-slate-200">
+                  Costo Total OTs Mostradas: <span className="ml-2 font-mono">${costoTotal.toLocaleString()}</span>
+               </div>
+            )}
             <table className="w-full text-sm text-left">
                 <thead className="bg-slate-50 dark:bg-slate-900/50 border-b dark:border-slate-800 uppercase text-xs text-slate-500 dark:text-slate-400">
                     <tr>
@@ -108,7 +124,7 @@ export default function GestionOrdenesTrabajo() {
                     </tr>
                 </thead>
                 <tbody>
-                    {otsFiltradas.map((ot) => {
+                    {otsPaginadas.map((ot) => {
                         const vehiculo = vehiculos.find(v => v.id === ot.vehiculoId);
                         return (
                             <tr key={ot.id} className="border-b dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:bg-slate-900/50">
@@ -125,6 +141,14 @@ export default function GestionOrdenesTrabajo() {
                     })}
                 </tbody>
             </table>
+            
+            {totalPaginas > 1 && (
+                <div className="flex justify-center items-center gap-2 p-4 border-t dark:border-slate-800">
+                    <Button variant="outline" size="sm" disabled={paginaActual === 1} onClick={() => setPaginaActual(p => p - 1)}>Anterior</Button>
+                    <span className="text-sm">Página {paginaActual} de {totalPaginas}</span>
+                    <Button variant="outline" size="sm" disabled={paginaActual === totalPaginas} onClick={() => setPaginaActual(p => p + 1)}>Siguiente</Button>
+                </div>
+            )}
         </div>
       </Card>
     </div>

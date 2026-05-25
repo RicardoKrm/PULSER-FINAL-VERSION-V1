@@ -71,7 +71,14 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
       valorHH: formData.valorHH ? Number(formData.valorHH) : undefined,
       presupuestoAprobado: formData.presupuestoAprobado ? Number(formData.presupuestoAprobado) : undefined,
       observaciones: formData.observaciones,
-      historial: [{ id: Math.random().toString(36).substring(7), descripcion: 'OT Creada', fechaEvento: new Date().toISOString(), usuario: 'Sistema' }],
+      historial: [{ 
+        id: Math.random().toString(36).substring(7), 
+        orden_id: '',
+        comentario: 'OT Creada', 
+        created_at: new Date().toISOString(), 
+        usuario_nombre: 'Sistema',
+        estado_nuevo: 'ABIERTA'
+      }],
       costoInsumos: 0,
       costoManoObraTareas: 0,
       costoManoObraHH: 0,

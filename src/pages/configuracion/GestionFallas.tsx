@@ -11,67 +11,80 @@ import {
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import Swal from 'sweetalert2';
-
-interface TipoFalla {
-  id: string;
-  nombre: string;
-  criticidad: 'Baja' | 'Media' | 'Alta' | 'Muy Alta';
-  frecuencia: 'Baja' | 'Media' | 'Alta';
-  color: string;
-  estado: 'Activo' | 'Inactivo';
-}
-
-const INITIAL_DATA: TipoFalla[] = [
-  { id: '1', nombre: 'Pérdida de Potencia Motor', criticidad: 'Muy Alta', frecuencia: 'Alta', color: 'bg-rose-500', estado: 'Activo' },
-  { id: '2', nombre: 'Fugas de Aire Comprimido', criticidad: 'Media', frecuencia: 'Alta', color: 'bg-amber-500', estado: 'Activo' },
-  { id: '3', nombre: 'Fallo en Frenos ABS/EBS', criticidad: 'Muy Alta', frecuencia: 'Baja', color: 'bg-red-500', estado: 'Activo' },
-  { id: '4', nombre: 'Desgaste Irregular Neumáticos', criticidad: 'Alta', frecuencia: 'Media', color: 'bg-orange-500', estado: 'Activo' },
-  { id: '5', nombre: 'Luces Quemadas', criticidad: 'Baja', frecuencia: 'Alta', color: 'bg-emerald-500', estado: 'Activo' },
-  { id: '6', nombre: 'Problema en Inyectores', criticidad: 'Alta', frecuencia: 'Media', color: 'bg-rose-500', estado: 'Inactivo' },
-];
+import { useAppContext } from '../../context/AppContext';
+import { useCompany } from '../../contexts/CompanyContext';
+import { supabase } from '../../lib/supabase';
 
 export default function GestionFallas() {
-  const [tiposFalla, setTiposFalla] = useState<TipoFalla[]>(INITIAL_DATA);
+  const { tiposFalla, crearTipoFalla, eliminarTipoFalla } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
   // Form state
   const [nombre, setNombre] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [modeloAfectado, setModeloAfectado] = useState('');
   const [criticidad, setCriticidad] = useState<'Baja' | 'Media' | 'Alta' | 'Muy Alta'>('Alta');
-  const [frecuencia, setFrecuencia] = useState<'Baja' | 'Media' | 'Alta'>('Media');
-  const [color, setColor] = useState('bg-rose-500');
+  const [causa, setCausa] = useState('MECÁNICA');
+  const [tfs, setTfs] = useState(20);
 
   const filteredFallas = tiposFalla.filter(f => 
-    f.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+    (f.nombre || f.descripcion || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const { activeCompanyId } = useCompany();
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 100;
+
+  const totalPages = Math.ceil(filteredFallas.length / itemsPerPage);
+  const paginatedFallas = filteredFallas.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nombre) return;
+    if (!descripcion) return;
 
-    const newFalla: TipoFalla = {
-      id: Date.now().toString(),
-      nombre,
-      criticidad,
-      frecuencia,
-      color,
-      estado: 'Activo'
-    };
+    try {
+      const dbFalla = {
+        empresa_id: activeCompanyId,
+        nombre: descripcion,
+        descripcion,
+        modelo_afectado: modeloAfectado,
+        criticidad: criticidad?.toUpperCase() || 'ALTA',
+        causa: causa,
+        tfs_predeterminado_horas: tfs
+      };
 
-    setTiposFalla([newFalla, ...tiposFalla]);
-    
-    Swal.fire({
-      title: '¡Guardado!', 
-      text: 'El tipo de falla ha sido registrado exitosamente.', 
-      icon: 'success',
-      confirmButtonColor: '#4f46e5'
-    });
-    
-    setIsModalOpen(false);
-    setNombre('');
-    setCriticidad('Alta');
-    setFrecuencia('Media');
-    setColor('bg-rose-500');
+      const { data, error } = await supabase.from('tipo_falla').insert(dbFalla).select().single();
+      
+      if (error) throw error;
+
+      if (data) {
+        crearTipoFalla({
+          ...data,
+          id: data.id,
+          nombre: data.nombre,
+          descripcion: data.descripcion,
+          modelo_afectado: data.modelo_afectado,
+          criticidad: data.criticidad,
+          causa: data.causa,
+          tfs_predeterminado_horas: Number(data.tfs_predeterminado_horas)
+        } as any);
+      }
+
+      Swal.fire({
+        title: '¡Guardado!', 
+        text: 'El tipo de falla ha sido registrado exitosamente.', 
+        icon: 'success',
+        confirmButtonColor: '#4f46e5'
+      });
+      
+      setIsModalOpen(false);
+      setDescripcion('');
+      setModeloAfectado('');
+      setCriticidad('Alta');
+    } catch (err: any) {
+      Swal.fire('Error', err.message, 'error');
+    }
   };
 
   const handleDelete = (id: string, name: string) => {
@@ -84,19 +97,24 @@ export default function GestionFallas() {
       cancelButtonColor: '#64748b',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar'
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
-        setTiposFalla(tiposFalla.filter(f => f.id !== id));
-        Swal.fire('Eliminado!', 'El tipo de falla fue borrado exitosamente.', 'success');
+        const { error } = await supabase.from('tipo_falla').delete().eq('id', id);
+        if (error) {
+          Swal.fire('Error', error.message, 'error');
+        } else {
+          eliminarTipoFalla(id);
+          Swal.fire('Eliminado!', 'El tipo de falla fue borrado exitosamente.', 'success');
+        }
       }
     });
   };
 
-  const colors = [
-    'bg-slate-500', 'bg-red-500', 'bg-orange-500', 'bg-amber-500', 
-    'bg-emerald-500', 'bg-cyan-500', 'bg-blue-500', 'bg-indigo-500',
-    'bg-fuchsia-500', 'bg-rose-500'
-  ];
+  const hashColor = (str: string) => {
+     const hash = Array.from(str).reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0);
+     const cNames = ['bg-slate-500', 'bg-red-500', 'bg-orange-500', 'bg-amber-500', 'bg-emerald-500', 'bg-cyan-500', 'bg-blue-500', 'bg-indigo-500', 'bg-rose-500'];
+     return cNames[Math.abs(hash) % cNames.length];
+  };
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -126,7 +144,7 @@ export default function GestionFallas() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input 
               type="text" 
-              placeholder="Buscar por nombre de falla..." 
+              placeholder="Buscar por nombre o descripción..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-none rounded-xl text-sm font-bold focus:ring-2 focus:ring-rose-500/50 outline-none transition-all dark:text-white"
@@ -138,60 +156,73 @@ export default function GestionFallas() {
       </div>
 
       {/* List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredFallas.map((falla) => (
-          <div key={falla.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow group relative overflow-hidden flex flex-col h-full">
-            <div className={`absolute top-0 left-0 w-1.5 h-full ${falla.color}`}></div>
-            
-            <div className="flex justify-between items-start mb-4">
-               <div>
-                  <div className="flex items-center gap-2 mb-1">
-                     <div className={`w-3 h-3 rounded-full ${falla.color} shadow-sm border border-white dark:border-slate-800`}></div>
-                     <span className="text-[10px] uppercase tracking-widest font-black text-slate-400 dark:text-slate-500">ID: {falla.id.slice(0, 5)}</span>
-                  </div>
-                  <h3 className="text-lg font-black text-slate-800 dark:text-slate-100 leading-tight pr-4">{falla.nombre}</h3>
-               </div>
-               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
-                     <Edit3 className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => handleDelete(falla.id, falla.nombre)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors">
-                     <Trash2 className="w-4 h-4" />
-                  </button>
-               </div>
-            </div>
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 uppercase text-xs font-bold">
+              <tr>
+                <th className="px-6 py-4">Descripción / Nombre</th>
+                <th className="px-6 py-4">Modelo Afectado</th>
+                <th className="px-6 py-4">Causa</th>
+                <th className="px-6 py-4 text-center">TFS (Horas)</th>
+                <th className="px-6 py-4 text-center">Criticidad</th>
+                <th className="px-6 py-4 text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedFallas.map((falla) => (
+                <tr key={falla.id} className="border-b last:border-0 border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <td className="px-6 py-3 font-semibold text-slate-800 dark:text-slate-200">{falla.nombre || falla.descripcion}</td>
+                  <td className="px-6 py-3 font-mono text-slate-500">{falla.modelo_afectado || 'General'}</td>
+                  <td className="px-6 py-3 text-slate-600 dark:text-slate-400">{falla.causa || 'N/A'}</td>
+                  <td className="px-6 py-3 text-center font-mono">{falla.tfs_predeterminado_horas || 0}</td>
+                  <td className="px-6 py-3 text-center">
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                      falla.criticidad === 'ALTA' || falla.criticidad === 'Alta' 
+                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400' 
+                        : (falla.criticidad === 'MEDIA' || falla.criticidad === 'Media' 
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' 
+                            : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400')
+                    }`}>
+                      {falla.criticidad}
+                    </span>
+                  </td>
+                  <td className="px-6 py-3 text-right">
+                    <button onClick={() => handleDelete(falla.id, falla.nombre || falla.descripcion || 'Falla')} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors inline-block">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-            <div className="space-y-3 mb-6 flex-1">
-              <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400">
-                <AlertTriangle className="w-4 h-4 text-slate-400" />
-                <span>Criticidad: <strong>{falla.criticidad}</strong></span>
-              </div>
-              <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400">
-                <Activity className="w-4 h-4 text-slate-400" />
-                <span>Frecuencia: <strong>{falla.frecuencia}</strong></span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800/50 mt-auto">
-               <div className="flex items-center gap-2">
-                  <span className={`text-[11px] font-black uppercase tracking-wider ${
-                     falla.criticidad === 'Muy Alta' || falla.criticidad === 'Alta' ? 'text-rose-600 dark:text-rose-500' :
-                     falla.criticidad === 'Media' ? 'text-amber-600 dark:text-amber-500' :
-                     'text-emerald-600 dark:text-emerald-500'
-                  }`}>Criticidad {falla.criticidad}</span>
-               </div>
-               <div>
-                  <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-md ${
-                     falla.estado === 'Activo' 
-                     ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' 
-                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                  }`}>
-                     {falla.estado}
-                  </span>
-               </div>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+            <span className="text-sm font-medium text-slate-500">
+              Página {currentPage} de {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                disabled={currentPage === 1} 
+                onClick={() => setCurrentPage(p => p - 1)}
+              >
+                Anterior
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                disabled={currentPage === totalPages} 
+                onClick={() => setCurrentPage(p => p + 1)}
+              >
+                Siguiente
+              </Button>
             </div>
           </div>
-        ))}
+        )}
       </div>
 
       {filteredFallas.length === 0 && (
@@ -214,14 +245,24 @@ export default function GestionFallas() {
               <input 
                 type="text" 
                 required
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
+                value={descripcion}
+                onChange={(e) => setDescripcion(e.target.value)}
                 className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none dark:text-white transition-all" 
                 placeholder="Ej. Pérdida de Potencia Motor" 
               />
            </div>
 
            <div className="grid grid-cols-2 gap-4">
+              <div>
+                 <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Modelo Afectado</label>
+                 <input 
+                   type="text"
+                   value={modeloAfectado}
+                   onChange={e => setModeloAfectado(e.target.value)}
+                   className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none dark:text-white transition-all"
+                   placeholder="Ej. O 500 RS E III"
+                 />
+              </div>
               <div>
                  <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Criticidad</label>
                  <select 
@@ -235,31 +276,23 @@ export default function GestionFallas() {
                     <option value="Muy Alta">Muy Alta</option>
                  </select>
               </div>
-              <div>
-                 <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Frecuencia</label>
-                 <select 
-                   value={frecuencia}
-                   onChange={(e) => setFrecuencia(e.target.value as any)}
+              <div className="col-span-2 md:col-span-1">
+                 <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Causa Raíz</label>
+                 <input 
+                   type="text"
+                   value={causa}
+                   onChange={e => setCausa(e.target.value)}
                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none dark:text-white transition-all"
-                 >
-                    <option value="Baja">Baja</option>
-                    <option value="Media">Media</option>
-                    <option value="Alta">Alta</option>
-                 </select>
+                 />
               </div>
-           </div>
-
-           <div>
-              <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Color Base</label>
-              <div className="flex gap-2 bg-slate-50 dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 flex-wrap justify-between items-center h-[42px]">
-                 {colors.slice(0, 7).map(c => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setColor(c)}
-                      className={`w-5 h-5 rounded-full ${c} ${color === c ? 'ring-2 ring-offset-1 ring-slate-800 dark:ring-white dark:ring-offset-slate-900' : ''}`}
-                    />
-                 ))}
+              <div className="col-span-2 md:col-span-1">
+                 <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">TFS (Horas) *</label>
+                 <input 
+                   type="number"
+                   value={tfs}
+                   onChange={e => setTfs(Number(e.target.value))}
+                   className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none dark:text-white transition-all"
+                 />
               </div>
            </div>
 

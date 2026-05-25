@@ -105,22 +105,83 @@ export interface HistorialEvento {
   usuario: string;
 }
 
+export interface Repuesto {
+  id: string;
+  sku: string;
+  nombre: string;
+  stock_actual: number;
+  costo_unitario: number;
+}
+
+export interface DetalleInsumoOT {
+  id: string;
+  orden_id: string;
+  repuesto_id: string;
+  cantidad: number;
+  costo_unitario_aplicado: number;
+  costo_total: number;
+  repuesto?: Repuesto;
+}
+
+export interface OTTareaRealizada {
+  id: string;
+  orden_id: string;
+  tarea_estandar_id: string;
+  tiempo_real_minutos: number;
+  costo_real: number;
+  tarea_estandar?: TareaEstandar;
+}
+
+export interface HistorialOT {
+  id: string;
+  orden_id: string;
+  usuario_id?: string;
+  usuario_nombre?: string;
+  estado_anterior?: string;
+  estado_nuevo?: string;
+  comentario?: string;
+  created_at: string;
+}
+
+export interface SolicitudRepuesto {
+  id: string;
+  orden_id: string;
+  repuesto_nombre: string;
+  cantidad: number;
+  estado: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
+  motivo_rechazo?: string;
+  solicitante_id?: string;
+  fecha_solicitud: string;
+}
+
 export interface OrdenDeTrabajo {
   id: string;
   folio: string;
   vehiculoId: string;
+  vehiculo_id?: string;
   tecnicoResponsable?: string;
+  responsable_id?: string; // DB
   tipo: 'PREVENTIVA' | 'CORRECTIVA' | 'EVALUATIVA' | 'PREVENTIVA_NEUMATICOS' | 'CORRECTIVA_NEUMATICOS' | 'EVALUATIVA_NEUMATICOS' | 'INSPECCION';
   estado: 'ABIERTA' | 'EN_PROCESO' | 'FINALIZADA' | 'CANCELADA' | 'PAUSADA' | 'POR_ASIGNAR' | 'CERRADA_MECANICO' | 'PROGRAMADA' | 'CERRADA_POR_MECANICO';
   prioridad: 'BAJA' | 'MEDIA' | 'ALTA';
   kilometrajeApertura: number;
+  kilometraje_apertura?: number;
   kilometrajeCierre?: number;
+  kilometraje_cierre?: number;
   fechaCreacion: string;
   fechaProgramada?: string;
   horaInicioProgramada?: string;
   horaTerminoProgramada?: string;
-  tareasRealizadas: Tarea[];
-  insumos: Insumo[];
+  
+  // Relaciones y KPIs
+  pauta_mantenimiento_id?: string;
+  tipo_falla_id?: string;
+  inicio_proceso?: string;
+  termino_proceso?: string;
+  tfs_minutos?: number;
+
+  tareasRealizadas: OTTareaRealizada[];
+  insumos: DetalleInsumoOT[];
   observacionInicial?: string;
   diagnosticoEvaluacion?: string;
   // Detalle Técnico
@@ -144,7 +205,9 @@ export interface OrdenDeTrabajo {
   costoManoObraTareas: number;
   costoManoObraHH: number;
   tiempoTrabajadoSegundos: number;
-  historial: HistorialEvento[];
+  historial: HistorialOT[];
+  solicitudes?: SolicitudRepuesto[];
+  firmaCertificado?: string;
 }
 
 export interface PautaMantenimiento {
@@ -164,7 +227,12 @@ export interface TareaEstandar {
 
 export interface TipoFalla {
   id: string;
-  nombre: string;
+  nombre?: string;
+  descripcion: string;
+  modelo_afectado?: string;
+  criticidad?: string;
+  causa?: string;
+  tfs_predeterminado_horas?: number;
 }
 
 export interface Proveedor {

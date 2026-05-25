@@ -1,5 +1,8 @@
-import React, { createContext, useContext, useState } from 'react';
-import { ReservaTurismo, Conductor, Vehiculo, OrdenDeTrabajo, PautaMantenimiento, TareaEstandar, TipoFalla, KitRepuesto, Usuario, Proveedor, Collaborator } from '../types';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from './AuthContext';
+import { useCompany } from '../contexts/CompanyContext';
+import { ReservaTurismo, Conductor, Vehiculo, OrdenDeTrabajo, PautaMantenimiento, TareaEstandar, TipoFalla, KitRepuesto, Usuario, Proveedor, Collaborator, Repuesto } from '../types';
 
 interface AppContextType {
   reservasTurismo: ReservaTurismo[];
@@ -10,6 +13,8 @@ interface AppContextType {
   tareasEstandar: TareaEstandar[];
   tiposFalla: TipoFalla[];
   kitsRepuesto: KitRepuesto[];
+  repuestos: Repuesto[];
+  setRepuestos?: (repuestos: Repuesto[]) => void;
   usuarios: Usuario[];
   currentUser: Usuario;
   setCurrentUser: (usuario: Usuario) => void;
@@ -35,14 +40,59 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [ordenesTrabajo, setOrdenesTrabajo] = useState<OrdenDeTrabajo[]>([]);
   const [conductores] = useState<Conductor[]>([]);
   const [vehiculos] = useState<Vehiculo[]>([]);
-  const [pautas] = useState<PautaMantenimiento[]>([]);
-  const [tareasEstandar] = useState<TareaEstandar[]>([]);
+  const [pautas, setPautas] = useState<PautaMantenimiento[]>([]);
+  const [tareasEstandar, setTareasEstandar] = useState<TareaEstandar[]>([]);
   const [tiposFalla, setTiposFalla] = useState<TipoFalla[]>([]);
   const [kitsRepuesto, setKitsRepuesto] = useState<KitRepuesto[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [currentUser, setCurrentUser] = useState<Usuario>({ id: 'u4', nombre: 'Admin Usuario', cargo: 'Súper Administrador' });
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [personal, setPersonal] = useState<Collaborator[]>([]);
+
+  const [repuestos, setRepuestos] = useState<Repuesto[]>([]);
+  const { profile } = useAuth();
+  const { activeCompanyId } = useCompany();
+
+  useEffect(() => {
+    if (!activeCompanyId) return;
+
+    const fetchAllData = async () => {
+      // Fetch Tareas
+      const { data: tareasData } = await supabase.from('tarea_estandar').select('*').eq('empresa_id', activeCompanyId);
+      if (tareasData) {
+        setTareasEstandar(tareasData.map(t => ({ id: t.id, descripcion: t.descripcion, tiempoEstandarMinutos: t.tiempo_estandar_minutos, costoManoObra: t.costo_base })));
+      }
+
+      // Fetch Tipos Falla
+      const { data: fallasData } = await supabase.from('tipo_falla').select('*').eq('empresa_id', activeCompanyId).limit(10000);
+      if (fallasData) {
+        setTiposFalla(fallasData.map(f => ({ 
+           id: f.id, 
+           nombre: f.nombre || f.descripcion, 
+           descripcion: f.descripcion,
+           modelo_afectado: f.modelo_afectado,
+           criticidad: f.criticidad,
+           causa: f.causa,
+           tfs_predeterminado_horas: Number(f.tfs_predeterminado_horas)
+        } as any)));
+      }
+
+      // Fetch Pautas
+      const { data: pautasData } = await supabase.from('pauta_mantenimiento').select('*').eq('empresa_id', activeCompanyId);
+      if (pautasData) {
+        setPautas(pautasData.map(p => ({ id: p.id, nombre: p.nombre, kmRecomendado: p.km_aplicacion } as any)));
+      }
+
+      // Fetch Repuestos
+      const { data: repData } = await supabase.from('repuesto').select('*');
+      if (repData) {
+        setRepuestos(repData.map(r => ({ ...r, stock_actual: Number(r.stock_actual), costo_unitario: Number(r.costo_unitario) })));
+      }
+
+    };
+
+    fetchAllData();
+  }, [activeCompanyId]);
 
   const crearReservaTurismo = (reserva: ReservaTurismo) => {
     // Logic for adding a reservation
@@ -85,7 +135,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AppContext.Provider value={{ reservasTurismo, ordenesTrabajo, conductores, vehiculos, pautas, tareasEstandar, tiposFalla, kitsRepuesto, usuarios, currentUser, setCurrentUser, proveedores, personal, setPersonal, crearReservaTurismo, crearOrdenTrabajo, eliminarOrdenTrabajo, actualizarOrdenTrabajo, crearTipoFalla, eliminarTipoFalla, crearKitRepuesto, eliminarKitRepuesto, crearProveedor, eliminarProveedor }}>
+    <AppContext.Provider value={{ reservasTurismo, ordenesTrabajo, conductores, vehiculos, pautas, tareasEstandar, tiposFalla, kitsRepuesto, repuestos, setRepuestos, usuarios, currentUser, setCurrentUser, proveedores, personal, setPersonal, crearReservaTurismo, crearOrdenTrabajo, eliminarOrdenTrabajo, actualizarOrdenTrabajo, crearTipoFalla, eliminarTipoFalla, crearKitRepuesto, eliminarKitRepuesto, crearProveedor, eliminarProveedor }}>
       {children}
     </AppContext.Provider>
   );
