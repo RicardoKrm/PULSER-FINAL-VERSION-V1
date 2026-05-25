@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Clock, 
   Plus, 
@@ -12,6 +12,8 @@ import {
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import Swal from 'sweetalert2';
+import { useCompany } from '../../contexts/CompanyContext';
+import { supabase } from '../../lib/supabase';
 
 interface TipoPausa {
   id: string;
@@ -22,19 +24,13 @@ interface TipoPausa {
   estado: 'Activo' | 'Inactivo';
 }
 
-const INITIAL_DATA: TipoPausa[] = [
-  { id: '1', nombre: 'Falta de Repuestos', descripcion: 'Pausa por stock insuficiente o retraso logístico.', color: 'bg-rose-500', impacto: 'Alto', estado: 'Activo' },
-  { id: '2', nombre: 'Falta de Personal', descripcion: 'Pausa por ausencia de mecánicos o especialistas.', color: 'bg-amber-500', impacto: 'Alto', estado: 'Activo' },
-  { id: '3', nombre: 'Esperando Herramienta', descripcion: 'Herramienta especial en uso o dañada.', color: 'bg-blue-500', impacto: 'Medio', estado: 'Activo' },
-  { id: '4', nombre: 'Fin de Turno', descripcion: 'El mecánico terminó su turno antes de cerrar la OT.', color: 'bg-slate-500', impacto: 'Bajo', estado: 'Activo' },
-  { id: '5', nombre: 'Esperando Aprobación', descripcion: 'Presupuesto o tarea crítica esperando OK.', color: 'bg-indigo-500', impacto: 'Medio', estado: 'Activo' },
-  { id: '6', nombre: 'Sin Bahía Disponible', descripcion: 'Falta de espacio en taller para continuar.', color: 'bg-orange-500', impacto: 'Alto', estado: 'Inactivo' },
-];
-
 export default function GestionPausas() {
-  const [tiposPausa, setTiposPausa] = useState<TipoPausa[]>(INITIAL_DATA);
+  const { activeCompanyId } = useCompany();
+  const [tiposPausa, setTiposPausa] = useState<TipoPausa[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 100;
   
   // Form state
   const [nombre, setNombre] = useState('');
@@ -42,38 +38,73 @@ export default function GestionPausas() {
   const [impacto, setImpacto] = useState<'Bajo' | 'Medio' | 'Alto'>('Medio');
   const [color, setColor] = useState('bg-slate-500');
 
+  useEffect(() => {
+    if (activeCompanyId) {
+      fetchPausas();
+    }
+  }, [activeCompanyId]);
+
+  const fetchPausas = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tipo_pausa')
+        .select('*')
+        .eq('empresa_id', activeCompanyId)
+        .order('nombre', { ascending: true })
+        .limit(10000);
+
+      if (error) throw error;
+      setTiposPausa(data || []);
+    } catch (err: any) {
+      console.error(err);
+    }
+  };
+
   const filteredPausas = tiposPausa.filter(p => 
-    p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
+    (p.nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (p.descripcion || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const totalPages = Math.ceil(filteredPausas.length / itemsPerPage);
+  const paginatedPausas = filteredPausas.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nombre) return;
 
-    const newPausa: TipoPausa = {
-      id: Date.now().toString(),
-      nombre,
-      descripcion,
-      color,
-      impacto,
-      estado: 'Activo'
-    };
+    try {
+      const dbPausa = {
+        empresa_id: activeCompanyId,
+        nombre,
+        descripcion,
+        color,
+        impacto,
+        estado: 'Activo'
+      };
 
-    setTiposPausa([newPausa, ...tiposPausa]);
-    
-    Swal.fire({
-      title: '¡Guardado!', 
-      text: 'El tipo de pausa ha sido registrado exitosamente.', 
-      icon: 'success',
-      confirmButtonColor: '#4f46e5'
-    });
-    
-    setIsModalOpen(false);
-    setNombre('');
-    setDescripcion('');
-    setImpacto('Medio');
-    setColor('bg-slate-500');
+      const { data, error } = await supabase.from('tipo_pausa').insert(dbPausa).select().single();
+      
+      if (error) throw error;
+
+      if (data) {
+        setTiposPausa(prev => [...prev, data]);
+      }
+      
+      Swal.fire({
+        title: '¡Guardado!', 
+        text: 'El tipo de pausa ha sido registrado exitosamente.', 
+        icon: 'success',
+        confirmButtonColor: '#4f46e5'
+      });
+      
+      setIsModalOpen(false);
+      setNombre('');
+      setDescripcion('');
+      setImpacto('Medio');
+      setColor('bg-slate-500');
+    } catch (err: any) {
+      Swal.fire('Error', err.message, 'error');
+    }
   };
 
   const handleDelete = (id: string, name: string) => {
@@ -86,10 +117,15 @@ export default function GestionPausas() {
       cancelButtonColor: '#64748b',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar'
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
-        setTiposPausa(tiposPausa.filter(p => p.id !== id));
-        Swal.fire('Eliminado!', 'El tipo de pausa fue borrado exitosamente.', 'success');
+        const { error } = await supabase.from('tipo_pausa').delete().eq('id', id);
+        if (error) {
+          Swal.fire('Error', error.message, 'error');
+        } else {
+          setTiposPausa(tiposPausa.filter(f => f.id !== id));
+          Swal.fire('Eliminado!', 'El tipo de pausa fue borrado exitosamente.', 'success');
+        }
       }
     });
   };
@@ -140,55 +176,89 @@ export default function GestionPausas() {
       </div>
 
       {/* List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredPausas.map((pausa) => (
-          <div key={pausa.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow group relative overflow-hidden flex flex-col h-full">
-            <div className={`absolute top-0 left-0 w-1.5 h-full ${pausa.color}`}></div>
-            
-            <div className="flex justify-between items-start mb-4">
-               <div>
-                  <div className="flex items-center gap-2 mb-1">
-                     <div className={`w-3 h-3 rounded-full ${pausa.color} shadow-sm border border-white dark:border-slate-800`}></div>
-                     <span className="text-[10px] uppercase tracking-widest font-black text-slate-400 dark:text-slate-500">ID: {pausa.id.slice(0, 5)}</span>
-                  </div>
-                  <h3 className="text-lg font-black text-slate-800 dark:text-slate-100 leading-tight pr-4">{pausa.nombre}</h3>
-               </div>
-               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
-                     <Edit3 className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => handleDelete(pausa.id, pausa.nombre)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors">
-                     <Trash2 className="w-4 h-4" />
-                  </button>
-               </div>
-            </div>
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 uppercase text-xs font-bold">
+              <tr>
+                <th className="px-6 py-4">Nombre / ID</th>
+                <th className="px-6 py-4">Descripción</th>
+                <th className="px-6 py-4 text-center">Impacto</th>
+                <th className="px-6 py-4 text-center">Estado</th>
+                <th className="px-6 py-4 text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedPausas.map((pausa) => (
+                <tr key={pausa.id} className="border-b last:border-0 border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <td className="px-6 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-3 h-3 rounded-full ${pausa.color} shadow-sm border border-white dark:border-slate-800`}></div>
+                      <div>
+                        <div className="font-semibold text-slate-800 dark:text-slate-200">{pausa.nombre}</div>
+                        <div className="text-[10px] uppercase tracking-widest font-black text-slate-400 dark:text-slate-500">ID: {pausa.id.slice(0, 5)}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-3 text-slate-600 dark:text-slate-400 max-w-sm truncate" title={pausa.descripcion}>
+                    {pausa.descripcion}
+                  </td>
+                  <td className="px-6 py-3 text-center">
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                      pausa.impacto === 'Alto' || pausa.impacto === 'ALTO'
+                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400' 
+                        : (pausa.impacto === 'Medio' || pausa.impacto === 'MEDIO'
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' 
+                            : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400')
+                    }`}>
+                      {pausa.impacto}
+                    </span>
+                  </td>
+                  <td className="px-6 py-3 text-center">
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                      pausa.estado === 'Activo' 
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' 
+                        : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                    }`}>
+                      {pausa.estado}
+                    </span>
+                  </td>
+                  <td className="px-6 py-3 text-right">
+                    <button onClick={() => handleDelete(pausa.id, pausa.nombre)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors inline-block">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-6 flex-1">
-               {pausa.descripcion}
-            </p>
-
-            <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800/50 mt-auto">
-               <div className="flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-slate-400" />
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Impacto:</span>
-                  <span className={`text-[11px] font-black uppercase tracking-wider ${
-                     pausa.impacto === 'Alto' ? 'text-rose-600 dark:text-rose-500' :
-                     pausa.impacto === 'Medio' ? 'text-amber-600 dark:text-amber-500' :
-                     'text-emerald-600 dark:text-emerald-500'
-                  }`}>{pausa.impacto}</span>
-               </div>
-               <div>
-                  <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-md ${
-                     pausa.estado === 'Activo' 
-                     ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' 
-                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                  }`}>
-                     {pausa.estado}
-                  </span>
-               </div>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+            <span className="text-sm font-medium text-slate-500">
+              Página {currentPage} de {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                disabled={currentPage === 1} 
+                onClick={() => setCurrentPage(p => p - 1)}
+              >
+                Anterior
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                disabled={currentPage === totalPages} 
+                onClick={() => setCurrentPage(p => p + 1)}
+              >
+                Siguiente
+              </Button>
             </div>
           </div>
-        ))}
+        )}
       </div>
 
       {filteredPausas.length === 0 && (

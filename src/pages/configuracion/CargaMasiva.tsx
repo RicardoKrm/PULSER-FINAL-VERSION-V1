@@ -132,14 +132,17 @@ const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any
   },
   fallas: { 
     table: 'tipo_falla', 
-    mapConfig: (r: any) => ({
-      descripcion: r.descripcion,
-      modelo_afectado: r.modelo_afectado,
-      criticidad: r.criticidad,
-      causa: r.causa,
-      tfs_predeterminado_horas: r.tfs_predeterminado_n ? parseFloat(r.tfs_predeterminado_n.toString().replace(',', '.')) : undefined,
-      nombre: r.descripcion
-    }) 
+    mapConfig: (r: any) => {
+      const tfsVal = r.tfs_predeterminado_min !== undefined ? r.tfs_predeterminado_min : (r.tfs_predeterminado_horas !== undefined ? r.tfs_predeterminado_horas : r.tfs_predeterminado_n);
+      return {
+        descripcion: r.descripcion,
+        modelo_afectado: r.modelo_afectado,
+        criticidad: r.criticidad,
+        causa: r.causa,
+        tfs_predeterminado_horas: tfsVal !== undefined ? parseFloat(tfsVal.toString().replace(',', '.')) : 0,
+        nombre: r.descripcion
+      };
+    } 
   },
   proveedores: { 
     table: 'proveedor', 
@@ -272,7 +275,7 @@ const MODULES: UploadModule[] = [
     description: 'Carga del catálogo de fallas comunes, sistemas afectados y criticidad.',
     icon: AlertCircle,
     template: [
-      { descripcion: 'MOTOR AGRIPADO', modelo_afectado: 'O 500 RS E III', criticidad: 'ALTA', causa: 'MECÁNICA', tfs_predeterminado_n: 20.00 }
+      { descripcion: 'MOTOR AGRIPADO', modelo_afectado: 'O 500 RS E III', criticidad: 'ALTA', causa: 'MECÁNICA', tfs_predeterminado_min: 20.00 }
     ]
   },
   {
