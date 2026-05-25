@@ -74,7 +74,7 @@ export default function Programacion() {
   const fetchData = async () => {
     try {
       let queryProg = supabase.from('operacion_programacion').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)');
-      let queryServ = supabase.from('operacion_servicio').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)').in('estado', ['Borrador', 'Programado']);
+      let queryServ = supabase.from('operacion_servicio').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)').in('estado', ['Borrador', 'Programado', 'Confirmado']);
       let queryCond = supabase.from('colaborador').select('id, nombre, estado, rol');
       let queryVehs = supabase.from('vehiculo').select('id, patente, estado');
       let queryRutas = supabase.from('operacion_ruta').select('id, nombre, origen, destino');
@@ -103,7 +103,27 @@ export default function Programacion() {
         setConductores(driversOnly.map((c: any) => ({ ...c, vehiculo: 'Sin Asignar', selected: true })));
       }
       
-      if (resServ.data) {
+      if (resServ.data && resProg.data) {
+        // Filter out services that already have a corresponding program block
+        const unprogrammedServices = resServ.data.filter((s: any) => {
+          // If it's already dragged onto the calendar, we inserted a program block with same origin/destination
+          const hasProgBlock = resProg.data.some((p: any) => p.origen === s.origen && p.destino === s.destino && p.empresa_id === s.empresa_id);
+          return !hasProgBlock;
+        });
+
+        setPendings(unprogrammedServices.map((s: any) => ({
+          id: s.id,
+          tipo: s.tipo_carga || 'Interprovincial',
+          origen: s.origen,
+          destino: s.destino,
+          conductorName: s.conductor?.nombre || null,
+          vehiculoPatente: s.vehiculo?.patente || null,
+          empresa_id: s.empresa_id,
+          conductor_id: s.conductor_id,
+          vehiculo_id: s.vehiculo_id,
+          bgColor: 'bg-white dark:bg-slate-800'
+        })));
+      } else if (resServ.data) {
         setPendings(resServ.data.map((s: any) => ({
           id: s.id,
           tipo: s.tipo_carga || 'Interprovincial',
@@ -120,16 +140,23 @@ export default function Programacion() {
       
       if (resProg.data) {
         setScheduled(resProg.data.map((p: any) => {
+          let hasDriver = !!p.conductor_id || p.conductor;
           let colorClass = 'bg-indigo-50 border-indigo-200 text-indigo-800 dark:bg-indigo-500/10 dark:border-indigo-500/20 dark:text-indigo-300';
-          if (p.estado === 'Asignado') colorClass = 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-500/10 dark:border-blue-500/20 dark:text-blue-300'; // RESERVADO
-          else if (p.estado === 'En Curso') colorClass = 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-300'; // EN PROCESO
-          else if (p.estado === 'Realizado') colorClass = 'bg-slate-100 border-slate-300 text-slate-800 dark:bg-slate-700/50 dark:border-slate-600 dark:text-slate-300'; // TERMINO
-          else if (p.estado === 'Pausado') colorClass = 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-300'; // PAUSADO
-
           let estadoLabel = 'RESERVADO';
-          if (p.estado === 'En Curso') estadoLabel = 'EN PROCESO';
-          else if (p.estado === 'Realizado') estadoLabel = 'TERMINADO';
-          else if (p.estado === 'Pausado') estadoLabel = 'PAUSADO';
+
+          if (!hasDriver) {
+             colorClass = 'bg-yellow-50 border-yellow-400 text-yellow-800 dark:bg-yellow-900/30 dark:border-yellow-600/50 dark:text-yellow-400';
+             estadoLabel = 'FALTA CONDUCTOR';
+          } else {
+            if (p.estado === 'Asignado') colorClass = 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-500/10 dark:border-blue-500/20 dark:text-blue-300';
+            else if (p.estado === 'En Curso') colorClass = 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-300';
+            else if (p.estado === 'Realizado') colorClass = 'bg-slate-100 border-slate-300 text-slate-800 dark:bg-slate-700/50 dark:border-slate-600 dark:text-slate-300';
+            else if (p.estado === 'Pausado') colorClass = 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-300';
+
+            if (p.estado === 'En Curso') estadoLabel = 'EN PROCESO';
+            else if (p.estado === 'Realizado') estadoLabel = 'TERMINADO';
+            else if (p.estado === 'Pausado') estadoLabel = 'PAUSADO';
+          }
 
           return {
           id: p.id,

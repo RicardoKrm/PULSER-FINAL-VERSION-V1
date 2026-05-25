@@ -239,15 +239,36 @@ export default function CrearServicio() {
       };
 
       let saveError;
+      let insertedServicioId = null;
       if (editingServicio) {
         const { error } = await supabase.from('operacion_servicio').update(serviceData).eq('id', editingServicio.id);
         saveError = error;
       } else {
-        const { error } = await supabase.from('operacion_servicio').insert([serviceData]);
+        const { data: newServ, error } = await supabase.from('operacion_servicio').insert([serviceData]).select().single();
         saveError = error;
+        if (newServ) insertedServicioId = newServ.id;
       }
 
       if (saveError) throw saveError;
+
+      // Auto-programar si es nuevo
+      if (insertedServicioId && !editingServicio) {
+        await supabase.from('operacion_programacion').insert([{
+          empresa_id: saveCompanyId,
+          tipo: newSvrTipo || newTipoCarga || 'Interprovincial',
+          origen: newOrigen,
+          destino: newDestino,
+          fecha: newFecha || new Date().toISOString().split('T')[0],
+          hora: 10,
+          duracion: 2,
+          conductor_id: newConductor || null,
+          vehiculo_id: newUnidad || null,
+          estado: newConductor ? 'Asignado' : 'Pendiende',
+          notas: `Auto-programado desde servicio ${codigo}`
+        }]);
+        // Y lo marcamos como confirmado
+        await supabase.from('operacion_servicio').update({ estado: 'Confirmado' }).eq('id', insertedServicioId);
+      }
 
       clearFormCache();
       setIsModalOpen(false);
