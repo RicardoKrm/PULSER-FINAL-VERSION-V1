@@ -161,6 +161,52 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         })));
       }
 
+      // Fetch Ordenes de Trabajo
+      const { data: otsData } = await supabase.from('orden_de_trabajo').select('*');
+      if (otsData) {
+        setOrdenesTrabajo(otsData.map(row => ({
+          id: row.id,
+          folio: row.folio,
+          vehiculoId: row.vehiculo_id,
+          tecnicoResponsable: row.tecnico_responsable || undefined,
+          responsable_id: row.responsable_id || undefined,
+          tipo: row.tipo as any,
+          estado: row.estado as any,
+          prioridad: row.prioridad as any,
+          kilometrajeApertura: Number(row.kilometraje_apertura || 0),
+          kilometrajeCierre: row.kilometraje_cierre ? Number(row.kilometraje_cierre) : undefined,
+          fechaCreacion: row.fecha_creacion,
+          fechaProgramada: row.fecha_programada || undefined,
+          horaInicioProgramada: row.hora_inicio_programada || undefined,
+          horaTerminoProgramada: row.hora_termino_programada || undefined,
+          observacionInicial: row.observacion_inicial || undefined,
+          diagnosticoEvaluacion: row.diagnostico_evaluacion || undefined,
+          pauta: row.pauta || undefined,
+          kitRepuestos: row.kit_repuestos || undefined,
+          tipoFalla: row.tipo_falla || undefined,
+          sintomas: row.sintomas || undefined,
+          inspeccionTrenMotriz: row.inspeccion_tren_motriz || undefined,
+          eje: row.eje || undefined,
+          presionNeumatico: row.presion_neumatico ? Number(row.presion_neumatico) : undefined,
+          personalOperativo: row.personal_operativo || undefined,
+          proveedor: row.proveedor || undefined,
+          empresaExterna: row.empresa_externa || undefined,
+          rutEmpresa: row.rut_empresa || undefined,
+          valorHH: row.valor_hh ? Number(row.valor_hh) : undefined,
+          presupuestoAprobado: row.presupuesto_aprobado ? Number(row.presupuesto_aprobado) : undefined,
+          observaciones: row.observaciones || undefined,
+          costoInsumos: Number(row.costo_insumos || 0),
+          costoManoObraTareas: Number(row.costo_mano_obra_tareas || 0),
+          costoManoObraHH: Number(row.costo_mano_obra_hh || 0),
+          tiempoTrabajadoSegundos: Number(row.tiempo_trabajado_segundos || 0),
+          tareasRealizadas: [],
+          insumos: [],
+          historial: []
+        })));
+      } else {
+        setOrdenesTrabajo([]);
+      }
+
     };
 
     fetchAllData();
@@ -170,16 +216,132 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Logic for adding a reservation
   };
   
-  const crearOrdenTrabajo = (ot: OrdenDeTrabajo) => {
-    setOrdenesTrabajo([...ordenesTrabajo, ot]);
+  const generateUUID = () => {
+    if (typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID) {
+      return window.crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
   };
 
-  const eliminarOrdenTrabajo = (id: string) => {
-    setOrdenesTrabajo(ordenesTrabajo.filter(ot => ot.id !== id));
+  const crearOrdenTrabajo = async (ot: OrdenDeTrabajo) => {
+    let finalId = ot.id;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(finalId);
+    if (!isUuid) {
+      finalId = generateUUID();
+    }
+    const finalOT = { ...ot, id: finalId };
+    
+    setOrdenesTrabajo(prev => [...prev, finalOT]);
+
+    try {
+      const dbPayload = {
+        id: finalOT.id,
+        folio: finalOT.folio,
+        vehiculo_id: finalOT.vehiculoId,
+        tecnico_responsable: finalOT.tecnicoResponsable || finalOT.personalOperativo || null,
+        tipo: finalOT.tipo,
+        estado: finalOT.estado,
+        prioridad: finalOT.prioridad,
+        kilometraje_apertura: finalOT.kilometrajeApertura ? Number(finalOT.kilometrajeApertura) : 0,
+        kilometraje_cierre: finalOT.kilometrajeCierre ? Number(finalOT.kilometrajeCierre) : null,
+        fecha_creacion: finalOT.fechaCreacion,
+        fecha_programada: finalOT.fechaProgramada || null,
+        hora_inicio_programada: finalOT.horaInicioProgramada || null,
+        hora_termino_programada: finalOT.horaTerminoProgramada || null,
+        observacion_inicial: finalOT.observacionInicial || null,
+        diagnostico_evaluacion: finalOT.diagnosticoEvaluacion || null,
+        pauta: finalOT.pauta || null,
+        kit_repuestos: finalOT.kitRepuestos || null,
+        tipo_falla: finalOT.tipoFalla || null,
+        sintomas: finalOT.sintomas || null,
+        inspeccion_tren_motriz: finalOT.inspeccionTrenMotriz || null,
+        eje: finalOT.eje || null,
+        presion_neumatico: finalOT.presionNeumatico ? Number(finalOT.presionNeumatico) : null,
+        personal_operativo: finalOT.personalOperativo || null,
+        proveedor: finalOT.proveedor || null,
+        empresa_externa: finalOT.empresaExterna || null,
+        rut_empresa: finalOT.rutEmpresa || null,
+        valor_hh: finalOT.valorHH ? Number(finalOT.valorHH) : null,
+        presupuesto_aprobado: finalOT.presupuestoAprobado ? Number(finalOT.presupuestoAprobado) : null,
+        observaciones: finalOT.observaciones || null,
+        costo_insumos: finalOT.costoInsumos ? Number(finalOT.costoInsumos) : 0,
+        costo_mano_obra_tareas: finalOT.costoManoObraTareas ? Number(finalOT.costoManoObraTareas) : 0,
+        costo_mano_obra_hh: finalOT.costoManoObraHH ? Number(finalOT.costoManoObraHH) : 0,
+        tiempo_trabajado_segundos: finalOT.tiempoTrabajadoSegundos ? Number(finalOT.tiempoTrabajadoSegundos) : 0
+      };
+
+      const { error } = await supabase.from('orden_de_trabajo').insert([dbPayload]);
+      if (error) {
+        console.error("Error inserting work order to Supabase:", error);
+      } else {
+        console.log("Work order successfully persistent in Supabase database!");
+      }
+    } catch (err) {
+      console.error("Exception during database insert:", err);
+    }
   };
 
-  const actualizarOrdenTrabajo = (otActualizada: OrdenDeTrabajo) => {
-    setOrdenesTrabajo(ordenesTrabajo.map(ot => ot.id === otActualizada.id ? otActualizada : ot));
+  const eliminarOrdenTrabajo = async (id: string) => {
+    setOrdenesTrabajo(prev => prev.filter(ot => ot.id !== id));
+    try {
+      const { error } = await supabase.from('orden_de_trabajo').delete().eq('id', id);
+      if (error) {
+        console.error("Error deleting work order from database:", error);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const actualizarOrdenTrabajo = async (otActualizada: OrdenDeTrabajo) => {
+    setOrdenesTrabajo(prev => prev.map(ot => ot.id === otActualizada.id ? otActualizada : ot));
+    try {
+      const dbPayload = {
+        folio: otActualizada.folio,
+        vehiculo_id: otActualizada.vehiculoId,
+        tecnico_responsable: otActualizada.tecnicoResponsable || otActualizada.personalOperativo || null,
+        tipo: otActualizada.tipo,
+        estado: otActualizada.estado,
+        prioridad: otActualizada.prioridad,
+        kilometraje_apertura: otActualizada.kilometrajeApertura ? Number(otActualizada.kilometrajeApertura) : 0,
+        kilometraje_cierre: otActualizada.kilometrajeCierre ? Number(otActualizada.kilometrajeCierre) : null,
+        fecha_creacion: otActualizada.fechaCreacion,
+        fecha_programada: otActualizada.fechaProgramada || null,
+        hora_inicio_programada: otActualizada.horaInicioProgramada || null,
+        hora_termino_programada: otActualizada.horaTerminoProgramada || null,
+        observacion_inicial: otActualizada.observacionInicial || null,
+        diagnostico_evaluacion: otActualizada.diagnosticoEvaluacion || null,
+        pauta: otActualizada.pauta || null,
+        kit_repuestos: otActualizada.kitRepuestos || null,
+        tipo_falla: otActualizada.tipoFalla || null,
+        sintomas: otActualizada.sintomas || null,
+        inspeccion_tren_motriz: otActualizada.inspeccionTrenMotriz || null,
+        eje: otActualizada.eje || null,
+        presion_neumatico: otActualizada.presionNeumatico ? Number(otActualizada.presionNeumatico) : null,
+        personal_operativo: otActualizada.personalOperativo || null,
+        proveedor: otActualizada.proveedor || null,
+        empresa_externa: otActualizada.empresaExterna || null,
+        rut_empresa: otActualizada.rutEmpresa || null,
+        valor_hh: otActualizada.valorHH ? Number(otActualizada.valorHH) : null,
+        presupuesto_aprobado: otActualizada.presupuestoAprobado ? Number(otActualizada.presupuestoAprobado) : null,
+        observaciones: otActualizada.observaciones || null,
+        costo_insumos: otActualizada.costoInsumos ? Number(otActualizada.costoInsumos) : 0,
+        costo_mano_obra_tareas: otActualizada.costoManoObraTareas ? Number(otActualizada.costoManoObraTareas) : 0,
+        costo_mano_obra_hh: otActualizada.costoManoObraHH ? Number(otActualizada.costoManoObraHH) : 0,
+        tiempo_trabajado_segundos: otActualizada.tiempoTrabajadoSegundos ? Number(otActualizada.tiempoTrabajadoSegundos) : 0
+      };
+
+      const { error } = await supabase.from('orden_de_trabajo').update(dbPayload).eq('id', otActualizada.id);
+      if (error) {
+        console.error("Error updating work order in database:", error);
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const crearTipoFalla = (tipoFalla: TipoFalla) => {
