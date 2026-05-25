@@ -172,10 +172,9 @@ export default function Programacion() {
 
           if (p.realTimeStr) {
               const d = new Date(p.realTimeStr);
-              // Handle UTC local conversion if needed, but the browser parses correctly.
-              // We'll use local hours for rendering.
-              exactHour = d.getHours();
-              exactMinute = d.getMinutes();
+              // Extract UTC hours to ignore browser timezone offsets and strictly match DB representation
+              exactHour = d.getUTCHours();
+              exactMinute = d.getUTCMinutes();
           }
 
           const ampm = exactHour >= 12 ? 'PM' : 'AM';
@@ -771,7 +770,8 @@ export default function Programacion() {
                            ))}
                             {/* Render blocks for this day */}
                            {scheduled.filter(s => s.dateStr === dateStr).map(block => {
-                              const topOffset = block.hour * 80 + (block.minute / 60) * 80; 
+                              const minutesFromStart = block.hour * 60 + block.minute;
+                              const topOffset = (minutesFromStart / 60) * 80;
                               const heightOffset = block.duration * 80;
                               
                               // Check if we need to assign a driver to display 
@@ -833,7 +833,8 @@ export default function Programacion() {
                            
                            {/* Driver Blocks for Today */}
                            {driverBlocks.map(block => {
-                              const topOffset = block.hour * 80 + (block.minute / 60) * 80; 
+                              const minutesFromStart = block.hour * 60 + block.minute;
+                              const topOffset = (minutesFromStart / 60) * 80;
                               const heightOffset = block.duration * 80;
                               return (
                                 <div 
