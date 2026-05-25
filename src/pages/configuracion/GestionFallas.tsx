@@ -175,7 +175,7 @@ export default function GestionFallas() {
                   <td className="px-6 py-3 font-semibold text-slate-800 dark:text-slate-200">{falla.nombre || falla.descripcion}</td>
                   <td className="px-6 py-3 font-mono text-slate-500">{falla.modelo_afectado || 'General'}</td>
                   <td className="px-6 py-3 text-slate-600 dark:text-slate-400">{falla.causa || 'N/A'}</td>
-                  <td className="px-6 py-3 text-center font-mono">{falla.tfs_predeterminado_horas || 0}</td>
+                  <td className="px-6 py-3 text-center font-mono">{Number(falla.tfs_predeterminado_horas || 0).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td className="px-6 py-3 text-center">
                     <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
                       falla.criticidad === 'ALTA' || falla.criticidad === 'Alta' 
@@ -289,6 +289,7 @@ export default function GestionFallas() {
                  <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">TFS (Horas) *</label>
                  <input 
                    type="number"
+                   step="0.01"
                    value={tfs}
                    onChange={e => setTfs(Number(e.target.value))}
                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none dark:text-white transition-all"

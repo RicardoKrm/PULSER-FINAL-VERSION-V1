@@ -64,9 +64,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Fetch Tipos Falla
-      const { data: fallasData } = await supabase.from('tipo_falla').select('*').eq('empresa_id', activeCompanyId).limit(10000);
-      if (fallasData) {
-        setTiposFalla(fallasData.map(f => ({ 
+      let allFallasData: any[] = [];
+      let hasMoreFallas = true;
+      let startF = 0;
+      const pageSize = 1000;
+      
+      while (hasMoreFallas) {
+        const { data } = await supabase
+          .from('tipo_falla')
+          .select('*')
+          .eq('empresa_id', activeCompanyId)
+          .range(startF, startF + pageSize - 1);
+          
+        if (data && data.length > 0) {
+          allFallasData = [...allFallasData, ...data];
+          if (data.length < pageSize) {
+            hasMoreFallas = false;
+          } else {
+            startF += pageSize;
+          }
+        } else {
+          hasMoreFallas = false;
+        }
+      }
+      
+      if (allFallasData.length > 0) {
+        setTiposFalla(allFallasData.map(f => ({ 
            id: f.id, 
            nombre: f.nombre || f.descripcion, 
            descripcion: f.descripcion,
@@ -75,6 +98,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
            causa: f.causa,
            tfs_predeterminado_horas: Number(f.tfs_predeterminado_horas)
         } as any)));
+      } else {
+        setTiposFalla([]);
       }
 
       // Fetch Pautas
