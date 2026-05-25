@@ -3,18 +3,22 @@ import { Calendar as CalendarIcon, CheckCircle2, AlertCircle, Plus, Search, MapP
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
+import { cn } from '../../lib/utils';
 
 type Servicio = {
   id: string;
   codigo: string;
   contrato: string;
+  contrato_id?: string;
   tipo: string;
   subtipo: string;
   origen: string;
   destino: string;
   fecha: string;
   conductor: string;
+  conductor_id?: string;
   unidad: string;
+  vehiculo_id?: string;
   estado: string;
   ingreso: number;
   costo: number;
@@ -31,8 +35,10 @@ export default function CrearServicio() {
   const [selectedServicio, setSelectedServicio] = useState<Servicio | null>(null);
   const [editingServicio, setEditingServicio] = useState<Servicio | null>(null);
   const [showHojaRuta, setShowHojaRuta] = useState(false);
+  const [confirmState, setConfirmState] = useState<{ isOpen: boolean; action: 'anular' | 'eliminar' | null }>({ isOpen: false, action: null });
   const [searchTerm, setSearchTerm] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
+  const [dateFilterStart, setDateFilterStart] = useState('');
+  const [dateFilterEnd, setDateFilterEnd] = useState('');
   
   // States for the creation form to drive real-time validations
   const [newContrato, setNewContrato] = useState(() => localStorage.getItem('formCrearServicio_newContrato') || '');
@@ -110,13 +116,16 @@ export default function CrearServicio() {
         id: s.id,
         codigo: s.codigo || 'S-S/N',
         contrato: s.operacion_contrato?.cliente_razon_social || 'Sin contrato',
+        contrato_id: s.contrato_id,
         tipo: s.tipo_carga,
         subtipo: s.subtipo || '',
         origen: s.origen,
         destino: s.destino,
         fecha: s.fecha_servicio,
         conductor: s.colaborador?.nombre || 'Sin asignar',
+        conductor_id: s.conductor_id,
         unidad: s.vehiculo?.patente || 'Sin asignar',
+        vehiculo_id: s.vehiculo_id,
         estado: s.estado,
         ingreso: parseFloat(s.ingreso_esperado) || 0,
         costo: parseFloat(s.costo_estimado) || 0
@@ -191,14 +200,14 @@ export default function CrearServicio() {
   const handleEditService = () => {
     if (!selectedServicio) return;
     setEditingServicio(selectedServicio);
-    setNewContrato(selectedServicio.contrato);
+    setNewContrato(selectedServicio.contrato_id || '');
     setNewFecha(selectedServicio.fecha);
     setNewTipoCarga(selectedServicio.tipo);
     setNewSubtipo(selectedServicio.subtipo);
     setNewOrigen(selectedServicio.origen);
     setNewDestino(selectedServicio.destino);
-    setNewConductor(selectedServicio.conductor);
-    setNewUnidad(selectedServicio.unidad);
+    setNewConductor(selectedServicio.conductor_id || '');
+    setNewUnidad(selectedServicio.vehiculo_id || '');
     setNewIngreso(selectedServicio.ingreso || '');
     setNewCosto(selectedServicio.costo || '');
     
@@ -222,18 +231,20 @@ export default function CrearServicio() {
     try {
       showToast('Guardando servicio...');
 
+      const safeUUID = (val: string) => val && val.length > 20 ? val : null;
+
       const serviceData = {
         empresa_id: finalCompanyId,
         codigo: editingServicio?.codigo || `SRV-${Math.floor(Math.random() * 10000)}`,
-        contrato_id: newContrato || null,
+        contrato_id: safeUUID(newContrato),
         tipo_carga: newTipoCarga,
         subtipo: newSubtipo,
         origen: newOrigen,
         destino: newDestino,
         fecha_servicio: newFecha || new Date().toISOString(),
-        conductor_id: newConductor || null,
-        vehiculo_id: newUnidad || null,
-        estado: 'Programado',
+        conductor_id: safeUUID(newConductor),
+        vehiculo_id: safeUUID(newUnidad),
+        estado: newConductor && newUnidad ? 'Programado' : 'Borrador',
         ingreso_esperado: newIngreso ? Number(newIngreso) : 0,
         costo_estimado: newCosto ? Number(newCosto) : 0
       };
@@ -262,10 +273,10 @@ export default function CrearServicio() {
           fecha: progDateStr,
           hora: newFecha && newFecha.includes('T') ? parseInt(newFecha.split('T')[1].split(':')[0]) : 10,
           duracion: 2,
-          conductor_id: newConductor || null,
-          vehiculo_id: newUnidad || null,
-          estado: newConductor ? 'Asignado' : 'Pendiende',
-          notas: `Auto-programado desde servicio ${editingServicio ? editingServicio.codigo : serviceData.codigo}`
+          conductor_id: safeUUID(newConductor),
+          vehiculo_id: safeUUID(newUnidad),
+          estado: safeUUID(newConductor) ? 'Asignado' : 'Pendiende',
+          notas: insertedServicioId
         }]);
         if (progSaveErr) console.error("Error inserting prog", progSaveErr);
         // Y lo marcamos como confirmado
@@ -282,36 +293,41 @@ export default function CrearServicio() {
     }
   };
 
-  const handleAnularService = async () => {
+  const handleAnularService = () => {
     if (!selectedServicio) return;
-    
-    if (confirm(`¿Estás seguro de que deseas anular el servicio ${selectedServicio.codigo}?`)) {
-      try {
-        const { error } = await supabase.from('operacion_servicio').update({ estado: 'Anulado' }).eq('id', selectedServicio.id);
-        if (error) throw error;
-        
-        setSelectedServicio(null);
-        loadData();
-      } catch (error: any) {
-        console.error('Error al anular servicio:', error);
-        alert(`Error al anular el servicio: ${error.message || JSON.stringify(error)}`);
-      }
-    }
+    setConfirmState({ isOpen: true, action: 'anular' });
   };
 
-  const handleDeleteService = async () => {
+  const handleDeleteService = () => {
     if (!selectedServicio) return;
-    if (confirm(`ATENCIÓN: ¿Estás seguro de que deseas ELIMINAR PERMANENTEMENTE el servicio ${selectedServicio.codigo}?`)) {
-      try {
+    setConfirmState({ isOpen: true, action: 'eliminar' });
+  };
+
+  const confirmAction = async () => {
+    if (!selectedServicio || !confirmState.action) return;
+    
+    try {
+      if (confirmState.action === 'anular') {
+        const { error: progDelErr } = await supabase.from('operacion_programacion').delete().eq('notas', selectedServicio.id);
+        if (progDelErr) console.error("Error deleting programacion:", progDelErr);
+        const { error } = await supabase.from('operacion_servicio').update({ estado: 'Anulado' }).eq('id', selectedServicio.id);
+        if (error) throw error;
+        showToast('Servicio anulado exitosamente.');
+      } else if (confirmState.action === 'eliminar') {
+        const { error: progDelErr } = await supabase.from('operacion_programacion').delete().eq('notas', selectedServicio.id);
+        if (progDelErr) console.error("Error deleting programacion:", progDelErr);
         const { error } = await supabase.from('operacion_servicio').delete().eq('id', selectedServicio.id);
         if (error) throw error;
-
-        setSelectedServicio(null);
-        loadData();
-      } catch (error: any) {
-        console.error('Error deleting service:', error);
-        alert(`Error al eliminar el servicio: ${error.message || JSON.stringify(error)}`);
+        showToast('Servicio eliminado exitosamente.');
       }
+      
+      setConfirmState({ isOpen: false, action: null });
+      setSelectedServicio(null);
+      loadData();
+    } catch (error: any) {
+      console.error(`Error al ${confirmState.action} servicio:`, error);
+      showToast(`Error al ${confirmState.action} el servicio.`);
+      setConfirmState({ isOpen: false, action: null });
     }
   };
 
@@ -320,10 +336,18 @@ export default function CrearServicio() {
       const matchName = s.codigo.toLowerCase().includes(searchTerm.toLowerCase()) || 
                         s.contrato.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         s.conductor.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchDate = dateFilter ? s.fecha.startsWith(dateFilter) : true;
+      
+      let matchDate = true;
+      if (s.fecha) {
+        const sDateStr = s.fecha.split('T')[0];
+        if (dateFilterStart && sDateStr < dateFilterStart) matchDate = false;
+        if (dateFilterEnd && sDateStr > dateFilterEnd) matchDate = false;
+      } else if (dateFilterStart || dateFilterEnd) {
+        matchDate = false; // If there is a filter but no date, reject
+      }
       return matchName && matchDate;
     });
-  }, [servicios, searchTerm, dateFilter]);
+  }, [servicios, searchTerm, dateFilterStart, dateFilterEnd]);
 
   // Real-time validations logic
   const validations = useMemo(() => {
@@ -396,14 +420,27 @@ export default function CrearServicio() {
             className="w-full pl-11 pr-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white"
           />
         </div>
-        <div className="w-full md:w-64 relative group">
-          <CalendarIcon className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors pointer-events-none" />
-          <input 
-            type="date" 
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            className="w-full pl-11 pr-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white [color-scheme:light] dark:[color-scheme:dark]"
-          />
+        <div className="flex gap-2 w-full md:w-auto">
+          <div className="w-full md:w-40 relative group">
+            <CalendarIcon className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors pointer-events-none" />
+            <input 
+              type="date" 
+              value={dateFilterStart}
+              onChange={(e) => setDateFilterStart(e.target.value)}
+              className="w-full pl-11 pr-2 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white [color-scheme:light] dark:[color-scheme:dark]"
+              title="Fecha desde"
+            />
+          </div>
+          <div className="w-full md:w-40 relative group">
+            <CalendarIcon className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors pointer-events-none" />
+            <input 
+              type="date" 
+              value={dateFilterEnd}
+              onChange={(e) => setDateFilterEnd(e.target.value)}
+              className="w-full pl-11 pr-2 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white [color-scheme:light] dark:[color-scheme:dark]"
+              title="Fecha hasta"
+            />
+          </div>
         </div>
       </div>
 
@@ -1049,6 +1086,39 @@ export default function CrearServicio() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Confirm Modal */}
+      {confirmState.isOpen && selectedServicio && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setConfirmState({ isOpen: false, action: null })} />
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-sm overflow-hidden z-10 p-6 relative">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+              {confirmState.action === 'anular' ? 'Anular Servicio' : 'Eliminar Servicio'}
+            </h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
+              ¿Estás seguro de que deseas {confirmState.action} el servicio <strong className="text-slate-800 dark:text-slate-200">{selectedServicio.codigo}</strong>?
+              {confirmState.action === 'eliminar' && ' Esta acción es irreversible.'}
+            </p>
+            <div className="flex gap-3 justify-end items-center">
+              <button 
+                onClick={() => setConfirmState({ isOpen: false, action: null })}
+                className="px-4 py-2 rounded-lg font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={confirmAction}
+                className={cn(
+                  "px-4 py-2 rounded-lg text-white font-medium transition-colors shadow-sm",
+                  confirmState.action === 'eliminar' ? "bg-red-600 hover:bg-red-700" : "bg-amber-600 hover:bg-amber-700"
+                )}
+              >
+                {confirmState.action === 'eliminar' ? 'Eliminar' : 'Anular'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

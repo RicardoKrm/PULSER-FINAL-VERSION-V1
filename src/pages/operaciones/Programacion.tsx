@@ -103,8 +103,13 @@ export default function Programacion() {
         setConductores(driversOnly.map((c: any) => ({ ...c, vehiculo: 'Sin Asignar', selected: true })));
       }
       
-      if (resServ.data) {
-        setPendings(resServ.data.map((s: any) => ({
+      if (resServ.data && resProg.data) {
+        // Filter out services that already have a corresponding program block linked by notas
+        const unprogrammedServices = resServ.data.filter((s: any) => {
+          return !resProg.data.some((p: any) => p.notas === s.id);
+        });
+
+        setPendings(unprogrammedServices.map((s: any) => ({
           id: s.id,
           tipo: s.tipo_carga || 'Interprovincial',
           origen: s.origen,
@@ -155,6 +160,7 @@ export default function Programacion() {
           empresa_id: p.empresa_id,
           conductor_id: p.conductor_id,
           vehiculo_id: p.vehiculo_id,
+          notas: p.notas,
           colorClass
         };
         }));
@@ -199,6 +205,7 @@ export default function Programacion() {
 
   const handleDrop = async (e: React.DragEvent, dateStr: string, hour?: number) => {
     e.preventDefault();
+    e.stopPropagation();
     if (!draggedItem) return;
 
     const { item, source } = draggedItem;
@@ -207,7 +214,7 @@ export default function Programacion() {
     if (hour !== undefined) {
       const isConflict = scheduled.some(s => s.dateStr === dateStr && s.hour === hour && s.id !== item.id);
       if (isConflict) {
-        alert('Control Anticolisión: Ya existe un servicio asigando en este horario.');
+        console.error('Control Anticolisión: Ya existe un servicio asigando en este horario.');
         setDraggedItem(null);
         return;
       }
@@ -225,7 +232,8 @@ export default function Programacion() {
           duracion: 2,
           conductor_id: item.conductor_id,
           vehiculo_id: item.vehiculo_id,
-          estado: 'Asignado'
+          estado: 'Asignado',
+          notas: item.id
         }]).select().single();
 
         if (progErr) throw progErr;
@@ -247,6 +255,7 @@ export default function Programacion() {
           empresa_id: progData.empresa_id,
           conductor_id: progData.conductor_id,
           vehiculo_id: progData.vehiculo_id,
+          notas: progData.notas,
           timeStr: hour !== undefined ? `${hour}:00` : '10:00 AM',
           colorClass: 'bg-indigo-50 border-indigo-200 text-indigo-800 dark:bg-indigo-500/10 dark:border-indigo-500/20 dark:text-indigo-300'
         }]);
@@ -276,6 +285,7 @@ export default function Programacion() {
 
   const handleDropToPending = async (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     if (!draggedItem) return;
 
     const { item, source } = draggedItem;
@@ -284,31 +294,45 @@ export default function Programacion() {
       try {
         await supabase.from('operacion_programacion').delete().eq('id', item.id);
         
-        const { data: servData, error: servErr } = await supabase.from('operacion_servicio').insert([{
-           empresa_id: item.empresa_id,
-           codigo: `SRV-${Math.random().toString().slice(2, 6)}`,
-           tipo_carga: item.tipo,
-           origen: item.origen,
-           destino: item.destino,
-           fecha_servicio: new Date().toISOString(),
-           estado: 'Borrador',
-           conductor_id: item.conductor_id,
-           vehiculo_id: item.vehiculo_id
-        }]).select().single();
-
-        if (servErr) throw servErr;
+        let servId = item.id;
+        let isOriginalService = false;
+        
+        if (item.notas && item.notas.length > 20) {
+          // Si tenemos el ID del servicio original guardado en notas
+          const { error: updateErr } = await supabase.from('operacion_servicio').update({ estado: 'Borrador' }).eq('id', item.notas);
+          if (!updateErr) {
+            servId = item.notas;
+            isOriginalService = true;
+          }
+        }
+        
+        if (!isOriginalService) {
+          const { data: servData, error: servErr } = await supabase.from('operacion_servicio').insert([{
+             empresa_id: item.empresa_id,
+             codigo: `SRV-${Math.floor(Math.random() * 10000)}`,
+             tipo_carga: item.tipo,
+             origen: item.origen,
+             destino: item.destino,
+             fecha_servicio: new Date().toISOString(),
+             estado: 'Borrador',
+             conductor_id: item.conductor_id,
+             vehiculo_id: item.vehiculo_id
+          }]).select().single();
+          if (servErr) throw servErr;
+          servId = servData.id;
+        }
 
         setScheduled(prev => prev.filter(s => s.id !== item.id));
         setPendings(prev => [...prev, {
-          id: servData.id,
-          tipo: servData.tipo_carga,
-          origen: servData.origen,
-          destino: servData.destino,
+          id: servId,
+          tipo: item.tipo,
+          origen: item.origen,
+          destino: item.destino,
           conductorName: item.conductorName,
           vehiculoPatente: item.vehiculoPatente,
-          empresa_id: servData.empresa_id,
-          conductor_id: servData.conductor_id,
-          vehiculo_id: servData.vehiculo_id,
+          empresa_id: item.empresa_id,
+          conductor_id: item.conductor_id,
+          vehiculo_id: item.vehiculo_id,
           bgColor: 'bg-white dark:bg-slate-800'
         }]);
       } catch (err) {
