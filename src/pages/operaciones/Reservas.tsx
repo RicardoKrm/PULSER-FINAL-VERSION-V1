@@ -60,7 +60,6 @@ export default function ReservasTurismo() {
         tipoVehiculo: dbR.detalles?.tipoVehiculo || 'SUV',
         fecha: dbR.fecha_reserva ? new Date(dbR.fecha_reserva).toISOString().split('T')[0] : '',
         horaInicio: dbR.detalles?.horaInicio || '',
-        horaTermino: dbR.detalles?.horaTermino || '',
         conductorId: dbR.conductor_id || '',
         vehiculoId: dbR.vehiculo_id || '',
         finanzas: dbR.detalles?.finanzas || {
@@ -79,7 +78,7 @@ export default function ReservasTurismo() {
 
       setReservasTurismo(formattedReservas);
 
-      let condQuery = supabase.from('colaborador').select('id, nombre, estado').in('rol', ['Conductor', 'Chofer']);
+      let condQuery = supabase.from('colaborador').select('id, nombre, estado').in('rol', ['Conductor', 'Chofer', 'Conductor Interprovincial', 'Conductor Interno Mina']);
       let vehQuery = supabase.from('vehiculo').select('id, patente, marca, estado');
       
       if (activeCompanyId !== 'GLOBAL') {
@@ -154,7 +153,6 @@ export default function ReservasTurismo() {
     tipoVehiculo: 'SUV' as ReservaTurismo['tipoVehiculo'],
     fecha: '',
     horaInicio: '',
-    horaTermino: '',
     conductorId: '',
     vehiculoId: '',
     finanzas: {
@@ -168,7 +166,18 @@ export default function ReservasTurismo() {
     comentarios: { conductor: '', interno: '' }
   };
 
-  const [formReserva, setFormReserva] = useState(initialFormState);
+  const [formReserva, setFormReserva] = useState(() => {
+    try {
+      const saved = localStorage.getItem('formReservaDraft');
+      if (saved) return JSON.parse(saved);
+    } catch(e){}
+    return initialFormState;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('formReservaDraft', JSON.stringify(formReserva));
+  }, [formReserva]);
+
   const [userCompanies, setUserCompanies] = useState<{id: string, nombre: string}[]>([]);
   const [newEmpresaId, setNewEmpresaId] = useState('');
 
@@ -215,7 +224,6 @@ export default function ReservasTurismo() {
         'N° Vuelo': r.lugares.numeroVuelo || 'N/A',
         'Fecha': r.fecha,
         'Hora Inicio': r.horaInicio,
-        'Hora Termino': r.horaTermino,
         'Vehículo': v ? v.patente : 'N/A',
         'Conductor': c ? c.nombre : 'N/A',
         'Monto Bruto': r.finanzas.montoBruto,
@@ -269,7 +277,6 @@ export default function ReservasTurismo() {
         servicio: formReserva.servicio,
         tipoVehiculo: formReserva.tipoVehiculo,
         horaInicio: formReserva.horaInicio,
-        horaTermino: formReserva.horaTermino,
         finanzas: {
           ...formReserva.finanzas,
           montoNeto: neto
@@ -285,6 +292,7 @@ export default function ReservasTurismo() {
       
       setMostrarFormulario(false);
       setFormReserva(initialFormState);
+      localStorage.removeItem('formReservaDraft');
       loadData(); // refresh data
     } catch (err) {
       console.error('Error saving reserva', err);
@@ -467,7 +475,7 @@ export default function ReservasTurismo() {
                   </div>
                   <div className="text-[10px] flex flex-col text-right">
                     <span className="text-slate-400 dark:text-slate-500 uppercase font-black tracking-wide">Horario</span>
-                    <span className="font-bold text-slate-700 dark:text-slate-300 mt-0.5">{res.horaInicio} - {res.horaTermino}</span>
+                    <span className="font-bold text-slate-700 dark:text-slate-300 mt-0.5">{res.horaInicio}</span>
                   </div>
                 </div>
 
@@ -746,7 +754,7 @@ export default function ReservasTurismo() {
                       <div className="relative group">
                          <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500 focus-within:text-blue-500" />
                          <input 
-                          type="email" required placeholder="Email de Facturación"
+                          type="email" placeholder="Email de Facturación"
                           className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                           value={formReserva.cliente.email}
                           onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, email: e.target.value}})}
@@ -893,22 +901,13 @@ export default function ReservasTurismo() {
                                onChange={(e) => setFormReserva({...formReserva, fecha: e.target.value})}
                             />
                          </div>
-                         <div className="col-span-1">
+                         <div className="col-span-2">
                             <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Hora Inicio</span>
                             <input 
                                type="time" required
                                className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                                value={formReserva.horaInicio}
                                onChange={(e) => setFormReserva({...formReserva, horaInicio: e.target.value})}
-                            />
-                         </div>
-                         <div className="col-span-1">
-                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Hora Termino</span>
-                            <input 
-                               type="time" required
-                               className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                               value={formReserva.horaTermino}
-                               onChange={(e) => setFormReserva({...formReserva, horaTermino: e.target.value})}
                             />
                          </div>
                       </div>

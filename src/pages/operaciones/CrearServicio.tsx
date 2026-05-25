@@ -97,7 +97,7 @@ export default function CrearServicio() {
       // Load form options
       let contratosQ = supabase.from('operacion_contrato').select('id, cliente_razon_social').eq('activo', true);
       let vehiculosQ = supabase.from('vehiculo').select('id, patente');
-      let colaboradoresQ = supabase.from('colaborador').select('id, nombre, estado').in('rol', ['Conductor', 'Chofer']);
+      let colaboradoresQ = supabase.from('colaborador').select('id, nombre, estado').in('rol', ['Conductor', 'Chofer', 'Conductor Interprovincial', 'Conductor Interno Mina']);
 
       if (activeCompanyId !== 'GLOBAL') {
         contratosQ = contratosQ.eq('empresa_id', activeCompanyId);

@@ -167,13 +167,11 @@ export default function ControlDocumental() {
   // Rules Check
   const checkDriverStatus = (driver: any) => {
     const isLicenciaVencida = new Date(driver.vencimientoLicencia).getTime() < today;
-    const isSaludVencida = new Date(driver.vencimientoSalud).getTime() < today;
     const isVacacionesVencidas = driver.vacaciones === 'Vencidas';
     
-    if (isLicenciaVencida || isSaludVencida || isVacacionesVencidas) {
+    if (isLicenciaVencida || isVacacionesVencidas) {
        return { status: 'BLOQUEADO', reasons: [
          isLicenciaVencida ? 'Licencia Vencida' : null,
-         isSaludVencida ? 'Examen Salud Vencido' : null,
          isVacacionesVencidas ? 'Vacaciones Vencidas' : null
        ].filter(Boolean) }
     }
@@ -209,7 +207,6 @@ export default function ControlDocumental() {
         detalles: {
           tipoLicencia: newDriverForm.tipoLicencia,
           vencimientoLicencia: newDriverForm.vencimientoLicencia,
-          vencimientoSalud: newDriverForm.vencimientoSalud,
           vacaciones: 'Al día'
         }
       }]).select();
@@ -453,6 +450,8 @@ export default function ControlDocumental() {
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Tipo de Licencia</label>
                     <select value={newDriverForm.tipoLicencia} onChange={e => setNewDriverForm({...newDriverForm, tipoLicencia: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white">
+                      <option>B</option>
+                      <option>C</option>
                       <option>A1</option>
                       <option>A2</option>
                       <option>A3</option>
@@ -460,13 +459,9 @@ export default function ControlDocumental() {
                       <option>A5</option>
                     </select>
                   </div>
-                  <div>
+                  <div className="col-span-2">
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Venc. Licencia</label>
                     <input type="date" value={newDriverForm.vencimientoLicencia} onChange={e => setNewDriverForm({...newDriverForm, vencimientoLicencia: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" required />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">Venc. Salud</label>
-                    <input type="date" value={newDriverForm.vencimientoSalud} onChange={e => setNewDriverForm({...newDriverForm, vencimientoSalud: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white" required />
                   </div>
                 </div>
                 <div className="pt-2">
@@ -507,6 +502,8 @@ export default function ControlDocumental() {
                       <option>Bus</option>
                       <option>Camion</option>
                       <option>Minibus</option>
+                      <option>Sedan</option>
+                      <option>SUV</option>
                     </select>
                   </div>
                   <div>
@@ -576,12 +573,25 @@ export default function ControlDocumental() {
                        type="file" 
                        className="hidden" 
                        ref={fileInputRef}
+                       accept="image/*,.pdf,.doc,.docx"
                        onChange={(e) => handleFileUpload(e.target.files)} 
                        multiple 
                      />
                    </label>
                  </div>
                  
+                 {modalType === 'driver' && (
+                    <div className="mb-4 bg-indigo-50 dark:bg-indigo-900/10 p-3 rounded-lg border border-indigo-100 dark:border-indigo-900/30">
+                        <p className="text-xs font-bold text-indigo-800 dark:text-indigo-300 mb-2">Documentos requeridos sugeridos:</p>
+                        <div className="flex flex-wrap gap-2 text-[11px] font-medium text-indigo-700 dark:text-indigo-400">
+                           <span className="bg-indigo-100 dark:bg-indigo-900/40 px-2 py-1 rounded">Licencia de Conducir</span>
+                           <span className="bg-indigo-100 dark:bg-indigo-900/40 px-2 py-1 rounded">Cédula de Identidad</span>
+                           <span className="bg-indigo-100 dark:bg-indigo-900/40 px-2 py-1 rounded">Hoja de Vida del Conductor</span>
+                           <span className="bg-indigo-100 dark:bg-indigo-900/40 px-2 py-1 rounded">Certificado de Antecedentes</span>
+                        </div>
+                    </div>
+                 )}
+
                  <div 
                    className={`space-y-3 min-h-[140px] rounded-xl border-2 border-dashed p-4 transition-colors ${
                      isDragging 
@@ -646,16 +656,6 @@ export default function ControlDocumental() {
                          <button onClick={() => {
                            const v = (document.getElementById('nueva_licencia') as HTMLInputElement).value;
                            if(v) handleRegularizar(selectedEntity.id, 'driver', 'vencimientoLicencia', v, `Licencia renovada hasta ${v}`)
-                         }} className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition">Actualizar</button>
-                       </div>
-                     )}
-                     {modalType === 'driver' && checkDriverStatus(selectedEntity).reasons.includes('Examen Salud Vencido') && (
-                       <div className="flex gap-2 items-center mb-3">
-                         <span className="text-xs font-semibold w-1/3 text-slate-700 dark:text-slate-300">Examen Vencido:</span>
-                         <input type="date" className="flex-1 px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white" id="nuevo_salud" defaultValue="" />
-                         <button onClick={() => {
-                           const v = (document.getElementById('nuevo_salud') as HTMLInputElement).value;
-                           if(v) handleRegularizar(selectedEntity.id, 'driver', 'vencimientoSalud', v, `Examen de Salud renovado hasta ${v}`)
                          }} className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition">Actualizar</button>
                        </div>
                      )}
