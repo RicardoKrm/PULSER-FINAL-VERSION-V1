@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Calendar as CalendarIcon, Download, Filter, Search, GripVertical, Clock, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { Calendar as CalendarIcon, Download, Filter, Search, GripVertical, Clock, ChevronLeft, ChevronRight, Plus, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { Modal } from '../../components/ui/Modal';
@@ -52,7 +52,7 @@ const INIT_DATE = today;
 const startOfMonthStr = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
 const endOfMonthStr = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
 
-const HOURS = Array.from({ length: 12 }, (_, i) => i + 8); // 8 to 19
+const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0 to 23
 
 export default function Programacion() {
   const { activeCompanyId, currentCompany } = useCompany();
@@ -767,7 +767,7 @@ export default function Programacion() {
                            ))}
                             {/* Render blocks for this day */}
                            {scheduled.filter(s => s.dateStr === dateStr).map(block => {
-                              const topOffset = (block.hour - 8) * 80 + (block.minute / 60) * 80; 
+                              const topOffset = block.hour * 80 + (block.minute / 60) * 80; 
                               const heightOffset = block.duration * 80;
                               
                               // Check if we need to assign a driver to display 
@@ -829,7 +829,7 @@ export default function Programacion() {
                            
                            {/* Driver Blocks for Today */}
                            {driverBlocks.map(block => {
-                              const topOffset = (block.hour - 8) * 80 + (block.minute / 60) * 80; 
+                              const topOffset = block.hour * 80 + (block.minute / 60) * 80; 
                               const heightOffset = block.duration * 80;
                               return (
                                 <div 
