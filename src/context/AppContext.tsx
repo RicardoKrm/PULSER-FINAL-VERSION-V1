@@ -149,17 +149,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // Fetch Personal
       const { data: colabData } = await supabase.from('colaborador').select('*').eq('empresa_id', activeCompanyId);
       if (colabData) {
-        setPersonal(colabData.map(c => ({
-          ...c,
-          name: c.nombre || c.nombre_completo || c.name || '',
-          email: c.email || '',
-          phone: c.telefono || '',
-          roleBadgeText: c.rol || c.cargo || c.roleBadgeText || '',
-          // Add default avatar/stats for UI compatibility
-          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(c.nombre || c.nombre_completo || c.name || '')}&background=random`,
-          performanceScore: c.performanceScore || 0,
-          pendingTasks: c.pendingTasks || 0,
-        })));
+        setPersonal(colabData.map(c => {
+          const roleText = c.rol || c.cargo || '';
+          const isMec = roleText.toLowerCase().includes('mecanic') || roleText.toLowerCase().includes('mecánic') || !!c.detalles?.isMecanico || !!c.is_mecanico || false;
+          const isCond = roleText.toLowerCase().includes('conduct') || roleText.toLowerCase().includes('chofer') || roleText.toLowerCase().includes('conductor') || !!c.detalles?.isConductor || !!c.is_conductor || false;
+          return {
+            ...c,
+            name: c.nombre || c.nombre_completo || c.name || '',
+            email: c.email || '',
+            phone: c.telefono || '',
+            role: roleText,
+            roleBadgeText: roleText,
+            isMecanico: isMec,
+            isConductor: isCond,
+            // Add default avatar/stats for UI compatibility
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(c.nombre || c.nombre_completo || c.name || '')}&background=random`,
+            performanceScore: c.performanceScore || 0,
+            pendingTasks: c.pendingTasks || 0,
+          };
+        }));
       }
 
       // Fetch Ordenes de Trabajo
@@ -243,6 +251,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         id: finalOT.id,
         folio: finalOT.folio,
         vehiculo_id: finalOT.vehiculoId,
+        empresa_id: activeCompanyId || null,
         tecnico_responsable: finalOT.tecnicoResponsable || finalOT.personalOperativo || null,
         tipo: finalOT.tipo,
         estado: finalOT.estado,
@@ -326,6 +335,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const dbPayload = {
         folio: otActualizada.folio,
         vehiculo_id: otActualizada.vehiculoId,
+        empresa_id: activeCompanyId || null,
         tecnico_responsable: otActualizada.tecnicoResponsable || otActualizada.personalOperativo || null,
         tipo: otActualizada.tipo,
         estado: otActualizada.estado,

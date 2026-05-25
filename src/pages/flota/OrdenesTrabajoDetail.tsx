@@ -20,14 +20,15 @@ const sumInsumosData = [
 export default function OrdenesTrabajoDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { ordenesTrabajo, vehiculos, kitsRepuesto, tareasEstandar, repuestos, actualizarOrdenTrabajo } = useAppContext();
+  const { ordenesTrabajo, vehiculos, kitsRepuesto, tareasEstandar, repuestos, personal, actualizarOrdenTrabajo } = useAppContext();
   const { profile } = useAuth();
   const isSupervisorOrAdmin = profile?.rol?.nombre === 'Supervisor' || profile?.rol?.nombre === 'Administrador' || profile?.rol?.nombre === 'Admin' || profile?.rol?.nombre === 'Súper Admin';
   const isMecanico = profile?.rol?.nombre === 'Mecánico' || profile?.rol?.nombre === 'Mecanico';
   const [activeTab, setActiveTab] = useState<'tareas' | 'insumos' | 'historial' | 'solicitudes'>('tareas');
   const [activePanels, setActivePanels] = useState<Record<string, boolean>>({ diagnostico: false, pauta: false, personal: false, estado: false });
   const [selectedKitToAdd, setSelectedKitToAdd] = useState('');
-  
+  const [selectedTecnico, setSelectedTecnico] = useState('');
+
   const [isTareaModalOpen, setIsTareaModalOpen] = useState(false);
   const [isInsumoModalOpen, setIsInsumoModalOpen] = useState(false);
   const [insumoSearch, setInsumoSearch] = useState('');
@@ -40,8 +41,14 @@ export default function OrdenesTrabajoDetail() {
   
   const [firmaURL, setFirmaURL] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const ot = ordenesTrabajo.find(o => o.id === id || o.folio === id);
+
+  React.useEffect(() => {
+    if (ot) {
+      setSelectedTecnico(ot.tecnicoResponsable || '');
+    }
+  }, [ot]);
   const vehiculo = vehiculos.find(v => v.id === ot?.vehiculoId);
 
   const [nuevoEstado, setNuevoEstado] = useState(ot?.estado || 'ABIERTA');
@@ -150,6 +157,35 @@ export default function OrdenesTrabajoDetail() {
   };
 
   const togglePanel = (panel: string) => setActivePanels(prev => ({ ...prev, [panel]: !prev[panel] }));
+
+  const handleGuardarAsignacion = async () => {
+    if (!ot) return;
+    setIsUpdatingDb(true);
+    try {
+      await actualizarOrdenTrabajo({
+        ...ot,
+        tecnicoResponsable: selectedTecnico || undefined,
+        historial: [
+          ...ot.historial,
+          {
+            id: Math.random().toString(36).substring(2, 11),
+            orden_id: ot.id,
+            comentario: `Se asignó el responsable: ${selectedTecnico || 'Sin asignar'}`,
+            created_at: new Date().toISOString(),
+            usuario_nombre: 'Administrador'
+          }
+        ]
+      });
+      alert('Asignación de personal guardada correctamente.');
+      togglePanel('personal');
+    } catch (e) {
+      console.error(e);
+      alert('Error al guardar la asignación.');
+    } finally {
+      setIsUpdatingDb(false);
+    }
+  };
+
   const totalCosto = ot.costoInsumos + ot.costoManoObraTareas + ot.costoManoObraHH;
 
   const handleCargarKit = () => {
@@ -504,7 +540,25 @@ export default function OrdenesTrabajoDetail() {
 
                     <div>
                         <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold">Cambiar Responsable</p>
-                        <select className="w-full p-2 mt-1 border rounded dark:border-slate-800 text-sm dark:bg-slate-800 dark:text-slate-100"><option value="">Seleccionar técnico...</option></select>
+                        <select 
+                            value={selectedTecnico} 
+                            onChange={(e) => setSelectedTecnico(e.target.value)}
+                            className="w-full p-2 mt-1 border rounded dark:border-slate-800 text-sm dark:bg-slate-800 dark:text-slate-100"
+                        >
+                            <option value="">Seleccionar técnico...</option>
+                            {personal
+                              .filter(p => p.isMecanico || p.roleBadgeText?.toLowerCase().includes('mecanic') || p.role?.toLowerCase().includes('mecanic') || p.roleBadgeText?.toLowerCase().includes('taller') || p.role?.toLowerCase().includes('taller'))
+                              .map(p => (
+                                <option key={p.id} value={p.name}>{p.name} ({p.roleBadgeText || p.role || 'Mecánico'})</option>
+                              ))
+                            }
+                            {/* Fallback to list anyone in personal if no filtered mechanics are found */}
+                            {personal.length > 0 && personal.filter(p => p.isMecanico || p.roleBadgeText?.toLowerCase().includes('mecanic') || p.role?.toLowerCase().includes('mecanic') || p.roleBadgeText?.toLowerCase().includes('taller') || p.role?.toLowerCase().includes('taller')).length === 0 &&
+                              personal.map(p => (
+                                <option key={p.id} value={p.name}>{p.name} ({p.roleBadgeText || p.role || 'Personal'})</option>
+                              ))
+                            }
+                        </select>
                     </div>
 
                     <div>
@@ -512,7 +566,9 @@ export default function OrdenesTrabajoDetail() {
                         <input type="text" className="w-full p-2 mt-1 border rounded dark:border-slate-800 text-sm dark:bg-slate-800 dark:text-slate-100" placeholder="Buscar ayudantes..." />
                     </div>
 
-                    <Button className="w-full bg-cyan-600 hover:bg-cyan-700">Guardar Asignación</Button>
+                    <Button onClick={handleGuardarAsignacion} disabled={isUpdatingDb} className="w-full bg-cyan-600 hover:bg-cyan-700">
+                        {isUpdatingDb ? 'Guardando...' : 'Guardar Asignación'}
+                    </Button>
                 </div>
             </AccordionPanel>
             

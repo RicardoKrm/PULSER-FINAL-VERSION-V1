@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
-import { ChevronLeft, ChevronRight, Clock, GripVertical, Search, AlertCircle, Plus, Calendar as CalendarIcon, Check, MoreHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, GripVertical, Search, AlertCircle, Plus, Calendar as CalendarIcon, Check, MoreHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { CrearOTModal } from '../../components/flota/CrearOTModal';
@@ -18,6 +18,7 @@ interface OtMock {
   startHour?: number;
   duration?: number;
   dayOffset?: number; // 0 = today, 1 = tomorrow, etc.
+  fechaProgramada?: string; // YYYY-MM-DD
   isOverdue?: boolean;
   estado?: 'EN_PROCESO' | 'PAUSADA' | 'PAUSADA_MECANICO' | 'TERMINADA' | 'PROGRAMADA';
   tiempoAplicacion?: string;
@@ -35,63 +36,214 @@ interface MecanicoMock {
   ots: OtMock[];
 }
 
-const getTipoColor = (tipo: string) => {
-  switch (tipo) {
-    case 'Preventiva': return 'bg-blue-500 hover:bg-blue-600';
-    case 'Correctiva': return 'bg-red-500 hover:bg-red-600';
-    case 'Evaluativa': return 'bg-emerald-500 hover:bg-emerald-600';
-    case 'Preventiva Neumático': return 'bg-amber-400 hover:bg-amber-500';
-    case 'Correctiva Neumático': return 'bg-orange-500 hover:bg-orange-600';
-    case 'Evaluativa Neumático': return 'bg-indigo-500 hover:bg-indigo-600';
-    case 'Inspección': return 'bg-purple-500 hover:bg-purple-600';
-    default: return 'bg-slate-500 hover:bg-slate-600';
+const formatDateStr = (date: Date): string => {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const isSameDay = (d1: Date, d2: Date) => {
+  return d1.getFullYear() === d2.getFullYear() &&
+         d1.getMonth() === d2.getMonth() &&
+         d1.getDate() === d2.getDate();
+};
+
+const getSpanishMonthName = (date: Date) => {
+  return date.toLocaleDateString('es-CL', { month: 'long' });
+};
+
+const getTipoColor = (tipoRaw: string) => {
+  const tipo = (tipoRaw || '').toUpperCase().replace(/_/g, ' ').trim();
+  
+  if (tipo.includes('PREVENTIVA NEUMATICO') || tipo.includes('PREVENTIVO NEUMATICO') || tipo.includes('PREVENTIVA NEUMÁTICO') || tipo.includes('PREVENTIVO NEUMÁTICO')) {
+     return 'bg-yellow-400 hover:bg-yellow-500 text-slate-950';
+  }
+  if (tipo.includes('CORRECTIVA NEUMATICO') || tipo.includes('CORRECTIVO NEUMATICO') || tipo.includes('CORRECTIVA NEUMÁTICO') || tipo.includes('CORRECTIVO NEUMÁTICO')) {
+     return 'bg-red-700 hover:bg-red-800 text-white';
+  }
+  if (tipo.includes('EVALUATIVA NEUMATICO') || tipo.includes('EVALUATIVO NEUMATICO') || tipo.includes('EVALUATIVA NEUMÁTICO') || tipo.includes('EVALUATIVO NEUMÁTICO')) {
+     return 'bg-[#c29153] hover:bg-[#b08044] text-white'; // marrón claro
+  }
+  
+  if (tipo.includes('PREVENTIV')) {
+     return 'bg-blue-600 hover:bg-blue-700 text-white';
+  }
+  if (tipo.includes('CORRECTIV')) {
+     return 'bg-red-600 hover:bg-red-700 text-white';
+  }
+  if (tipo.includes('EVALUA') || tipo.includes('EVALUAC')) {
+     return 'bg-green-600 hover:bg-green-700 text-white';
+  }
+  if (tipo.includes('INSPECC')) {
+     return 'bg-purple-600 hover:bg-purple-700 text-white';
+  }
+
+  // legacy fallback support of basic types
+  switch (tipoRaw) {
+    case 'Preventiva': return 'bg-blue-600 hover:bg-blue-700 text-white';
+    case 'Correctiva': return 'bg-red-600 hover:bg-red-700 text-white';
+    case 'Evaluativa': return 'bg-green-600 hover:bg-green-700 text-white';
+    case 'Preventiva Neumático': return 'bg-yellow-400 hover:bg-yellow-500 text-slate-950';
+    case 'Correctiva Neumático': return 'bg-red-700 hover:bg-red-800 text-white';
+    case 'Evaluativa Neumático': return 'bg-[#c29153] hover:bg-[#b08044] text-white';
+    case 'Inspección': return 'bg-purple-600 hover:bg-purple-700 text-white';
+    default: return 'bg-slate-500 hover:bg-slate-600 text-white';
   }
 };
 
 export default function PizarraProgramacion() {
   const navigate = useNavigate();
-  const { personal } = useAppContext();
+  const { personal, ordenesTrabajo, vehiculos, actualizarOrdenTrabajo } = useAppContext();
   
   const [viewMode, setViewMode] = useState<'Día' | 'Semana' | 'Mes'>('Mes');
-  const [currentDate, setCurrentDate] = useState(new Date('2026-05-14T12:00:00'));
+  const [currentDate, setCurrentDate] = useState(() => {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    return d;
+  });
   const [draggedOt, setDraggedOt] = useState<string | null>(null);
   
   const [isNewOtModalOpen, setIsNewOtModalOpen] = useState(false);
+  const [isColorCodeOpen, setIsColorCodeOpen] = useState(false);
   const [dayEventsModal, setDayEventsModal] = useState<{ isOpen: boolean, date: number | null, events: any[] }>({ isOpen: false, date: null, events: [] });
   
   const hours = Array.from({length: 11}, (_, i) => i + 8); // 8 to 18
 
   const [pendingOts, setPendingOts] = useState<OtMock[]>([]);
-
   const [mecanicos, setMecanicos] = useState<MecanicoMock[]>([]);
 
+  // Sincronizar mecánicos y OTs desde el estado global/Supabase
   useEffect(() => {
-    // Sincronizar mecánicos desde personal
-    const personalMecanicos = personal.filter(p => p.isMecanico || p.roleBadgeText === 'Mecánico');
-    
-    setMecanicos(currentMecanicos => {
-      const currentMap = new Map<string, MecanicoMock>(currentMecanicos.map(m => [m.id, m]));
-      const newMecanicos: MecanicoMock[] = [];
-      
-      // Mantenemos mecánicos existentes con sus OTs
-      personalMecanicos.forEach(p => {
-        const idStr = p.id.toString();
-        if (currentMap.has(idStr)) {
-          newMecanicos.push(currentMap.get(idStr)!);
+    // 1. Filtrar mecánicos del personal y complementarlo con los asignados en las OTs
+    const personalMecanicos = [...personal.filter(p => 
+      p.isMecanico || 
+      p.roleBadgeText?.toLowerCase().includes('mecanic') || 
+      p.role?.toLowerCase().includes('mecanic') ||
+      p.roleBadgeText?.toLowerCase().includes('mantenimiento') ||
+      p.role?.toLowerCase().includes('mantenimiento') ||
+      p.roleBadgeText?.toLowerCase().includes('taller') ||
+      p.role?.toLowerCase().includes('taller') ||
+      p.roleBadgeText?.toLowerCase().includes('tecnic') ||
+      p.role?.toLowerCase().includes('tecnic') ||
+      p.roleBadgeText?.toLowerCase().includes('técnic') ||
+      p.role?.toLowerCase().includes('técnic')
+    )];
+
+    // Extraer todos los nombres de técnicos responsables asignados en las OTs
+    const activeTechNames = new Set<string>(
+      ordenesTrabajo
+        .map(ot => ot.tecnicoResponsable)
+        .filter((tr): tr is string => !!tr && tr.trim().length > 0)
+    );
+
+    activeTechNames.forEach(techNameStr => {
+      const techName = techNameStr as string;
+      const exists = personalMecanicos.some(p => (p.name as string).trim().toLowerCase() === techName.trim().toLowerCase());
+      if (!exists) {
+        const found = personal.find(p => (p.name as string).trim().toLowerCase() === techName.trim().toLowerCase());
+        if (found) {
+          personalMecanicos.push(found);
         } else {
-          newMecanicos.push({
-            id: idStr,
-            nombre: p.name,
-            especialidad: p.especialidad || 'Mecánico General',
-            selected: true,
-            ots: []
-          });
+          personalMecanicos.push({
+            id: techName,
+            name: techName,
+            role: 'Técnico',
+            roleBadgeText: 'Técnico',
+            isMecanico: true,
+            isConductor: false,
+            initials: techName.substring(0, 2).toUpperCase()
+          } as any);
         }
-      });
-      
-      return newMecanicos;
+      }
     });
-  }, [personal]);
+
+    // 2. Mapear todas las OTs activas al formato OtMock
+    const mappedOtsList: OtMock[] = ordenesTrabajo.map(ot => {
+      const veh = vehiculos.find(v => v.id === ot.vehiculoId);
+      const patente = veh ? veh.patente : 'S/P';
+      
+      // Parsear Hora de Inicio
+      let startHour = 8;
+      if (ot.horaInicioProgramada) {
+        const parts = ot.horaInicioProgramada.split(':');
+        if (parts.length > 0) {
+          const h = parseInt(parts[0], 10);
+          if (!isNaN(h)) startHour = h;
+        }
+      }
+      
+      // Parsear Duración
+      let duration = 2;
+      if (ot.horaInicioProgramada && ot.horaTerminoProgramada) {
+        const startParts = ot.horaInicioProgramada.split(':');
+        const endParts = ot.horaTerminoProgramada.split(':');
+        if (startParts.length > 0 && endParts.length > 0) {
+          const sh = parseInt(startParts[0], 10);
+          const eh = parseInt(endParts[0], 10);
+          if (!isNaN(sh) && !isNaN(eh) && eh > sh) {
+            duration = eh - sh;
+          }
+        }
+      }
+      
+      const isOverdue = (ot.estado === 'ABIERTA' || ot.estado === 'EN_PROCESO') && ot.fechaProgramada && new Date(ot.fechaProgramada + 'T23:59:59') < new Date();
+
+      let estado: OtMock['estado'] = 'PROGRAMADA';
+      if (ot.estado === 'EN_PROCESO') estado = 'EN_PROCESO';
+      else if (ot.estado === 'PAUSADA' || ot.estado === 'PAUSADA_MECANICO') estado = 'PAUSADA';
+      else if (ot.estado === 'FINALIZADA' || ot.estado === 'TERMINADA' || ot.estado === 'CERRADA_POR_MECANICO') estado = 'TERMINADA';
+
+      return {
+        id: ot.id,
+        folio: ot.folio,
+        patente: patente,
+        tipo: (ot.tipo || 'Inspección') as OTTipo,
+        actividad: ot.observacionInicial || 'Orden de trabajo',
+        startHour,
+        duration,
+        fechaProgramada: ot.fechaProgramada || undefined,
+        isOverdue,
+        estado,
+        progress: ot.estado === 'EN_PROCESO' ? 50 : (ot.estado === 'FINALIZADA' || ot.estado === 'TERMINADA') ? 100 : 0
+      };
+    });
+
+    // 3. Asignar OTs a sus respectivos mecánicos
+    const updatedMecanicos = personalMecanicos.map(p => {
+      const idStr = p.id.toString();
+      
+      const assignedOts = mappedOtsList.filter(ot => {
+        const dbOt = ordenesTrabajo.find(o => o.id === ot.id);
+        if (!dbOt) return false;
+        
+        const tr = (dbOt.tecnicoResponsable || '').trim().toLowerCase();
+        const pName = p.name.trim().toLowerCase();
+        
+        return tr && (tr === pName || pName.includes(tr) || tr.includes(pName)) && dbOt.fechaProgramada;
+      });
+
+      const prevMec = mecanicos.find(m => m.id === idStr);
+      const isSelected = prevMec ? prevMec.selected : true;
+
+      return {
+        id: idStr,
+        nombre: p.name,
+        especialidad: p.especialidad || 'Mecánico General',
+        selected: isSelected,
+        ots: assignedOts
+      };
+    });
+
+    setMecanicos(updatedMecanicos);
+
+    // 4. Cualquier OT que no tenga mecánico asignado o no tenga fecha programada se considera pendiente (sin asignar)
+    const assignedOtIds = new Set(updatedMecanicos.flatMap(m => m.ots.map(ot => ot.id)));
+    const unassignedOts = mappedOtsList.filter(ot => !assignedOtIds.has(ot.id));
+
+    setPendingOts(unassignedOts);
+
+  }, [personal, ordenesTrabajo, vehiculos, currentDate]);
 
   const toggleMechanic = (id: string) => {
     setMecanicos(mecanicos.map(m => m.id === id ? { ...m, selected: !m.selected } : m));
@@ -115,84 +267,80 @@ export default function PizarraProgramacion() {
     e.dataTransfer.dropEffect = 'move';
   };
 
-  const handleDrop = (e: React.DragEvent, mechanicId: string, hour: number, dayOffset: number = 0) => {
+  const handleDrop = async (e: React.DragEvent, mechanicId: string, hour: number, targetDateStr: string) => {
     e.preventDefault();
     const otId = e.dataTransfer.getData('text/plain');
     
-    // Simplification for the mockup
-    const pendingOt = pendingOts.find(ot => ot.id === otId);
-    if (pendingOt) {
-      setPendingOts(pendingOts.filter(ot => ot.id !== otId));
-      setMecanicos(mecanicos.map(m => m.id === mechanicId ? {
-        ...m, ots: [...m.ots, { ...pendingOt, startHour: hour, duration: 2, dayOffset }]
-      } : m));
-    } else {
-       // Moving an assigned OT to another mechanic or hour
-       let movedOt: OtMock | undefined;
-       const newMecanicos = mecanicos.map(m => {
-          const found = m.ots.find(ot => ot.id === otId);
-          if (found) {
-             movedOt = found;
-             return { ...m, ots: m.ots.filter(ot => ot.id !== otId) };
-          }
-          return m;
-       });
+    // Obtener la OT original
+    const targetOt = ordenesTrabajo.find(ot => ot.id === otId);
+    if (!targetOt) return;
 
-       if (movedOt) {
-          setMecanicos(newMecanicos.map(m => m.id === mechanicId ? {
-            ...m, ots: [...m.ots, { ...movedOt, startHour: hour, dayOffset }]
-          } : m));
-       }
-    }
+    // Obtener el mecánico
+    const targetMec = personal.find(p => p.id.toString() === mechanicId);
+    if (!targetMec) return;
+
+    // Calcular horas estructuradas
+    const startHourStr = `${String(hour).padStart(2, '0')}:00`;
+    const endHourStr = `${String(hour + 2).padStart(2, '0')}:00`;
+
+    // Actualizar remotamente en Supabase
+    const updatedOt = {
+      ...targetOt,
+      tecnicoResponsable: targetMec.name,
+      fechaProgramada: targetDateStr,
+      horaInicioProgramada: startHourStr,
+      horaTerminoProgramada: endHourStr,
+    };
+
+    actualizarOrdenTrabajo(updatedOt);
     setDraggedOt(null);
   };
 
-  const handleDropToPending = (e: React.DragEvent) => {
+  const handleDropToPending = async (e: React.DragEvent) => {
     e.preventDefault();
     const otId = e.dataTransfer.getData('text/plain');
     
-    if (pendingOts.find(ot => ot.id === otId)) return;
+    const targetOt = ordenesTrabajo.find(ot => ot.id === otId);
+    if (!targetOt) return;
 
-    let movedOt: OtMock | undefined;
-    const newMecanicos = mecanicos.map(m => {
-       const found = m.ots.find(ot => ot.id === otId);
-       if (found) {
-          movedOt = found;
-          return { ...m, ots: m.ots.filter(ot => ot.id !== otId) };
-       }
-       return m;
-    });
+    // Desasignar de mecánico y fecha
+    const updatedOt = {
+      ...targetOt,
+      tecnicoResponsable: undefined,
+      fechaProgramada: undefined,
+      horaInicioProgramada: undefined,
+      horaTerminoProgramada: undefined,
+    };
 
-    if (movedOt) {
-       setMecanicos(newMecanicos);
-       setPendingOts([{ ...movedOt, startHour: undefined, duration: undefined, dayOffset: undefined }, ...pendingOts]);
-    }
+    actualizarOrdenTrabajo(updatedOt);
     setDraggedOt(null);
   };
 
-  const handleDropOnDay = (e: React.DragEvent, dayIndex: number) => {
+  const handleDropOnDay = async (e: React.DragEvent, dateObj: Date) => {
     e.preventDefault();
     const otId = e.dataTransfer.getData('text/plain');
-    const dayOffset = dayIndex - 14; // specific to this mock
+    
+    const targetOt = ordenesTrabajo.find(ot => ot.id === otId);
+    if (!targetOt) return;
 
-    const pendingOt = pendingOts.find(ot => ot.id === otId);
-    if (pendingOt) {
-      setPendingOts(pendingOts.filter(ot => ot.id !== otId));
-      // Assign to the first selected mechanic as default 
-      const firstMec = mecanicos.find(m => m.selected) || mecanicos[0];
-      setMecanicos(mecanicos.map(m => m.id === firstMec.id ? {
-        ...m, ots: [...m.ots, { ...pendingOt, startHour: 8, duration: 2, dayOffset }]
-      } : m));
-    } else {
-       // Re-scheduling already placed OT to a different day
-       setMecanicos(mecanicos.map(m => {
-          const found = m.ots.find(ot => ot.id === otId);
-          if (found) {
-             return { ...m, ots: m.ots.map(ot => ot.id === otId ? {...ot, dayOffset} : ot) };
-          }
-          return m;
-       }));
+    const fechaProgramadaStr = formatDateStr(dateObj);
+
+    let updatedOt = {
+      ...targetOt,
+      fechaProgramada: fechaProgramadaStr
+    };
+
+    // Si aún no tiene programado un técnico ni hora, asignar uno por defecto al primer mecánico activo
+    if (!targetOt.tecnicoResponsable) {
+      const activeMecs = personal.filter(p => p.isMecanico || p.roleBadgeText?.toLowerCase().includes('mecanic') || p.role?.toLowerCase().includes('mecanic') || p.roleBadgeText?.toLowerCase().includes('taller') || p.role?.toLowerCase().includes('taller'));
+      if (activeMecs.length > 0) {
+        updatedOt.tecnicoResponsable = activeMecs[0].name;
+        updatedOt.horaInicioProgramada = '08:00';
+        updatedOt.horaTerminoProgramada = '10:00';
+      }
     }
+
+    actualizarOrdenTrabajo(updatedOt);
     setDraggedOt(null);
   };
 
@@ -216,41 +364,79 @@ export default function PizarraProgramacion() {
     return date.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
   };
 
-  // Generate Month Days (mock logic for May 2026)
+  // Generate Month Days dynamically
   const renderMonthGrid = () => {
-    const startDayOfWeek = 4; // May 1, 2026 is Friday (0=Mon, 1=Tue... 4=Fri)
-    const daysInMonth = 31;
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+
+    const firstDayOfMonth = new Date(year, month, 1);
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+    const daysInMonth = lastDayOfMonth.getDate();
+
+    const startDayOfWeek = firstDayOfMonth.getDay(); // 0 = Sun, 1 = Mon ... 6 = Sat
+    const startDayOfWeekIndex = (startDayOfWeek === 0 ? 6 : startDayOfWeek - 1);
+
+    const lastDayOfPrevMonth = new Date(year, month, 0).getDate();
+
     const days = [];
-    
+
+    // Today's comparison variables
+    const today = new Date();
+    const isSameMonthYearAsToday = today.getFullYear() === year && today.getMonth() === month;
+
     // Previous month padding
-    for(let i=0; i<startDayOfWeek; i++) {
-       days.push({ day: 27 + i, isCurrentMonth: false, events: [] });
+    for (let i = startDayOfWeekIndex - 1; i >= 0; i--) {
+      const dayNum = lastDayOfPrevMonth - i;
+      const dObj = new Date(year, month - 1, dayNum);
+      days.push({ 
+        day: dayNum, 
+        dateObj: dObj, 
+        isCurrentMonth: false, 
+        isToday: false, 
+        events: [] 
+      });
     }
-    
+
     // Current month
-    for(let i=1; i<=daysInMonth; i++) {
-       const dayOffset = i - 14;
-       let dailyEvents: {title: string, color: string, isOverdue?: boolean, otId: string}[] = [];
-       mecanicos.filter(m => m.selected).forEach(m => {
-          m.ots.filter(ot => ot.dayOffset === dayOffset).forEach(ot => {
-             dailyEvents.push({
-               title: `${ot.startHour}:00 ${ot.tipo} ${ot.patente}`,
-               color: getTipoColor(ot.tipo),
-               isOverdue: ot.isOverdue,
-               otId: ot.id
-             });
+    for (let i = 1; i <= daysInMonth; i++) {
+      const dObj = new Date(year, month, i);
+      const dateStr = formatDateStr(dObj);
+      
+      let dailyEvents: {title: string, color: string, isOverdue?: boolean, otId: string}[] = [];
+      mecanicos.filter(m => m.selected).forEach(m => {
+        m.ots.filter(ot => ot.fechaProgramada === dateStr).forEach(ot => {
+          dailyEvents.push({
+            title: `${ot.startHour}:00 ${ot.tipo} ${ot.patente}`,
+            color: getTipoColor(ot.tipo),
+            isOverdue: ot.isOverdue,
+            otId: ot.id
           });
-       });
-       // Sort by time
-       dailyEvents.sort((a,b) => a.title.localeCompare(b.title));
-       
-       days.push({ day: i, isCurrentMonth: true, isToday: i === 14, events: dailyEvents });
+        });
+      });
+
+      // Sort by time
+      dailyEvents.sort((a,b) => a.title.localeCompare(b.title));
+
+      days.push({ 
+        day: i, 
+        dateObj: dObj, 
+        isCurrentMonth: true, 
+        isToday: isSameMonthYearAsToday && today.getDate() === i, 
+        events: dailyEvents 
+      });
     }
 
     // Next month padding
     const remaining = 42 - days.length; // 6 rows of 7
-    for(let i=1; i<=remaining; i++) {
-        days.push({ day: i, isCurrentMonth: false, events: [] });
+    for (let i = 1; i <= remaining; i++) {
+      const dObj = new Date(year, month + 1, i);
+      days.push({ 
+        day: i, 
+        dateObj: dObj, 
+        isCurrentMonth: false, 
+        isToday: false, 
+        events: [] 
+      });
     }
 
     const weekDaysInfo = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'];
@@ -260,7 +446,7 @@ export default function PizarraProgramacion() {
         <div className="grid grid-cols-7 border-b border-slate-200 dark:border-slate-800">
            {weekDaysInfo.map(d => (
              <div key={d} className="py-2 text-center text-[10px] font-bold text-slate-500 dark:text-slate-400 border-r border-slate-200 dark:border-slate-800 last:border-r-0 uppercase">
-               {d}
+                {d}
              </div>
            ))}
         </div>
@@ -268,9 +454,7 @@ export default function PizarraProgramacion() {
            {days.map((d, idx) => (
              <div key={idx} 
                onClick={d.isCurrentMonth ? () => {
-                 const newDate = new Date(currentDate);
-                 newDate.setDate(d.day);
-                 setCurrentDate(newDate);
+                 setCurrentDate(d.dateObj);
                  setViewMode('Día');
                } : undefined}
                className={cn(
@@ -279,16 +463,16 @@ export default function PizarraProgramacion() {
                  d.isCurrentMonth && "cursor-pointer"
                )}
                onDragOver={handleDragOver}
-               onDrop={d.isCurrentMonth ? (e) => handleDropOnDay(e, d.day) : undefined}
+               onDrop={d.isCurrentMonth ? (e) => handleDropOnDay(e, d.dateObj) : undefined}
              >
                <div className="flex justify-center mb-1">
                  <span 
                    className={cn(
                      "text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full mt-1 transition-all",
-                     d.isToday ? "bg-blue-600 text-white" : (d.isCurrentMonth ? "text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700" : "text-slate-400 dark:text-slate-600")
+                     d.isToday ? "bg-blue-600 text-white font-bold shadow-sm" : (d.isCurrentMonth ? "text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700" : "text-slate-400 dark:text-slate-600")
                    )}
                  >
-                   {d.day}
+                    {d.day}
                  </span>
                </div>
                <div className="flex-1 overflow-y-auto space-y-1.5 px-1 scrollbar-none pb-1">
@@ -319,7 +503,7 @@ export default function PizarraProgramacion() {
                </div>
              </div>
            ))}
-        </div>
+                </div>
       </div>
     );
   };
@@ -350,7 +534,7 @@ export default function PizarraProgramacion() {
              {weekDates.map(wd => (
                <div key={wd.label} className="flex-1 min-w-[120px] py-2 text-center border-r border-slate-200 dark:border-slate-800 last:border-r-0">
                  <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">{wd.label}</div>
-                 <div className={cn("text-lg font-normal mb-1", wd.date.getDate() === new Date('2026-05-14T12:00:00').getDate() ? "text-blue-600 font-bold" : "text-slate-800 dark:text-slate-200")}>
+                 <div className={cn("text-lg font-normal mb-1", isSameDay(wd.date, new Date()) ? "text-blue-600 font-bold" : "text-slate-800 dark:text-slate-200")}>
                     {wd.dayNum}
                  </div>
                </div>
@@ -366,16 +550,22 @@ export default function PizarraProgramacion() {
                  ))}
               </div>
               {weekDates.map(wd => {
-                 const dayOffset = wd.date.getDate() - 14; 
+                 const dateStr = formatDateStr(wd.date);
                  return (
                  <div key={wd.label} className="flex-1 min-w-[120px] border-r border-slate-100 dark:border-slate-800 relative z-10">
                    {hours.map(h => (
-                     <div key={h} className="h-20 border-b border-slate-100 dark:border-slate-800 border-dashed hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                     <div key={h} className="h-20 border-b border-slate-100 dark:border-slate-800 border-dashed hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors"
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => {
+                            if (activeMecanicos.length > 0) {
+                              handleDrop(e, activeMecanicos[0].id, h, dateStr);
+                            }
+                          }}>
                      </div>
                    ))}
-
+ 
                    {activeMecanicos.map(m => 
-                      m.ots.filter(ot => ot.dayOffset === dayOffset).map(ot => {
+                      m.ots.filter(ot => ot.fechaProgramada === dateStr).map(ot => {
                          const top = (ot.startHour! - 8) * 80;
                          const height = ot.duration! * 80;
                          return (
@@ -455,11 +645,11 @@ export default function PizarraProgramacion() {
                    {hours.map(h => (
                      <div key={h} className="h-20 border-b border-slate-100 dark:border-slate-800 border-dashed hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors"
                           onDragOver={handleDragOver}
-                          onDrop={(e) => handleDrop(e, m.id, h, currentDate.getDate() - 14)}>
+                          onDrop={(e) => handleDrop(e, m.id, h, formatDateStr(currentDate))}>
                      </div>
                    ))}
 
-                   {m.ots.filter(ot => ot.dayOffset === (currentDate.getDate() - 14)).map(ot => {
+                   {m.ots.filter(ot => ot.fechaProgramada === formatDateStr(currentDate)).map(ot => {
                       const top = (ot.startHour! - 8) * 80;
                       const height = ot.duration! * 80;
                       return (
@@ -598,6 +788,56 @@ export default function PizarraProgramacion() {
                </div>
             </div>
 
+            {/* Código de Colores / Tipos */}
+            <div className="border-t border-slate-100 dark:border-slate-800/80 pt-4 pb-2">
+               <button 
+                 onClick={() => setIsColorCodeOpen(!isColorCodeOpen)}
+                 className="flex items-center justify-between w-full text-left py-1.5 px-1 rounded hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors select-none group"
+               >
+                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300 uppercase tracking-wider">
+                   Color de OTs
+                 </span>
+                 {isColorCodeOpen ? (
+                   <ChevronUp className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-transform" />
+                 ) : (
+                   <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-transform" />
+                 )}
+               </button>
+               
+               {isColorCodeOpen && (
+                  <div className="space-y-2.5 px-1 pt-3 pb-2 transition-all">
+                     <div className="flex items-center gap-2.5 text-xs">
+                        <span className="w-3 h-3 rounded bg-blue-600 block shrink-0 shadow-sm border border-blue-700/50"></span>
+                        <span className="text-slate-600 dark:text-slate-300">Preventiva</span>
+                     </div>
+                     <div className="flex items-center gap-2.5 text-xs">
+                        <span className="w-3 h-3 rounded bg-red-600 block shrink-0 shadow-sm border border-red-700/50"></span>
+                        <span className="text-slate-600 dark:text-slate-300">Correctiva</span>
+                     </div>
+                     <div className="flex items-center gap-2.5 text-xs">
+                        <span className="w-3 h-3 rounded bg-green-600 block shrink-0 shadow-sm border border-green-700/50"></span>
+                        <span className="text-slate-600 dark:text-slate-300">Evaluativa</span>
+                     </div>
+                     <div className="flex items-center gap-2.5 text-xs">
+                        <span className="w-3 h-3 rounded bg-purple-600 block shrink-0 shadow-sm border border-purple-700/50"></span>
+                        <span className="text-slate-600 dark:text-slate-300">Inspección</span>
+                     </div>
+                     <div className="flex items-center gap-2.5 text-xs">
+                        <span className="w-3 h-3 rounded bg-yellow-400 block shrink-0 shadow-sm border border-yellow-500/50"></span>
+                        <span className="text-slate-600 dark:text-slate-300">Preventiva Neumáticos</span>
+                     </div>
+                     <div className="flex items-center gap-2.5 text-xs">
+                        <span className="w-3 h-3 rounded bg-red-700 block shrink-0 shadow-sm border border-red-800/50"></span>
+                        <span className="text-slate-600 dark:text-slate-300">Correctiva Neumáticos</span>
+                     </div>
+                     <div className="flex items-center gap-2.5 text-xs">
+                        <span className="w-3 h-3 rounded bg-[#c29153] block shrink-0 shadow-sm border border-[#b08044]/50"></span>
+                        <span className="text-slate-600 dark:text-slate-300">Evaluativa Neumáticos</span>
+                     </div>
+                  </div>
+               )}
+            </div>
+
             {/* Mechanics Filter */}
             <div className="pb-4">
                <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-2 mb-3 px-1">
@@ -628,7 +868,7 @@ export default function PizarraProgramacion() {
          <div className="h-16 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 lg:px-6 bg-white dark:bg-slate-900 shrink-0">
             <div className="flex items-center gap-4 lg:gap-6">
                <div className="flex items-center gap-4">
-                 <button onClick={() => { setCurrentDate(new Date('2026-05-14T12:00:00')); setViewMode('Día'); }} className="text-sm font-medium px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm">
+                 <button onClick={() => { const d = new Date(); d.setHours(12, 0, 0, 0); setCurrentDate(d); setViewMode('Día'); }} className="text-sm font-medium px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm">
                    Hoy
                  </button>
                  <div className="flex gap-1">
@@ -674,7 +914,7 @@ export default function PizarraProgramacion() {
       {/* Modals */}
       <CrearOTModal isOpen={isNewOtModalOpen} onClose={() => setIsNewOtModalOpen(false)} />
 
-      <Modal isOpen={dayEventsModal.isOpen} onClose={() => setDayEventsModal({ isOpen: false, date: null, events: [] })} title={`Programación del ${dayEventsModal.date} de Mayo`}>
+      <Modal isOpen={dayEventsModal.isOpen} onClose={() => setDayEventsModal({ isOpen: false, date: null, events: [] })} title={`Programación del ${dayEventsModal.date} de ${getSpanishMonthName(currentDate)}`}>
          <div className="space-y-2">
             {dayEventsModal.events.map((ev, i) => (
                <div 

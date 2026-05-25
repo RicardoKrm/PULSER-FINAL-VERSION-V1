@@ -60,11 +60,36 @@ export default function GestionOrdenesTrabajo() {
     }
   }
 
-  const getTipoColor = (tipo: string) => {
-    switch(tipo) {
-        case 'PREVENTIVA': return 'bg-sky-100 text-sky-700 border-sky-200';
-        case 'CORRECTIVA': return 'bg-amber-100 text-amber-700 border-amber-200';
-        case 'INSPECCION': return 'bg-purple-100 text-purple-700 border-purple-200';
+  const getTipoColor = (tipoRaw: string) => {
+    const tipo = (tipoRaw || '').toUpperCase().replace(/_/g, ' ').trim();
+
+    if (tipo.includes('PREVENTIVA NEUMATICO') || tipo.includes('PREVENTIVO NEUMATICO') || tipo.includes('PREVENTIVA NEUMÁTICO') || tipo.includes('PREVENTIVO NEUMÁTICO')) {
+       return 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900';
+    }
+    if (tipo.includes('CORRECTIVA NEUMATICO') || tipo.includes('CORRECTIVO NEUMATICO') || tipo.includes('CORRECTIVA NEUMÁTICO') || tipo.includes('CORRECTIVO NEUMÁTICO')) {
+       return 'bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900';
+    }
+    if (tipo.includes('EVALUATIVA NEUMATICO') || tipo.includes('EVALUATIVO NEUMATICO') || tipo.includes('EVALUATIVA NEUMÁTICO') || tipo.includes('EVALUATIVO NEUMÁTICO')) {
+       return 'bg-[#fcf8f2] text-[#c29153] border-[#e8dfd3] dark:bg-stone-900/40 dark:text-[#dfb278] dark:border-stone-800';
+    }
+
+    if (tipo.includes('PREVENTIV')) {
+       return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900';
+    }
+    if (tipo.includes('CORRECTIV')) {
+       return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900';
+    }
+    if (tipo.includes('EVALUA') || tipo.includes('EVALUAC')) {
+       return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-900';
+    }
+    if (tipo.includes('INSPECC')) {
+       return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-900';
+    }
+
+    switch(tipoRaw) {
+        case 'PREVENTIVA': return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900';
+        case 'CORRECTIVA': return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900';
+        case 'INSPECCION': return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-900';
         default: return 'bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800';
     }
   }
