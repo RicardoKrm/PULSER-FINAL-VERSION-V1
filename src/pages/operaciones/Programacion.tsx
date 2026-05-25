@@ -104,9 +104,28 @@ export default function Programacion() {
       }
       
       if (resServ.data && resProg.data) {
+        
+        // --- CLEANUP ORPHANED BLOCKS ---
+        const allServsQuery = await supabase.from('operacion_servicio').select('id');
+        const allServsIds = new Set(allServsQuery.data?.map((s:any) => s.id) || []);
+        
+        const validBlocks = resProg.data.filter((p: any) => {
+          if (p.notas && p.notas.length > 20 && p.notas.includes('-')) {
+             if (!allServsIds.has(p.notas)) {
+                // Eliminate orphaned block asynchronously
+                supabase.from('operacion_programacion').delete().eq('id', p.id).then();
+                return false;
+             }
+          }
+          // Si resServ viene vacío asumiendo que el usuario borró todo y p.notas está vacío, limpiarlo
+          if (!p.notas) return false; 
+          
+          return true;
+        });
+
         // Filter out services that already have a corresponding program block linked by notas
         const unprogrammedServices = resServ.data.filter((s: any) => {
-          return !resProg.data.some((p: any) => p.notas === s.id);
+          return !validBlocks.some((p: any) => p.notas === s.id);
         });
 
         setPendings(unprogrammedServices.map((s: any) => ({
@@ -121,6 +140,8 @@ export default function Programacion() {
           vehiculo_id: s.vehiculo_id,
           bgColor: 'bg-white dark:bg-slate-800'
         })));
+        
+        resProg.data = validBlocks;
       }
       
       if (resProg.data) {
@@ -238,8 +259,9 @@ export default function Programacion() {
 
         if (progErr) throw progErr;
 
-        // Modificamos el estado del servicio original a Confirmado
-        await supabase.from('operacion_servicio').update({ estado: 'Confirmado' }).eq('id', item.id);
+        // Modificamos el estado del servicio original a Confirmado y guardamos la fecha/hora nueva
+        const newFechaStr = `${dateStr}T${(hour !== undefined ? hour : 10).toString().padStart(2, '0')}:00:00.000Z`;
+        await supabase.from('operacion_servicio').update({ estado: 'Confirmado', fecha_servicio: newFechaStr }).eq('id', item.id);
 
         setPendings(prev => prev.filter(p => p.id !== item.id));
         setScheduled(prev => [...prev, {
@@ -265,14 +287,21 @@ export default function Programacion() {
       }
     } else if (source === 'scheduled') {
       try {
+         const newHour = hour !== undefined ? hour : item.hour;
          await supabase.from('operacion_programacion').update({ 
            fecha: dateStr, 
-           hora: hour !== undefined ? hour : item.hour 
+           hora: newHour 
          }).eq('id', item.id);
+
+         // Sincronizar fecha hacia atrás si tiene notas vinculadas al servicio.
+         if (item.notas && item.notas.length > 20) {
+           const newFechaStr = `${dateStr}T${newHour.toString().padStart(2, '0')}:00:00.000Z`;
+           await supabase.from('operacion_servicio').update({ fecha_servicio: newFechaStr }).eq('id', item.notas);
+         }
 
          setScheduled(prev => prev.map(s => 
            s.id === item.id 
-             ? { ...s, dateStr, hour: hour !== undefined ? hour : s.hour, timeStr: hour !== undefined ? `${hour}:00` : s.timeStr } 
+             ? { ...s, dateStr, hour: newHour, timeStr: `${newHour}:00` } 
              : s
          ));
       } catch (err) {
@@ -382,10 +411,20 @@ export default function Programacion() {
       const { error } = await supabase.from('operacion_programacion').update({
         conductor_id: editingBlock.newConductor || null,
         vehiculo_id: editingBlock.newVehiculo || null,
-        estado: editingBlock.newConductor ? 'Asignado' : 'Pendiende'
+        estado: editingBlock.newConductor ? 'Asignado' : 'Asignado'
       }).eq('id', editingBlock.id);
 
       if (error) throw error;
+      
+      // Sincronizar conductor y vehiculo a operacion_servicio
+      if (editingBlock.notas && editingBlock.notas.length > 20) {
+        await supabase.from('operacion_servicio').update({
+          conductor_id: editingBlock.newConductor || null,
+          vehiculo_id: editingBlock.newVehiculo || null,
+          estado: editingBlock.newConductor ? 'Confirmado' : 'Borrador'
+        }).eq('id', editingBlock.notas);
+      }
+
       fetchData();
       setEditingBlock(null);
     } catch (err) {
@@ -426,22 +465,34 @@ export default function Programacion() {
     };
 
     try {
-      // Pedimos retorno completo incluyendo relaciones para pintarlas al instante si es posible
+      // Create service
       const { data, error } = await supabase.from('operacion_servicio').insert([newServiceData]).select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)').single();
       if (error) throw error;
       
-      setPendings(prev => [...prev, {
-        id: data.id,
-        tipo: data.tipo_carga,
+      const progDateStr = new Date().toISOString().split('T')[0];
+      const hora = new Date().getHours();
+      
+      const progData = {
+        empresa_id: data.empresa_id,
+        tipo: data.tipo_carga || 'Interprovincial',
         origen: data.origen,
         destino: data.destino,
-        conductorName: data.conductor?.nombre || null,
-        vehiculoPatente: data.vehiculo?.patente || null,
-        empresa_id: data.empresa_id,
-        conductor_id: data.conductor_id,
-        vehiculo_id: data.vehiculo_id,
-        bgColor: 'bg-white dark:bg-slate-800'
-      }]);
+        fecha: progDateStr,
+        hora: hora,
+        duracion: 2,
+        conductor_id: data.conductor_id || null,
+        vehiculo_id: data.vehiculo_id || null,
+        estado: data.conductor_id ? 'Asignado' : 'Borrador',
+        notas: data.id
+      };
+      
+      const { data: pData, error: pErr } = await supabase.from('operacion_programacion').insert([progData]).select().single();
+      
+      if (!pErr && pData) {
+         await supabase.from('operacion_servicio').update({ estado: data.conductor_id ? 'Confirmado' : 'Borrador' }).eq('id', data.id);
+         
+         fetchData();
+      }
 
     } catch (error) {
       console.error("Error creating service:", error);

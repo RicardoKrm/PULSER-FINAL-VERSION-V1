@@ -265,11 +265,12 @@ export default function CrearServicio() {
       const targetServicioId = editingServicio ? editingServicio.id : insertedServicioId;
       
       if (targetServicioId) {
-        const hasTimeAndDriver = safeUUID(newConductor) && newFecha && newFecha.includes('T');
+        // Only require a date/time to sync to the board. Driver is optional.
+        const hasTime = newFecha && newFecha.includes('T');
         
         const { data: existingProg } = await supabase.from('operacion_programacion').select('id').eq('notas', targetServicioId).maybeSingle();
 
-        if (hasTimeAndDriver) {
+        if (hasTime) {
           const progDateStr = newFecha.split('T')[0];
           const hora = parseInt(newFecha.split('T')[1].split(':')[0]);
           
@@ -281,9 +282,9 @@ export default function CrearServicio() {
             fecha: progDateStr,
             hora: hora,
             duracion: 2,
-            conductor_id: safeUUID(newConductor),
-            vehiculo_id: safeUUID(newUnidad),
-            estado: 'Asignado',
+            conductor_id: safeUUID(newConductor) || null,
+            vehiculo_id: safeUUID(newUnidad) || null,
+            estado: safeUUID(newConductor) ? 'Asignado' : 'Borrador',
             notas: targetServicioId
           };
 
@@ -295,9 +296,9 @@ export default function CrearServicio() {
              if (progSaveErr) console.error("Error inserting prog", progSaveErr);
           }
           
-          await supabase.from('operacion_servicio').update({ estado: 'Confirmado' }).eq('id', targetServicioId);
+          await supabase.from('operacion_servicio').update({ estado: safeUUID(newConductor) ? 'Confirmado' : 'Borrador' }).eq('id', targetServicioId);
         } else {
-          // If it lacks driver/time but has an existing block on the board, delete it so it surfaces to Pendientes.
+          // If it lacks a valid time but has an existing block on the board, delete it so it surfaces to Pendientes.
           if (existingProg) {
              await supabase.from('operacion_programacion').delete().eq('id', existingProg.id);
           }
