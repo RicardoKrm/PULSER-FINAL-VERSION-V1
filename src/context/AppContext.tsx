@@ -27,6 +27,7 @@ interface AppContextType {
   actualizarOrdenTrabajo: (ot: OrdenDeTrabajo) => void;
   crearTipoFalla: (tipoFalla: TipoFalla) => void;
   eliminarTipoFalla: (id: string) => void;
+  actualizarTipoFalla?: (tipoFalla: TipoFalla) => void;
   crearKitRepuesto: (kit: KitRepuesto) => void;
   eliminarKitRepuesto: (id: string) => void;
   crearProveedor: (proveedor: Proveedor) => void;
@@ -114,9 +115,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Fetch Pautas
-      const { data: pautasData } = await supabase.from('mantenimiento_pauta').select('*').eq('empresa_id', activeCompanyId);
+      const { data: pautasData } = await supabase.from('mantenimiento_pauta').select('*, modelo:mantenimiento_modelo_vehiculo(nombre)').eq('empresa_id', activeCompanyId);
       if (pautasData) {
-        setPautas(pautasData.map(p => ({ id: p.id, nombre: p.nombre, kmRecomendado: p.kilometraje_inicial || 0 } as any)));
+        setPautas(pautasData.map(p => ({
+          id: p.id,
+          nombre: p.nombre,
+          kmRecomendado: p.kilometraje_inicial || 0,
+          modeloVehiculo: p.modelo?.nombre || ''
+        } as any)));
       }
 
       // Fetch Repuestos
@@ -144,12 +150,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (colabData) {
         setPersonal(colabData.map(c => ({
           ...c,
-          name: c.nombre_completo || c.name || '',
+          name: c.nombre || c.nombre_completo || c.name || '',
           email: c.email || '',
           phone: c.telefono || '',
-          roleBadgeText: c.cargo || c.roleBadgeText || '',
+          roleBadgeText: c.rol || c.cargo || c.roleBadgeText || '',
           // Add default avatar/stats for UI compatibility
-          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(c.nombre_completo || c.name || '')}&background=random`,
+          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(c.nombre || c.nombre_completo || c.name || '')}&background=random`,
           performanceScore: c.performanceScore || 0,
           pendingTasks: c.pendingTasks || 0,
         })));
@@ -184,6 +190,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setTiposFalla(tiposFalla.filter(tf => tf.id !== id));
   };
 
+  const actualizarTipoFalla = (tipoFallaActualizada: TipoFalla) => {
+    setTiposFalla(tiposFalla.map(tf => tf.id === tipoFallaActualizada.id ? tipoFallaActualizada : tf));
+  };
+
   const crearKitRepuesto = (kit: KitRepuesto) => {
     setKitsRepuesto([...kitsRepuesto, kit]);
   };
@@ -201,7 +211,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AppContext.Provider value={{ reservasTurismo, ordenesTrabajo, conductores, vehiculos, pautas, tareasEstandar, tiposFalla, kitsRepuesto, repuestos, setRepuestos, usuarios, currentUser, setCurrentUser, proveedores, personal, setPersonal, crearReservaTurismo, crearOrdenTrabajo, eliminarOrdenTrabajo, actualizarOrdenTrabajo, crearTipoFalla, eliminarTipoFalla, crearKitRepuesto, eliminarKitRepuesto, crearProveedor, eliminarProveedor }}>
+    <AppContext.Provider value={{ reservasTurismo, ordenesTrabajo, conductores, vehiculos, pautas, tareasEstandar, tiposFalla, kitsRepuesto, repuestos, setRepuestos, usuarios, currentUser, setCurrentUser, proveedores, personal, setPersonal, crearReservaTurismo, crearOrdenTrabajo, eliminarOrdenTrabajo, actualizarOrdenTrabajo, crearTipoFalla, eliminarTipoFalla, actualizarTipoFalla, crearKitRepuesto, eliminarKitRepuesto, crearProveedor, eliminarProveedor }}>
       {children}
     </AppContext.Provider>
   );

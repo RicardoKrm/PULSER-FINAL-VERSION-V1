@@ -26,6 +26,36 @@ export default function PizarraMantenimiento() {
   const [selectedVehicleRow, setSelectedVehicleRow] = useState<string | number | null>(null);
   const [vistaTabla, setVistaTabla] = useState(false);
   const [fichaTecnicaVehiculo, setFichaTecnicaVehiculo] = useState<any | null>(null);
+  const [isEditingFicha, setIsEditingFicha] = useState(false);
+  const [editFichaData, setEditFichaData] = useState<any>({
+    marca: '',
+    modelo: '',
+    ano: '',
+    fechaMatriculacion: '',
+    chasis: '',
+    motor: '',
+    norma: '',
+    aplicacion: '',
+    tipoAceite: ''
+  });
+
+  useEffect(() => {
+    if (fichaTecnicaVehiculo) {
+      setIsEditingFicha(false);
+      setEditFichaData({
+        marca: fichaTecnicaVehiculo.marca || '',
+        modelo: fichaTecnicaVehiculo.modelo || '',
+        ano: fichaTecnicaVehiculo.ano || fichaTecnicaVehiculo.anio || '',
+        fechaMatriculacion: fichaTecnicaVehiculo.detalles?.fecha_matriculacion || fichaTecnicaVehiculo.fecha_matriculacion || '',
+        chasis: fichaTecnicaVehiculo.chasis || '',
+        motor: fichaTecnicaVehiculo.motor || '',
+        norma: fichaTecnicaVehiculo.norma || '',
+        aplicacion: fichaTecnicaVehiculo.aplicacion || '',
+        tipoAceite: fichaTecnicaVehiculo.tipoAceite || ''
+      });
+    }
+  }, [fichaTecnicaVehiculo]);
+
   const [historialVehiculo, setHistorialVehiculo] = useState<any | null>(null);
   const navigate = useNavigate();
   
@@ -165,7 +195,22 @@ export default function PizarraMantenimiento() {
               kmUltimaMantencion: kmUltMant,
               fechaUltimaMantencion: fechaUltMant ? new Date(fechaUltMant) : null,
               tipoUltimaPauta: pautasSecuenciaStr,
-              pautasSecuencia
+              pautasSecuencia,
+              
+              // Technical specifications mapping
+              marca: v.marca || detalles.marca || '',
+              modelo: v.modelo || detalles.modelo || '',
+              ano: v.anio || v.ano || detalles.ano || detalles.anio || '',
+              chasis: v.chasis || detalles.chasis || '',
+              motor: v.motor || detalles.motor || '',
+              norma: v.norma_euro || v.norma || detalles.norma_euro || detalles.norma || '',
+              aplicacion: v.aplicacion || detalles.aplicacion || '',
+              tipoAceite: v.tipo_aceite || v.tipoAceite || detalles.tipo_aceite || detalles.tipoAceite || '',
+              fecha_matriculacion: v.fecha_matriculacion || detalles.fecha_matriculacion || '',
+              detalles,
+              intervaloMantenimiento: kmInterv,
+              tipoIntervalo: v.tipo_intervalo || 'KM',
+              factorConversionHoras: v.factor_conversion_horas || null
             };
           });
 
@@ -239,6 +284,75 @@ export default function PizarraMantenimiento() {
     } catch (e: any) {
         console.error('Error updating KM:', e);
         alert("Error al actualizar KM en la BD: " + (e.message || JSON.stringify(e)));
+    }
+  };
+
+  const handleSaveFicha = async () => {
+    if (!fichaTecnicaVehiculo) return;
+    try {
+      // Get existing details
+      const { data, error: selectErr } = await supabase
+        .from('vehiculo')
+        .select('detalles')
+        .eq('id', fichaTecnicaVehiculo.id)
+        .single();
+        
+      const existingDetalles = data?.detalles || {};
+      
+      const payload: any = {
+        marca: editFichaData.marca,
+        modelo: editFichaData.modelo,
+        anio: parseInt(editFichaData.ano || '0', 10) || null,
+        chasis: editFichaData.chasis,
+        motor: editFichaData.motor,
+        norma_euro: editFichaData.norma,
+        aplicacion: editFichaData.aplicacion,
+        tipo_aceite: editFichaData.tipoAceite,
+        detalles: {
+          ...existingDetalles,
+          marca: editFichaData.marca,
+          modelo: editFichaData.modelo,
+          ano: editFichaData.ano,
+          anio: editFichaData.ano,
+          chasis: editFichaData.chasis,
+          motor: editFichaData.motor,
+          norma: editFichaData.norma,
+          norma_euro: editFichaData.norma,
+          aplicacion: editFichaData.aplicacion,
+          tipoAceite: editFichaData.tipoAceite,
+          tipo_aceite: editFichaData.tipoAceite,
+          fecha_matriculacion: editFichaData.fechaMatriculacion
+        }
+      };
+
+      const { error } = await supabase
+        .from('vehiculo')
+        .update(payload)
+        .eq('id', fichaTecnicaVehiculo.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setFichaTecnicaVehiculo({
+        ...fichaTecnicaVehiculo,
+        marca: editFichaData.marca,
+        modelo: editFichaData.modelo,
+        ano: editFichaData.ano,
+        anio: editFichaData.ano,
+        chasis: editFichaData.chasis,
+        motor: editFichaData.motor,
+        norma: editFichaData.norma,
+        aplicacion: editFichaData.aplicacion,
+        tipoAceite: editFichaData.tipoAceite,
+        fecha_matriculacion: editFichaData.fechaMatriculacion,
+        detalles: payload.detalles
+      });
+      
+      setIsEditingFicha(false);
+      // Refresh database records
+      fetchVehiculos();
+    } catch (e: any) {
+      console.error('Error saving technical sheet:', e);
     }
   };
 
@@ -1015,40 +1129,159 @@ export default function PizarraMantenimiento() {
           title={`Ficha Técnica - ${fichaTecnicaVehiculo.numeroInterno} (${fichaTecnicaVehiculo.patente})`}
         >
           <div className="space-y-6 text-sm">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
-                <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Marca / Modelo</span>
-                <span className="font-bold">{fichaTecnicaVehiculo.marca} {fichaTecnicaVehiculo.modelo}</span>
+            {!isEditingFicha ? (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Marca / Modelo</span>
+                    <span className="font-bold">{fichaTecnicaVehiculo.marca || '--'} {fichaTecnicaVehiculo.modelo || ''}</span>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Año de Fabricación</span>
+                    <span className="font-bold">{fichaTecnicaVehiculo.ano || '--'}</span>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Patente (PPU)</span>
+                    <span className="font-bold">{fichaTecnicaVehiculo.patente || '--'}</span>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Fecha de Matriculación</span>
+                    <span className="font-bold">{fichaTecnicaVehiculo.fecha_matriculacion || '--'}</span>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">N° de Chasis (VIN)</span>
+                    <span className="font-bold font-mono">{fichaTecnicaVehiculo.chasis || '--'}</span>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Motorización</span>
+                    <span className="font-bold">{fichaTecnicaVehiculo.motor || '--'}</span>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Norma de Emisión</span>
+                    <span className="font-bold">{fichaTecnicaVehiculo.norma || '--'}</span>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Aplicación Operativa</span>
+                    <span className="font-bold">{fichaTecnicaVehiculo.aplicacion || '--'}</span>
+                  </div>
+                  <div className="col-span-2 bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Tipo de Aceite</span>
+                    <span className="font-bold">{fichaTecnicaVehiculo.tipoAceite || '--'}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <Button 
+                    onClick={() => setIsEditingFicha(true)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+                  >
+                    <Edit3 className="w-4 h-4" /> Editar Ficha Técnica
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Marca</label>
+                    <input 
+                      type="text" 
+                      value={editFichaData.marca} 
+                      onChange={(e) => setEditFichaData({ ...editFichaData, marca: e.target.value })} 
+                      className="w-full p-2 border rounded rounded-md dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Modelo</label>
+                    <input 
+                      type="text" 
+                      value={editFichaData.modelo} 
+                      onChange={(e) => setEditFichaData({ ...editFichaData, modelo: e.target.value })} 
+                      className="w-full p-2 border rounded rounded-md dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Año de Fabricación</label>
+                    <input 
+                      type="number" 
+                      value={editFichaData.ano} 
+                      onChange={(e) => setEditFichaData({ ...editFichaData, ano: e.target.value })} 
+                      className="w-full p-2 border rounded rounded-md dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Fecha de Matriculación</label>
+                    <input 
+                      type="date" 
+                      value={editFichaData.fechaMatriculacion} 
+                      onChange={(e) => setEditFichaData({ ...editFichaData, fechaMatriculacion: e.target.value })} 
+                      className="w-full p-2 border rounded rounded-md dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">N° de Chasis (VIN)</label>
+                    <input 
+                      type="text" 
+                      value={editFichaData.chasis} 
+                      onChange={(e) => setEditFichaData({ ...editFichaData, chasis: e.target.value })} 
+                      className="w-full p-2 border rounded rounded-md dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 font-mono" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Motorización</label>
+                    <input 
+                      type="text" 
+                      value={editFichaData.motor} 
+                      onChange={(e) => setEditFichaData({ ...editFichaData, motor: e.target.value })} 
+                      className="w-full p-2 border rounded rounded-md dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Norma de Emisión</label>
+                    <input 
+                      type="text" 
+                      value={editFichaData.norma} 
+                      onChange={(e) => setEditFichaData({ ...editFichaData, norma: e.target.value })} 
+                      className="w-full p-2 border rounded rounded-md dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Aplicación Operativa</label>
+                    <input 
+                      type="text" 
+                      value={editFichaData.aplicacion} 
+                      onChange={(e) => setEditFichaData({ ...editFichaData, aplicacion: e.target.value })} 
+                      className="w-full p-2 border rounded rounded-md dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" 
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Tipo de Aceite</label>
+                    <input 
+                      type="text" 
+                      value={editFichaData.tipoAceite} 
+                      onChange={(e) => setEditFichaData({ ...editFichaData, tipoAceite: e.target.value })} 
+                      className="w-full p-2 border rounded rounded-md dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" 
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t dark:border-slate-700">
+                  <Button 
+                    onClick={() => setIsEditingFicha(false)}
+                    variant="outline"
+                    className="border-slate-200 text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    onClick={handleSaveFicha}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    Guardar Cambios
+                  </Button>
+                </div>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
-                <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Año de Fabricación</span>
-                <span className="font-bold">{fichaTecnicaVehiculo.ano || '--'}</span>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
-                <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Patente (PPU)</span>
-                <span className="font-bold">{fichaTecnicaVehiculo.patente}</span>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
-                <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">N° de Chasis (VIN)</span>
-                <span className="font-bold font-mono">{fichaTecnicaVehiculo.chasis || '--'}</span>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
-                <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Motorización</span>
-                <span className="font-bold">{fichaTecnicaVehiculo.motor || '--'}</span>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
-                <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Norma de Emisión</span>
-                <span className="font-bold">{fichaTecnicaVehiculo.norma || '--'}</span>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
-                <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Aplicación Operativa</span>
-                <span className="font-bold">{fichaTecnicaVehiculo.aplicacion || '--'}</span>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
-                <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Tipo de Aceite</span>
-                <span className="font-bold">{fichaTecnicaVehiculo.tipoAceite || '--'}</span>
-              </div>
-            </div>
+            )}
 
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/50 p-4 rounded-lg">
               <h3 className="font-bold text-blue-900 dark:text-blue-100 mb-3 flex items-center gap-2">

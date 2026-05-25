@@ -41,6 +41,15 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
     });
   }, [tiposFalla, vehiculoSeleccionado]);
 
+  const filteredPautas = useMemo(() => {
+    if (!vehiculoSeleccionado?.modelo) return pautas;
+    return pautas.filter(p => {
+      const pautaModelo = (p.modeloVehiculo || '').toLowerCase();
+      if (!pautaModelo || pautaModelo === 'general' || pautaModelo === 'todos' || pautaModelo === '') return true;
+      return vehiculoSeleccionado.modelo?.toLowerCase().includes(pautaModelo) || pautaModelo.includes(vehiculoSeleccionado.modelo?.toLowerCase() || '');
+    });
+  }, [pautas, vehiculoSeleccionado]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -171,7 +180,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
                     <label className="block text-sm font-medium">Pauta Mantenimiento</label>
                     <select name="pauta" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange}>
                         <option value="">---------</option>
-                        {pautas.map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                        {filteredPautas.map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
                     </select>
                   </div>
                   <div>

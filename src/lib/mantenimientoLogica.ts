@@ -12,6 +12,21 @@ export interface VehiculoDB {
     fechaUltimaMantencion: Date | null;
     tipoUltimaPauta: string;
     pautasSecuencia?: { iteracion_km: number; nombre: string }[];
+    
+    // Tech sheet data integration
+    marca?: string;
+    modelo?: string;
+    ano?: string | number;
+    chasis?: string;
+    motor?: string;
+    norma?: string;
+    aplicacion?: string;
+    tipoAceite?: string;
+    fecha_matriculacion?: string;
+    detalles?: any;
+    intervaloMantenimiento?: number;
+    tipoIntervalo?: string;
+    factorConversionHoras?: number | null;
 }
 
 // 2. Estructura exacta de las 16 columnas de salida para la tabla
@@ -43,6 +58,21 @@ export interface FilaPizarraMantenimiento {
     fechaProximaMantencion: string | null; // 15. Fecha Próx. Mant.
     
     // 16. Acciones es UI (HTML/Botones), no requiere lógica de datos aquí.
+
+    // Tech sheet data integration
+    marca?: string;
+    modelo?: string;
+    ano?: string | number;
+    chasis?: string;
+    motor?: string;
+    norma?: string;
+    aplicacion?: string;
+    tipoAceite?: string;
+    fecha_matriculacion?: string;
+    detalles?: any;
+    intervaloMantenimiento?: number;
+    tipoIntervalo?: string;
+    factorConversionHoras?: number | null;
 }
 
 /**
@@ -203,6 +233,7 @@ export function calcularDatosPizarra(vehiculo: VehiculoDB): FilaPizarraMantenimi
     };
 
     return {
+        ...vehiculo,
         id: vehiculo.id,
         numeroInterno: vehiculo.numeroInterno,
         ppu: vehiculo.patente,
