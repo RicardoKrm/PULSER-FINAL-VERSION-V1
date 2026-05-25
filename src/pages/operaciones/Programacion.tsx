@@ -67,6 +67,10 @@ export default function Programacion() {
   const [dateFilterStart, setDateFilterStart] = useState(startOfMonthStr);
   const [dateFilterEnd, setDateFilterEnd] = useState(endOfMonthStr);
 
+  const [timePeriod, setTimePeriod] = useState<'AM' | 'PM'>('AM');
+  const startHour = timePeriod === 'AM' ? 0 : 12;
+  const displayHours = Array.from({ length: 12 }, (_, i) => i + startHour);
+
   useEffect(() => {
     fetchData();
   }, [activeCompanyId]);
@@ -169,13 +173,16 @@ export default function Programacion() {
             else if (p.estado === 'Pausado') estadoLabel = 'PAUSADO';
           }
 
-          let exactHour = p.hora || 10;
+          let exactHour = (p.hora !== undefined && p.hora !== null) ? parseInt(p.hora) : 10;
+          if (isNaN(exactHour)) exactHour = 10;
           let exactMinute = 0;
 
           if (p.realTimeStr) {
               const d = new Date(p.realTimeStr);
-              exactHour = d.getHours();
-              exactMinute = d.getMinutes();
+              if (!isNaN(d.getTime())) {
+                exactHour = d.getHours(); // <-- Cambiado a hora local
+                exactMinute = d.getMinutes(); // <-- Cambiado a minutos locales
+              }
           }
 
           const ampm = exactHour >= 12 ? 'PM' : 'AM';
@@ -288,6 +295,7 @@ export default function Programacion() {
           id: progData.id,
           dateStr: progData.fecha,
           hour: progData.hora || 10,
+           minute: 0,
           duration: progData.duracion || 2,
           tipo: progData.tipo,
           origen: progData.origen,
@@ -697,6 +705,23 @@ export default function Programacion() {
                  <option value="Tabla">Tabla Listado</option>
                </select>
 
+               {(viewMode === 'Semana' || viewMode === 'Día') && (
+                 <div className="flex bg-slate-100 dark:bg-slate-800 rounded-md p-1 border border-slate-200 dark:border-slate-700 shadow-sm">
+                   <button 
+                     onClick={() => setTimePeriod('AM')}
+                     className={cn("px-3 py-1 text-sm font-medium rounded-md transition-colors", timePeriod === 'AM' ? "bg-white dark:bg-slate-700 text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300")}
+                   >
+                     AM
+                   </button>
+                   <button 
+                     onClick={() => setTimePeriod('PM')}
+                     className={cn("px-3 py-1 text-sm font-medium rounded-md transition-colors", timePeriod === 'PM' ? "bg-white dark:bg-slate-700 text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300")}
+                   >
+                     PM
+                   </button>
+                 </div>
+               )}
+
                <button disabled={syncStatus === 'syncing'} onClick={handleSyncDrive} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors flex items-center justify-center gap-2 text-sm text-nowrap whitespace-nowrap disabled:opacity-50">
                   <span className="hidden sm:inline">{syncStatus === 'syncing' ? 'Sincronizando...' : syncStatus === 'success' ? '✓ Drive Sincronizado' : '⇄ Sync Bidireccional Drive'}</span>
                </button>
@@ -746,7 +771,7 @@ export default function Programacion() {
                 <div className="flex-1 overflow-y-auto overflow-x-auto relative flex">
                   {/* Time Axis */}
                   <div className="w-16 shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col sticky left-0 z-20">
-                    {HOURS.map((hour) => (
+                    {displayHours.map((hour) => (
                       <div key={hour} className="h-20 border-b border-slate-200 dark:border-slate-800 relative bg-white dark:bg-slate-900">
                          <span className="absolute -top-2.5 right-2 text-[10px] text-slate-500 font-medium">
                            {hour === 0 ? '12:00 AM' : hour < 12 ? `${hour}:00 AM` : hour === 12 ? '12:00 PM' : `${hour - 12}:00 PM`}
@@ -761,7 +786,7 @@ export default function Programacion() {
                        const dateStr = formatDateString(day);
                        return (
                          <div key={dateStr} className="flex-1 min-w-[120px] border-r border-slate-100 dark:border-slate-800 relative z-10">
-                           {HOURS.map((hour) => (
+                           {displayHours.map((hour) => (
                              <div 
                                key={`${dateStr}-${hour}`} 
                                className="h-20 border-b border-slate-100 dark:border-slate-800 border-dashed hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors"
@@ -772,7 +797,13 @@ export default function Programacion() {
                            ))}
                             {/* Render blocks for this day */}
                            {scheduled.filter(s => s.dateStr === dateStr).map(block => {
-                              const minutesFromStart = block.hour * 60 + block.minute;
+                              const adjustedHour = block.hour - startHour;
+                              
+                              // We can show blocks that start in this period or slightly overlap
+                              const isVisible = (adjustedHour >= -0.5 && adjustedHour < 12);
+                              if (!isVisible) return null;
+
+                              const minutesFromStart = adjustedHour * 60 + (block.minute || 0);
                               const topOffset = (minutesFromStart / 60) * 80;
                               const heightOffset = block.duration * 80;
                               
@@ -823,7 +854,7 @@ export default function Programacion() {
 
                        return (
                          <div key={c.id} className="flex-1 min-w-[150px] border-r border-slate-100 dark:border-slate-800 relative z-10">
-                           {HOURS.map((hour) => (
+                           {displayHours.map((hour) => (
                              <div 
                                key={`${c.id}-${hour}`} 
                                className="h-20 border-b border-slate-100 dark:border-slate-800 border-dashed hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors"
@@ -835,7 +866,12 @@ export default function Programacion() {
                            
                            {/* Driver Blocks for Today */}
                            {driverBlocks.map(block => {
-                              const minutesFromStart = block.hour * 60 + block.minute;
+                              const adjustedHour = block.hour - startHour;
+                              
+                              const isVisible = (adjustedHour >= -0.5 && adjustedHour < 12);
+                              if (!isVisible) return null;
+
+                              const minutesFromStart = adjustedHour * 60 + (block.minute || 0);
                               const topOffset = (minutesFromStart / 60) * 80;
                               const heightOffset = block.duration * 80;
                               return (
