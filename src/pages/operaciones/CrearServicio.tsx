@@ -35,16 +35,46 @@ export default function CrearServicio() {
   const [dateFilter, setDateFilter] = useState('');
   
   // States for the creation form to drive real-time validations
-  const [newContrato, setNewContrato] = useState('');
-  const [newFecha, setNewFecha] = useState('');
-  const [newTipoCarga, setNewTipoCarga] = useState('');
-  const [newSubtipo, setNewSubtipo] = useState('');
-  const [newOrigen, setNewOrigen] = useState('');
-  const [newDestino, setNewDestino] = useState('');
-  const [newConductor, setNewConductor] = useState('');
-  const [newUnidad, setNewUnidad] = useState('');
-  const [newIngreso, setNewIngreso] = useState<number | ''>('');
-  const [newCosto, setNewCosto] = useState<number | ''>('');
+  const [newContrato, setNewContrato] = useState(() => localStorage.getItem('formCrearServicio_newContrato') || '');
+  const [newFecha, setNewFecha] = useState(() => localStorage.getItem('formCrearServicio_newFecha') || '');
+  const [newTipoCarga, setNewTipoCarga] = useState(() => localStorage.getItem('formCrearServicio_newTipoCarga') || '');
+  const [newSubtipo, setNewSubtipo] = useState(() => localStorage.getItem('formCrearServicio_newSubtipo') || '');
+  const [newOrigen, setNewOrigen] = useState(() => localStorage.getItem('formCrearServicio_newOrigen') || '');
+  const [newDestino, setNewDestino] = useState(() => localStorage.getItem('formCrearServicio_newDestino') || '');
+  const [newConductor, setNewConductor] = useState(() => localStorage.getItem('formCrearServicio_newConductor') || '');
+  const [newUnidad, setNewUnidad] = useState(() => localStorage.getItem('formCrearServicio_newUnidad') || '');
+  const [newIngreso, setNewIngreso] = useState<number | ''>(() => {
+    const val = localStorage.getItem('formCrearServicio_newIngreso');
+    return val ? Number(val) : '';
+  });
+  const [newCosto, setNewCosto] = useState<number | ''>(() => {
+    const val = localStorage.getItem('formCrearServicio_newCosto');
+    return val ? Number(val) : '';
+  });
+
+  useEffect(() => { localStorage.setItem('formCrearServicio_newContrato', newContrato); }, [newContrato]);
+  useEffect(() => { localStorage.setItem('formCrearServicio_newFecha', newFecha); }, [newFecha]);
+  useEffect(() => { localStorage.setItem('formCrearServicio_newTipoCarga', newTipoCarga); }, [newTipoCarga]);
+  useEffect(() => { localStorage.setItem('formCrearServicio_newSubtipo', newSubtipo); }, [newSubtipo]);
+  useEffect(() => { localStorage.setItem('formCrearServicio_newOrigen', newOrigen); }, [newOrigen]);
+  useEffect(() => { localStorage.setItem('formCrearServicio_newDestino', newDestino); }, [newDestino]);
+  useEffect(() => { localStorage.setItem('formCrearServicio_newConductor', newConductor); }, [newConductor]);
+  useEffect(() => { localStorage.setItem('formCrearServicio_newUnidad', newUnidad); }, [newUnidad]);
+  useEffect(() => { localStorage.setItem('formCrearServicio_newIngreso', String(newIngreso)); }, [newIngreso]);
+  useEffect(() => { localStorage.setItem('formCrearServicio_newCosto', String(newCosto)); }, [newCosto]);
+
+  const clearFormCache = () => {
+    localStorage.removeItem('formCrearServicio_newContrato');
+    localStorage.removeItem('formCrearServicio_newFecha');
+    localStorage.removeItem('formCrearServicio_newTipoCarga');
+    localStorage.removeItem('formCrearServicio_newSubtipo');
+    localStorage.removeItem('formCrearServicio_newOrigen');
+    localStorage.removeItem('formCrearServicio_newDestino');
+    localStorage.removeItem('formCrearServicio_newConductor');
+    localStorage.removeItem('formCrearServicio_newUnidad');
+    localStorage.removeItem('formCrearServicio_newIngreso');
+    localStorage.removeItem('formCrearServicio_newCosto');
+  };
   const [toastMessage, setToastMessage] = useState('');
   const [userCompanies, setUserCompanies] = useState<{id: string, nombre: string}[]>([]);
   const [newEmpresaId, setNewEmpresaId] = useState('');
@@ -219,6 +249,7 @@ export default function CrearServicio() {
 
       if (saveError) throw saveError;
 
+      clearFormCache();
       setIsModalOpen(false);
       loadData();
       showToast('Servicio guardado exitosamente.');

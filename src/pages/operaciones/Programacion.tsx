@@ -46,9 +46,11 @@ const MONTHS_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio
 // Mock Data
 const PENDING_SERVICES: any[] = [];
 
-const INIT_DATE = new Date(2026, 3, 6); // 6 Abril 2026
+const today = new Date();
+const INIT_DATE = today;
 
-const SCHEDULED_BLOCKS: any[] = [];
+const startOfMonthStr = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+const endOfMonthStr = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
 
 const HOURS = Array.from({ length: 12 }, (_, i) => i + 8); // 8 to 19
 
@@ -62,8 +64,8 @@ export default function Programacion() {
   const [pendings, setPendings] = useState<any[]>([]);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success'>('idle');
 
-  const [dateFilterStart, setDateFilterStart] = useState('2026-04-01');
-  const [dateFilterEnd, setDateFilterEnd] = useState('2026-04-30');
+  const [dateFilterStart, setDateFilterStart] = useState(startOfMonthStr);
+  const [dateFilterEnd, setDateFilterEnd] = useState(endOfMonthStr);
 
   useEffect(() => {
     fetchData();
