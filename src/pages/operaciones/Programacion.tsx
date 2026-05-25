@@ -106,8 +106,8 @@ export default function Programacion() {
       if (resServ.data && resProg.data) {
         
         // --- CLEANUP ORPHANED BLOCKS ---
-        const allServsQuery = await supabase.from('operacion_servicio').select('id, fecha_servicio');
-        const allServsMap = new Map(allServsQuery.data?.map((s:any) => [s.id, s.fecha_servicio]) || []);
+        const allServsQuery = await supabase.from('operacion_servicio').select('id, fecha_servicio, codigo');
+        const allServsMap = new Map(allServsQuery.data?.map((s:any) => [s.id, s]) || []);
         
         const validBlocks = resProg.data.filter((p: any) => {
           if (p.notas && p.notas.length > 20 && p.notas.includes('-')) {
@@ -116,7 +116,9 @@ export default function Programacion() {
                 supabase.from('operacion_programacion').delete().eq('id', p.id).then();
                 return false;
              } else {
-                p.realTimeStr = allServsMap.get(p.notas);
+                const s = allServsMap.get(p.notas);
+                p.realTimeStr = s.fecha_servicio;
+                p.codigo = s.codigo;
              }
           }
           // Si resServ viene vacío asumiendo que el usuario borró todo y p.notas está vacío, limpiarlo
@@ -172,9 +174,8 @@ export default function Programacion() {
 
           if (p.realTimeStr) {
               const d = new Date(p.realTimeStr);
-              // Extract UTC hours to ignore browser timezone offsets and strictly match DB representation
-              exactHour = d.getUTCHours();
-              exactMinute = d.getUTCMinutes();
+              exactHour = d.getHours();
+              exactMinute = d.getMinutes();
           }
 
           const ampm = exactHour >= 12 ? 'PM' : 'AM';
@@ -183,6 +184,7 @@ export default function Programacion() {
 
           return {
           id: p.id,
+          codigo: p.codigo,
           dateStr: p.fecha,
           hour: exactHour,
           minute: exactMinute,
@@ -791,7 +793,7 @@ export default function Programacion() {
                                   style={{ top: `${topOffset + 2}px`, height: `${heightOffset - 4}px` }}
                                 >
                                   <div className="font-semibold text-[10px] leading-tight truncate flex justify-between gap-1 items-center mb-0.5">
-                                    <span>{block.tipo}</span>
+                                    <span>{block.codigo ? `${block.codigo} - ${block.tipo}` : block.tipo}</span>
                                     <span className="text-[9px] uppercase tracking-wider opacity-80">{block.estado}</span>
                                   </div>
                                   {(block.conductorName || block.vehiculoPatente) && (
@@ -852,7 +854,7 @@ export default function Programacion() {
                                   style={{ top: `${topOffset + 2}px`, height: `${heightOffset - 4}px` }}
                                 >
                                   <div className="font-semibold text-xs leading-tight truncate flex justify-between gap-1 items-center mb-0.5">
-                                    <span>{block.tipo}</span>
+                                    <span>{block.codigo ? `${block.codigo} - ${block.tipo}` : block.tipo}</span>
                                     <span className="text-[10px] uppercase tracking-wider opacity-80">{block.estado}</span>
                                   </div>
                                   <div className="mt-auto flex flex-col gap-1 pt-1 opacity-90">
