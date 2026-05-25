@@ -106,15 +106,17 @@ export default function Programacion() {
       if (resServ.data && resProg.data) {
         
         // --- CLEANUP ORPHANED BLOCKS ---
-        const allServsQuery = await supabase.from('operacion_servicio').select('id');
-        const allServsIds = new Set(allServsQuery.data?.map((s:any) => s.id) || []);
+        const allServsQuery = await supabase.from('operacion_servicio').select('id, fecha_servicio');
+        const allServsMap = new Map(allServsQuery.data?.map((s:any) => [s.id, s.fecha_servicio]) || []);
         
         const validBlocks = resProg.data.filter((p: any) => {
           if (p.notas && p.notas.length > 20 && p.notas.includes('-')) {
-             if (!allServsIds.has(p.notas)) {
+             if (!allServsMap.has(p.notas)) {
                 // Eliminate orphaned block asynchronously
                 supabase.from('operacion_programacion').delete().eq('id', p.id).then();
                 return false;
+             } else {
+                p.realTimeStr = allServsMap.get(p.notas);
              }
           }
           // Si resServ viene vacío asumiendo que el usuario borró todo y p.notas está vacío, limpiarlo
@@ -165,17 +167,31 @@ export default function Programacion() {
             else if (p.estado === 'Pausado') estadoLabel = 'PAUSADO';
           }
 
+          let exactHour = p.hora || 10;
+          let exactMinute = 0;
+          let timeStr = `${exactHour}:00`;
+
+          if (p.realTimeStr) {
+              const d = new Date(p.realTimeStr);
+              // Handle UTC local conversion if needed, but the browser parses correctly.
+              // We'll use local hours for rendering.
+              exactHour = d.getHours();
+              exactMinute = d.getMinutes();
+              timeStr = `${exactHour.toString().padStart(2, '0')}:${exactMinute.toString().padStart(2, '0')}`;
+          }
+
           return {
           id: p.id,
           dateStr: p.fecha,
-          hour: p.hora || 10,
+          hour: exactHour,
+          minute: exactMinute,
           duration: p.duracion || 2,
           tipo: p.tipo,
           origen: p.origen,
           destino: p.destino,
           estado: estadoLabel,
           estadoRaw: p.estado,
-          timeStr: `${p.hora || 10}:00`,
+          timeStr: timeStr,
           conductorName: p.conductor?.nombre || null,
           vehiculoPatente: p.vehiculo?.patente || null,
           empresa_id: p.empresa_id,
@@ -408,21 +424,39 @@ export default function Programacion() {
   const handleEditBlockSave = async () => {
     if (!editingBlock) return;
     try {
-      const { error } = await supabase.from('operacion_programacion').update({
+      let updateProgData: any = {
         conductor_id: editingBlock.newConductor || null,
         vehiculo_id: editingBlock.newVehiculo || null,
         estado: editingBlock.newConductor ? 'Asignado' : 'Asignado'
-      }).eq('id', editingBlock.id);
+      };
+
+      if (editingBlock.newTime) {
+         updateProgData.hora = parseInt(editingBlock.newTime.split(':')[0]);
+      }
+
+      const { error } = await supabase.from('operacion_programacion').update(updateProgData).eq('id', editingBlock.id);
 
       if (error) throw error;
       
       // Sincronizar conductor y vehiculo a operacion_servicio
       if (editingBlock.notas && editingBlock.notas.length > 20) {
-        await supabase.from('operacion_servicio').update({
+        let updateData: any = {
           conductor_id: editingBlock.newConductor || null,
           vehiculo_id: editingBlock.newVehiculo || null,
           estado: editingBlock.newConductor ? 'Confirmado' : 'Borrador'
-        }).eq('id', editingBlock.notas);
+        };
+
+        if (editingBlock.newTime) {
+           const timeParts = editingBlock.newTime.split(':');
+           const h = timeParts[0];
+           const m = timeParts[1];
+           
+           // We keep the date of the block, but use the new time
+           const newD = new Date(`${editingBlock.dateStr}T${h}:${m}:00`);
+           updateData.fecha_servicio = newD.toISOString();
+        }
+
+        await supabase.from('operacion_servicio').update(updateData).eq('id', editingBlock.notas);
       }
 
       fetchData();
@@ -731,7 +765,7 @@ export default function Programacion() {
                            ))}
                             {/* Render blocks for this day */}
                            {scheduled.filter(s => s.dateStr === dateStr).map(block => {
-                              const topOffset = (block.hour - 8) * 80; 
+                              const topOffset = (block.hour - 8) * 80 + (block.minute / 60) * 80; 
                               const heightOffset = block.duration * 80;
                               
                               // Check if we need to assign a driver to display 
@@ -739,7 +773,7 @@ export default function Programacion() {
                                 <div 
                                   key={block.id}
                                   draggable={block.estadoRaw !== 'Realizado'}
-                                  onClick={() => setEditingBlock({ ...block, newConductor: block.conductor_id || '', newVehiculo: block.vehiculo_id || '' })}
+                                  onClick={() => setEditingBlock({ ...block, newConductor: block.conductor_id || '', newVehiculo: block.vehiculo_id || '', newTime: block.timeStr })}
                                   onDragStart={(e) => handleDragStart(e, block, 'scheduled')}
                                   onMouseEnter={(e) => handleMouseEnterTooltip(e, block)}
                                   onMouseLeave={handleMouseLeaveTooltip}
@@ -777,7 +811,7 @@ export default function Programacion() {
                      conductores.filter(c => c.selected).map(c => {
                        const todayStr = formatDateString(currentDate);
                        // Fix driver scheduling mock logic since we don't have a real DB logic yet to tie drivers directly to blocks
-                       const driverBlocks = scheduled.filter(s => s.dateStr === todayStr && (s.id.charCodeAt(1) % conductores.length) === (parseInt(c.id.replace('c','')) - 1));
+                       const driverBlocks = scheduled.filter(s => s.dateStr === todayStr && s.conductor_id === c.id);
 
                        return (
                          <div key={c.id} className="flex-1 min-w-[150px] border-r border-slate-100 dark:border-slate-800 relative z-10">
@@ -793,13 +827,13 @@ export default function Programacion() {
                            
                            {/* Driver Blocks for Today */}
                            {driverBlocks.map(block => {
-                              const topOffset = (block.hour - 8) * 80; 
+                              const topOffset = (block.hour - 8) * 80 + (block.minute / 60) * 80; 
                               const heightOffset = block.duration * 80;
                               return (
                                 <div 
                                   key={block.id}
                                   draggable={block.estadoRaw !== 'Realizado'}
-                                  onClick={() => setEditingBlock({ ...block, newConductor: block.conductor_id || '', newVehiculo: block.vehiculo_id || '' })}
+                                  onClick={() => setEditingBlock({ ...block, newConductor: block.conductor_id || '', newVehiculo: block.vehiculo_id || '', newTime: block.timeStr })}
                                   onDragStart={(e) => handleDragStart(e, block, 'scheduled')}
                                   onMouseEnter={(e) => handleMouseEnterTooltip(e, block)}
                                   onMouseLeave={handleMouseLeaveTooltip}
@@ -1109,6 +1143,16 @@ export default function Programacion() {
             
             <div className="space-y-3">
               <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Hora del Servicio</label>
+                <input 
+                  type="time" 
+                  value={editingBlock.newTime || ''}
+                  onChange={e => setEditingBlock({ ...editingBlock, newTime: e.target.value })}
+                  className="w-full text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Conductor</label>
                 <select 
                   value={editingBlock.newConductor} 
@@ -1137,9 +1181,20 @@ export default function Programacion() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-4">
-              <button onClick={() => setEditingBlock(null)} className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
-              <button onClick={handleEditBlockSave} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors">Guardar</button>
+            <div className="flex justify-between items-center gap-2 pt-4">
+              <div>
+                 {editingBlock.notas && editingBlock.notas.length > 20 && (
+                   <button onClick={() => {
+                        window.location.href = `/operaciones/servicios?edit=${editingBlock.notas}`;
+                   }} className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                      Ir a Detalles del Servicio <ArrowRight className="w-3 h-3" />
+                   </button>
+                 )}
+              </div>
+              <div className="flex justify-end gap-2">
+                 <button onClick={() => setEditingBlock(null)} className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
+                 <button onClick={handleEditBlockSave} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors">Guardar</button>
+              </div>
             </div>
           </div>
         </Modal>
