@@ -74,7 +74,7 @@ export default function Programacion() {
   const fetchData = async () => {
     try {
       let queryProg = supabase.from('operacion_programacion').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)');
-      let queryServ = supabase.from('operacion_servicio').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)').in('estado', ['Borrador', 'Programado', 'Confirmado']);
+      let queryServ = supabase.from('operacion_servicio').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)').in('estado', ['Borrador', 'Programado']);
       let queryCond = supabase.from('colaborador').select('id, nombre, estado, rol');
       let queryVehs = supabase.from('vehiculo').select('id, patente, estado');
       let queryRutas = supabase.from('operacion_ruta').select('id, nombre, origen, destino');
@@ -103,27 +103,7 @@ export default function Programacion() {
         setConductores(driversOnly.map((c: any) => ({ ...c, vehiculo: 'Sin Asignar', selected: true })));
       }
       
-      if (resServ.data && resProg.data) {
-        // Filter out services that already have a corresponding program block
-        const unprogrammedServices = resServ.data.filter((s: any) => {
-          // If it's already dragged onto the calendar, we inserted a program block with same origin/destination
-          const hasProgBlock = resProg.data.some((p: any) => p.origen === s.origen && p.destino === s.destino && p.empresa_id === s.empresa_id);
-          return !hasProgBlock;
-        });
-
-        setPendings(unprogrammedServices.map((s: any) => ({
-          id: s.id,
-          tipo: s.tipo_carga || 'Interprovincial',
-          origen: s.origen,
-          destino: s.destino,
-          conductorName: s.conductor?.nombre || null,
-          vehiculoPatente: s.vehiculo?.patente || null,
-          empresa_id: s.empresa_id,
-          conductor_id: s.conductor_id,
-          vehiculo_id: s.vehiculo_id,
-          bgColor: 'bg-white dark:bg-slate-800'
-        })));
-      } else if (resServ.data) {
+      if (resServ.data) {
         setPendings(resServ.data.map((s: any) => ({
           id: s.id,
           tipo: s.tipo_carga || 'Interprovincial',
@@ -139,6 +119,7 @@ export default function Programacion() {
       }
       
       if (resProg.data) {
+        console.log("BLOCKS FETCHED:", resProg.data);
         setScheduled(resProg.data.map((p: any) => {
           let hasDriver = !!p.conductor_id || p.conductor;
           let colorClass = 'bg-indigo-50 border-indigo-200 text-indigo-800 dark:bg-indigo-500/10 dark:border-indigo-500/20 dark:text-indigo-300';
@@ -369,6 +350,25 @@ export default function Programacion() {
   }, [currentDate, viewMode]);
 
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [editingBlock, setEditingBlock] = useState<any>(null);
+  
+  const handleEditBlockSave = async () => {
+    if (!editingBlock) return;
+    try {
+      const { error } = await supabase.from('operacion_programacion').update({
+        conductor_id: editingBlock.newConductor || null,
+        vehiculo_id: editingBlock.newVehiculo || null,
+        estado: editingBlock.newConductor ? 'Asignado' : 'Pendiende'
+      }).eq('id', editingBlock.id);
+
+      if (error) throw error;
+      fetchData();
+      setEditingBlock(null);
+    } catch (err) {
+      console.error(err);
+      alert('Error updating program block');
+    }
+  };
   const [dayDetailsModal, setDayDetailsModal] = useState<{isOpen: boolean, dateStr: string, blocks: any[]}>({ isOpen: false, dateStr: '', blocks: [] });
   const [newSvrTipo, setNewSvrTipo] = useState('Interprovincial');
   const [newSvrOrigen, setNewSvrOrigen] = useState('');
@@ -458,27 +458,33 @@ export default function Programacion() {
                  <span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span>
                </div>
                <div className="grid grid-cols-7 text-center text-xs gap-y-1">
-                 {[...Array(4)].map((_,i) => <span key={`e-${i}`} className="text-slate-300 dark:text-slate-600 py-1">{27+i}</span>)}
-                 {[...Array(31)].map((_,i) => {
-                    const d = i + 1;
-                    return (
-                      <span 
-                        key={`d-${i}`} 
-                        onClick={() => {
-                          const newDate = new Date(currentDate);
-                          newDate.setDate(d);
-                          setCurrentDate(newDate);
-                          setViewMode('Día');
-                        }}
-                        className={cn("w-6 h-6 flex items-center justify-center rounded-full mx-auto cursor-pointer transition-colors", 
-                           d === currentDate.getDate() && viewMode === 'Día' ? "bg-blue-600 text-white font-bold" : "hover:bg-slate-200 dark:hover:bg-slate-700",
-                           d === currentDate.getDate() && viewMode !== 'Día' ? "ring-2 ring-blue-500 font-bold" : ""
-                        )}
-                      >
-                        {d}
-                      </span>
-                    );
-                 })}
+                 {(() => {
+                    const start = getStartOfMonth(currentDate);
+                    const startDay = start.getDay();
+                    const diff = startDay === 0 ? 6 : startDay - 1; 
+                    const calendarStart = addDays(start, -diff);
+                    return Array.from({ length: 42 }).map((_, i) => {
+                      const day = addDays(calendarStart, i);
+                      const isCurrentM = day.getMonth() === currentDate.getMonth();
+                      const d = day.getDate();
+                      return (
+                        <span 
+                          key={`md-${i}`} 
+                          onClick={() => {
+                            setCurrentDate(day);
+                            setViewMode('Día');
+                          }}
+                          className={cn("w-6 h-6 flex items-center justify-center rounded-full mx-auto transition-colors",
+                             isCurrentM ? "cursor-pointer text-slate-700 dark:text-slate-300" : "text-slate-300 dark:text-slate-600",
+                             d === currentDate.getDate() && isCurrentM && viewMode === 'Día' ? "bg-blue-600 text-white font-bold" : (isCurrentM ? "hover:bg-slate-200 dark:hover:bg-slate-700" : ""),
+                             d === currentDate.getDate() && isCurrentM && viewMode !== 'Día' ? "ring-2 ring-blue-500 font-bold" : ""
+                          )}
+                        >
+                          {d}
+                        </span>
+                      );
+                    });
+                 })()}
                </div>
             </div>
 
@@ -658,6 +664,7 @@ export default function Programacion() {
                                 <div 
                                   key={block.id}
                                   draggable={block.estadoRaw !== 'Realizado'}
+                                  onClick={() => setEditingBlock({ ...block, newConductor: block.conductor_id || '', newVehiculo: block.vehiculo_id || '' })}
                                   onDragStart={(e) => handleDragStart(e, block, 'scheduled')}
                                   onMouseEnter={(e) => handleMouseEnterTooltip(e, block)}
                                   onMouseLeave={handleMouseLeaveTooltip}
@@ -717,6 +724,7 @@ export default function Programacion() {
                                 <div 
                                   key={block.id}
                                   draggable={block.estadoRaw !== 'Realizado'}
+                                  onClick={() => setEditingBlock({ ...block, newConductor: block.conductor_id || '', newVehiculo: block.vehiculo_id || '' })}
                                   onDragStart={(e) => handleDragStart(e, block, 'scheduled')}
                                   onMouseEnter={(e) => handleMouseEnterTooltip(e, block)}
                                   onMouseLeave={handleMouseLeaveTooltip}
@@ -805,6 +813,7 @@ export default function Programacion() {
                                 <div 
                                   key={block.id}
                                   draggable={block.estadoRaw !== 'Realizado'}
+                                  onClick={() => setEditingBlock({ ...block, newConductor: block.conductor_id || '', newVehiculo: block.vehiculo_id || '' })}
                                   onDragStart={(e) => handleDragStart(e, block, 'scheduled')}
                                   onMouseEnter={(e) => handleMouseEnterTooltip(e, block)}
                                   onMouseLeave={handleMouseLeaveTooltip}
@@ -1013,6 +1022,53 @@ export default function Programacion() {
           </div>
         </div>
       </Modal>
+
+      {/* Modal for editing existing block */}
+      {editingBlock && (
+        <Modal isOpen={!!editingBlock} onClose={() => setEditingBlock(null)} title={`Editar Programación`}>
+          <div className="space-y-4">
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+              <div className="font-semibold text-slate-800 dark:text-slate-200 mb-1">{editingBlock.tipo}</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">{editingBlock.origen} - {editingBlock.destino}</div>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Conductor</label>
+                <select 
+                  value={editingBlock.newConductor} 
+                  onChange={e => setEditingBlock({ ...editingBlock, newConductor: e.target.value })} 
+                  className="w-full text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Sin asignar</option>
+                  {dbConductores.map(c => (
+                    <option key={c.id} value={c.id}>{c.nombre} ({c.rol})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Vehículo</label>
+                <select 
+                  value={editingBlock.newVehiculo} 
+                  onChange={e => setEditingBlock({ ...editingBlock, newVehiculo: e.target.value })} 
+                  className="w-full text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Sin asignar</option>
+                  {dbVehiculos.map(v => (
+                    <option key={v.id} value={v.id}>{v.patente}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <button onClick={() => setEditingBlock(null)} className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
+              <button onClick={handleEditBlockSave} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors">Guardar</button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       <Modal isOpen={dayDetailsModal.isOpen} onClose={() => setDayDetailsModal({ ...dayDetailsModal, isOpen: false })} title={`Servicios del ${dayDetailsModal.dateStr}`}>
          <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2">

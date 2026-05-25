@@ -253,19 +253,21 @@ export default function CrearServicio() {
 
       // Auto-programar si es nuevo
       if (insertedServicioId && !editingServicio) {
-        await supabase.from('operacion_programacion').insert([{
+        const progDateStr = newFecha ? newFecha.split('T')[0] : new Date().toISOString().split('T')[0];
+        const { error: progSaveErr } = await supabase.from('operacion_programacion').insert([{
           empresa_id: saveCompanyId,
-          tipo: newSvrTipo || newTipoCarga || 'Interprovincial',
+          tipo: newTipoCarga || 'Interprovincial',
           origen: newOrigen,
           destino: newDestino,
-          fecha: newFecha || new Date().toISOString().split('T')[0],
-          hora: 10,
+          fecha: progDateStr,
+          hora: newFecha && newFecha.includes('T') ? parseInt(newFecha.split('T')[1].split(':')[0]) : 10,
           duracion: 2,
           conductor_id: newConductor || null,
           vehiculo_id: newUnidad || null,
           estado: newConductor ? 'Asignado' : 'Pendiende',
-          notas: `Auto-programado desde servicio ${codigo}`
+          notas: `Auto-programado desde servicio ${editingServicio ? editingServicio.codigo : serviceData.codigo}`
         }]);
+        if (progSaveErr) console.error("Error inserting prog", progSaveErr);
         // Y lo marcamos como confirmado
         await supabase.from('operacion_servicio').update({ estado: 'Confirmado' }).eq('id', insertedServicioId);
       }
@@ -288,12 +290,11 @@ export default function CrearServicio() {
         const { error } = await supabase.from('operacion_servicio').update({ estado: 'Anulado' }).eq('id', selectedServicio.id);
         if (error) throw error;
         
-        showToast('Servicio anulado exitosamente.');
         setSelectedServicio(null);
         loadData();
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error al anular servicio:', error);
-        showToast('Error al anular el servicio.');
+        alert(`Error al anular el servicio: ${error.message || JSON.stringify(error)}`);
       }
     }
   };
@@ -302,15 +303,14 @@ export default function CrearServicio() {
     if (!selectedServicio) return;
     if (confirm(`ATENCIÓN: ¿Estás seguro de que deseas ELIMINAR PERMANENTEMENTE el servicio ${selectedServicio.codigo}?`)) {
       try {
-        showToast('Eliminando servicio...');
         const { error } = await supabase.from('operacion_servicio').delete().eq('id', selectedServicio.id);
         if (error) throw error;
-        showToast('Servicio eliminado exitosamente.');
+
         setSelectedServicio(null);
         loadData();
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error deleting service:', error);
-        showToast('Error al eliminar el servicio.');
+        alert(`Error al eliminar el servicio: ${error.message || JSON.stringify(error)}`);
       }
     }
   };
