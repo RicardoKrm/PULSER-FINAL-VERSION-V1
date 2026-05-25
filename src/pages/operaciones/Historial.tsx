@@ -26,29 +26,31 @@ export default function Historial() {
 
   useEffect(() => {
     const fetchHistory = async () => {
-      let query = supabase.from('operacion_programacion').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)').eq('estado', 'Realizado').order('fecha', { ascending: false });
+      let progQuery = supabase.from('operacion_programacion').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)').eq('estado', 'Realizado').order('fecha', { ascending: false });
+      let servQuery = supabase.from('operacion_servicio').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)').order('fecha_servicio', { ascending: false });
       
       if (activeCompanyId && activeCompanyId !== 'GLOBAL') {
-        query = query.eq('empresa_id', activeCompanyId);
+        progQuery = progQuery.eq('empresa_id', activeCompanyId);
+        servQuery = servQuery.eq('empresa_id', activeCompanyId);
       }
 
-      const { data, error } = await query;
-      if (!error && data) {
-         setHistoryItems(data.map(item => {
+      const [progRes, servRes] = await Promise.all([progQuery, servQuery]);
+      
+      let combined: any[] = [];
+      if (!progRes.error && progRes.data) {
+         const pData = progRes.data.map((item: any) => {
            let parsedDate = new Date().toISOString();
            try {
              if (item.fecha) {
-               // Safe parsing
                const timePart = String(item.hora || 10).padStart(2, '0');
                parsedDate = new Date(`${item.fecha}T${timePart}:00:00`).toISOString();
              }
            } catch(e) {}
-           
            return {
              id: item.id,
              module: 'Viajes',
-             action: `Viaje Finalizado - ${item.tipo || 'Servicio'}`,
-             description: `El viaje con origen en ${item.origen || 'N/A'} y destino en ${item.destino || 'N/A'} fue marcado como realizado.`,
+             action: `Viaje Realizado - Programado`,
+             description: `El viaje programado con origen en ${item.origen || 'N/A'} y destino en ${item.destino || 'N/A'} fue marcado como realizado.`,
              user: item.conductor?.nombre || 'Sin Conductor',
              date: parsedDate,
              reference: item.id.substring(0, 8).toUpperCase(),
@@ -59,8 +61,46 @@ export default function Historial() {
              vehiculo: item.vehiculo?.patente || 'Sin Vehículo',
              fecha: item.fecha || '2000-01-01'
            };
-         }));
+         });
+         combined = [...combined, ...pData];
       }
+
+      if (!servRes.error && servRes.data) {
+         const sData = servRes.data.map((item: any) => {
+           let actionText = 'Servicio Creado';
+           let colorClass = 'bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400';
+           
+           if (item.estado === 'Finalizado') {
+             actionText = 'Servicio Finalizado';
+             colorClass = 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400';
+           } else if (item.estado === 'Anulado') {
+             actionText = 'Servicio Anulado';
+             colorClass = 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400';
+           }
+
+           const fechaServStr = item.fecha_servicio ? item.fecha_servicio.split('T')[0] : '2000-01-01';
+
+           return {
+             id: item.id,
+             module: 'Viajes',
+             action: actionText,
+             description: `El servicio ${item.codigo || ''} tipo ${item.tipo_carga || ''} (${item.origen || 'N/A'} -> ${item.destino || 'N/A'}) se registró en estado ${item.estado}.`,
+             user: item.conductor?.nombre || 'Sin Conductor',
+             date: item.created_at || new Date().toISOString(),
+             reference: item.codigo || item.id.substring(0, 8).toUpperCase(),
+             icon: ClipboardList,
+             color: colorClass,
+             origen: item.origen || 'N/A',
+             destino: item.destino || 'N/A',
+             vehiculo: item.vehiculo?.patente || 'Sin Vehículo',
+             fecha: fechaServStr
+           };
+         });
+         combined = [...combined, ...sData];
+      }
+
+      combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setHistoryItems(combined);
     };
     fetchHistory();
   }, [activeCompanyId]);

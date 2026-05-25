@@ -72,7 +72,7 @@ export default function Programacion() {
   const fetchData = async () => {
     try {
       let queryProg = supabase.from('operacion_programacion').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)');
-      let queryServ = supabase.from('operacion_servicio').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)').eq('estado', 'Borrador');
+      let queryServ = supabase.from('operacion_servicio').select('*, conductor:colaborador(nombre), vehiculo:vehiculo(patente)').in('estado', ['Borrador', 'Programado']);
       let queryCond = supabase.from('colaborador').select('id, nombre, estado, rol');
       let queryVehs = supabase.from('vehiculo').select('id, patente, estado');
       let queryRutas = supabase.from('operacion_ruta').select('id, nombre, origen, destino');
