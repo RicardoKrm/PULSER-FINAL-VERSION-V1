@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase, logActividad } from '../lib/supabase';
 
 interface AuthProfile {
   id: string;
@@ -99,6 +99,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signOut = async () => {
+    if (profile) {
+      try {
+        await logActividad(
+          'Acceso', 
+          'Cerró Sesión', 
+          `Usuario ${profile.nombre || 'Desconocido'} cerró su sesión de manera voluntaria.`, 
+          profile.empresa_id, 
+          profile.id
+        );
+      } catch (le) {
+        console.warn(le);
+      }
+    }
     await supabase.auth.signOut();
   };
 

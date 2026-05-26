@@ -37,11 +37,14 @@ export default function ControlDocumental() {
     
     try {
       const file = files[0];
+      const saveCompanyId = activeCompanyId || profile?.empresa_id;
       const newDoc = {
-        entidad_tipo: modalType === 'driver' ? 'conductor' : 'vehiculo',
+        empresa_id: saveCompanyId,
+        tipo_entidad: modalType === 'driver' ? 'CONDUCTOR' : 'VEHICULO',
         entidad_id: selectedEntity.id,
-        nombre: file.name,
-        estado: 'vigente'
+        tipo_documento: file.name,
+        estado: 'Vigente',
+        archivo_url: file.name
       };
 
       const { data, error } = await supabase.from('operacion_documento').insert([newDoc]).select();
@@ -615,12 +618,12 @@ export default function ControlDocumental() {
                        {documentos.map((doc: any) => (
                          <div key={doc.id} className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-xl hover:border-indigo-300 transition-colors group relative overflow-hidden">
                            <div className="flex items-center gap-3">
-                             <div className={`p-2 rounded-lg ${doc.estado === 'vigente' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20' : 'bg-red-50 text-red-600 dark:bg-red-900/20'}`}>
-                               {doc.estado === 'vigente' ? <FileCheck className="w-5 h-5" /> : <FileWarning className="w-5 h-5" />}
+                             <div className={`p-2 rounded-lg ${(doc.estado || '').toLowerCase() === 'vigente' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20' : 'bg-red-50 text-red-600 dark:bg-red-900/20'}`}>
+                               {(doc.estado || '').toLowerCase() === 'vigente' ? <FileCheck className="w-5 h-5" /> : <FileWarning className="w-5 h-5" />}
                              </div>
                              <div>
-                               <p className="font-bold text-sm text-slate-800 dark:text-white">{doc.nombre}</p>
-                               <p className={`text-[10px] font-bold uppercase tracking-wide ${doc.estado === 'vigente' ? 'text-emerald-600' : 'text-red-500'}`}>
+                               <p className="font-bold text-sm text-slate-800 dark:text-white">{doc.nombre || doc.tipo_documento}</p>
+                               <p className={`text-[10px] font-bold uppercase tracking-wide ${(doc.estado || '').toLowerCase() === 'vigente' ? 'text-emerald-600' : 'text-red-500'}`}>
                                  Registrado
                                </p>
                              </div>

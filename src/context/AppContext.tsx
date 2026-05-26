@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, logActividad } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import { useCompany } from '../contexts/CompanyContext';
 import Swal from 'sweetalert2';
@@ -497,6 +497,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
+        try {
+          await logActividad(
+            'Mantenimiento',
+            'Creó Orden de Trabajo',
+            `OT #${finalOT.folio || finalOT.id} - Tipo: ${finalOT.tipo} - Estado: ${finalOT.estado}`,
+            activeCompanyId || profile?.empresa_id || undefined,
+            profile?.id
+          );
+        } catch (le) {
+          console.warn('Logging error:', le);
+        }
+
         Swal.fire({
           title: "¡Guardado Exitoso!",
           text: `La orden de trabajo ${finalOT.folio} se ha guardado correctamente en la base de datos.`,
@@ -786,6 +798,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           } catch (eSol) {
             console.warn("Could not sync solicitudes to database:", eSol);
           }
+        }
+
+        try {
+          await logActividad(
+            'Mantenimiento',
+            'Actualizó Orden de Trabajo',
+            `OT #${otActualizada.folio || otActualizada.id} - Estado: ${otActualizada.estado} - Prioridad: ${otActualizada.prioridad}`,
+            activeCompanyId || profile?.empresa_id || undefined,
+            profile?.id
+          );
+        } catch (le) {
+          console.warn('Logging error:', le);
         }
 
         Swal.fire({

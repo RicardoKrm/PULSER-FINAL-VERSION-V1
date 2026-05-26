@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { supabase, logActividad } from '../lib/supabase';
 import { Building2, Lock, User, ArrowRight, ShieldCheck, Zap, BarChart3, X, Mail } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -57,12 +57,27 @@ export default function Login() {
         // Find panel_inicio in table usuario_aplicacion
         const { data: profile } = await supabase
           .from('usuario_aplicacion')
-          .select('panel_inicio')
+          .select('id, nombre, empresa_id, panel_inicio')
           .eq('auth_user_id', data.session.user.id)
           .single();
           
-        if (profile && profile.panel_inicio) {
-          navigate(profile.panel_inicio);
+        if (profile) {
+          try {
+            await logActividad(
+              'Acceso',
+              'Ingreso al Sistema',
+              `Usuario ${profile.nombre || 'Desconocido'} inició sesión con éxito.`,
+              profile.empresa_id,
+              profile.id
+            );
+          } catch (le) {
+            console.warn(le);
+          }
+          if (profile.panel_inicio) {
+            navigate(profile.panel_inicio);
+          } else {
+            navigate('/dashboard');
+          }
         } else {
           // Default start panel
           navigate('/dashboard');

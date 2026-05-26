@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Calendar as CalendarIcon, CheckCircle2, AlertCircle, Plus, Search, MapPin, Truck, User, FileText, X, Activity, Download, ChevronRight, DollarSign, Clock, FileWarning, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { supabase } from '../../lib/supabase';
+import { supabase, logActividad } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
+import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../lib/utils';
 
 type Servicio = {
@@ -26,6 +27,7 @@ type Servicio = {
 
 export default function CrearServicio() {
   const { activeCompanyId } = useCompany();
+  const { profile } = useAuth();
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [contratosDisponibles, setContratosDisponibles] = useState<{ id: string; cliente: string }[]>([]);
   const [vehiculosDisponibles, setVehiculosDisponibles] = useState<{ id: string; patente: string }[]>([]);
@@ -309,6 +311,18 @@ export default function CrearServicio() {
       setIsModalOpen(false);
       loadData();
       showToast('Servicio guardado exitosamente.');
+      
+      try {
+        logActividad(
+          'Operaciones',
+          editingServicio ? 'Actualizó Servicio' : 'Creó Servicio',
+          `Código: ${serviceData.codigo}, Ruta: ${serviceData.origen} -> ${serviceData.destino}, Estado: ${serviceData.estado}`,
+          finalCompanyId ?? activeCompanyId ?? profile?.empresa_id,
+          profile?.id
+        );
+      } catch (logErr) {
+        console.warn('Logging skipped:', logErr);
+      }
     } catch (error) {
       console.error('Error saving service:', error);
       showToast('Error al guardar el servicio.');
@@ -335,12 +349,36 @@ export default function CrearServicio() {
         const { error } = await supabase.from('operacion_servicio').update({ estado: 'Anulado' }).eq('id', selectedServicio.id);
         if (error) throw error;
         showToast('Servicio anulado exitosamente.');
+        
+        try {
+          await logActividad(
+            'Operaciones',
+            'Anuló Servicio',
+            `Foliado o Código: ${selectedServicio.codigo || selectedServicio.id}`,
+            activeCompanyId || profile?.empresa_id,
+            profile?.id
+          );
+        } catch (le) {
+          console.warn(le);
+        }
       } else if (confirmState.action === 'eliminar') {
         const { error: progDelErr } = await supabase.from('operacion_programacion').delete().eq('notas', selectedServicio.id);
         if (progDelErr) console.error("Error deleting programacion:", progDelErr);
         const { error } = await supabase.from('operacion_servicio').delete().eq('id', selectedServicio.id);
         if (error) throw error;
         showToast('Servicio eliminado exitosamente.');
+        
+        try {
+          await logActividad(
+            'Operaciones',
+            'Eliminó Servicio',
+            `Foliado o Código: ${selectedServicio.codigo || selectedServicio.id}`,
+            activeCompanyId || profile?.empresa_id,
+            profile?.id
+          );
+        } catch (le) {
+          console.warn(le);
+        }
       }
       
       setConfirmState({ isOpen: false, action: null });
