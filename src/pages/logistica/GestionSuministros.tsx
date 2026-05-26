@@ -214,6 +214,11 @@ export default function GestionSuministros() {
   const [entriesPerPage, setEntriesPerPage] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
   const [auditoriaData, setAuditoriaData] = React.useState<any[]>([]);
+  const [auditoriaSearchTerm, setAuditoriaSearchTerm] = useState('');
+  const [auditoriaDesde, setAuditoriaDesde] = useState('');
+  const [auditoriaHasta, setAuditoriaHasta] = useState('');
+  const [auditoriaMovimiento, setAuditoriaMovimiento] = useState('Cualquier Movimiento');
+  const [auditoriaUsuario, setAuditoriaUsuario] = useState('Cualquier Usuario');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBodega, setSelectedBodega] = useState('Todas las bodegas');
@@ -290,6 +295,33 @@ export default function GestionSuministros() {
     v.notas.toLowerCase().includes(validacionesSearchTerm.toLowerCase()) ||
     v.usuario.toLowerCase().includes(validacionesSearchTerm.toLowerCase())
   );
+
+  const filteredAuditoria = auditoriaData.filter(v => {
+    let match = true;
+    if (auditoriaSearchTerm) {
+      const st = auditoriaSearchTerm.toLowerCase();
+      const n = (v.logistica_repuestos?.nombre || '').toLowerCase();
+      const sku = (v.logistica_repuestos?.sku || '').toLowerCase();
+      const ref = (v.referencia || '').toLowerCase();
+      const notas = (v.notas || '').toLowerCase();
+      if (!n.includes(st) && !sku.includes(st) && !ref.includes(st) && !notas.includes(st)) {
+        match = false;
+      }
+    }
+    if (auditoriaDesde) {
+      if (new Date(v.created_at) < new Date(auditoriaDesde + 'T00:00:00')) match = false;
+    }
+    if (auditoriaHasta) {
+      if (new Date(v.created_at) > new Date(auditoriaHasta + 'T23:59:59')) match = false;
+    }
+    if (auditoriaMovimiento && auditoriaMovimiento !== 'Cualquier Movimiento') {
+      if (v.tipo !== auditoriaMovimiento) match = false;
+    }
+    if (auditoriaUsuario && auditoriaUsuario !== 'Cualquier Usuario') {
+      if (v.usuario_nombre !== auditoriaUsuario) match = false;
+    }
+    return match;
+  });
 
   // Function to format currency
   const formatCurrency = (amount: number) => {
@@ -402,6 +434,36 @@ export default function GestionSuministros() {
     URL.revokeObjectURL(link.href);
   };
 
+  const [auditoriaPage, setAuditoriaPage] = useState(1);
+  const [auditoriaPerPage, setAuditoriaPerPage] = useState(50);
+  const paginatedAuditoria = filteredAuditoria.slice((auditoriaPage - 1) * auditoriaPerPage, auditoriaPage * auditoriaPerPage);
+
+  const exportAuditoria = () => {
+    const headers = ['Fecha/Hora', 'Repuesto', 'SKU', 'Proveedor', 'Ubicación', 'Tipo', 'Cantidad', 'Notas/Referencia', 'Usuario'];
+    const rows = filteredAuditoria.map(item => {
+      const cant = (item.tipo === 'ENTRADA' || (item.cantidad > 0 && item.tipo !== 'ENTRADA' && item.tipo !== 'SALIDA' && item.tipo !== 'TRASLADO') ? '+' : item.tipo === 'SALIDA' ? '-' : '') + Math.abs(item.cantidad);
+      return [
+        `"${new Date(item.created_at).toLocaleString()}"`,
+        `"${item.logistica_repuestos?.nombre || 'Eliminado'}"`,
+        `"${item.logistica_repuestos?.sku || '--'}"`,
+        `"${item.logistica_repuestos?.proveedor || '--'}"`,
+        `"${item.logistica_repuestos?.logistica_bodegas?.nombre || '--'} - ${item.logistica_repuestos?.ubicacion || '--'}"`,
+        `"${item.tipo}"`,
+        cant,
+        `"${item.notas || item.referencia || ''}"`,
+        `"${item.usuario_nombre || 'Sistema'}"`
+      ];
+    });
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `auditoria_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
   const valorizacionFiltrada = filteredData.reduce((acc, item) => acc + item.valorTotal, 0);
 
   const totalPages = Math.ceil(filteredData.length / entriesPerPage);
@@ -449,7 +511,7 @@ export default function GestionSuministros() {
               VOLVER
             </Button>
             
-            <Button className="bg-[#10b981] hover:bg-[#059669] text-white">
+            <Button className="bg-[#10b981] hover:bg-[#059669] text-white" onClick={exportAuditoria}>
               <Download className="w-4 h-4 mr-2" />
               EXPORTAR EXCEL
             </Button>
@@ -462,30 +524,53 @@ export default function GestionSuministros() {
             <input 
               type="text" 
               placeholder="Buscar Repuesto, SKU o Notas..."
+              value={auditoriaSearchTerm}
+              onChange={(e) => setAuditoriaSearchTerm(e.target.value)}
               className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-400"
             />
           </div>
 
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-500 font-medium">DESDE:</span>
-            <input type="date" className="border border-slate-300 dark:border-slate-700 rounded-md px-3 py-1.5 bg-transparent text-sm dark:bg-slate-800" />
+            <input 
+              type="date" 
+              value={auditoriaDesde}
+              onChange={(e) => setAuditoriaDesde(e.target.value)}
+              className="border border-slate-300 dark:border-slate-700 rounded-md px-3 py-1.5 bg-transparent text-sm dark:bg-slate-800" 
+            />
           </div>
           
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-500 font-medium">HASTA:</span>
-            <input type="date" className="border border-slate-300 dark:border-slate-700 rounded-md px-3 py-1.5 bg-transparent text-sm dark:bg-slate-800" />
+            <input 
+              type="date" 
+              value={auditoriaHasta}
+              onChange={(e) => setAuditoriaHasta(e.target.value)}
+              className="border border-slate-300 dark:border-slate-700 rounded-md px-3 py-1.5 bg-transparent text-sm dark:bg-slate-800" 
+            />
           </div>
 
-          <select className="border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800">
+          <select 
+             className="border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800"
+             value={auditoriaMovimiento}
+             onChange={(e) => setAuditoriaMovimiento(e.target.value)}
+          >
             <option>Cualquier Movimiento</option>
             <option>ENTRADA</option>
             <option>SALIDA</option>
+            <option>TRASLADO</option>
+            <option>CORRECCIÓN_MANUAL</option>
           </select>
 
-          <select className="border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800">
+          <select 
+             className="border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800"
+             value={auditoriaUsuario}
+             onChange={(e) => setAuditoriaUsuario(e.target.value)}
+          >
             <option>Cualquier Usuario</option>
-            <option>administrador</option>
-            <option>demo</option>
+            {Array.from(new Set(auditoriaData.map(v => v.usuario_nombre).filter(Boolean))).map(u => (
+               <option key={u} value={u}>{u}</option>
+            ))}
           </select>
         </div>
 
@@ -494,11 +579,23 @@ export default function GestionSuministros() {
           <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-800">
             <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
               Show 
-              <select className="border border-slate-300 dark:border-slate-700 rounded px-2 py-1 mx-1 bg-transparent">
-                <option>50</option>
-                <option>100</option>
+              <select 
+                className="border border-slate-300 dark:border-slate-700 rounded px-2 py-1 mx-1 bg-transparent text-sm"
+                value={auditoriaPerPage}
+                onChange={(e) => {
+                   setAuditoriaPerPage(Number(e.target.value));
+                   setAuditoriaPage(1);
+                }}
+              >
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={500}>500</option>
               </select> 
               entries
+              <span className="ml-4 font-medium text-slate-700 dark:text-slate-300">
+                Mostrando {Math.min((auditoriaPage - 1) * auditoriaPerPage + 1, filteredAuditoria.length)} - {Math.min(auditoriaPage * auditoriaPerPage, filteredAuditoria.length)} de {filteredAuditoria.length} registros
+              </span>
             </div>
           </div>
 
@@ -517,7 +614,7 @@ export default function GestionSuministros() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {auditoriaData.map((item) => (
+                {paginatedAuditoria.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
                     <td className="px-4 py-3 align-top whitespace-nowrap">
                       <div className="font-bold text-slate-800 dark:text-slate-200 text-xs">{new Date(item.created_at).toLocaleDateString()}</div>
@@ -560,6 +657,56 @@ export default function GestionSuministros() {
                 ))}
               </tbody>
             </table>
+          </div>
+          
+          {/* Pagination controls */}
+          <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-slate-200 dark:border-slate-800 gap-4">
+            <div className="text-sm text-slate-500 font-medium">
+              Página {auditoriaPage} de {Math.ceil(filteredAuditoria.length / auditoriaPerPage) || 1}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="secondary" 
+                className="px-3 py-1.5 h-auto text-xs font-semibold"
+                disabled={auditoriaPage === 1}
+                onClick={() => setAuditoriaPage(prev => Math.max(1, prev - 1))}
+              >
+                Anterior
+              </Button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, Math.ceil(filteredAuditoria.length / auditoriaPerPage)) }, (_, i) => {
+                  const total = Math.ceil(filteredAuditoria.length / auditoriaPerPage);
+                  let pageNum = auditoriaPage - 2 + i;
+                  if (auditoriaPage <= 3) pageNum = i + 1;
+                  else if (auditoriaPage >= total - 2) pageNum = total - 4 + i;
+                  
+                  if (pageNum > 0 && pageNum <= total) {
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setAuditoriaPage(pageNum)}
+                        className={`w-8 h-8 flex items-center justify-center rounded-md text-xs font-bold transition-colors
+                          ${auditoriaPage === pageNum 
+                            ? 'bg-blue-600 text-white' 
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                          }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  }
+                  return null;
+                })}
+              </div>
+              <Button 
+                variant="secondary" 
+                className="px-3 py-1.5 h-auto text-xs font-semibold"
+                disabled={auditoriaPage >= Math.ceil(filteredAuditoria.length / auditoriaPerPage)}
+                onClick={() => setAuditoriaPage(prev => Math.min(Math.ceil(filteredAuditoria.length / auditoriaPerPage), prev + 1))}
+              >
+                Siguiente
+              </Button>
+            </div>
           </div>
         </div>
       </div>
