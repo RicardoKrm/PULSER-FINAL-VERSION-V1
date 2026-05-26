@@ -113,6 +113,13 @@ export default function GestionSuministros() {
       } else {
          setSumInsumosData([]);
       }
+      const { data: mvData, error: mvErr } = await supabase.from('logistica_movimientos').select(`
+        *,
+        logistica_repuestos (nombre, sku, proveedor, ubicacion, logistica_bodegas(nombre))
+      `).eq('empresa_id', currentCompany.id).order('created_at', { ascending: false });
+      if (!mvErr && mvData) {
+         setAuditoriaData(mvData);
+      }
     }, [currentCompany]);
 
   React.useEffect(() => {
@@ -192,6 +199,10 @@ export default function GestionSuministros() {
   };
 
   const [activeView, setActiveView] = useState<'inventario' | 'auditoria' | 'validaciones'>('inventario');
+  const [entriesPerPage, setEntriesPerPage] = useState(100);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [auditoriaData, setAuditoriaData] = React.useState<any[]>([]);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBodega, setSelectedBodega] = useState('Todas las bodegas');
   const [selectedUbicacion, setSelectedUbicacion] = useState('Todas las ubicaciones');
@@ -229,6 +240,9 @@ export default function GestionSuministros() {
     autorizador: '',
     destino: ''
   });
+
+  const [isEditRepuestoModalOpen, setIsEditRepuestoModalOpen] = useState(false);
+  const [editRepuestoObj, setEditRepuestoObj] = useState<Insumo | null>(null);
 
   // States for New Repuesto (Nuevo)
   const [isNewRepuestoModalOpen, setIsNewRepuestoModalOpen] = useState(false);
@@ -367,10 +381,33 @@ export default function GestionSuministros() {
 
   const valorizacionFiltrada = filteredData.reduce((acc, item) => acc + item.valorTotal, 0);
 
+  const totalPages = Math.ceil(filteredData.length / entriesPerPage);
+  const paginatedData = filteredData.slice((currentPage - 1) * entriesPerPage, currentPage * entriesPerPage);
+
+  const handleDeleteRepuesto = async (id: number) => {
+    const res = await Swal.fire({
+      title: '¿Eliminar repuesto?',
+      text: "Esta acción no se puede deshacer.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar'
+    });
+    if (res.isConfirmed) {
+      const { error } = await supabase.from('logistica_repuestos').delete().eq('id', id);
+      if (!error) {
+        Swal.fire("Eliminado", "Repuesto eliminado", "success");
+        loadData();
+      } else {
+        Swal.fire("Error", "No se pudo eliminar", "error");
+      }
+    }
+  };
+
   if (activeView === 'auditoria') {
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        {/* Header section with metrics and actions */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center p-6 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 gap-4">
           <div>
             <div className="flex items-center gap-3">
@@ -457,23 +494,24 @@ export default function GestionSuministros() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {mockAuditoriaData.map((item) => (
+                {auditoriaData.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
                     <td className="px-4 py-3 align-top whitespace-nowrap">
-                      <div className="font-bold text-slate-800 dark:text-slate-200 text-xs">{item.fecha}</div>
-                      <div className="text-[10px] text-slate-500">{item.hora}</div>
+                      <div className="font-bold text-slate-800 dark:text-slate-200 text-xs">{new Date(item.created_at).toLocaleDateString()}</div>
+                      <div className="text-[10px] text-slate-500">{new Date(item.created_at).toLocaleTimeString()}</div>
                     </td>
                     <td className="px-4 py-3 align-top">
                       <div className="font-bold text-blue-600 dark:text-blue-400 text-xs hover:underline cursor-pointer">
-                        {item.repuestoNombre}
+                        {item.logistica_repuestos?.nombre || 'Repuesto Eliminado'}
                       </div>
                       <div className="text-[10px] text-slate-400 mt-0.5">
-                        SKU: {item.sku}
+                        SKU: {item.logistica_repuestos?.sku || '--'}
                       </div>
                     </td>
-                    <td className="px-4 py-3 align-top text-xs text-slate-600 dark:text-slate-400">{item.proveedor}</td>
+                    <td className="px-4 py-3 align-top text-xs text-slate-600 dark:text-slate-400">{item.logistica_repuestos?.proveedor || '--'}</td>
                     <td className="px-4 py-3 align-top text-xs font-bold text-slate-700 dark:text-slate-300">
-                      {item.ubicacion.split(' ').map((p, i) => <div key={i}>{p}</div>)}
+                      {item.logistica_repuestos?.logistica_bodegas?.nombre ? `${item.logistica_repuestos?.logistica_bodegas?.nombre} - ` : ''}
+                      {item.logistica_repuestos?.ubicacion || '--'}
                     </td>
                     <td className="px-4 py-3 align-top text-center">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase
@@ -482,19 +520,15 @@ export default function GestionSuministros() {
                       </span>
                     </td>
                     <td className={`px-4 py-3 align-top text-center font-bold text-sm ${item.tipo === 'SALIDA' ? 'text-orange-500' : 'text-emerald-500'}`}>
-                      {item.cant}
+                      {item.tipo === 'ENTRADA' ? '+' : ''}{item.cantidad > 0 && item.tipo !== 'ENTRADA' && item.tipo !== 'SALIDA' && item.tipo !== 'TRASLADO' ? '+' : (item.tipo === 'SALIDA' ? '-' : '')}{Math.abs(item.cantidad)}
                     </td>
                     <td className="px-4 py-3 align-top">
-                      {item.esEnlace ? (
-                        <a href="#" className="text-[10px] font-bold text-blue-500 hover:underline">{item.notas}</a>
-                      ) : (
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-medium leading-tight">
-                          {item.notas}
-                        </p>
-                      )}
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-medium leading-tight">
+                        {item.notas || item.referencia}
+                      </p>
                     </td>
                     <td className="px-4 py-3 align-top text-xs font-bold text-slate-600 dark:text-slate-400">
-                      {item.usuario}
+                      {item.usuario_nombre || 'Sistema'}
                     </td>
                   </tr>
                 ))}
@@ -853,12 +887,24 @@ export default function GestionSuministros() {
         <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
             Show 
-            <select className="border border-slate-300 dark:border-slate-700 rounded px-2 py-1 mx-1 bg-transparent">
-              <option>25</option>
-              <option>50</option>
-              <option>100</option>
+            <select 
+              className="border border-slate-300 dark:border-slate-700 rounded px-2 py-1 mx-1 bg-transparent"
+              value={entriesPerPage}
+              onChange={(e) => {
+                setEntriesPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+            >
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={500}>500</option>
+              <option value={1000}>1000</option>
             </select> 
             entries
+            <span className="ml-4 font-medium text-slate-700 dark:text-slate-300">
+              Mostrando {Math.min((currentPage - 1) * entriesPerPage + 1, filteredData.length)} - {Math.min(currentPage * entriesPerPage, filteredData.length)} de {filteredData.length} repuestos
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -896,7 +942,7 @@ export default function GestionSuministros() {
               </tr>
             </thead>
             <tbody>
-              {filteredData.map((item) => (
+              {paginatedData.map((item) => (
                 <tr 
                   key={item.id} 
                   className={`border-b dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors
@@ -932,10 +978,18 @@ export default function GestionSuministros() {
                   <td className="px-4 py-3 text-right font-medium">{formatCurrency(item.valorTotal)}</td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center gap-1">
-                      <button className="p-1.5 text-slate-400 hover:text-blue-500 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm transition-colors" title="Editar">
+                      <button 
+                        className="p-1.5 text-slate-400 hover:text-blue-500 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm transition-colors" 
+                        title="Editar"
+                        onClick={() => { setEditRepuestoObj(item); setIsEditRepuestoModalOpen(true); }}
+                      >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
-                      <button className="p-1.5 text-slate-400 hover:text-red-500 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm transition-colors" onClick={(e) => e.preventDefault()} title="Eliminar Registro">
+                      <button 
+                         className="p-1.5 text-slate-400 hover:text-red-500 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm transition-colors" 
+                         onClick={() => handleDeleteRepuesto(item.id)} 
+                         title="Eliminar Registro"
+                      >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -1128,6 +1182,20 @@ export default function GestionSuministros() {
                       .in('id', selectedItems);
                       
                     if (!error) {
+                      const destBodega = bodegasList.find(b => b.id === destinationBodega);
+                      const movs = selectedItems.map(itemId => {
+                        const repItem = sumInsumosData.find(r => r.id === itemId);
+                        return {
+                          empresa_id: currentCompany.id,
+                          repuesto_id: itemId,
+                          tipo: 'TRASLADO',
+                          cantidad: repItem?.stock || 0,
+                          notas: `Traslado masivo de ${repItem?.bodegaNombre || 'Sin Asignar'} a ${destBodega?.nombre}`,
+                          estado: 'COMPLETADO'
+                        };
+                      });
+                      await supabase.from('logistica_movimientos').insert(movs);
+                      
                       setIsMoveModalOpen(false);
                       setIsSuccessModalOpen(true);
                       await loadData();
@@ -1296,6 +1364,81 @@ export default function GestionSuministros() {
             >
               Procesar Movimiento
             </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Edit Repuesto Modal */}
+      <Modal
+         isOpen={isEditRepuestoModalOpen}
+         onClose={() => setIsEditRepuestoModalOpen(false)}
+         title="Editar Repuesto"
+      >
+        <div className="space-y-4 pt-4">
+          <div className="grid grid-cols-2 gap-4">
+             <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nombre</label>
+                <input 
+                  type="text" 
+                  value={editRepuestoObj?.nombre || ''}
+                  onChange={e => setEditRepuestoObj(prev => prev ? {...prev, nombre: e.target.value} : prev)}
+                  className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800"
+                />
+             </div>
+             <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">SKU</label>
+                <input 
+                  type="text" 
+                  value={editRepuestoObj?.sku || ''}
+                  onChange={e => setEditRepuestoObj(prev => prev ? {...prev, sku: e.target.value} : prev)}
+                  className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800"
+                />
+             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+             <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Precio Unitario ($)</label>
+                <input 
+                  type="number" 
+                  value={editRepuestoObj?.precio || ''}
+                  onChange={e => setEditRepuestoObj(prev => prev ? {...prev, precio: parseFloat(e.target.value) || 0} : prev)}
+                  className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800"
+                />
+             </div>
+             <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Stock Mínimo</label>
+                <input 
+                  type="number" 
+                  value={editRepuestoObj?.min || ''}
+                  onChange={e => setEditRepuestoObj(prev => prev ? {...prev, min: parseInt(e.target.value) || 0} : prev)}
+                  className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800"
+                />
+             </div>
+          </div>
+          <div className="pt-4 flex justify-end gap-3 border-t border-slate-100 dark:border-slate-800">
+             <Button variant="secondary" onClick={() => setIsEditRepuestoModalOpen(false)}>Cancelar</Button>
+             <Button 
+               className="bg-[#10b981] hover:bg-[#059669] text-white"
+               onClick={async () => {
+                 if (editRepuestoObj) {
+                    const { error } = await supabase.from('logistica_repuestos').update({
+                       nombre: editRepuestoObj.nombre,
+                       sku: editRepuestoObj.sku,
+                       precio: editRepuestoObj.precio,
+                       min_stock: editRepuestoObj.min
+                    }).eq('id', editRepuestoObj.id);
+                    if (!error) {
+                       Swal.fire("Éxito", "Repuesto actualizado", "success");
+                       setIsEditRepuestoModalOpen(false);
+                       loadData();
+                    } else {
+                       Swal.fire("Error", "No se pudo actualizar", "error");
+                    }
+                 }
+               }}
+             >
+               Guardar Cambios
+             </Button>
           </div>
         </div>
       </Modal>
