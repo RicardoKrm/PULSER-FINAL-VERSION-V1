@@ -55,10 +55,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const { profile } = useAuth();
   const { activeCompanyId } = useCompany();
 
-  useEffect(() => {
+  const fetchAllData = React.useCallback(async () => {
     if (!activeCompanyId) return;
 
-    const fetchAllData = async () => {
+    const loadData = async () => {
       const pageSize = 1000;
       // Fetch Tareas
       let allTareasData: any[] = [];
@@ -341,8 +341,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     };
 
-    fetchAllData();
+    await loadData();
   }, [activeCompanyId]);
+
+  useEffect(() => {
+    fetchAllData();
+  }, [activeCompanyId, fetchAllData]);
 
   const crearReservaTurismo = (reserva: ReservaTurismo) => {
     // Logic for adding a reservation
@@ -606,25 +610,42 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         
         // Insumos y Repuestos
         if (otActualizada.insumos) {
+          // A. Obtener el detalle de insumos actualmente registrado en la base de datos para calcular el delta
+          let dbInsumos: any[] = [];
+          try {
+            const { data: qData, error: qErr } = await supabase
+              .from('detalle_insumo_ot')
+              .select('repuesto_id, cantidad')
+              .eq('orden_id', otActualizada.id);
+            if (!qErr && qData) {
+              dbInsumos = qData;
+            }
+          } catch (eQuery) {
+            console.error("No se pudieron cargar los insumos previos para calcular el delta:", eQuery);
+          }
+
+          // B. Eliminar antiguos detalles
           const { error: delInsumosErr } = await supabase.from('detalle_insumo_ot').delete().eq('orden_id', otActualizada.id);
           if (delInsumosErr) {
             console.error("Error deleting old detalle_insumo_ot:", delInsumosErr);
             throw new Error(`No se pudieron limpiar los insumos anteriores: ${delInsumosErr.message}`);
           }
+
+          // C. Insertar los nuevos
           if (otActualizada.insumos.length > 0) {
-            // Pre-ensure catalog entries exist to satisfy foreign keys
+            // Asegurar que existan en la tabla "repuesto" auxiliar
             for (const item of otActualizada.insumos) {
               if (item.repuesto) {
                 try {
                   await supabase.from('repuesto').upsert({
                     id: item.repuesto.id,
-                    sku: item.repuesto.sku || item.repuesto.referencia || Math.random().toString(36).substr(2, 9),
+                    sku: item.repuesto.sku || item.repuesto.referencia || Math.random().toString(36).substring(2, 11),
                     nombre: item.repuesto.nombre || 'Repuesto',
                     stock_actual: Number(item.repuesto.stock_actual || 0),
-                    costo_unitario: Number(item.repuesto.costo_unitario || item.repuesto.costo_unitario_aplicado || item.repuesto.costo_unitario || 0)
+                    costo_unitario: Number(item.repuesto.costo_unitario || item.repuesto.costo_unitario_aplicado || 0)
                   });
                 } catch (errRec) {
-                  console.warn("Failed to pre-upsert repuesto, continuing:", errRec);
+                  console.warn("Failed to pre-upsert repuesto auxiliary, continuing:", errRec);
                 }
               }
             }
@@ -642,6 +663,76 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               console.error("Error inserting detalle_insumo_ot:", insInsumosErr);
               throw new Error(`No se pudieron registrar los insumos de repuesto: ${insInsumosErr.message}`);
             }
+          }
+
+          // D. Calcular diferencia de cantidades, aplicar rebaja a "logistica_repuestos" y registrar en "logistica_movimientos"
+          try {
+            const dbMap: Record<string, number> = {};
+            for (const dbI of dbInsumos) {
+              if (dbI.repuesto_id) {
+                dbMap[dbI.repuesto_id] = (dbMap[dbI.repuesto_id] || 0) + Number(dbI.cantidad || 0);
+              }
+            }
+
+            const newMap: Record<string, number> = {};
+            for (const newI of otActualizada.insumos) {
+              const rId = newI.repuesto?.id || newI.repuesto_id;
+              if (rId) {
+                newMap[rId] = (newMap[rId] || 0) + Number(newI.cantidad || 0);
+              }
+            }
+
+            const todosRepIds = Array.from(new Set([...Object.keys(dbMap), ...Object.keys(newMap)]));
+
+            for (const rId of todosRepIds) {
+              const oldQty = dbMap[rId] || 0;
+              const newQty = newMap[rId] || 0;
+              const diff = newQty - oldQty;
+
+              if (diff !== 0) {
+                console.log(`[BODEGA DELTA COMPLETA] Repuesto: ${rId}, diff: ${diff}`);
+                const { data: currentRepData, error: currentRepErr } = await supabase
+                  .from('logistica_repuestos')
+                  .select('stock, nombre, empresa_id')
+                  .eq('id', rId)
+                  .single();
+
+                if (!currentRepErr && currentRepData) {
+                  const stockActualBD = Number(currentRepData.stock) || 0;
+                  const nuevoStockBD = stockActualBD - diff;
+
+                  // Actualizar stock de bodega real
+                  await supabase
+                    .from('logistica_repuestos')
+                    .update({ stock: nuevoStockBD })
+                    .eq('id', rId);
+
+                  // Crear registro de movimiento hist_bodega
+                  const otFolio = otActualizada.folio || otActualizada.id;
+                  const latMovInsert = {
+                    empresa_id: currentRepData.empresa_id || activeCompanyId,
+                    repuesto_id: rId,
+                    tipo: diff > 0 ? "SALIDA" : "ENTRADA",
+                    cantidad: Math.abs(diff),
+                    referencia: `OT #${otFolio}`,
+                    notas: diff > 0 
+                      ? `Consumo de material cargado a Orden de Trabajo #${otFolio}` 
+                      : `Devolución de material de Orden de Trabajo #${otFolio}`,
+                    usuario_nombre: 'Central/Taller OT',
+                    estado: 'COMPLETADO'
+                  };
+
+                  await supabase
+                    .from('logistica_movimientos')
+                    .insert([latMovInsert]);
+                }
+              }
+            }
+
+            // Recargar datos para que se actualice la vista de inventarios
+            await fetchAllData();
+          } catch (eDelta) {
+            console.error("Error al descontar de bodega:", eDelta);
           }
         }
         

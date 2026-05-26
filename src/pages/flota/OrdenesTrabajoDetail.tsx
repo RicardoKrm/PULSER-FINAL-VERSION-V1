@@ -60,6 +60,7 @@ export default function OrdenesTrabajoDetail() {
   const [tareaSearch, setTareaSearch] = useState('');
   const [isInsumoModalOpen, setIsInsumoModalOpen] = useState(false);
   const [insumoSearch, setInsumoSearch] = useState('');
+  const [insumoQuantities, setInsumoQuantities] = useState<Record<string, number>>({});
 
   const [isSolicitudModalOpen, setIsSolicitudModalOpen] = useState(false);
   const [nuevaSolicitud, setNuevaSolicitud] = useState({ repuesto_nombre: '', cantidad: 1 });
@@ -404,22 +405,23 @@ export default function OrdenesTrabajoDetail() {
     setIsTareaModalOpen(false);
   };
 
-  const agregarInsumo = (repuesto: any) => {
+  const agregarInsumo = (repuesto: any, cantidadToUse: number = 1) => {
     if (!ot) return;
     const existe = ot.insumos.find(i => i.repuesto?.nombre === repuesto.nombre);
     
     let nuevosInsumos: any[] = [];
     if (existe) {
-      nuevosInsumos = ot.insumos.map(i => i.repuesto?.nombre === repuesto.nombre ? { ...i, cantidad: i.cantidad + 1, costo_total: (i.cantidad + 1) * i.costo_unitario_aplicado } : i);
+      const nuevaCantidad = existe.cantidad + cantidadToUse;
+      nuevosInsumos = ot.insumos.map(i => i.repuesto?.nombre === repuesto.nombre ? { ...i, cantidad: nuevaCantidad, costo_total: nuevaCantidad * i.costo_unitario_aplicado } : i);
     } else {
       nuevosInsumos = [...ot.insumos, { 
         id: Math.random().toString(36).substr(2, 9), 
         orden_id: ot.id,
         repuesto_id: repuesto.id || Math.random().toString(36).substr(2, 9),
         repuesto: repuesto,
-        cantidad: 1, 
+        cantidad: cantidadToUse, 
         costo_unitario_aplicado: repuesto.costo_unitario || 0,
-        costo_total: repuesto.costo_unitario || 0
+        costo_total: cantidadToUse * (repuesto.costo_unitario || 0)
       }];
     }
 
@@ -432,7 +434,7 @@ export default function OrdenesTrabajoDetail() {
         {
           id: Math.random().toString(36).substr(2, 9),
           orden_id: ot.id,
-          comentario: `Agregado insumo/repuesto: ${repuesto.nombre}`,
+          comentario: `Agregado insumo/repuesto: ${repuesto.nombre} (x${cantidadToUse})`,
           created_at: new Date().toISOString(),
           usuario_nombre: profile?.nombre || 'Taller'
         }
@@ -440,6 +442,7 @@ export default function OrdenesTrabajoDetail() {
     });
     setIsInsumoModalOpen(false);
     setInsumoSearch('');
+    setInsumoQuantities({});
   };
 
   const eliminarTarea = (tareaId: string) => {
@@ -1430,8 +1433,17 @@ export default function OrdenesTrabajoDetail() {
                     <p className="text-xs text-slate-500">SKU: {i.sku} | Stock: <span className="text-emerald-500 font-semibold">{i.stock_actual} disponibles ✓</span></p>
                   </div>
                   <div className="flex gap-2 items-center">
-                    <input type="number" defaultValue={1} min={1} className="w-16 border rounded p-1 text-center text-sm dark:bg-slate-800 dark:border-slate-700" />
-                    <Button size="sm" className="bg-[#0cf]" onClick={() => agregarInsumo(i)}>Añadir</Button>
+                    <input 
+                      type="number" 
+                      value={insumoQuantities[i.id] ?? 1} 
+                      min={1} 
+                      onChange={(e) => setInsumoQuantities({
+                        ...insumoQuantities,
+                        [i.id]: Math.max(1, parseInt(e.target.value) || 1)
+                      })}
+                      className="w-16 border rounded p-1 text-center text-sm dark:bg-slate-800 dark:border-slate-700" 
+                    />
+                    <Button size="sm" className="bg-[#0cf]" onClick={() => agregarInsumo(i, insumoQuantities[i.id] ?? 1)}>Añadir</Button>
                   </div>
                </div>
             )) : (
