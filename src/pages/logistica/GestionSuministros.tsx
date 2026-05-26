@@ -7,6 +7,9 @@ import {
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { useAppContext } from '../../context/AppContext';
+import { useCompany } from '../../contexts/CompanyContext';
+import { supabase } from '../../lib/supabase';
+import { useNavigate } from 'react-router-dom';
 
 // Interfaces to maintain TypeScript types
 interface Insumo {
@@ -68,21 +71,38 @@ const mockValidacionesData: ValidacionData[] = [];
 
 export default function GestionSuministros() {
   const { proveedores } = useAppContext();
+  const { currentCompany } = useCompany();
+  const navigate = useNavigate();
   const [sumInsumosData, setSumInsumosData] = React.useState<Insumo[]>([]);
   
   const [bodegasList, setBodegasList] = React.useState<any[]>([]);
 
   React.useEffect(() => {
-    fetch('/api/bodegas')
-      .then(res => res.json())
-      .then(data => setBodegasList(data))
-      .catch(console.error);
+    const loadData = async () => {
+      // Intentar cargar desde supabase
+      if (!currentCompany?.id) return;
       
-    fetch('/api/repuestos')
-      .then(res => res.json())
-      .then(data => setSumInsumosData(data))
-      .catch(console.error);
-  }, []);
+      const { data: bData, error: bErr } = await supabase.from('logistica_bodegas').select('*').eq('empresa_id', currentCompany.id);
+      if (!bErr && bData) {
+        setBodegasList(bData);
+      } else {
+        // Fallback or empty
+        setBodegasList([]);
+      }
+
+      const { data: rData, error: rErr } = await supabase.from('logistica_repuestos').select('*').eq('empresa_id', currentCompany.id);
+      if (!rErr && rData) {
+        setSumInsumosData(rData.map((r: any) => ({
+          ...r, 
+          min: r.min_stock,
+          ultMov: r.ult_mov ? new Date(r.ult_mov).toLocaleDateString() : '--'
+        })));
+      } else {
+         setSumInsumosData([]);
+      }
+    };
+    loadData();
+  }, [currentCompany]);
 
   const [activeView, setActiveView] = useState<'inventario' | 'auditoria' | 'validaciones'>('inventario');
   const [searchTerm, setSearchTerm] = useState('');

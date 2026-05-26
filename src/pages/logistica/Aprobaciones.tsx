@@ -4,9 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
+import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
 
 export default function Aprobaciones() {
   const navigate = useNavigate();
+  const { currentCompany } = useCompany();
   const [pendientes, setPendientes] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
@@ -18,13 +21,21 @@ export default function Aprobaciones() {
 
   useEffect(() => {
     fetchPendientes();
-  }, []);
+  }, [currentCompany]);
 
   const fetchPendientes = async () => {
+    if (!currentCompany?.id) return;
     try {
-      const res = await fetch('/api/inventario/aprobaciones');
-      const data = await res.json();
-      setPendientes(data);
+      const { data, error } = await supabase
+        .from('logistica_movimientos')
+        .select('*')
+        .eq('empresa_id', currentCompany.id)
+        .eq('tipo', 'PENDIENTE_VALIDACION')
+        .eq('estado', 'PENDIENTE');
+      
+      if (data) {
+        setPendientes(data);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -32,24 +43,40 @@ export default function Aprobaciones() {
 
   const openApproveModal = (item: any) => {
     setSelectedItem(item);
-    setEditNombre(item.nombre === 'NUEVO PRODUCTO' ? '' : item.nombre);
+    setEditNombre(item.referencia === 'NUEVO PRODUCTO' ? '' : (item.referencia || '')); // referencia acts as captured SKU info
     setEditPrecio(0);
     setEditCantidad(item.cantidad || 1);
     setIsModalOpen(true);
   };
 
   const handleApprove = async () => {
-    if (!editNombre) return;
+    if (!editNombre || !currentCompany?.id) return;
     try {
-      const res = await fetch(`/api/inventario/aprobaciones/${selectedItem.id}/aprobar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre: editNombre, precio: editPrecio, stock: editCantidad })
-      });
-      if (res.ok) {
+      // Create new repuesto
+      const newRepuesto = {
+        empresa_id: currentCompany.id,
+        nombre: editNombre,
+        sku: selectedItem.referencia === 'NUEVO PRODUCTO' ? `SKU-${Math.floor(Math.random() * 10000)}` : selectedItem.notas || `SKU-${Math.floor(Math.random() * 10000)}`,
+        stock: editCantidad,
+        precio: editPrecio,
+        valor_total: editCantidad * editPrecio,
+        estado: 'ACTIVO',
+        ult_mov: new Date().toISOString()
+      };
+      
+      const { data: repData, error: repErr } = await supabase.from('logistica_repuestos').insert([newRepuesto]).select();
+      
+      if (!repErr && repData) {
+        // Mark as completed
+        await supabase.from('logistica_movimientos')
+          .update({ estado: 'COMPLETADO', repuesto_id: repData[0].id })
+          .eq('id', selectedItem.id);
+          
         Swal.fire('Éxito', 'Producto aprobado e ingresado a bodega', 'success');
         setIsModalOpen(false);
         fetchPendientes();
+      } else {
+        Swal.fire('Error', 'No se pudo crear repuesto', 'error');
       }
     } catch (e) {
       Swal.fire('Error', 'No se pudo aprobar', 'error');
@@ -109,8 +136,8 @@ export default function Aprobaciones() {
               ) : (
                 pendientes.map((item, idx) => (
                   <tr key={item.id || idx} className="border-t border-slate-100 dark:border-slate-800">
-                    <td className="px-6 py-4 font-medium">{item.sku}</td>
-                    <td className="px-6 py-4">{item.nombre}</td>
+                    <td className="px-6 py-4 font-medium">{item.notas || 'N/A'}</td>
+                    <td className="px-6 py-4">{item.referencia || 'NUEVO PRODUCTO'}</td>
                     <td className="px-6 py-4 text-center">{item.cantidad}</td>
                     <td className="px-6 py-4 text-center">
                       <button 
@@ -141,7 +168,7 @@ export default function Aprobaciones() {
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Aprobar Producto">
         <div className="space-y-4">
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-            SKU: <span className="font-bold text-slate-800 dark:text-slate-200">{selectedItem?.sku}</span>
+            SKU: <span className="font-bold text-slate-800 dark:text-slate-200">{selectedItem?.notas || 'N/A'}</span>
           </p>
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nombre Final / Clasificación</label>

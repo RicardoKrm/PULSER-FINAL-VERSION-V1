@@ -15,6 +15,8 @@ import {
   ScanBarcode
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
 
 interface ScanItem {
   sku: string;
@@ -43,6 +45,7 @@ interface Auditoria {
 
 export default function PuertoEscaneo() {
   const navigate = useNavigate();
+  const { currentCompany } = useCompany();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [bodegas, setBodegas] = useState<Bodega[]>([]);
   const [auditoriasActivas, setAuditoriasActivas] = useState<Auditoria[]>([]);
@@ -99,20 +102,26 @@ export default function PuertoEscaneo() {
   }, [scannedList]);
 
   const fetchData = async () => {
+    if (!currentCompany?.id) return;
     try {
-      const [bodegasRes, auditoriasRes] = await Promise.all([
-        fetch('/api/bodegas'),
-        fetch('/api/auditorias/activas')
-      ]);
-      const bodegasData = await bodegasRes.json();
+      const { data: bodegasData, error: bErr } = await supabase.from('logistica_bodegas').select('*').eq('empresa_id', currentCompany.id);
+      
+      const auditoriasRes = await fetch('/api/auditorias/activas');
       const auditoriasData = await auditoriasRes.json();
-      setBodegas(bodegasData);
+      
+      if (!bErr && bodegasData) {
+         setBodegas(bodegasData);
+         if (bodegasData.length > 0) setBodegaId(bodegasData[0].id.toString());
+      }
       setAuditoriasActivas(auditoriasData);
-      if (bodegasData.length > 0) setBodegaId(bodegasData[0].id.toString());
     } catch (e) {
       console.error("Error fetching initial data", e);
     }
   };
+
+  useEffect(() => {
+     fetchData();
+  }, [currentCompany]);
 
   const getTurno = () => {
     const hours = currentTime.getHours();
@@ -121,14 +130,27 @@ export default function PuertoEscaneo() {
 
   const handleSearch = async (query: string) => {
     setManualSearch(query);
-    if (query.length < 2) {
+    if (query.length < 2 || !currentCompany?.id) {
       setSearchResults([]);
       return;
     }
     try {
-      const res = await fetch(`/api/repuestos/search?q=${encodeURIComponent(query)}&bodega_id=${bodegaId}`);
-      const data = await res.json();
-      setSearchResults(data);
+      const { data, error } = await supabase
+        .from('logistica_repuestos')
+        .select('*')
+        .eq('empresa_id', currentCompany.id)
+        .or(`sku.ilike.%${query}%,nombre.ilike.%${query}%`);
+        
+      if (!error && data) {
+         setSearchResults(data.map((r: any) => ({
+           id: r.id,
+           sku: r.sku,
+           text: `${r.nombre} | ${r.sku}`,
+           stock_total: r.stock,
+           stock_local: r.stock,
+           precio: r.precio
+         })));
+      }
     } catch (e) {
       console.error("Error searching products", e);
     }
@@ -185,14 +207,22 @@ export default function PuertoEscaneo() {
     }
 
     // Normal mode: Search and open modal
-    try {
-      const res = await fetch(`/api/repuestos/search?q=${encodeURIComponent(sku)}&bodega_id=${bodegaId}`);
-      const d = await res.json();
-      const nombre = d.length > 0 ? d[0].text.split('|')[0].trim() : "NUEVO PRODUCTO";
-      openConfirmationModal(sku, nombre);
-    } catch (e) {
-      openConfirmationModal(sku, "NUEVO PRODUCTO");
+    let nombre = "NUEVO PRODUCTO";
+    if (currentCompany?.id) {
+       try {
+         const { data, error } = await supabase
+           .from('logistica_repuestos')
+           .select('nombre')
+           .eq('empresa_id', currentCompany.id)
+           .eq('sku', sku)
+           .limit(1);
+           
+         if (!error && data && data.length > 0) {
+            nombre = data[0].nombre;
+         }
+       } catch (e) {}
     }
+    openConfirmationModal(sku, nombre);
   };
 
   const openConfirmationModal = (sku: string, nombre: string) => {
@@ -265,17 +295,49 @@ export default function PuertoEscaneo() {
 
     for (const item of scannedList) {
       try {
-        const urlApi = item.tipo_movimiento === 'AUDITORIA' 
-          ? '/api/inventario/auditoria/conteo' 
-          : '/api/inventario/escanear';
-          
-        const res = await fetch(urlApi, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(item)
-        });
-
-        if (res.ok) {
+        const isAudit = item.tipo_movimiento === 'AUDITORIA';
+        let success = false;
+        
+        if (currentCompany?.id) {
+          if (isAudit) {
+            const { error: err } = await supabase.from('logistica_movimientos').insert({
+               empresa_id: currentCompany.id,
+               tipo: 'AUDITORIA',
+               cantidad: item.cantidad,
+               notas: item.sku,
+               referencia: item.nombre,
+               usuario_nombre: 'Escaneo Rápido',
+               estado: 'COMPLETADO'
+            });
+            if (!err) success = true;
+          } else {
+            if (item.nombre === "NUEVO PRODUCTO" || item.nombre.includes("Escaneo")) {
+               const { error: err } = await supabase.from('logistica_movimientos').insert({
+                 empresa_id: currentCompany.id,
+                 tipo: 'PENDIENTE_VALIDACION',
+                 cantidad: item.cantidad,
+                 notas: item.sku,
+                 referencia: item.nombre,
+                 usuario_nombre: 'Escaneo Rápido',
+                 estado: 'PENDIENTE'
+               });
+               if (!err) success = true;
+            } else {
+               const { error: err } = await supabase.from('logistica_movimientos').insert({
+                 empresa_id: currentCompany.id,
+                 tipo: item.tipo_movimiento,
+                 cantidad: item.cantidad,
+                 notas: item.sku,
+                 referencia: item.nombre,
+                 usuario_nombre: 'Escaneo Rápido',
+                 estado: 'COMPLETADO'
+               });
+               if (!err) success = true;
+            }
+          }
+        }
+        
+        if (success) {
           ok++;
         } else {
           errors.push(item.nombre);
