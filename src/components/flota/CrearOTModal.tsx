@@ -73,8 +73,33 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    let autoInstruccion = '';
+    switch(formData.tipo) {
+      case 'PREVENTIVA':
+      case 'PREVENTIVA_NEUMATICOS':
+          autoInstruccion = `Mantenimiento preventivo. Pauta a realizar: ${formData.pauta || 'No especificada'}.`;
+          if (formData.kitRepuestos) autoInstruccion += ` Utilizar Kit: ${formData.kitRepuestos}.`;
+          break;
+      case 'CORRECTIVA':
+      case 'EVALUATIVA':
+          autoInstruccion = `Revisión/Reparación. Falla reportada: ${formData.tipoFalla || 'No especificada'}. Síntomas: ${formData.sintomas || 'No especificados'}.`;
+          break;
+      case 'INSPECCION':
+          autoInstruccion = `Realizar inspección general del vehículo.`;
+          break;
+      case 'EVALUATIVA_NEUMATICOS':
+          autoInstruccion = `Inspección de Neumáticos/Tren Motriz. Configuración Ejes: ${formData.inspeccionTrenMotriz || 'No especificada'}, Eje afectado: ${formData.eje || 'No especificado'}.`;
+          break;
+      case 'CORRECTIVA_NEUMATICOS':
+          autoInstruccion = `Reparación correctiva de neumáticos.`;
+          if (formData.presionNeumatico) autoInstruccion += ` Ajustar presión a: ${formData.presionNeumatico} PSI.`;
+          break;
+      default:
+          autoInstruccion = 'Revisar vehículo según requerimiento.';
+    }
+
     if (otToEdit) {
-      actualizarOrdenTrabajo(formData as OrdenDeTrabajo);
+      actualizarOrdenTrabajo({ ...formData, observacionInicial: autoInstruccion } as OrdenDeTrabajo);
       onClose();
       return;
     }
@@ -113,7 +138,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
       fechaCreacion: formData.fechaCreacion || new Date().toISOString(),
       tareasRealizadas: [],
       insumos: insumosDesdeKit,
-      observacionInicial: formData.observacionInicial,
+      observacionInicial: autoInstruccion,
       pauta: formData.pauta,
       kitRepuestos: formData.kitRepuestos,
       tipoFalla: formData.tipoFalla,
