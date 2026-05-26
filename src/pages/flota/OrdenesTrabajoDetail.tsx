@@ -299,24 +299,35 @@ export default function OrdenesTrabajoDetail() {
     togglePanel('estado');
   };
 
+  const [personalTemporal, setPersonalTemporal] = useState(ot?.personalOperativo || '');
+
   const togglePanel = (panel: string) => setActivePanels(prev => ({ ...prev, [panel]: !prev[panel] }));
 
   const handleGuardarAsignacion = async () => {
     if (!ot) return;
     setIsUpdatingDb(true);
+    let comentarios = [];
+    if (selectedTecnico) {
+       comentarios.push(`Responsable: ${selectedTecnico}`);
+    }
+    if (personalTemporal && personalTemporal !== ot.personalOperativo) {
+       comentarios.push(`Apoyos: ${personalTemporal}`);
+    }
+
     try {
       await actualizarOrdenTrabajo({
         ...ot,
-        tecnicoResponsable: selectedTecnico || undefined,
+        tecnicoResponsable: selectedTecnico || ot.tecnicoResponsable,
+        personalOperativo: personalTemporal,
         historial: [
           ...ot.historial,
-          {
+          ...(comentarios.length > 0 ? [{
             id: Math.random().toString(36).substring(2, 11),
             orden_id: ot.id,
-            comentario: `Se asignó el responsable: ${selectedTecnico || 'Sin asignar'}`,
+            comentario: `Asignación actualizada -> ${comentarios.join(' | ')}`,
             created_at: new Date().toISOString(),
-            usuario_nombre: 'Administrador'
-          }
+            usuario_nombre: profile?.nombre || 'Administrador'
+          }] : [])
         ]
       });
       alert('Asignación de personal guardada correctamente.');
@@ -353,7 +364,7 @@ export default function OrdenesTrabajoDetail() {
           orden_id: ot.id,
           comentario: `Agregado Kit de repuestos: ${kit.nombre}`,
           created_at: new Date().toISOString(),
-          usuario_nombre: 'Sistema/Admin'
+          usuario_nombre: profile?.nombre || 'General'
         }
       ]
     });
@@ -375,7 +386,17 @@ export default function OrdenesTrabajoDetail() {
           tarea_estandar: tarea 
         }
       ],
-      costoManoObraTareas: ot.costoManoObraTareas + tarea.costoManoObra
+      costoManoObraTareas: ot.costoManoObraTareas + tarea.costoManoObra,
+      historial: [
+        ...ot.historial,
+        {
+          id: Math.random().toString(36).substr(2, 9),
+          orden_id: ot.id,
+          comentario: `Agregada tarea: ${tarea.descripcion || tarea.nombre || 'Tarea'}`,
+          created_at: new Date().toISOString(),
+          usuario_nombre: profile?.nombre || 'General'
+        }
+      ]
     });
     setIsTareaModalOpen(false);
   };
@@ -416,6 +437,47 @@ export default function OrdenesTrabajoDetail() {
     });
     setIsInsumoModalOpen(false);
     setInsumoSearch('');
+  };
+
+  const eliminarTarea = (tareaId: string) => {
+    if (!ot) return;
+    const tareaObj = ot.tareasRealizadas.find(t => t.id === tareaId);
+    actualizarOrdenTrabajo({
+      ...ot,
+      tareasRealizadas: ot.tareasRealizadas.filter(t => t.id !== tareaId),
+      costoManoObraTareas: ot.costoManoObraTareas - (tareaObj?.costo_real || 0),
+      historial: [
+        ...ot.historial,
+        {
+          id: Math.random().toString(36).substr(2, 9),
+          orden_id: ot.id,
+          comentario: `Se eliminó la tarea: ${tareaObj?.tarea_estandar?.descripcion || 'Tarea'}`,
+          created_at: new Date().toISOString(),
+          usuario_nombre: profile?.nombre || 'General'
+        }
+      ]
+    });
+  };
+
+  const eliminarInsumo = (insumoId: string) => {
+    if (!ot) return;
+    const insumoObj = ot.insumos.find(i => i.id === insumoId);
+    const nuevosInsumos = ot.insumos.filter(i => i.id !== insumoId);
+    actualizarOrdenTrabajo({
+      ...ot,
+      insumos: nuevosInsumos,
+      costoInsumos: nuevosInsumos.reduce((sum, item) => sum + item.costo_total, 0),
+      historial: [
+        ...ot.historial,
+        {
+          id: Math.random().toString(36).substr(2, 9),
+          orden_id: ot.id,
+          comentario: `Se eliminó el insumo/repuesto: ${insumoObj?.repuesto?.nombre || 'Insumo'}`,
+          created_at: new Date().toISOString(),
+          usuario_nombre: profile?.nombre || 'General'
+        }
+      ]
+    });
   };
 
   const crearSolicitud = () => {
@@ -658,7 +720,19 @@ export default function OrdenesTrabajoDetail() {
                     {activeTab === 'tareas' && (
                         <div>
                             <div className="flex justify-between items-center mb-4"><h3 className="font-bold">Tareas</h3>{canManageTareas && <Button size="sm" onClick={() => setIsTareaModalOpen(true)}><Plus className="w-4 h-4 mr-2"/>añadir tarea</Button>}</div>
-                            {ot.tareasRealizadas.map(t => <div key={t.id} className="flex justify-between p-2 border-b last:border border-0 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:bg-slate-900/50"><span>{t.tarea_estandar?.descripcion || 'Tarea'}</span>{canViewCostos && <span className="font-mono text-slate-600 dark:text-slate-400">${t.costo_real.toLocaleString()}</span>}</div>)}
+                            {ot.tareasRealizadas.map(t => (
+                                <div key={t.id} className="flex justify-between items-center p-2 border-b last:border-0 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:bg-slate-900/50 transition-colors">
+                                    <span className="flex-1 text-slate-800 dark:text-slate-200">{t.tarea_estandar?.descripcion || 'Tarea'}</span>
+                                    <div className="flex items-center gap-4">
+                                        {canViewCostos && <span className="font-mono text-slate-600 dark:text-slate-400">${t.costo_real.toLocaleString()}</span>}
+                                        {canManageTareas && (
+                                            <button onClick={() => eliminarTarea(t.id)} className="text-slate-400 hover:text-red-500 transition-colors" title="Eliminar tarea">
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     )}
                     {activeTab === 'insumos' && (
@@ -691,7 +765,19 @@ export default function OrdenesTrabajoDetail() {
                                     No hay insumos registrados en esta OT.
                                 </p>
                             )}
-                            {ot.insumos.map(i => <div key={i.id} className="flex justify-between p-2 border-b last:border border-0 dark:border-slate-800"><span>{i.repuesto?.nombre || 'Insumo'} (x{i.cantidad})</span>{canViewCostos && <span className="font-mono text-slate-600 dark:text-slate-400">${(i.costo_total).toLocaleString()}</span>}</div>)}
+                            {ot.insumos.map(i => (
+                                <div key={i.id} className="flex justify-between items-center p-2 border-b last:border-0 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:bg-slate-900/50 transition-colors">
+                                    <span className="flex-1 text-slate-800 dark:text-slate-200">{i.repuesto?.nombre || 'Insumo'} <span className="text-slate-500 font-mono text-xs">(x{i.cantidad})</span></span>
+                                    <div className="flex items-center gap-4">
+                                        {canViewCostos && <span className="font-mono text-slate-600 dark:text-slate-400">${(i.costo_total).toLocaleString()}</span>}
+                                        {canManageInsumos && (
+                                            <button onClick={() => eliminarInsumo(i.id)} className="text-slate-400 hover:text-red-500 transition-colors" title="Eliminar insumo">
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     )}
                     {activeTab === 'historial' && (
@@ -824,11 +910,7 @@ export default function OrdenesTrabajoDetail() {
                             className="w-full p-2 mt-1 border rounded dark:border-slate-800 text-sm dark:bg-slate-800 dark:text-slate-100" 
                             placeholder="Buscar ayudantes..." 
                             onChange={(e) => {
-                                // Normally this would push to an array of helpers, but for now we just handle it textually
-                                actualizarOrdenTrabajo({
-                                    ...ot,
-                                    personalOperativo: e.target.value,
-                                });
+                                setPersonalTemporal(e.target.value);
                             }}
                             defaultValue={ot.personalOperativo || ''}
                         />
