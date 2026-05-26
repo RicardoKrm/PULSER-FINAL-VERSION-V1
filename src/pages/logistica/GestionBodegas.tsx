@@ -21,7 +21,7 @@ export default function GestionBodegas() {
 
   useEffect(() => {
     fetchBodegas();
-  }, []);
+  }, [currentCompany]);
 
   useEffect(() => {
     const fetchColaboradores = async () => {
@@ -40,10 +40,15 @@ export default function GestionBodegas() {
   }, [currentCompany]);
 
   const fetchBodegas = async () => {
+    if (!currentCompany?.id) return;
     try {
-      const res = await fetch('/api/bodegas');
-      const data = await res.json();
-      setBodegas(data);
+      const { data, error } = await supabase
+        .from('logistica_bodegas')
+        .select('*')
+        .eq('empresa_id', currentCompany.id);
+      if (!error && data) {
+         setBodegas(data);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -66,19 +71,28 @@ export default function GestionBodegas() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentCompany?.id) return;
     try {
+      const payload = {
+        empresa_id: currentCompany.id,
+        nombre: formData.nombre,
+        tipo: formData.tipo,
+        identificador: formData.identificador,
+        proveedor: formData.proveedor,
+        responsable: formData.responsable,
+        ubicacion: formData.ubicacion,
+        estado: formData.estado
+      };
+
       if (editingBodega) {
-        await fetch(`/api/bodegas/${editingBodega.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
-        });
+        await supabase
+          .from('logistica_bodegas')
+          .update(payload)
+          .eq('id', editingBodega.id);
       } else {
-        await fetch('/api/bodegas', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
-        });
+        await supabase
+          .from('logistica_bodegas')
+          .insert([payload]);
       }
       fetchBodegas();
       setIsModalOpen(false);
@@ -94,17 +108,17 @@ export default function GestionBodegas() {
     setEditingBodega(bodega as any);
     setFormData({
       nombre: bodega.nombre,
-      tipo: bodega.tipo,
+      tipo: bodega.tipo || 'Principal',
       identificador: bodega.identificador || 1,
       proveedor: bodega.proveedor || '',
-      responsable: bodega.responsable,
-      ubicacion: bodega.ubicacion,
-      estado: bodega.estado
+      responsable: bodega.responsable || '',
+      ubicacion: bodega.ubicacion || '',
+      estado: bodega.estado || 'Activo'
     });
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     const result = await Swal.fire({
       title: '¿Estás seguro?',
       text: "No podrás revertir esto",
@@ -115,7 +129,11 @@ export default function GestionBodegas() {
     });
     if (result.isConfirmed) {
       try {
-        await fetch(`/api/bodegas/${id}`, { method: 'DELETE' });
+        await supabase
+          .from('logistica_bodegas')
+          .delete()
+          .eq('id', id);
+        
         fetchBodegas();
         Swal.fire('Eliminado!', 'La bodega ha sido eliminada.', 'success');
       } catch (e) {

@@ -6,6 +6,12 @@ CREATE TABLE IF NOT EXISTS public.logistica_bodegas (
     empresa_id UUID NOT NULL,
     nombre VARCHAR(255) NOT NULL,
     descripcion TEXT,
+    tipo VARCHAR(100),
+    identificador INTEGER,
+    proveedor VARCHAR(255),
+    responsable VARCHAR(255),
+    ubicacion VARCHAR(255),
+    estado VARCHAR(100),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

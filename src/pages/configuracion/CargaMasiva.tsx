@@ -108,8 +108,12 @@ const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any
     })
   },
   inventario: { 
-    table: 'insumo', 
-    mapConfig: (r: any) => ({ codigo: r.Codigo, nombre: r.Nombre, categoria: r.Categoria, stock: r.StockInicial, precio_unitario: r.PrecioUnitario, proveedor_principal: r.ProveedorPrincipal }) 
+    table: 'logistica_repuestos', 
+    mapConfig: (r: any) => ({ sku: r.Codigo || r.SKU, nombre: r.Nombre || r.Repuesto, categoria: r.Categoria, stock: r.StockInicial || r.Stock || 0, min_stock: r.StockMinimo || 0, precio: r.PrecioUnitario || r.Precio || 0, proveedor: r.ProveedorPrincipal || r.Proveedor }) 
+  },
+  bodegas: { 
+    table: 'logistica_bodegas', 
+    mapConfig: (r: any) => ({ nombre: r.Nombre, descripcion: r.Descripcion, tipo: r.Tipo, identificador: r.Identificador, proveedor: r.Proveedor, responsable: r.Responsable, ubicacion: r.Ubicacion, estado: r.Estado || 'Activo' }) 
   },
   pautas: { 
     table: 'mantenimiento_pauta', 
@@ -185,10 +189,6 @@ const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any
   documental: { 
     table: 'operacion_documento', 
     mapConfig: (r: any) => ({ entidad: r.Entidad, referencia: r.Referencia, tipo_documento: r.TipoDocumento, fecha_emision: r.FechaEmision, fecha_vencimiento: r.FechaVencimiento }) 
-  },
-  bodegas: { 
-    table: 'bodega', 
-    mapConfig: (r: any) => ({ codigo_bodega: r.CodigoBodega, nombre: r.Nombre, direccion: r.Dirección || r.Direccion, encargado: r.Encargado }) 
   },
   suministros: { 
     table: 'sumuministro', // actually let's check schema: table name is suministro
@@ -368,7 +368,7 @@ const MODULES: UploadModule[] = [
     description: 'Creación de múltiples sucursales, almacenes y sus datos de ubicación.',
     icon: Warehouse,
     template: [
-      { CodigoBodega: 'BOD-NTE-01', Nombre: 'Bodega Central Antofagasta', Dirección: 'Av. Pedro Aguirre Cerda 1234', Encargado: 'Carlos Silva' }
+      { Nombre: 'Bodega Central Antofagasta', Descripcion: 'Bodega principal', Tipo: 'Principal', Identificador: 1, Proveedor: '', Responsable: 'Carlos Silva', Ubicacion: 'Av. Pedro Aguirre Cerda 1234' }
     ]
   },
   {

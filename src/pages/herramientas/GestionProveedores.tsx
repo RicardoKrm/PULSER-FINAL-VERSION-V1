@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Trash, Plus, Search, Building2 } from 'lucide-react';
-import { useAppContext } from '../../context/AppContext';
-import { Proveedor } from '../../types';
+import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
+import Swal from 'sweetalert2';
 
 export default function GestionProveedores() {
-  const { proveedores, crearProveedor, eliminarProveedor } = useAppContext();
+  const { currentCompany } = useCompany();
+  const [proveedores, setProveedores] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   // Form State
@@ -18,27 +20,85 @@ export default function GestionProveedores() {
   const [email, setEmail] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
+  useEffect(() => {
+    fetchProveedores();
+  }, [currentCompany]);
+
+  const fetchProveedores = async () => {
+    if (!currentCompany?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from('proveedor')
+        .select('*')
+        .eq('empresa_id', currentCompany.id);
+      
+      // If error (e.g. column does not exist), just load all
+      if (error) {
+         const { data: fallbackData } = await supabase.from('proveedor').select('*');
+         if (fallbackData) setProveedores(fallbackData);
+      } else if (data) {
+        setProveedores(data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const filteredProveedores = proveedores.filter(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nombre.trim()) return;
+    if (!nombre.trim() || !currentCompany?.id) return;
     
-    crearProveedor({ 
-      id: Math.random().toString(36).substr(2, 9), 
-      nombre,
-      rut,
-      direccion,
-      telefono,
-      email
+    try {
+      const { error } = await supabase.from('proveedor').insert([{
+        empresa_id: currentCompany.id,
+        nombre,
+        rut,
+        direccion,
+        telefono,
+        email
+      }]);
+      
+      // If it fails because of missing empresa_id
+      if (error && error.message.includes('empresa_id')) {
+         await supabase.from('proveedor').insert([{
+           nombre, rut, direccion, telefono, email
+         }]);
+      }
+      
+      setNombre('');
+      setRut('');
+      setDireccion('');
+      setTelefono('');
+      setEmail('');
+      setIsModalOpen(false);
+      fetchProveedores();
+      Swal.fire('Éxito', 'Proveedor guardado correctamente', 'success');
+    } catch (e) {
+      Swal.fire('Error', 'No se pudo guardar', 'error');
+    }
+  };
+
+  const eliminarProveedor = async (id: string) => {
+    const res = await Swal.fire({
+      title: '¿Eliminar proveedor?',
+      text: 'Esta acción no se puede deshacer',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
     });
     
-    setNombre('');
-    setRut('');
-    setDireccion('');
-    setTelefono('');
-    setEmail('');
-    setIsModalOpen(false);
+    if (res.isConfirmed) {
+      try {
+        await supabase.from('proveedor').delete().eq('id', id);
+        fetchProveedores();
+        Swal.fire('Eliminado', '', 'success');
+      } catch (e) {
+        // Handle error
+      }
+    }
   };
 
   return (

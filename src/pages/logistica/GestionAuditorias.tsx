@@ -32,7 +32,11 @@ interface Bodega {
   nombre: string;
 }
 
+import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
+
 export default function GestionAuditorias() {
+  const { currentCompany } = useCompany();
   const navigate = useNavigate();
   const [auditorias, setAuditorias] = useState<Auditoria[]>([]);
   const [bodegas, setBodegas] = useState<Bodega[]>([]);
@@ -44,13 +48,12 @@ export default function GestionAuditorias() {
   useEffect(() => {
     fetchAuditorias();
     fetchBodegas();
-  }, []);
+  }, [currentCompany]);
 
   const fetchAuditorias = async () => {
+    if (!currentCompany?.id) return;
     try {
-      const res = await fetch('/api/auditorias/historial');
-      const data = await res.json();
-      setAuditorias(data);
+      setAuditorias([]); // Placeholder, ya construiremos logistica_auditorias
     } catch (e) {
       console.error("Error fetching audits", e);
     } finally {
@@ -59,33 +62,21 @@ export default function GestionAuditorias() {
   };
 
   const fetchBodegas = async () => {
+    if (!currentCompany?.id) return;
     try {
-      const res = await fetch('/api/bodegas');
-      const data = await res.json();
-      setBodegas(data);
-      if (data.length > 0) setNewAudit(prev => ({ ...prev, bodega_id: data[0].id.toString() }));
+      const { data, error } = await supabase.from('logistica_bodegas').select('*').eq('empresa_id', currentCompany.id);
+      if (!error && data) {
+         setBodegas(data as any);
+         if (data.length > 0) setNewAudit(prev => ({ ...prev, bodega_id: data[0].id.toString() }));
+      }
     } catch (e) {
       console.error("Error fetching bodegas", e);
     }
   };
 
   const handleStartAudit = async () => {
-    try {
-      const res = await fetch('/api/auditorias/iniciar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newAudit)
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setIsModalOpen(false);
-        navigate(`/logistica/auditorias/${data.id}`);
-      } else {
-        Swal.fire('Error', data.message || 'No se pudo iniciar la auditoría', 'error');
-      }
-    } catch (e) {
-      Swal.fire('Error', 'Error de conexión', 'error');
-    }
+    Swal.fire("En desarrollo", "Las auditorías están en proceso de integración a base de datos", "info");
+    setIsModalOpen(false);
   };
 
   const getStatusBadge = (status: string) => {

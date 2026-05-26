@@ -106,8 +106,7 @@ export default function PuertoEscaneo() {
     try {
       const { data: bodegasData, error: bErr } = await supabase.from('logistica_bodegas').select('*').eq('empresa_id', currentCompany.id);
       
-      const auditoriasRes = await fetch('/api/auditorias/activas');
-      const auditoriasData = await auditoriasRes.json();
+      const { data: auditoriasData, error: aErr } = await supabase.from('logistica_movimientos').select('*').eq('empresa_id', currentCompany.id).eq('tipo', 'AUDITORIA').eq('estado', 'PENDIENTE');
       
       if (!bErr && bodegasData) {
          setBodegas(bodegasData);

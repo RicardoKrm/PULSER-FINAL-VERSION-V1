@@ -104,6 +104,85 @@ export default function GestionSuministros() {
     loadData();
   }, [currentCompany]);
 
+  const handleTerminalSubmit = async () => {
+    if (!currentCompany?.id || !terminalForm.bodegaId) {
+       Swal.fire("Error", "Seleccione una bodega", "error");
+       return;
+    }
+    
+    try {
+       // Check if SKU exists
+       const { data: rep, error: rErr } = await supabase.from('logistica_repuestos')
+         .select('*')
+         .eq('empresa_id', currentCompany.id)
+         .eq('bodega_id', terminalForm.bodegaId)
+         .eq('sku', terminalForm.sku).single();
+
+       let repId = rep?.id;
+       let requiresValidation = false;
+         
+       if (!rep) {
+          if (terminalForm.tipoMovimiento === 'ENTRADA') {
+             requiresValidation = true;
+          } else {
+             Swal.fire("Error", "SKU no encontrado en esta bodega, no puede extraer stock", "error");
+             return;
+          }
+       }
+
+       if (requiresValidation) {
+          await supabase.from('logistica_movimientos').insert({
+             empresa_id: currentCompany.id,
+             tipo: 'PENDIENTE_VALIDACION',
+             cantidad: terminalForm.cantidad,
+             notas: terminalForm.sku,
+             referencia: terminalForm.nombre || 'NUEVO PRODUCTO',
+             usuario_nombre: terminalForm.solicitante || 'Escaneo Terminal',
+             estado: 'PENDIENTE'
+          });
+          Swal.fire("Guardado", "Enviado a validación", "info");
+       } else if (repId) {
+          // Normal movement
+          const newStock = terminalForm.tipoMovimiento === 'ENTRADA' ? rep.stock + terminalForm.cantidad : rep.stock - terminalForm.cantidad;
+          
+          await supabase.from('logistica_repuestos').update({ 
+             stock: newStock,
+             ult_mov: new Date().toISOString()
+          }).eq('id', repId);
+          
+          await supabase.from('logistica_movimientos').insert({
+             empresa_id: currentCompany.id,
+             repuesto_id: repId,
+             tipo: terminalForm.tipoMovimiento,
+             cantidad: terminalForm.cantidad,
+             notas: `Solicitante: ${terminalForm.solicitante}, Autorizador: ${terminalForm.autorizador}, Destino: ${terminalForm.destino}`,
+             estado: 'COMPLETADO'
+          });
+          
+          Swal.fire("Éxito", "Movimiento procesado", "success");
+          
+          // Refetch
+          const { data, error } = await supabase.from('logistica_repuestos').select('*').eq('empresa_id', currentCompany.id);
+          if (!error && data) {
+            setSumInsumosData(data.map((r: any) => ({
+              ...r, 
+              min: r.min_stock,
+              ultMov: r.ult_mov ? new Date(r.ult_mov).toLocaleDateString() : '--'
+            })));
+          }
+       }
+       
+       setIsTerminalModalOpen(false);
+       setTerminalForm({
+         sku: '', nombre: '', bodegaId: '', tipoMovimiento: 'SALIDA', 
+         cantidad: 1, solicitante: '', autorizador: '', destino: ''
+       });
+    } catch (e) {
+       console.error(e);
+       Swal.fire("Error", "Error al procesar", "error");
+    }
+  };
+
   const [activeView, setActiveView] = useState<'inventario' | 'auditoria' | 'validaciones'>('inventario');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBodega, setSelectedBodega] = useState('Todas las bodegas');
@@ -1000,10 +1079,9 @@ export default function GestionSuministros() {
             onChange={(e) => setDestinationBodega(e.target.value)}
           >
             <option value="" disabled>Selecciona bodega de destino</option>
-            <option value="Kaufmann">Kaufmann</option>
-            <option value="Bodega Matrix">Bodega Matrix</option>
-            <option value="Bodega Consignación">Bodega Consignación</option>
-            <option value="Turno Noche">Turno Noche</option>
+            {bodegasList.map(b => (
+               <option key={b.id} value={b.id}>{b.nombre}</option>
+            ))}
           </select>
           <div className="flex gap-4 pt-4">
             <Button 
@@ -1100,9 +1178,9 @@ export default function GestionSuministros() {
               onChange={(e) => setTerminalForm({...terminalForm, bodegaId: e.target.value})}
             >
               <option value="">Seleccione una bodega...</option>
-              <option value="1">Kaufmann</option>
-              <option value="2">Bodega Matrix</option>
-              <option value="3">Bodega Consignación</option>
+              {bodegasList.map((b) => (
+                <option key={b.id} value={b.id}>{b.nombre}</option>
+              ))}
             </select>
           </div>
 
@@ -1167,14 +1245,7 @@ export default function GestionSuministros() {
             <Button variant="secondary" onClick={() => setIsTerminalModalOpen(false)}>Cancelar</Button>
             <Button 
               className="bg-amber-500 hover:bg-amber-600 text-white"
-              onClick={() => {
-                setIsTerminalModalOpen(false);
-                setTerminalForm({
-                  sku: '', nombre: '', bodegaId: '', tipoMovimiento: 'SALIDA', 
-                  cantidad: 1, solicitante: '', autorizador: '', destino: ''
-                });
-                alert("Movimiento procesado correctamente");
-              }}
+              onClick={handleTerminalSubmit}
             >
               Procesar Movimiento
             </Button>
@@ -1292,9 +1363,10 @@ export default function GestionSuministros() {
                 value={newRepuestoForm.bodegaId}
                 onChange={(e) => setNewRepuestoForm({...newRepuestoForm, bodegaId: e.target.value})}
               >
-                <option value="1">Kaufmann</option>
-                <option value="2">Bodega Matrix</option>
-                <option value="3">Bodega Consignación</option>
+                <option value="">Seleccione bodega</option>
+                {bodegasList.map(b => (
+                  <option key={b.id} value={b.id}>{b.nombre}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -1335,23 +1407,31 @@ export default function GestionSuministros() {
                   ubicacion: newRepuestoForm.ubicacion || "Sin Ubicación",
                   calidad: newRepuestoForm.calidad,
                   stock: newRepuestoForm.stockActual,
-                  min: newRepuestoForm.stockMinimo,
-                  ultMov: "--",
+                  min_stock: newRepuestoForm.stockMinimo,
+                  ult_mov: new Date().toISOString(),
                   precio: newRepuestoForm.precioUnitario,
-                  valorTotal: newRepuestoForm.precioUnitario * newRepuestoForm.stockActual,
-                  isCritico: newRepuestoForm.nivelCriticidad === "CRÍTICO"
+                  valor_total: newRepuestoForm.precioUnitario * newRepuestoForm.stockActual,
+                  is_critico: newRepuestoForm.nivelCriticidad === "CRÍTICO",
+                  bodega_id: newRepuestoForm.bodegaId,
+                  proveedor: newRepuestoForm.proveedorReferencia,
+                  ubicacion: newRepuestoForm.ubicacion,
+                  estado: 'ACTIVO'
                 };
 
                 try {
-                  await fetch('/api/repuestos', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(nuevo)
-                  });
-                  // Refetch
-                  const res = await fetch('/api/repuestos');
-                  const data = await res.json();
-                  setSumInsumosData(data);
+                  if (currentCompany?.id) {
+                     await supabase.from('logistica_repuestos').insert([nuevo]);
+                     
+                     // Refetch
+                     const { data, error } = await supabase.from('logistica_repuestos').select('*').eq('empresa_id', currentCompany.id);
+                     if (!error && data) {
+                       setSumInsumosData(data.map((r: any) => ({
+                         ...r, 
+                         min: r.min_stock,
+                         ultMov: r.ult_mov ? new Date(r.ult_mov).toLocaleDateString() : '--'
+                       })));
+                     }
+                  }
                 } catch (e) {
                   console.error(e);
                 }
