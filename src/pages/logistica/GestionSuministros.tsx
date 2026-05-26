@@ -624,7 +624,7 @@ export default function GestionSuministros() {
             </Button>
           )}
           
-          <Button className="bg-[#6366f1] hover:bg-[#4f46e5] text-white" onClick={() => setActiveView('validaciones')}>
+          <Button className="bg-[#6366f1] hover:bg-[#4f46e5] text-white" onClick={() => navigate('/logistica/validaciones')}>
             <AlertCircle className="w-4 h-4 mr-2" />
             Validaciones
           </Button>

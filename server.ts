@@ -35,7 +35,7 @@ async function startServer() {
     { id: 1, nombre: 'Mecánico de Mantenimiento', departamento: 'Taller', sueldoBase: 650000, usuarios: 12 },
     { id: 2, nombre: 'Jefe de Taller', departamento: 'Taller', sueldoBase: 1200000, usuarios: 2 },
     { id: 3, nombre: 'Conductor', departamento: 'Operaciones', sueldoBase: 700000, usuarios: 45 },
-    { id: 4, nombre: 'Bodeguero', departamento: 'Logística', sueldoBase: 600000, usuarios: 5 },
+    { id: 4, nombre: 'ENCARGADO DE BODEGA Y BODEGUERO', departamento: 'Logística', sueldoBase: 800000, usuarios: 5 },
   ];
 
   const mockFallas = [
@@ -211,6 +211,17 @@ async function startServer() {
     const audit = mockAuditorias.find(a => a.id === auditId);
     if (audit) {
       audit.estado = 'FINALIZADA';
+      // Update actual inventory stock based on physical count
+      if (audit.detalles) {
+         audit.detalles.forEach((det: any) => {
+            const repuesto = repuestosData.find(r => r.sku === det.repuesto.sku);
+            if (repuesto) {
+               repuesto.stock = det.stock_fisico;
+               repuesto.valorTotal = repuesto.precio * repuesto.stock;
+               repuesto.ultMov = new Date().toLocaleDateString();
+            }
+         });
+      }
       res.json({ status: "success" });
     } else {
       res.status(404).json({ message: "Audit not found" });

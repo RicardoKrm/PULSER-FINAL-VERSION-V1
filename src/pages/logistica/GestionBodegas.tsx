@@ -29,7 +29,7 @@ export default function GestionBodegas() {
       const { data, error } = await supabase.from('colaborador')
         .select('*')
         .eq('empresa_id', currentCompany.id)
-        .ilike('rol', '%bodeguero%');
+        .or('rol.ilike.%bodeguero%,rol.ilike.%encargado de bodega%');
       if (error) {
         console.error('Error fetching colaboradores:', error);
       } else if (data) {
