@@ -8,49 +8,82 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { useAppContext } from '../../context/AppContext';
 
-// Mock data based on screenshots
-const sumInsumosData = [
-  { id: 1, nombre: "ABRAZADERA INTER.", sku: "132165165", proveedor: "Kaufmann", ubicacion: "Estante A-4", calidad: "Alternativo Genérico", stock: 20, min: 2, ultMov: "17/04/2026", precio: 20000.00, valorTotal: 400000.00, isCritico: false },
-  { id: 2, nombre: "ACC. VISCOSO", sku: "A 000 457 3001:MBB", proveedor: "--", ubicacion: "INMOVILIZADO", calidad: "Alternativo Genérico", stock: 98, min: 1, ultMov: "17/04/2026", precio: 360000.00, valorTotal: 35280000.00, isCritico: false },
-  { id: 3, nombre: "ACDELCO ATF DEXRON VI", sku: "965472:SHLAM", proveedor: "--", ubicacion: "INMOVILIZADO", calidad: "Alternativo Genérico", stock: 100, min: 2, ultMov: "--", precio: 7329.00, valorTotal: 732900.00, isCritico: false },
-  { id: 4, nombre: "ACOPLE RAPIDO 12MM.", sku: "28390755:MBB", proveedor: "--", ubicacion: "INMOVILIZADO", calidad: "Alternativo Genérico", stock: 100, min: 10, ultMov: "--", precio: 8000.00, valorTotal: 800000.00, isCritico: false },
-  { id: 5, nombre: "ACOPLE RAPIDO 8MM", sku: "28390744:LOC", proveedor: "--", ubicacion: "INMOVILIZADO", calidad: "Alternativo Genérico", stock: 100, min: 10, ultMov: "--", precio: 4500.00, valorTotal: 450000.00, isCritico: false },
-  { id: 6, nombre: "ACOPLE RAPIDO 8MM.", sku: "28390744:MBB", proveedor: "--", ubicacion: "INMOVILIZADO", calidad: "Alternativo Genérico", stock: 100, min: 10, ultMov: "--", precio: 12971.00, valorTotal: 1297100.00, isCritico: false },
-  { id: 7, nombre: "ALARMA RETROCESO", sku: "508327:LOC", proveedor: "--", ubicacion: "INMOVILIZADO", calidad: "Alternativo Genérico", stock: 100, min: 2, ultMov: "--", precio: 7140.00, valorTotal: 714000.00, isCritico: false },
-  { id: 8, nombre: "AMP. 1 CONT. 12 V H7", sku: "1002", proveedor: "--", ubicacion: "Sin Ubicación", calidad: "Alternativo Genérico", stock: 0, min: 5, ultMov: "24/02/2026", precio: 1178.00, valorTotal: 0.00, isCritico: true },
-  { id: 9, nombre: "AMP. 1 CONT. 24 V H1", sku: "1004", proveedor: "--", ubicacion: "Bodega Matrix", calidad: "Alternativo Genérico", stock: 100, min: 5, ultMov: "--", precio: 1290.00, valorTotal: 129000.00, isCritico: false },
-  { id: 10, nombre: "AMP. 1 CONT. 24 V H7", sku: "1003", proveedor: "--", ubicacion: "Bodega Matrix", calidad: "Alternativo Genérico", stock: 100, min: 5, ultMov: "--", precio: 2860.00, valorTotal: 286000.00, isCritico: false },
-  { id: 11, nombre: "AMP. GL. GR. 24 V", sku: "1005", proveedor: "--", ubicacion: "Bodega Matrix", calidad: "Alternativo Genérico", stock: 100, min: 5, ultMov: "--", precio: 291.00, valorTotal: 29100.00, isCritico: false },
-  { id: 12, nombre: "AMP. H1 LUZ ALTA", sku: "1000", proveedor: "--", ubicacion: "Bodega Matrix", calidad: "Alternativo Genérico", stock: 100, min: 5, ultMov: "--", precio: 1867.00, valorTotal: 186700.00, isCritico: false },
-];
+// Interfaces to maintain TypeScript types
+interface Insumo {
+  id: number;
+  nombre: string;
+  sku: string;
+  proveedor: string;
+  ubicacion: string;
+  calidad: string;
+  stock: number;
+  min: number;
+  ultMov: string;
+  precio: number;
+  valorTotal: number;
+  isCritico: boolean;
+}
 
-const mockHistorialMovimientos = [
-  { id: 1, fechaHora: "17/04/2026 17:25 hrs", tipo: "Salida por OT", cant: -1, responsable: "administrador", referencia: "--", notas: "TERMINAL DÍA | Destino: Gasto General | Retira: No especificado | Autoriza: No especificado | Validado como GASTO GENERAL: TALLER | Por: administrador" },
-  { id: 2, fechaHora: "17/04/2026 16:14 hrs", tipo: "Ajuste de Inventario (Suma)", cant: 0, responsable: "administrador", referencia: "--", notas: "TRASLADO: 100 un. desde INMOVILIZADO a INMOVILIZADO" },
-  { id: 3, fechaHora: "17/04/2026 16:13 hrs", tipo: "Ajuste de Inventario (Suma)", cant: 0, responsable: "administrador", referencia: "--", notas: "TRASLADO: 100 un. desde Bodega Matrix a Bodega Matrix" },
-  { id: 4, fechaHora: "17/04/2026 16:03 hrs", tipo: "Ajuste de Inventario (Suma)", cant: 0, responsable: "administrador", referencia: "--", notas: "TRASLADO MASIVO: Desde INMOVILIZADO a Bodega Turno Noche" },
-  { id: 5, fechaHora: "16/04/2026 17:48 hrs", tipo: "Ajuste de Inventario (Suma)", cant: 0, responsable: "administrador", referencia: "--", notas: "TRASLADO MASIVO: Desde INMOVILIZADO a INMOVILIZADO" },
-];
+interface HistorialMovimiento {
+  id: number;
+  fechaHora: string;
+  tipo: string;
+  cant: number;
+  responsable: string;
+  referencia: string;
+  notas: string;
+}
 
-const mockAuditoriaData = [
-  { id: 1, fecha: "05/05/2026", hora: "10:28 HRS", repuestoNombre: "FAROL TRAS. G7", sku: "SKU MARSAL1211", proveedor: "--", ubicacion: "Estante A-2", tipo: "SALIDA", cant: 1, notas: "VALIDADO GASTO DÍA | DESTINO: ASD1 | RETIRA: ASDASD | AUTORIZA: ASDASDASD | VALIDADO COMO TALLER POR ADMINISTRADOR", usuario: "administrador" },
-  { id: 2, fecha: "05/05/2026", hora: "10:20 HRS", repuestoNombre: "FILTRO ACEITE DIRECCIÓN HIDRÁULICA SCANIA", sku: "38377546", proveedor: "--", ubicacion: "Estante A-1", tipo: "SALIDA", cant: 1, notas: "VALIDADO GASTO DÍA | DESTINO: ASD | RETIRA: YO | AUTORIZA: YOOO | VALIDADO COMO TALLER POR ADMINISTRADOR", usuario: "administrador" },
-  { id: 3, fecha: "29/04/2026", hora: "10:40 HRS", repuestoNombre: "FILTRO ACEITE DIRECCIÓN HIDRÁULICA SCANIA", sku: "38377546", proveedor: "--", ubicacion: "Estante A-1", tipo: "SALIDA", cant: 4, notas: "VALIDADO GASTO DÍA | DESTINO: CAMION | RETIRA: MIGUELITO | AUTORIZA: GONZALO | VALIDADO COMO TALLER POR ADMINISTRADOR", usuario: "administrador" },
-  { id: 4, fecha: "29/04/2026", hora: "10:39 HRS", repuestoNombre: "FILTRO ACEITE DIRECCIÓN HIDRÁULICA SCANIA", sku: "38377546", proveedor: "--", ubicacion: "Estante A-1", tipo: "ENTRADA", cant: 4, notas: "INGRESO TERMINAL DÍA - TERMINAL", usuario: "administrador" },
-  { id: 5, fecha: "29/04/2026", hora: "10:38 HRS", repuestoNombre: "FILTRO ACEITE DIRECCIÓN HIDRÁULICA SCANIA", sku: "38377546", proveedor: "--", ubicacion: "Estante A-1", tipo: "SALIDA", cant: 1, notas: "OT-OT-0348", usuario: "administrador", esEnlace: true },
-  { id: 6, fecha: "27/04/2026", hora: "10:55 HRS", repuestoNombre: "FILTRO DE POLVO VS30", sku: "A 910 830 11 00:MBA", proveedor: "--", ubicacion: "Estante A-1", tipo: "SALIDA", cant: 1, notas: "OT-OT-0349", usuario: "demo", esEnlace: true },
-  { id: 7, fecha: "27/04/2026", hora: "10:55 HRS", repuestoNombre: "FILTRO AIRE NCV3", sku: "A 0000903751:HENGST", proveedor: "--", ubicacion: "Estante A-1", tipo: "SALIDA", cant: 1, notas: "OT-OT-0349", usuario: "demo", esEnlace: true },
-  { id: 8, fecha: "27/04/2026", hora: "10:55 HRS", repuestoNombre: "FILTRO ACEITE NCV3 + VS30", sku: "A 651 180 01 09:HENGST", proveedor: "--", ubicacion: "Estante A-1", tipo: "SALIDA", cant: 1, notas: "OT-OT-0349", usuario: "demo", esEnlace: true },
-];
+const mockHistorialMovimientos: HistorialMovimiento[] = [];
 
-const mockValidacionesData = [
-  { id: 1, fecha: "15/05/2026", hora: "08:30 HRS", repuestoNombre: "BATERÍA 12V 70AH", sku: "BAT-1270", cant: -2, notas: "TERMINAL DÍA | Destino: Taller Mecánico | Retira: Juan", usuario: "operador1" },
-  { id: 2, fecha: "14/05/2026", hora: "15:45 HRS", repuestoNombre: "FRENOS PASTILLAS DELANTERAS", sku: "FR-PD-001", cant: -1, notas: "TERMINAL DÍA | Destino: Revisión Técnica | Retira: Pedro", usuario: "operador2" },
-  { id: 3, fecha: "14/05/2026", hora: "11:20 HRS", repuestoNombre: "ACEITE MOTOR 5W30 1L", sku: "AC-5W30-1L", cant: -5, notas: "TERMINAL NOCHE | Destino: Mantenimiento Preventivo | Retira: Ana", usuario: "operador3" },
-];
+interface AuditoriaData {
+  id: number;
+  fecha: string;
+  hora: string;
+  repuestoNombre: string;
+  sku: string;
+  proveedor: string;
+  ubicacion: string;
+  tipo: string;
+  cant: number;
+  notas: string;
+  usuario: string;
+  esEnlace?: boolean;
+}
+
+const mockAuditoriaData: AuditoriaData[] = [];
+
+interface ValidacionData {
+  id: number;
+  fecha: string;
+  hora: string;
+  repuestoNombre: string;
+  sku: string;
+  cant: number;
+  notas: string;
+  usuario: string;
+}
+
+const mockValidacionesData: ValidacionData[] = [];
 
 export default function GestionSuministros() {
   const { proveedores } = useAppContext();
+  const [sumInsumosData, setSumInsumosData] = React.useState<Insumo[]>([]);
+  
+  const [bodegasList, setBodegasList] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    fetch('/api/bodegas')
+      .then(res => res.json())
+      .then(data => setBodegasList(data))
+      .catch(console.error);
+      
+    fetch('/api/repuestos')
+      .then(res => res.json())
+      .then(data => setSumInsumosData(data))
+      .catch(console.error);
+  }, []);
+
   const [activeView, setActiveView] = useState<'inventario' | 'auditoria' | 'validaciones'>('inventario');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBodega, setSelectedBodega] = useState('Todas las bodegas');
@@ -59,7 +92,7 @@ export default function GestionSuministros() {
   const [filterBajoStock, setFilterBajoStock] = useState(false);
   const [filterSinMov, setFilterSinMov] = useState(false);
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
-  const [selectedRepuestoDetalle, setSelectedRepuestoDetalle] = useState<typeof sumInsumosData[0] | null>(null);
+  const [selectedRepuestoDetalle, setSelectedRepuestoDetalle] = useState<Insumo | null>(null);
   
   // States for Movimiento Masivo
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
@@ -621,8 +654,9 @@ export default function GestionSuministros() {
           onChange={(e) => setSelectedBodega(e.target.value)}
         >
           <option>Todas las bodegas</option>
-          <option>Bodega Matrix</option>
-          <option>Bodega Consignación</option>
+          {bodegasList.map(b => (
+            <option key={b.id} value={b.nombre}>{b.nombre}</option>
+          ))}
           <option>INMOVILIZADO</option>
           <option>Sin Ubicación</option>
         </select>
@@ -1273,7 +1307,35 @@ export default function GestionSuministros() {
             <Button 
               className="bg-cyan-600 hover:bg-cyan-700 text-white"
               disabled={!newRepuestoForm.nombre || !newRepuestoForm.numeroParte}
-              onClick={() => {
+              onClick={async () => {
+                const nuevo = {
+                  nombre: newRepuestoForm.nombre,
+                  sku: newRepuestoForm.numeroParte,
+                  proveedor: newRepuestoForm.proveedorId || "--",
+                  ubicacion: newRepuestoForm.ubicacion || "Sin Ubicación",
+                  calidad: newRepuestoForm.calidad,
+                  stock: newRepuestoForm.stockActual,
+                  min: newRepuestoForm.stockMinimo,
+                  ultMov: "--",
+                  precio: newRepuestoForm.precioUnitario,
+                  valorTotal: newRepuestoForm.precioUnitario * newRepuestoForm.stockActual,
+                  isCritico: newRepuestoForm.nivelCriticidad === "CRÍTICO"
+                };
+
+                try {
+                  await fetch('/api/repuestos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(nuevo)
+                  });
+                  // Refetch
+                  const res = await fetch('/api/repuestos');
+                  const data = await res.json();
+                  setSumInsumosData(data);
+                } catch (e) {
+                  console.error(e);
+                }
+
                 setIsNewRepuestoModalOpen(false);
                 setNewRepuestoForm({
                   nombre: '', numeroParte: '', calidad: 'ORIGINAL', origen: 'OEM', 

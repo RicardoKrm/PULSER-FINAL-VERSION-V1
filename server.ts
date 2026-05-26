@@ -9,24 +9,9 @@ async function startServer() {
 
   app.use(express.json());
 
-  // Mock data for inventory
-  const mockRepuestos = [
-    { id: 1, sku: 'SKU001', nombre: 'Filtro de Aceite Volvo', stock_total: 50, stock_local: 10, otras_bodegas: 'SCL: 25, ANF: 15' },
-    { id: 2, sku: 'SKU002', nombre: 'Pastillas de Freno Meritor', stock_total: 20, stock_local: 5, otras_bodegas: 'SCL: 10, CCP: 5' },
-    { id: 3, sku: 'SKU003', nombre: 'Ampolleta H4 24V', stock_total: 100, stock_local: 30, otras_bodegas: 'SCL: 70' },
-    { id: 4, sku: 'SKU004', nombre: 'Correa Ventilador', stock_total: 15, stock_local: 2, otras_bodegas: 'SCL: 13' },
-  ];
+  const mockBodegas: any[] = [];
 
-  const mockBodegas = [
-    { id: 1, nombre: 'Bodega Central' },
-    { id: 2, nombre: 'Taller Mecánico' },
-    { id: 3, nombre: 'Bodega de Tránsito' },
-  ];
-
-  const mockAuditorias = [
-    { id: 101, bodega: { nombre: 'Bodega Central' }, responsable: 'administrador', fecha_inicio: '2026-05-13T14:32:00', fecha_termino: null, estado: 'CAPTURANDO', notas: 'Inventario mensual' },
-    { id: 102, bodega: { nombre: 'Taller Mecánico' }, responsable: 'demo demo', fecha_inicio: '2026-04-18T11:13:00', fecha_termino: '2026-04-19T13:18:00', estado: 'FINALIZADA', notas: 'Cierre de trimestre' },
-  ];
+  const mockAuditorias: any[] = [];
 
   const mockOrdenesCompra = [
     { id: 'OC-2501', proveedor: 'REPUESTOS TOTAL', fecha: '2026-05-10', total: 1250000, estado: 'RECEPCIONADO', items: 12 },
@@ -87,24 +72,39 @@ async function startServer() {
     res.json(mockPautas);
   });
 
+  // Shared data for inventory
+  let repuestosData: any[] = [];
+
   // API Route for repuestos search
   app.get("/api/repuestos/search", (req, res) => {
     const { q, bodega_id } = req.query;
     const query = String(q || '').toLowerCase();
     
-    const results = mockRepuestos
+    const results = repuestosData
       .filter(r => r.sku.toLowerCase().includes(query) || r.nombre.toLowerCase().includes(query))
       .map(r => ({
         id: r.id,
         sku: r.sku,
         text: `${r.nombre} | ${r.sku}`,
-        stock_total: r.stock_total,
-        stock_local: r.stock_local,
-        otras_bodegas: r.otras_bodegas,
-        precio: 15000 // Added price
+        stock_total: r.stock,
+        stock_local: r.stock,
+        otras_bodegas: '',
+        precio: r.precio
       }));
     
     res.json(results);
+  });
+
+  // API Route to get all repuestos
+  app.get("/api/repuestos", (req, res) => {
+    res.json(repuestosData);
+  });
+
+  // API Route to add a repuesto
+  app.post("/api/repuestos", (req, res) => {
+    const newRepuesto = { id: repuestosData.length + 1, ...req.body };
+    repuestosData.push(newRepuesto);
+    res.json(newRepuesto);
   });
 
   // API Route for OC
@@ -167,16 +167,8 @@ async function startServer() {
     
     if (!audit) return res.status(404).json({ message: "Audit not found" });
 
-    // Mock details
-    const detalles = [
-      { id: 1, repuesto: { id: 1, nombre: 'Filtro de Aceite Volvo', sku: 'SKU001', precio: 12000 }, stock_teorico: 10, stock_fisico: 8, diferencia: -2, valor_diferencia: -24000, ubicacion_conteo: 'A-1' },
-      { id: 2, repuesto: { id: 3, nombre: 'Ampolleta H4 24V', sku: 'SKU003', precio: 2500 }, stock_teorico: 30, stock_fisico: 35, diferencia: 5, valor_diferencia: 12500, ubicacion_conteo: 'B-2' }
-    ];
-
-    const invisibles = [
-      { id: 3, repuesto: { id: 2, nombre: 'Pastillas de Freno Meritor', sku: 'SKU002', precio: 45000 }, stock_teorico: 5, stock_fisico: 0, diferencia: -5, valor_diferencia: -225000, ubicacion_conteo: 'Rack C-1', ultima_rotacion: '12/04/2026', rotacion_hace: 'HACE 1 MES' },
-      { id: 4, repuesto: { id: 4, nombre: 'Correa Ventilador', sku: 'SKU004', precio: 18000 }, stock_teorico: 2, stock_fisico: 0, diferencia: -2, valor_diferencia: -36000, ubicacion_conteo: 'Rack D-3', ultima_rotacion: '01/12/2025', rotacion_hace: 'HACE 5 MESES' }
-    ];
+    const detalles = audit.detalles || [];
+    const invisibles = audit.invisibles || [];
 
     res.json({ auditoria: audit, detalles, invisibles });
   });
@@ -225,10 +217,83 @@ async function startServer() {
     }
   });
 
+  const mockPendientesAprobacion: any[] = [];
+
   // API Route for scanning
   app.post("/api/inventario/escanear", (req, res) => {
-    console.log("Escaneo recibido:", req.body);
+    const { items } = req.body;
+    if (items && items.length > 0) {
+      items.forEach((item: any) => {
+        if (item.nombre === 'NUEVO PRODUCTO' || item.nombre === 'Escaneo Rápido...') {
+           mockPendientesAprobacion.push({
+             ...item,
+             id: Math.random().toString(36).substring(7),
+             fecha: new Date().toISOString()
+           });
+        }
+
+        // If it belongs to an audit, push to audit details
+        if (item.tipo_movimiento === 'AUDITORIA' && item.auditoria_id) {
+          const audit = mockAuditorias.find(a => a.id.toString() === item.auditoria_id.toString());
+          if (audit) {
+             if (!audit.detalles) audit.detalles = [];
+             // Find repuesto
+             const rep = repuestosData.find(r => r.sku === item.sku) || { id: 999, nombre: item.nombre, sku: item.sku, precio: 0 };
+             const existingDetail = audit.detalles.find((d: any) => d.repuesto.sku === item.sku);
+             if (existingDetail) {
+               existingDetail.stock_fisico += item.cantidad;
+               existingDetail.diferencia = existingDetail.stock_fisico - existingDetail.stock_teorico;
+               existingDetail.valor_diferencia = existingDetail.diferencia * rep.precio;
+             } else {
+               const stock_teorico = rep.stock || 0;
+               audit.detalles.push({
+                 id: audit.detalles.length + 1,
+                 repuesto: { id: rep.id, nombre: rep.nombre, sku: rep.sku, precio: rep.precio },
+                 stock_teorico,
+                 stock_fisico: item.cantidad,
+                 diferencia: item.cantidad - stock_teorico,
+                 valor_diferencia: (item.cantidad - stock_teorico) * (rep.precio || 0),
+                 ubicacion_conteo: item.ubicacion_conteo
+               });
+             }
+          }
+        }
+      });
+    }
     res.json({ status: "success", message: "Escaneo registrado correctamente" });
+  });
+
+  // API Route for pending approvals
+  app.get("/api/inventario/aprobaciones", (req, res) => {
+    res.json(mockPendientesAprobacion);
+  });
+  
+  app.post("/api/inventario/aprobaciones/:id/aprobar", (req, res) => {
+    const id = req.params.id;
+    const index = mockPendientesAprobacion.findIndex(p => p.id === id);
+    if (index !== -1) {
+      // Add to inventory
+      const pending = mockPendientesAprobacion[index];
+      const newRepuesto = { 
+        id: repuestosData.length + 1, 
+        nombre: req.body.nombre || pending.nombre,
+        sku: pending.sku,
+        stock: parseInt(req.body.stock) || pending.cantidad || 0,
+        precio: parseInt(req.body.precio) || 0,
+        proveedor: '--',
+        ubicacion: pending.bodega_nombre || 'Sin Ubicación',
+        calidad: 'Nuevo',
+        min: 0,
+        ultMov: new Date().toLocaleDateString(),
+        valorTotal: (parseInt(req.body.precio) || 0) * (parseInt(req.body.stock) || pending.cantidad || 0),
+        isCritico: false
+      };
+      repuestosData.push(newRepuesto);
+      mockPendientesAprobacion.splice(index, 1);
+      res.json({ success: true, newRepuesto });
+    } else {
+       res.status(404).json({ message: "Not found" });
+    }
   });
 
   // API Route for audit count

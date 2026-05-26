@@ -5,6 +5,9 @@ import {
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import Swal from 'sweetalert2';
+import { useAppContext } from '../../context/AppContext';
+import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
 
 export default function GestionBodegas() {
   const [bodegas, setBodegas] = useState<any[]>([]);
@@ -12,9 +15,29 @@ export default function GestionBodegas() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBodega, setEditingBodega] = useState<any | null>(null);
 
+  const { proveedores } = useAppContext();
+  const { currentCompany } = useCompany();
+  const [bodegueros, setBodegueros] = useState<any[]>([]);
+
   useEffect(() => {
     fetchBodegas();
   }, []);
+
+  useEffect(() => {
+    const fetchColaboradores = async () => {
+      if (!currentCompany?.id) return;
+      const { data, error } = await supabase.from('colaborador')
+        .select('*')
+        .eq('empresa_id', currentCompany.id)
+        .ilike('rol', '%bodeguero%');
+      if (error) {
+        console.error('Error fetching colaboradores:', error);
+      } else if (data) {
+        setBodegueros(data);
+      }
+    };
+    fetchColaboradores();
+  }, [currentCompany]);
 
   const fetchBodegas = async () => {
     try {
@@ -261,9 +284,9 @@ export default function GestionBodegas() {
                 className="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-700 rounded-lg bg-transparent text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-[#0891b2] outline-none transition-all"
               >
                 <option value="" disabled>---------</option>
-                <option value="Kaufmann">Kaufmann</option>
-                <option value="Epysa">Epysa</option>
-                <option value="Volvo">Volvo</option>
+                {proveedores.map(p => (
+                  <option key={p.id} value={p.nombre}>{p.nombre}</option>
+                ))}
               </select>
             </div>
 
@@ -276,10 +299,11 @@ export default function GestionBodegas() {
                 className="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-700 rounded-lg bg-transparent text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-[#0891b2] outline-none transition-all"
               >
                 <option value="" disabled>Sin responsable asignado</option>
-                <option value="Juan Pérez">Juan Pérez</option>
-                <option value="María Gómez">María Gómez</option>
-                <option value="Carlos Ruiz">Carlos Ruiz</option>
-                <option value="Ana Silva">Ana Silva</option>
+                {bodegueros.map(b => (
+                  <option key={b.id} value={`${b.nombre} ${b.apellidoPaterno || ''}`.trim()}>
+                    {b.nombre} {b.apellidoPaterno}
+                  </option>
+                ))}
               </select>
             </div>
 

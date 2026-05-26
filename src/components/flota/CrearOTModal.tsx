@@ -12,7 +12,7 @@ interface CrearOTModalProps {
 }
 
 export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, vehiculoPreseleccionadoId }) => {
-  const { crearOrdenTrabajo, vehiculos, tiposFalla, pautas, kitsRepuesto, personal } = useAppContext();
+  const { ordenesTrabajo, crearOrdenTrabajo, vehiculos, tiposFalla, pautas, kitsRepuesto, personal } = useAppContext();
   const excludedRoles = ['super administrador', 'súper administrador', 'super admin', 'súper admin', 'administrador', 'gerente', 'administrativo'];
   
   const personalOperativoList = personal.filter(u => {
@@ -71,9 +71,19 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
       }
     }
 
+    const folioNumbers = ordenesTrabajo
+      .map(ot => {
+        const match = ot.folio?.match(/OT-(\d+)/);
+        return match ? parseInt(match[1], 10) : 0;
+      })
+      .filter(n => !isNaN(n));
+      
+    const lastNum = folioNumbers.length > 0 ? Math.max(...folioNumbers) : 0;
+    const nextFolio = `OT-${String(lastNum + 1).padStart(4, '0')}`;
+
     const nuevaOT: OrdenDeTrabajo = {
       id: Math.random().toString(36).substr(2, 9),
-      folio: `OT-${Math.floor(Math.random() * 1000)}`,
+      folio: nextFolio,
       vehiculoId: formData.vehiculoId || '',
       tipo: formData.tipo as any,
       estado: 'ABIERTA',
