@@ -53,7 +53,18 @@ export default function GestionAuditorias() {
   const fetchAuditorias = async () => {
     if (!currentCompany?.id) return;
     try {
-      setAuditorias([]); // Placeholder, ya construiremos logistica_auditorias
+      const { data, error } = await supabase
+        .from('logistica_auditorias')
+        .select(`
+          *,
+          bodega:bodega_id (nombre)
+        `)
+        .eq('empresa_id', currentCompany.id)
+        .order('created_at', { ascending: false });
+        
+      if (!error && data) {
+        setAuditorias(data as any[]);
+      }
     } catch (e) {
       console.error("Error fetching audits", e);
     } finally {
@@ -75,8 +86,38 @@ export default function GestionAuditorias() {
   };
 
   const handleStartAudit = async () => {
-    Swal.fire("En desarrollo", "Las auditorías están en proceso de integración a base de datos", "info");
-    setIsModalOpen(false);
+    if (!currentCompany?.id) return;
+    if (!newAudit.bodega_id) {
+       Swal.fire("Error", "Seleccione una bodega", "error");
+       return;
+    }
+    
+    // Obtener información del usuario actual o usar un placeholder
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    const { data: newRecord, error } = await supabase.from('logistica_auditorias').insert({
+       empresa_id: currentCompany.id,
+       bodega_id: newAudit.bodega_id,
+       responsable: user?.email || 'Administrador',
+       notas: newAudit.notas,
+       estado: 'CAPTURANDO'
+    }).select('id').single();
+    
+    if (error) {
+       console.error(error);
+       Swal.fire("Error", "No se pudo crear la auditoría", "error");
+    } else {
+       Swal.fire({
+         title: "Éxito",
+         text: "Auditoría iniciada correctamente",
+         icon: "success",
+         timer: 1500,
+         showConfirmButton: false
+       });
+       setIsModalOpen(false);
+       setNewAudit({ bodega_id: bodegas.length > 0 ? bodegas[0].id.toString() : '', notas: '' });
+       navigate(`/logistica/auditorias/${newRecord.id}`);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -156,7 +197,7 @@ export default function GestionAuditorias() {
               <div className="flex justify-between items-start mb-4">
                  <div>
                     <span className="text-xs font-black text-cyan-600 dark:text-cyan-500 uppercase tracking-widest block mb-1">
-                      AUD-{a.id.toString().padStart(3, '0')}
+                      AUD-{a.id.toString().substring(0,8).toUpperCase()}
                     </span>
                     <h3 className="text-lg font-black text-slate-800 dark:text-slate-100 leading-tight">
                       {a.bodega.nombre}
