@@ -8,6 +8,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
 import { ArrowLeft, Edit, Printer, Clock, Wrench, Boxes, History, ChevronDown, ChevronUp, Save, Trash2, Plus, FileText, CheckCircle, FileDown, Search, AlertCircle, PenTool, ThumbsUp, ThumbsDown, DollarSign } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import Swal from 'sweetalert2';
 
 export default function OrdenesTrabajoDetail() {
   const { id } = useParams();
@@ -552,7 +553,22 @@ export default function OrdenesTrabajoDetail() {
                  <Button onClick={() => setIsPausaModalOpen(true)} className="bg-amber-500 hover:bg-amber-600 text-white font-bold">
                     Pausar OT
                  </Button>
-                 <Button onClick={() => handleActualizarEstadoRapido('CERRADA_POR_MECANICO')} className="bg-purple-600 hover:bg-purple-700 text-white font-bold">
+                 <Button onClick={() => {
+                     Swal.fire({
+                         title: '¿Estás seguro?',
+                         text: 'Al cerrar la OT, se enviará una alerta al supervisor para su revisión final. Deberás ingresar el kilometraje actual.',
+                         icon: 'warning',
+                         showCancelButton: true,
+                         confirmButtonColor: '#9333ea',
+                         cancelButtonColor: '#64748b',
+                         confirmButtonText: 'Sí, Cerrar OT',
+                         cancelButtonText: 'Cancelar'
+                     }).then((result) => {
+                         if (result.isConfirmed) {
+                             handleActualizarEstadoRapido('CERRADA_POR_MECANICO')
+                         }
+                     })
+                 }} className="bg-purple-600 hover:bg-purple-700 text-white font-bold">
                     <CheckCircle className="w-4 h-4 mr-2" /> Cerrar OT (Mecánico)
                  </Button>
               </>
