@@ -187,7 +187,38 @@ export default function PizarraProgramacion() {
         }
       }
       
-      const isOverdue = (ot.estado === 'ABIERTA' || ot.estado === 'EN_PROCESO') && ot.fechaProgramada && new Date(ot.fechaProgramada + 'T23:59:59') < new Date();
+      // Check start times
+      let isOverdue = false;
+      let startedLate = false;
+      let tiempoAplicacion = '';
+
+      if (ot.fechaProgramada && ot.horaInicioProgramada) {
+         try {
+           const progDate = new Date(`${ot.fechaProgramada}T${ot.horaInicioProgramada.length === 5 ? ot.horaInicioProgramada + ':00' : ot.horaInicioProgramada}`);
+           if (ot.inicio_proceso) {
+             const initDate = new Date(ot.inicio_proceso);
+             if (initDate > progDate) {
+               startedLate = true;
+             }
+           } else {
+             if (new Date() > progDate && (ot.estado === 'ABIERTA' || ot.estado === 'PROGRAMADA' || ot.estado === 'PENDIENTE')) {
+               isOverdue = true;
+               startedLate = true;
+             }
+           }
+         } catch(e) {}
+      }
+
+      if (ot.inicio_proceso) {
+         const initD = new Date(ot.inicio_proceso);
+         tiempoAplicacion = `Inició: ${initD.toLocaleDateString('es-CL', {day: '2-digit', month: '2-digit'})} ${initD.toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'})}`;
+      } else if (ot.estado === 'ABIERTA' || ot.estado === 'PROGRAMADA' || ot.estado === 'PENDIENTE') {
+          if (startedLate) {
+              tiempoAplicacion = '¡Atrasada sin iniciar!';
+          } else {
+              tiempoAplicacion = 'Pendiente inicio';
+          }
+      }
 
       let estado: OtMock['estado'] = 'PROGRAMADA';
       if (ot.estado === 'EN_PROCESO') estado = 'EN_PROCESO';
@@ -205,7 +236,9 @@ export default function PizarraProgramacion() {
         fechaProgramada: ot.fechaProgramada || undefined,
         isOverdue,
         estado,
-        progress: ot.estado === 'EN_PROCESO' ? 50 : (ot.estado === 'FINALIZADA' || ot.estado === 'TERMINADA') ? 100 : 0
+        tiempoAplicacion,
+        startedLate,
+        progress: ot.estado === 'EN_PROCESO' ? 50 : (ot.estado === 'FINALIZADA' || ot.estado === 'TERMINADA' || ot.estado === 'CERRADA_POR_MECANICO') ? 100 : 0
       };
     });
 
