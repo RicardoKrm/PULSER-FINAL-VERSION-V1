@@ -558,7 +558,13 @@ export default function OrdenesCompra() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 dark:bg-slate-900/50">
-                <th className="px-6 py-4 w-12"><input type="checkbox" className="rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800" onChange={(e) => setPedidosTaller(pedidosTaller.map(p => ({ ...p, selected: e.target.checked })))} /></th>
+                <th className="px-6 py-4 w-12"><input type="checkbox" className="rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800" onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedPedidos(pedidosTaller.map(p => p.id));
+                  } else {
+                    setSelectedPedidos([]);
+                  }
+                }} /></th>
                 <th className="px-4 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Fecha</th>
                 <th className="px-4 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Prioridad</th>
                 <th className="px-4 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Vehículo / OT</th>

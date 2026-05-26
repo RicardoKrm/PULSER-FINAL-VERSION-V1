@@ -10,6 +10,7 @@ import { useAppContext } from '../../context/AppContext';
 import { useCompany } from '../../contexts/CompanyContext';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import Swal from 'sweetalert2';
 
 // Interfaces to maintain TypeScript types
 interface Insumo {
@@ -1184,7 +1185,7 @@ export default function GestionSuministros() {
         isOpen={!!selectedRepuestoDetalle} 
         onClose={() => setSelectedRepuestoDetalle(null)} 
         title="Detalle de Repuesto"
-        size="7xl"
+        size="5xl"
       >
         {selectedRepuestoDetalle && (
           <div className="space-y-6">
@@ -1811,8 +1812,6 @@ export default function GestionSuministros() {
                   valor_total: newRepuestoForm.precioUnitario * newRepuestoForm.stockActual,
                   is_critico: newRepuestoForm.nivelCriticidad === "CRÍTICO",
                   bodega_id: newRepuestoForm.bodegaId,
-                  proveedor: newRepuestoForm.proveedorReferencia,
-                  ubicacion: newRepuestoForm.ubicacion,
                   estado: 'ACTIVO'
                 };
 

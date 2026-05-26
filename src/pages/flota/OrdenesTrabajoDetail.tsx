@@ -14,8 +14,40 @@ export default function OrdenesTrabajoDetail() {
   const navigate = useNavigate();
   const { ordenesTrabajo, vehiculos, kitsRepuesto, tareasEstandar, repuestos, personal, pautas, actualizarOrdenTrabajo } = useAppContext();
   const { profile } = useAuth();
-  const isSupervisorOrAdmin = profile?.rol?.nombre === 'Supervisor' || profile?.rol?.nombre === 'Administrador' || profile?.rol?.nombre === 'Admin' || profile?.rol?.nombre === 'Súper Admin';
-  const isMecanico = profile?.rol?.nombre === 'Mecánico' || profile?.rol?.nombre === 'Mecanico';
+  
+  const [userPermissions, setUserPermissions] = useState<string[]>([]);
+  React.useEffect(() => {
+     let isMounted = true;
+     const fetchPerms = async () => {
+         const basePerms = profile?.rol?.permisos || [];
+         if (profile?.rol?.nombre) {
+             const { data } = await supabase.from('cargo').select('permisos').eq('nombre', profile.rol.nombre).single();
+             if (isMounted) {
+                 if (data && data.permisos) {
+                     setUserPermissions([...new Set([...basePerms, ...data.permisos])]);
+                 } else {
+                     setUserPermissions(basePerms);
+                 }
+             }
+         } else if (isMounted) {
+             setUserPermissions(basePerms);
+         }
+     }
+     fetchPerms();
+     return () => { isMounted = false; };
+  }, [profile]);
+
+  const hasPermission = (perm: string) => userPermissions.includes(perm);
+  // Solo el dueño del sistema tiene acceso total por defecto. Los demás se rigen por los permisos configurables.
+  const isSaaSAdmin = profile?.rol?.nombre === 'Súper Administrador';
+  
+  const canViewCostos = isSaaSAdmin || hasPermission('Reportes y Finanzas:Ver Costos');
+  const canManageTareas = isSaaSAdmin || hasPermission('Módulo de Mantenimiento:Gestionar Tareas OT');
+  const canManageInsumos = isSaaSAdmin || hasPermission('Módulo de Mantenimiento:Gestionar Insumos OT');
+  const canAssignPersonal = isSaaSAdmin || hasPermission('Módulo de Mantenimiento:Asignar Personal OT');
+  const canForceState = isSaaSAdmin || hasPermission('Módulo de Mantenimiento:Forzar Cambio Estado OT');
+  const canManageRequests = isSaaSAdmin || hasPermission('Módulo de Mantenimiento:Aprobar Solicitudes Repuestos');
+
   const [activeTab, setActiveTab] = useState<'tareas' | 'insumos' | 'historial' | 'solicitudes'>('tareas');
   const [activePanels, setActivePanels] = useState<Record<string, boolean>>({ diagnostico: false, pauta: false, personal: false, estado: false });
   const [selectedKitToAdd, setSelectedKitToAdd] = useState('');
@@ -58,6 +90,18 @@ export default function OrdenesTrabajoDetail() {
     const [isPautaModalOpen, setIsPautaModalOpen] = useState(false);
     const [infoView, setInfoView] = useState<'info' | 'costos'>('info');
 
+    const [isPausaModalOpen, setIsPausaModalOpen] = useState(false);
+    const [tiposPausa, setTiposPausa] = useState<any[]>([]);
+    const [motivoPausaSeleccionado, setMotivoPausaSeleccionado] = useState('');
+
+    React.useEffect(() => {
+        const fetchPausas = async () => {
+            const { data } = await supabase.from('tipo_pausa').select('*').eq('estado', 'Activo');
+            if (data) setTiposPausa(data);
+        };
+        fetchPausas();
+    }, []);
+
     const [timerDisplay, setTimerDisplay] = useState(ot?.tiempoTrabajadoSegundos || 0);
 
     React.useEffect(() => {
@@ -77,7 +121,7 @@ export default function OrdenesTrabajoDetail() {
         return () => clearInterval(interval);
     }, [ot?.estado, ot?.tiempoTrabajadoSegundos, ot?.inicio_proceso]);
 
-    const handleActualizarEstadoRapido = async (estadoStr: string) => {
+    const handleActualizarEstadoRapido = async (estadoStr: string, pausaInfo?: { id: string, nombre: string }) => {
         if (!ot) return;
         const updates: any = { estado: estadoStr as any };
         if (estadoStr === 'EN_PROCESO') {
@@ -86,23 +130,44 @@ export default function OrdenesTrabajoDetail() {
         if (estadoStr === 'PAUSADA' || estadoStr === 'FINALIZADA' || estadoStr === 'CERRADA_POR_MECANICO') {
             updates.tiempoTrabajadoSegundos = timerDisplay;
         }
+        if (estadoStr === 'CERRADA_POR_MECANICO') {
+            const kmIngresado = window.prompt('Por favor ingrese el Kilometraje de Cierre actual del vehículo:');
+            if (!kmIngresado || isNaN(Number(kmIngresado)) || Number(kmIngresado) <= 0) {
+                 alert('Debe ingresar un kilometraje válido para poder cerrar la OT.');
+                 return;
+            }
+            updates.kilometrajeCierre = Number(kmIngresado);
+        }
+
+        let comentario = `Cambio de estado a ${estadoStr}`;
+        if (estadoStr === 'EN_PROCESO') comentario += ' (Trabajo Iniciado)';
+        if (estadoStr === 'PAUSADA' && pausaInfo) comentario += ` - Motivo: ${pausaInfo.nombre}`;
 
         actualizarOrdenTrabajo({
             ...ot,
             ...updates,
+            pausa_id: pausaInfo ? pausaInfo.id : undefined,
             historial: [
                 ...ot.historial,
                 {
                     id: Math.random().toString(36).substr(2, 9),
                     orden_id: ot.id,
-                    comentario: `Cambio de estado a ${estadoStr} (Trabajo Iniciado)`,
+                    comentario: comentario,
                     created_at: new Date().toISOString(),
                     estado_nuevo: estadoStr,
-                    usuario_nombre: profile?.nombre || 'Administrador'
+                    usuario_nombre: profile?.nombre || 'General'
                 }
             ]
         });
         setNuevoEstado(estadoStr);
+    };
+
+    const confirmarPausa = () => {
+        const pausaSeleccionada = tiposPausa.find(p => p.id === motivoPausaSeleccionado);
+        if (!pausaSeleccionada) return alert("Seleccione un motivo de pausa");
+        handleActualizarEstadoRapido('PAUSADA', { id: pausaSeleccionada.id, nombre: pausaSeleccionada.nombre });
+        setIsPausaModalOpen(false);
+        setMotivoPausaSeleccionado('');
     };
 
     const handleGuardarDiagnostico = async () => {
@@ -478,13 +543,13 @@ export default function OrdenesTrabajoDetail() {
             <Button variant="outline" className="hidden lg:flex" onClick={() => window.print()}><Printer className="w-4 h-4 mr-2"/> Hoja OT</Button>
             <Button variant="outline" onClick={() => window.print()}><CheckCircle className="w-4 h-4 mr-2"/> Certificado</Button>
 
-            {ot.estado === 'PROGRAMADA' || ot.estado === 'ABIERTA' || ot.estado === 'PENDIENTE' ? (
+            {ot.estado === 'PROGRAMADA' || ot.estado === 'ABIERTA' || ot.estado === 'PENDIENTE' || ot.estado === 'PAUSADA' ? (
               <Button onClick={() => handleActualizarEstadoRapido('EN_PROCESO')} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm font-bold">
-                 Iniciar Trabajo
+                 {ot.estado === 'PAUSADA' ? 'Reanudar Trabajo' : 'Iniciar Trabajo'}
               </Button>
             ) : ot.estado === 'EN_PROCESO' ? (
               <>
-                 <Button onClick={() => handleActualizarEstadoRapido('PAUSADA')} className="bg-amber-500 hover:bg-amber-600 text-white font-bold">
+                 <Button onClick={() => setIsPausaModalOpen(true)} className="bg-amber-500 hover:bg-amber-600 text-white font-bold">
                     Pausar OT
                  </Button>
                  <Button onClick={() => handleActualizarEstadoRapido('CERRADA_POR_MECANICO')} className="bg-purple-600 hover:bg-purple-700 text-white font-bold">
@@ -509,12 +574,14 @@ export default function OrdenesTrabajoDetail() {
                 >
                    Información General
                 </button>
+                {canViewCostos && (
                 <button 
                    className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-all ${infoView === 'costos' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                    onClick={() => setInfoView('costos')}
                 >
                    Desglose de Costos
                 </button>
+                )}
             </div>
 
             {infoView === 'info' && (
@@ -574,14 +641,15 @@ export default function OrdenesTrabajoDetail() {
                 <CardContent className="pt-6">
                     {activeTab === 'tareas' && (
                         <div>
-                            <div className="flex justify-between items-center mb-4"><h3 className="font-bold">Tareas</h3><Button size="sm" onClick={() => setIsTareaModalOpen(true)}><Plus className="w-4 h-4 mr-2"/>añadir tarea</Button></div>
-                            {ot.tareasRealizadas.map(t => <div key={t.id} className="flex justify-between p-2 border-b last:border border-0 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:bg-slate-900/50"><span>{t.tarea_estandar?.descripcion || 'Tarea'}</span><span className="font-mono text-slate-600 dark:text-slate-400">${t.costo_real.toLocaleString()}</span></div>)}
+                            <div className="flex justify-between items-center mb-4"><h3 className="font-bold">Tareas</h3>{canManageTareas && <Button size="sm" onClick={() => setIsTareaModalOpen(true)}><Plus className="w-4 h-4 mr-2"/>añadir tarea</Button>}</div>
+                            {ot.tareasRealizadas.map(t => <div key={t.id} className="flex justify-between p-2 border-b last:border border-0 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:bg-slate-900/50"><span>{t.tarea_estandar?.descripcion || 'Tarea'}</span>{canViewCostos && <span className="font-mono text-slate-600 dark:text-slate-400">${t.costo_real.toLocaleString()}</span>}</div>)}
                         </div>
                     )}
                     {activeTab === 'insumos' && (
                         <div>
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="font-bold">Insumos</h3>
+                                {canManageInsumos && (
                                 <div className="flex gap-2 items-center">
                                     <div className="flex bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden">
                                         <select 
@@ -600,13 +668,14 @@ export default function OrdenesTrabajoDetail() {
                                     </div>
                                     <Button size="sm" onClick={() => setIsInsumoModalOpen(true)}><Plus className="w-4 h-4 mr-2"/>añadir insumo</Button>
                                 </div>
+                                )}
                             </div>
                             {ot.insumos.length === 0 && (
                                 <p className="text-sm text-slate-500 py-4 text-center border-2 border-dashed rounded-lg dark:border-slate-800">
                                     No hay insumos registrados en esta OT.
                                 </p>
                             )}
-                            {ot.insumos.map(i => <div key={i.id} className="flex justify-between p-2 border-b last:border border-0 dark:border-slate-800"><span>{i.repuesto?.nombre || 'Insumo'} (x{i.cantidad})</span><span className="font-mono text-slate-600 dark:text-slate-400">${(i.costo_total).toLocaleString()}</span></div>)}
+                            {ot.insumos.map(i => <div key={i.id} className="flex justify-between p-2 border-b last:border border-0 dark:border-slate-800"><span>{i.repuesto?.nombre || 'Insumo'} (x{i.cantidad})</span>{canViewCostos && <span className="font-mono text-slate-600 dark:text-slate-400">${(i.costo_total).toLocaleString()}</span>}</div>)}
                         </div>
                     )}
                     {activeTab === 'historial' && (
@@ -635,7 +704,7 @@ export default function OrdenesTrabajoDetail() {
                                             <div className="text-sm text-slate-500 mt-1">Solicitado el {new Date(s.fecha_solicitud).toLocaleString()}</div>
                                             {s.motivo_rechazo && <div className="text-sm text-red-500 mt-1">Motivo: {s.motivo_rechazo}</div>}
                                          </div>
-                                         {isSupervisorOrAdmin && s.estado === 'PENDIENTE' && (
+                                         {canManageRequests && s.estado === 'PENDIENTE' && (
                                             <div className="flex gap-2 mt-2 md:mt-0 items-center">
                                                <Button size="sm" variant="outline" className="text-green-600 border-green-600 hover:bg-green-50" onClick={() => resolverSolicitud(s.id, 'APROBADA')}>
                                                   <ThumbsUp className="w-4 h-4 mr-1" /> Aprobar
@@ -700,6 +769,7 @@ export default function OrdenesTrabajoDetail() {
                 )}
             </AccordionPanel>
 
+            {canAssignPersonal && (
             <AccordionPanel title="Asignar Personal" active={activePanels.personal} onToggle={() => togglePanel('personal')}>
                 <div className="space-y-4">
                     <div>
@@ -758,7 +828,9 @@ export default function OrdenesTrabajoDetail() {
                     </Button>
                 </div>
             </AccordionPanel>
+            )}
             
+            {canForceState && (
             <AccordionPanel title="Cambiar Estado" active={activePanels.estado} onToggle={() => togglePanel('estado')}>
                 <div className="space-y-4 text-sm">
                     <div>
@@ -801,6 +873,7 @@ export default function OrdenesTrabajoDetail() {
                     </Button>
                 </div>
             </AccordionPanel>
+            )}
         </div>
       </div>
 
@@ -825,6 +898,28 @@ export default function OrdenesTrabajoDetail() {
             ))}
           </div>
         </div>
+      </Modal>
+
+      <Modal isOpen={isPausaModalOpen} onClose={() => setIsPausaModalOpen(false)} title="Motivo de Pausa">
+         <div className="space-y-4">
+            <p className="text-sm text-slate-600 dark:text-slate-400">Seleccione un motivo oficial de pausa antes de detener el cronómetro y el trabajo.</p>
+            <select 
+               className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700"
+               value={motivoPausaSeleccionado}
+               onChange={(e) => setMotivoPausaSeleccionado(e.target.value)}
+            >
+               <option value="">Seleccionar motivo...</option>
+               {tiposPausa.map(t => (
+                  <option key={t.id} value={t.id}>{t.nombre}</option>
+               ))}
+            </select>
+            <div className="flex gap-2 justify-end">
+               <Button variant="outline" onClick={() => setIsPausaModalOpen(false)}>Cancelar</Button>
+               <Button className="bg-amber-500 hover:bg-amber-600 text-white" onClick={confirmarPausa} disabled={!motivoPausaSeleccionado}>
+                  Pausar
+               </Button>
+            </div>
+         </div>
       </Modal>
 
       <Modal isOpen={isSolicitudModalOpen} onClose={() => setIsSolicitudModalOpen(false)} title="Nueva Solicitud de Repuesto">

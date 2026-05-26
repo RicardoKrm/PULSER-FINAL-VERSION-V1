@@ -36,7 +36,18 @@ export default function SuperAdminPerfiles() {
     { 
       section: 'Módulo de Mantenimiento', 
       requiredPerms: ['Gestión de Flota:Pizarra de Mantenimiento', 'Gestión de Flota:Órdenes de Trabajo (OT)'], 
-      perms: ['Ver Órdenes de Trabajo', 'Crear Órdenes', 'Aprobar Órdenes', 'Cerrar Órdenes', 'Aprobar Mantenciones Diarias'] 
+      perms: [
+        'Ver Órdenes de Trabajo', 
+        'Crear Órdenes', 
+        'Aprobar Órdenes', 
+        'Cerrar Órdenes', 
+        'Aprobar Mantenciones Diarias',
+        'Gestionar Tareas OT',
+        'Gestionar Insumos OT',
+        'Asignar Personal OT',
+        'Aprobar Solicitudes Repuestos',
+        'Forzar Cambio Estado OT'
+      ] 
     },
     { 
       section: 'Módulo de Personal', 
