@@ -64,18 +64,23 @@ export default function OrdenesTrabajoDetail() {
         let interval: NodeJS.Timeout;
         if (ot?.estado === 'EN_PROCESO') {
             interval = setInterval(() => {
-                setTimerDisplay(prev => prev + 1);
+                if (ot?.inicio_proceso) {
+                    const elapsedTime = Math.floor((Date.now() - new Date(ot.inicio_proceso).getTime()) / 1000);
+                    setTimerDisplay((ot.tiempoTrabajadoSegundos || 0) + elapsedTime);
+                } else {
+                    setTimerDisplay(prev => prev + 1);
+                }
             }, 1000);
         } else {
             setTimerDisplay(ot?.tiempoTrabajadoSegundos || 0);
         }
         return () => clearInterval(interval);
-    }, [ot?.estado, ot?.tiempoTrabajadoSegundos]);
+    }, [ot?.estado, ot?.tiempoTrabajadoSegundos, ot?.inicio_proceso]);
 
     const handleActualizarEstadoRapido = async (estadoStr: string) => {
         if (!ot) return;
         const updates: any = { estado: estadoStr as any };
-        if (estadoStr === 'EN_PROCESO' && !ot.inicio_proceso) {
+        if (estadoStr === 'EN_PROCESO') {
             updates.inicio_proceso = new Date().toISOString();
         }
         if (estadoStr === 'PAUSADA' || estadoStr === 'FINALIZADA') {
@@ -185,6 +190,8 @@ export default function OrdenesTrabajoDetail() {
                 ...ot,
                 estado: nuevoEstado as any,
                 kilometrajeCierre: kmVal,
+                tiempoTrabajadoSegundos: (nuevoEstado === 'PAUSADA' || nuevoEstado === 'FINALIZADA') ? timerDisplay : ot.tiempoTrabajadoSegundos,
+                inicio_proceso: nuevoEstado === 'EN_PROCESO' ? new Date().toISOString() : ot.inicio_proceso,
                 historial: [
                     ...ot.historial,
                     {
@@ -208,6 +215,8 @@ export default function OrdenesTrabajoDetail() {
         actualizarOrdenTrabajo({
             ...ot,
             estado: nuevoEstado as any,
+            tiempoTrabajadoSegundos: (nuevoEstado === 'PAUSADA' || nuevoEstado === 'FINALIZADA') ? timerDisplay : ot.tiempoTrabajadoSegundos,
+            inicio_proceso: nuevoEstado === 'EN_PROCESO' ? new Date().toISOString() : ot.inicio_proceso,
             historial: [
                 ...ot.historial,
                 {
