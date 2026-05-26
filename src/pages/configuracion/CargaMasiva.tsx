@@ -109,7 +109,16 @@ const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any
   },
   inventario: { 
     table: 'logistica_repuestos', 
-    mapConfig: (r: any) => ({ sku: r.Codigo || r.SKU, nombre: r.Nombre || r.Repuesto, categoria: r.Categoria, stock: r.StockInicial || r.Stock || 0, min_stock: r.StockMinimo || 0, precio: r.PrecioUnitario || r.Precio || 0, proveedor: r.ProveedorPrincipal || r.Proveedor }) 
+    mapConfig: (r: any) => ({
+      sku: r.numero_parte || r.Codigo || r.SKU,
+      nombre: r.nombre || r.Nombre || r.Repuesto,
+      calidad: r.calidad || r.Calidad,
+      stock: r.stock_actual || r.StockInicial || r.Stock || 0,
+      min_stock: r.stock_minimo || r.StockMinimo || 0,
+      ubicacion: r.ubicacion || r.Ubicacion,
+      proveedor: r.proveedor_habitual || r.ProveedorPrincipal || r.Proveedor,
+      precio: r.precio_unitario ? parseFloat(r.precio_unitario.toString().replace(/[^0-9.-]+/g,"")) : (r.PrecioUnitario || r.Precio || 0)
+    }) 
   },
   bodegas: { 
     table: 'logistica_bodegas', 
@@ -251,7 +260,7 @@ const MODULES: UploadModule[] = [
     description: 'Carga de catálogo de repuestos, precios, stock inicial y proveedores.',
     icon: Package,
     template: [
-      { Codigo: 'FIL-123', Nombre: 'Filtro de Aceite', Categoria: 'Filtros', StockInicial: 50, PrecioUnitario: 12500, ProveedorPrincipal: 'Repsol SA' }
+      { nombre: 'ABRAZADERA 1"', numero_parte: 'N3540319:MBB', calidad: 'ORIGINAL', stock_actual: 100, stock_minimo: 2, ubicacion: 'Estante A-4', proveedor_habitual: 'KAUFMANN', precio_unitario: '$2.000' }
     ]
   },
   {

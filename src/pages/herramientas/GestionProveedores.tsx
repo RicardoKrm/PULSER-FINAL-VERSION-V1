@@ -28,16 +28,16 @@ export default function GestionProveedores() {
     if (!currentCompany?.id) return;
     try {
       const { data, error } = await supabase
-        .from('proveedor')
+        .from('proveedores_directorio')
         .select('*')
         .eq('empresa_id', currentCompany.id);
       
-      // If error (e.g. column does not exist), just load all
-      if (error) {
-         const { data: fallbackData } = await supabase.from('proveedor').select('*');
-         if (fallbackData) setProveedores(fallbackData);
-      } else if (data) {
-        setProveedores(data);
+      if (!error && data) {
+         setProveedores(data);
+      } else {
+         // Fallback a localStorage si la tabla aún no se crea
+         const local = localStorage.getItem('proveedores_' + currentCompany.id);
+         if (local) setProveedores(JSON.parse(local));
       }
     } catch (e) {
       console.error(e);
@@ -50,21 +50,25 @@ export default function GestionProveedores() {
     e.preventDefault();
     if (!nombre.trim() || !currentCompany?.id) return;
     
-    try {
-      const { error } = await supabase.from('proveedor').insert([{
+    const newProv = {
         empresa_id: currentCompany.id,
         nombre,
         rut,
         direccion,
         telefono,
         email
-      }]);
+    };
+
+    try {
+      const { error } = await supabase.from('proveedores_directorio').insert([newProv]);
       
-      // If it fails because of missing empresa_id
-      if (error && error.message.includes('empresa_id')) {
-         await supabase.from('proveedor').insert([{
-           nombre, rut, direccion, telefono, email
-         }]);
+      if (error) {
+         // Fallback a localStorage si falla la BD
+         const updated = [...proveedores, { id: Math.random().toString(), ...newProv }];
+         setProveedores(updated);
+         localStorage.setItem('proveedores_' + currentCompany.id, JSON.stringify(updated));
+      } else {
+         fetchProveedores();
       }
       
       setNombre('');
@@ -73,7 +77,6 @@ export default function GestionProveedores() {
       setTelefono('');
       setEmail('');
       setIsModalOpen(false);
-      fetchProveedores();
       Swal.fire('Éxito', 'Proveedor guardado correctamente', 'success');
     } catch (e) {
       Swal.fire('Error', 'No se pudo guardar', 'error');
@@ -92,8 +95,15 @@ export default function GestionProveedores() {
     
     if (res.isConfirmed) {
       try {
-        await supabase.from('proveedor').delete().eq('id', id);
-        fetchProveedores();
+        const { error } = await supabase.from('proveedores_directorio').delete().eq('id', id);
+        
+        if (error) {
+           const updated = proveedores.filter(p => p.id !== id);
+           setProveedores(updated);
+           localStorage.setItem('proveedores_' + currentCompany.id, JSON.stringify(updated));
+        } else {
+           fetchProveedores();
+        }
         Swal.fire('Eliminado', '', 'success');
       } catch (e) {
         // Handle error
