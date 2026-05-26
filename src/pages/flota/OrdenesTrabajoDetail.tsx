@@ -9,6 +9,8 @@ import { Modal } from '../../components/ui/Modal';
 import { ArrowLeft, Edit, Printer, Clock, Wrench, Boxes, History, ChevronDown, ChevronUp, Save, Trash2, Plus, FileText, CheckCircle, FileDown, Search, AlertCircle, PenTool, ThumbsUp, ThumbsDown, DollarSign } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import Swal from 'sweetalert2';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 export default function OrdenesTrabajoDetail() {
   const { id } = useParams();
@@ -567,6 +569,363 @@ export default function OrdenesTrabajoDetail() {
      }
   };
 
+  const handleExportarPDF = () => {
+    if (!ot) return;
+
+    // Create a new jsPDF instance
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const primaryColor = [147, 51, 234]; // Purple theme
+    const secondaryColor = [71, 85, 105]; // Slate
+    const textColor = [15, 23, 42]; // Dark slate
+
+    // Helper: title banner / header
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.rect(0, 0, 210, 25, 'F');
+
+    // Title text
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(255, 255, 255);
+    doc.text('SISTEMA DE GESTIÓN DE FLOTA Y MANTENIMIENTO', 10, 10);
+    doc.setFontSize(11);
+    doc.setFont('Helvetica', 'normal');
+    doc.text('HOJA DE ORDEN DE TRABAJO - CONTROL DE PROCESO', 10, 16);
+    doc.setFont('Helvetica', 'bold');
+    doc.text(`OT NO: #${ot.folio}`, 200, 10, { align: 'right' });
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(`Impreso: ${new Date().toLocaleString()}`, 200, 16, { align: 'right' });
+
+    // Add white margin decoration line
+    doc.setDrawColor(255, 255, 255);
+    doc.setLineWidth(0.5);
+    doc.line(10, 19, 200, 19);
+
+    // 1. General information section in a nice grid table (2 columns)
+    const generalInfo = [
+      [
+        { content: 'INFORMACIÓN DE LA ORDEN DE TRABAJO', colSpan: 4, styles: { fontStyle: 'bold', textColor: primaryColor, fontSize: 10 } }
+      ],
+      [
+        { content: 'Folio:', styles: { fontStyle: 'bold' } },
+        `OT-#${ot.folio}`,
+        { content: 'Vehículo (Patente):', styles: { fontStyle: 'bold' } },
+        `${vehiculo?.patente || 'N/A'} ${vehiculo?.marca ? `(${vehiculo.marca} ${vehiculo.modelo || ''})` : ''}`
+      ],
+      [
+        { content: 'Tipo de Servicio:', styles: { fontStyle: 'bold' } },
+        ot.tipo?.replace('_', ' ') || 'N/A',
+        { content: 'Técnico Responsable:', styles: { fontStyle: 'bold' } },
+        ot.tecnicoResponsable || 'Sin asignar'
+      ],
+      [
+        { content: 'Prioridad:', styles: { fontStyle: 'bold' } },
+        ot.prioridad || 'N/A',
+        { content: 'Personal de Apoyo:', styles: { fontStyle: 'bold' } },
+        ot.personalOperativo || 'Sin apoyo'
+      ],
+      [
+        { content: 'Fecha Creación:', styles: { fontStyle: 'bold' } },
+        new Date(ot.fechaCreacion).toLocaleString() || 'N/A',
+        { content: 'KM Apertura:', styles: { fontStyle: 'bold' } },
+        ot.kilometrajeApertura ? ot.kilometrajeApertura.toLocaleString() : '0'
+      ],
+      [
+        { content: 'Estado de la OT:', styles: { fontStyle: 'bold' } },
+        ot.estado?.replace('_', ' ') || 'N/A',
+        { content: 'Pauta Mantenimiento:', styles: { fontStyle: 'bold' } },
+        ot.pauta || 'Ninguna'
+      ],
+      [
+        { content: 'Tiempo Trabajado:', styles: { fontStyle: 'bold' } },
+        new Date(timerDisplay * 1000).toISOString().substr(11, 8),
+        { content: 'KM Cierre:', styles: { fontStyle: 'bold' } },
+        ot.kilometrajeCierre ? ot.kilometrajeCierre.toLocaleString() : 'En proceso...'
+      ]
+    ];
+
+    (doc as any).autoTable({
+      startY: 32,
+      body: generalInfo,
+      theme: 'plain',
+      styles: { fontSize: 8.5, cellPadding: 2, textColor: textColor },
+      columnStyles: {
+        0: { cellWidth: 45 },
+        1: { cellWidth: 55 },
+        2: { cellWidth: 45 },
+        3: { cellWidth: 55 }
+      }
+    });
+
+    let currentY = (doc as any).lastAutoTable.finalY + 6;
+
+    // 2. Observations and Technical logs details (styled dynamically)
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text('OBSERVACIONES Y DIAGNÓSTICO', 10, currentY);
+    
+    doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setLineWidth(0.3);
+    doc.line(10, currentY + 1.5, 200, currentY + 1.5);
+    currentY += 5;
+
+    const noteText = [
+      [
+        { content: 'Instrucciones para el Mecánico (Observación Inicial):', styles: { fontStyle: 'bold', cellWidth: 50, fontSize: 8.5 } },
+        { content: ot.observacionInicial || 'No se especificó un motivo.', styles: { fontSize: 8.5 } }
+      ],
+      [
+        { content: 'Observaciones Generales de la OT:', styles: { fontStyle: 'bold', cellWidth: 50, fontSize: 8.5 } },
+        { content: ot.observaciones || 'Sin observaciones adicionales.', styles: { fontSize: 8.5 } }
+      ],
+      [
+        { content: 'Diagnóstico Técnico / Evaluación:', styles: { fontStyle: 'bold', cellWidth: 50, fontSize: 8.5 } },
+        { content: ot.diagnosticoEvaluacion || 'Evaluación técnica no registrada todavía.', styles: { fontSize: 8.5 } }
+      ]
+    ];
+
+    (doc as any).autoTable({
+      startY: currentY,
+      body: noteText,
+      theme: 'grid',
+      styles: { cellPadding: 3, textColor: textColor },
+      gridStyles: { borderWidth: 0.1, borderColor: [203, 213, 225] },
+      columnStyles: {
+        0: { fillColor: [248, 250, 252], fontStyle: 'bold' }
+      }
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 6;
+
+    // 3. Tareas Realizadas (Checklist)
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text('TAREAS REALIZADAS', 10, currentY);
+    doc.line(10, currentY + 1.5, 200, currentY + 1.5);
+    currentY += 5;
+
+    const tareasRows = ot.tareasRealizadas && ot.tareasRealizadas.length > 0
+      ? ot.tareasRealizadas.map((t, idx) => [
+          idx + 1,
+          t.tarea_estandar?.descripcion || t.tarea_estandar?.nombre || 'Tarea ejecutada',
+          `${t.tiempo_real_minutos || 0} min`,
+          canViewCostos ? `$${t.costo_real ? t.costo_real.toLocaleString() : '0'}` : 'N/A'
+        ])
+      : [["-", "No se han asignado o realizado tareas para esta orden.", "-", "-"]];
+
+    (doc as any).autoTable({
+      startY: currentY,
+      head: [['#', 'Descripción de la Tarea', 'Tiempo Real', 'Costo Tarea']],
+      body: tareasRows,
+      theme: 'striped',
+      headStyles: { fillColor: primaryColor, fontSize: 8.5 },
+      styles: { fontSize: 8, cellPadding: 2, textColor: textColor },
+      columnStyles: {
+        0: { cellWidth: 10 },
+        2: { cellWidth: 30, halign: 'center' },
+        3: { cellWidth: 30, halign: 'right' }
+      }
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 6;
+
+    // 4. Insumos y Repuestos Utilizados
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text('INSUMOS Y REPUESTOS UTILIZADOS', 10, currentY);
+    doc.line(10, currentY + 1.5, 200, currentY + 1.5);
+    currentY += 5;
+
+    const insumosRows = ot.insumos && ot.insumos.length > 0
+      ? ot.insumos.map((i, idx) => [
+          idx + 1,
+          i.repuesto?.nombre || i.nombre || 'Repuesto',
+          i.cantidad,
+          canViewCostos ? `$${(i.repuesto?.costo_unitario || i.precioUnitario || 0).toLocaleString()}` : 'N/A',
+          canViewCostos ? `$${(i.costo_total || (i.cantidad * (i.repuesto?.costo_unitario || i.precioUnitario || 0))).toLocaleString()}` : 'N/A'
+        ])
+      : [["-", "No se han ingresado repuestos ni insumos todavía.", "-", "-", "-"]];
+
+    (doc as any).autoTable({
+      startY: currentY,
+      head: [['#', 'Nombre del Insumo / Repuesto', 'Cantidad', 'Costo Unit.', 'Costo Total']],
+      body: insumosRows,
+      theme: 'striped',
+      headStyles: { fillColor: secondaryColor, fontSize: 8.5 },
+      styles: { fontSize: 8, cellPadding: 2, textColor: textColor },
+      columnStyles: {
+        0: { cellWidth: 10 },
+        2: { cellWidth: 25, halign: 'center' },
+        3: { cellWidth: 25, halign: 'right' },
+        4: { cellWidth: 25, halign: 'right' }
+      }
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 6;
+
+    // 5. Solicitudes de Repuestos (if any)
+    const solicitudes = ot.solicitudes || [];
+    if (solicitudes.length > 0) {
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.text('SOLICITUDES DE REPUESTOS EN BODEGA', 10, currentY);
+      doc.line(10, currentY + 1.5, 200, currentY + 1.5);
+      currentY += 5;
+
+      const solRows = solicitudes.map((s, idx) => [
+        idx + 1,
+        s.repuesto_nombre,
+        s.cantidad,
+        s.estado,
+        s.motivo_rechazo || 'N/A',
+        new Date(s.fecha_solicitud).toLocaleDateString()
+      ]);
+
+      (doc as any).autoTable({
+        startY: currentY,
+        head: [['#', 'Repuesto Solicitado', 'Cant.', 'Estado', 'Motivo Rechazo', 'Fecha Solicitud']],
+        body: solRows,
+        theme: 'striped',
+        headStyles: { fillColor: [194, 65, 12], fontSize: 8.5 },
+        styles: { fontSize: 8, cellPadding: 2, textColor: textColor },
+        columnStyles: {
+          0: { cellWidth: 10 },
+          2: { cellWidth: 15, halign: 'center' },
+          3: { cellWidth: 25, halign: 'center' },
+          5: { cellWidth: 25, halign: 'center' }
+        }
+      });
+
+      currentY = (doc as any).lastAutoTable.finalY + 6;
+    }
+
+    if (currentY > 210) {
+      doc.addPage();
+      currentY = 20;
+    }
+
+    // 6. HISTORIAL DE PROCESO (How is the OT process going - "todo lo que se hizo en ella")
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text('HISTORIAL Y SEGUIMIENTO DEL PROCESO', 10, currentY);
+    doc.line(10, currentY + 1.5, 200, currentY + 1.5);
+    currentY += 5;
+
+    const historialRows = ot.historial && ot.historial.length > 0
+      ? [...ot.historial]
+          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+          .map((h, idx) => [
+            idx + 1,
+            new Date(h.created_at).toLocaleString(),
+            h.usuario_nombre || 'Sistema',
+            h.comentario
+          ])
+      : [["-", "-", "-", "No se registran eventos en el historial de esta orden."]];
+
+    (doc as any).autoTable({
+      startY: currentY,
+      head: [['#', 'Fecha y Hora', 'Usuario / Rol', 'Acción / Suceso']],
+      body: historialRows,
+      theme: 'grid',
+      headStyles: { fillColor: [71, 85, 105], fontSize: 8.5 },
+      styles: { fontSize: 8, cellPadding: 2, textColor: textColor },
+      gridStyles: { borderWidth: 0.1, borderColor: [226, 232, 240] },
+      columnStyles: {
+        0: { cellWidth: 10 },
+        1: { cellWidth: 40 },
+        2: { cellWidth: 35 },
+        3: { fontStyle: 'italic' }
+      }
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 6;
+
+    if (currentY > 220) {
+      doc.addPage();
+      currentY = 20;
+    }
+
+    // 7. Costs summary & signatures
+    if (canViewCostos) {
+      doc.setFillColor(248, 250, 252);
+      doc.rect(130, currentY, 70, 30, 'F');
+      doc.setDrawColor(203, 213, 225);
+      doc.rect(130, currentY, 70, 30, 'S');
+
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+      doc.text(`Costo Insumos: $${ot.costoInsumos.toLocaleString()}`, 134, currentY + 6);
+      doc.text(`Costo Mano Obra: $${ot.costoManoObraTareas.toLocaleString()}`, 134, currentY + 12);
+      doc.text(`Costo HH: $${ot.costoManoObraHH.toLocaleString()}`, 134, currentY + 18);
+      
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(16, 185, 129);
+      doc.text(`COSTO TOTAL: $${totalCosto.toLocaleString()}`, 134, currentY + 25);
+    }
+
+    const sigY = currentY + 36;
+    doc.setDrawColor(148, 163, 184);
+    doc.setLineWidth(0.3);
+    
+    // Left signature line
+    doc.line(20, sigY + 15, 80, sigY + 15);
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+    doc.text('Firma Mecánico Responsable', 50, sigY + 19, { align: 'center' });
+    if (ot.tecnicoResponsable) {
+      doc.setFont('Helvetica', 'italic');
+      doc.text(ot.tecnicoResponsable, 50, sigY + 23, { align: 'center' });
+    }
+
+    // Right signature line
+    doc.line(130, sigY + 15, 190, sigY + 15);
+    doc.setFont('Helvetica', 'normal');
+    doc.text('Firma Supervisor / Oficina', 160, sigY + 19, { align: 'center' });
+    doc.setFont('Helvetica', 'italic');
+    doc.text('Aprobación Técnica', 160, sigY + 23, { align: 'center' });
+
+    // Render signature if it exists
+    if (ot.firmaCertificado) {
+      try {
+        doc.addImage(ot.firmaCertificado, 'PNG', 35, sigY - 8, 30, 20);
+      } catch (e) {
+        console.error('Error rendering signature in PDF', e);
+      }
+    }
+
+    const totalPages = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text(`Página ${i} de ${totalPages}`, 105, 287, { align: 'center' });
+      doc.text('Este documento digital representa el avance de proceso y la hoja de auditoría de Orden de Trabajo.', 105, 291, { align: 'center' });
+    }
+
+    doc.save(`HOJA_OT_${ot.folio}.pdf`);
+
+    Swal.fire({
+      title: '¡PDF Generado!',
+      text: 'Se ha descargado la Hoja de Orden de Trabajo con el avance actual y el historial completo de eventos.',
+      icon: 'success',
+      confirmButtonColor: '#9333ea'
+    });
+  };
+
   const hasSolicitudesPendientes = (ot?.solicitudes?.filter(s => s.estado === 'PENDIENTE').length || 0) > 0;
 
   const filteredInsumos = repuestos.filter(i => {
@@ -603,7 +962,7 @@ export default function OrdenesTrabajoDetail() {
             )}
             <span className="flex items-center text-slate-600 dark:text-slate-400 mr-4"><Clock className="w-4 h-4 mr-1"/> {new Date(timerDisplay * 1000).toISOString().substr(11, 8)}</span>
             
-            <Button variant="outline" className="hidden lg:flex" onClick={() => window.print()}><Printer className="w-4 h-4 mr-2"/> Hoja OT</Button>
+            <Button variant="outline" className="hidden lg:flex" onClick={handleExportarPDF}><Printer className="w-4 h-4 mr-2"/> Hoja OT</Button>
             <Button variant="outline" onClick={() => window.print()}><CheckCircle className="w-4 h-4 mr-2"/> Certificado</Button>
 
             {ot.estado === 'PROGRAMADA' || ot.estado === 'ABIERTA' || ot.estado === 'PENDIENTE' || ot.estado === 'PAUSADA' ? (
