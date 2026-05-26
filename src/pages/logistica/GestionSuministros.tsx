@@ -119,6 +119,18 @@ export default function GestionSuministros() {
       `).eq('empresa_id', currentCompany.id).order('created_at', { ascending: false });
       if (!mvErr && mvData) {
          setAuditoriaData(mvData);
+         
+         const pendientes = mvData.filter((m: any) => m.tipo === 'PENDIENTE_VALIDACION' && m.estado === 'PENDIENTE');
+         setValidacionesList(pendientes.map((p: any) => ({
+             id: p.id,
+             fecha: new Date(p.created_at).toLocaleDateString(),
+             hora: new Date(p.created_at).toLocaleTimeString(),
+             repuestoNombre: p.referencia || p.logistica_repuestos?.nombre || 'Producto Desconocido',
+             sku: p.notas || p.logistica_repuestos?.sku || '--',
+             cant: p.cantidad,
+             notas: `Solicitado por ${p.usuario_nombre || 'Desconocido'}`,
+             usuario: p.usuario_nombre || 'Sistema'
+         })));
       }
     }, [currentCompany]);
 
@@ -727,14 +739,19 @@ export default function GestionSuministros() {
             <Button 
               className="bg-indigo-600 hover:bg-indigo-700 text-white"
               disabled={validateType === 'OT' ? !validateOtId : !validateGastoCat}
-              onClick={() => {
+              onClick={async () => {
                 if (itemToValidate) {
-                  setValidacionesList(validacionesList.filter(v => v.id !== itemToValidate.id));
+                  await supabase.from('logistica_movimientos').update({
+                     estado: 'COMPLETADO',
+                     referencia: validateType === 'OT' ? validateOtId : validateGastoCat
+                  }).eq('id', itemToValidate.id);
+                  loadData();
+                  
                   setIsValidateModalOpen(false);
                   setItemToValidate(null);
                   setValidateOtId('');
                   setValidateGastoCat('');
-                  // Optionally show a success toast here
+                  Swal.fire("Validado", "El movimiento ha sido validado correctamente", "success");
                 }
               }}
             >
@@ -1397,6 +1414,15 @@ export default function GestionSuministros() {
           </div>
           <div className="grid grid-cols-2 gap-4">
              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Stock Actual</label>
+                <input 
+                  type="number" 
+                  value={editRepuestoObj?.stock || ''}
+                  onChange={e => setEditRepuestoObj(prev => prev ? {...prev, stock: parseInt(e.target.value) || 0} : prev)}
+                  className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800"
+                />
+             </div>
+             <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Precio Unitario ($)</label>
                 <input 
                   type="number" 
@@ -1425,7 +1451,8 @@ export default function GestionSuministros() {
                        nombre: editRepuestoObj.nombre,
                        sku: editRepuestoObj.sku,
                        precio: editRepuestoObj.precio,
-                       min_stock: editRepuestoObj.min
+                       min_stock: editRepuestoObj.min,
+                       stock: editRepuestoObj.stock
                     }).eq('id', editRepuestoObj.id);
                     if (!error) {
                        Swal.fire("Éxito", "Repuesto actualizado", "success");
