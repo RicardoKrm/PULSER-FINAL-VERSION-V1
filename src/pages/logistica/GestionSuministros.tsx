@@ -224,6 +224,17 @@ export default function GestionSuministros() {
   const [filterSinMov, setFilterSinMov] = useState(false);
   const [selectedItems, setSelectedItems] = useState<any[]>([]);
   const [selectedRepuestoDetalle, setSelectedRepuestoDetalle] = useState<Insumo | null>(null);
+  const [repuestoMovimientos, setRepuestoMovimientos] = useState<any[]>([]);
+
+  React.useEffect(() => {
+     if (selectedRepuestoDetalle) {
+        supabase.from('logistica_movimientos').select('*').eq('repuesto_id', selectedRepuestoDetalle.id).order('created_at', { ascending: false }).then(({ data, error }) => {
+           if (!error && data) setRepuestoMovimientos(data);
+        });
+     } else {
+        setRepuestoMovimientos([]);
+     }
+  }, [selectedRepuestoDetalle]);
   
   // States for Movimiento Masivo
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
@@ -527,12 +538,15 @@ export default function GestionSuministros() {
                     </td>
                     <td className="px-4 py-3 align-top text-center">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase
-                        ${item.tipo === 'SALIDA' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'}`}>
+                        ${item.tipo === 'SALIDA' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : 
+                          item.tipo === 'ENTRADA' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                          item.tipo === 'CORRECCIÓN_MANUAL' ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400' :
+                          'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'}`}>
                         {item.tipo}
                       </span>
                     </td>
-                    <td className={`px-4 py-3 align-top text-center font-bold text-sm ${item.tipo === 'SALIDA' ? 'text-orange-500' : 'text-emerald-500'}`}>
-                      {item.tipo === 'ENTRADA' ? '+' : ''}{item.cantidad > 0 && item.tipo !== 'ENTRADA' && item.tipo !== 'SALIDA' && item.tipo !== 'TRASLADO' ? '+' : (item.tipo === 'SALIDA' ? '-' : '')}{Math.abs(item.cantidad)}
+                    <td className={`px-4 py-3 align-top text-center font-bold text-sm ${item.tipo === 'SALIDA' ? 'text-orange-500' : item.tipo === 'ENTRADA' ? 'text-emerald-500' : item.tipo === 'CORRECCIÓN_MANUAL' ? 'text-purple-500' : 'text-blue-500'}`}>
+                      {item.cantidad > 0 ? '+' : ''}{item.cantidad}
                     </td>
                     <td className="px-4 py-3 align-top">
                       <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-medium leading-tight">
@@ -1023,21 +1037,12 @@ export default function GestionSuministros() {
         isOpen={!!selectedRepuestoDetalle} 
         onClose={() => setSelectedRepuestoDetalle(null)} 
         title="Detalle de Repuesto"
+        size="7xl"
       >
         {selectedRepuestoDetalle && (
           <div className="space-y-6">
-            <div className="flex flex-col md:flex-row justify-between md:items-end gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
-                <div>
-                   <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 uppercase">{selectedRepuestoDetalle.nombre} <span className="text-slate-400 font-normal">| SKU: {selectedRepuestoDetalle.sku}</span></h2>
-                </div>
-                <div className="flex gap-2">
-                    <Button variant="secondary" className="bg-slate-500 hover:bg-slate-600 text-white border-0" onClick={() => setSelectedRepuestoDetalle(null)}>
-                      <ArrowLeft className="w-4 h-4 mr-2" /> VOLVER AL INVENTARIO
-                    </Button>
-                    <Button className="bg-[#06b6d4] hover:bg-[#0891b2] text-white border-0">
-                      <Edit className="w-4 h-4 mr-2" /> EDITAR DATOS
-                    </Button>
-                </div>
+            <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
+                <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 uppercase">{selectedRepuestoDetalle.nombre} <span className="text-slate-400 font-normal">| SKU: {selectedRepuestoDetalle.sku}</span></h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1098,7 +1103,18 @@ export default function GestionSuministros() {
                     </div>
                   </div>
 
-                  <Button className="w-full bg-[#4285f4] hover:bg-[#3367d6] text-white">
+                  <Button 
+                    className="w-full bg-[#4285f4] hover:bg-[#3367d6] text-white"
+                    onClick={() => {
+                        setSelectedRepuestoDetalle(null);
+                        setTerminalForm(prev => ({
+                           ...prev, 
+                           sku: selectedRepuestoDetalle.sku, 
+                           nombre: selectedRepuestoDetalle.nombre
+                        }));
+                        setIsTerminalModalOpen(true);
+                    }}
+                  >
                     <ArrowRightLeft className="w-4 h-4 mr-2" />
                     REGISTRAR MOVIMIENTO MANUAL
                   </Button>
@@ -1113,7 +1129,7 @@ export default function GestionSuministros() {
                     HISTORIAL DE MOVIMIENTOS
                   </h3>
                   <span className="text-xs bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded-full font-medium text-slate-600 dark:text-slate-300">
-                    {mockHistorialMovimientos.length} REGISTROS
+                    {repuestoMovimientos.length} REGISTROS
                   </span>
                 </div>
 
@@ -1130,27 +1146,30 @@ export default function GestionSuministros() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-700/50">
-                      {mockHistorialMovimientos.map((mov) => (
+                      {repuestoMovimientos.map((mov) => (
                         <tr key={mov.id}>
                           <td className="py-4 pr-2 font-medium whitespace-nowrap">
-                            {mov.fechaHora.split(' ').map((part, i) => (
-                              <div key={i} className={i === 1 || i === 2 ? 'text-slate-500 text-[10px]' : ''}>{part}</div>
-                            ))}
+                            <div className="text-slate-800 dark:text-slate-200">{new Date(mov.created_at).toLocaleDateString()}</div>
+                            <div className="text-slate-500 text-[10px]">{new Date(mov.created_at).toLocaleTimeString()}</div>
                           </td>
                           <td className="py-4 px-2">
-                            <span className="bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded-md text-[10px] font-medium leading-tight inline-block text-slate-700 dark:text-slate-300">
+                            <span className={`px-2 py-1 rounded-md text-[10px] font-medium leading-tight inline-block
+                              ${mov.tipo === 'SALIDA' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30' : 
+                                mov.tipo === 'ENTRADA' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30' :
+                                mov.tipo === 'CORRECCIÓN_MANUAL' ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/30' :
+                                'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}`}>
                               {mov.tipo}
                             </span>
                           </td>
-                          <td className={`py-4 px-2 text-center font-bold ${mov.cant < 0 ? 'text-red-500' : (mov.cant > 0 ? 'text-emerald-500' : 'text-slate-500')}`}>
-                            {mov.cant}
+                          <td className={`py-4 px-2 text-center font-bold ${mov.tipo === 'SALIDA' ? 'text-orange-500' : mov.tipo === 'ENTRADA' ? 'text-emerald-500' : mov.tipo === 'CORRECCIÓN_MANUAL' ? 'text-purple-500' : 'text-blue-500'}`}>
+                             {mov.cantidad > 0 ? '+' : ''}{mov.cantidad}
                           </td>
                           <td className="py-4 px-2 font-medium">
                             <div className="flex items-center gap-1.5">
                               <span className="w-5 h-5 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center shrink-0">
                                 👤
                               </span>
-                              {mov.responsable}
+                              {mov.usuario_nombre || 'Sistema'}
                             </div>
                           </td>
                           <td className="py-4 px-2 text-slate-400">{mov.referencia}</td>
@@ -1447,6 +1466,8 @@ export default function GestionSuministros() {
                className="bg-[#10b981] hover:bg-[#059669] text-white"
                onClick={async () => {
                  if (editRepuestoObj) {
+                    const originalObj = sumInsumosData.find(r => r.id === editRepuestoObj.id);
+                    
                     const { error } = await supabase.from('logistica_repuestos').update({
                        nombre: editRepuestoObj.nombre,
                        sku: editRepuestoObj.sku,
@@ -1455,6 +1476,19 @@ export default function GestionSuministros() {
                        stock: editRepuestoObj.stock
                     }).eq('id', editRepuestoObj.id);
                     if (!error) {
+                       if (originalObj && originalObj.stock !== editRepuestoObj.stock) {
+                           // Hubo cambio manual de stock
+                           const stockDiff = editRepuestoObj.stock - originalObj.stock;
+                           await supabase.from('logistica_movimientos').insert({
+                               empresa_id: currentCompany?.id,
+                               repuesto_id: editRepuestoObj.id,
+                               tipo: 'CORRECCIÓN_MANUAL',
+                               cantidad: stockDiff,
+                               referencia: 'Edición Manual (Lápiz)',
+                               notas: 'Corrección administrativa de stock',
+                               estado: 'COMPLETADO'
+                           });
+                       }
                        Swal.fire("Éxito", "Repuesto actualizado", "success");
                        setIsEditRepuestoModalOpen(false);
                        loadData();
