@@ -83,7 +83,7 @@ export default function OrdenesTrabajoDetail() {
         if (estadoStr === 'EN_PROCESO') {
             updates.inicio_proceso = new Date().toISOString();
         }
-        if (estadoStr === 'PAUSADA' || estadoStr === 'FINALIZADA') {
+        if (estadoStr === 'PAUSADA' || estadoStr === 'FINALIZADA' || estadoStr === 'CERRADA_POR_MECANICO') {
             updates.tiempoTrabajadoSegundos = timerDisplay;
         }
 
@@ -190,7 +190,7 @@ export default function OrdenesTrabajoDetail() {
                 ...ot,
                 estado: nuevoEstado as any,
                 kilometrajeCierre: kmVal,
-                tiempoTrabajadoSegundos: (nuevoEstado === 'PAUSADA' || nuevoEstado === 'FINALIZADA') ? timerDisplay : ot.tiempoTrabajadoSegundos,
+                tiempoTrabajadoSegundos: (nuevoEstado === 'PAUSADA' || nuevoEstado === 'FINALIZADA' || nuevoEstado === 'CERRADA_POR_MECANICO') ? timerDisplay : ot.tiempoTrabajadoSegundos,
                 inicio_proceso: nuevoEstado === 'EN_PROCESO' ? new Date().toISOString() : ot.inicio_proceso,
                 historial: [
                     ...ot.historial,
@@ -215,7 +215,7 @@ export default function OrdenesTrabajoDetail() {
         actualizarOrdenTrabajo({
             ...ot,
             estado: nuevoEstado as any,
-            tiempoTrabajadoSegundos: (nuevoEstado === 'PAUSADA' || nuevoEstado === 'FINALIZADA') ? timerDisplay : ot.tiempoTrabajadoSegundos,
+            tiempoTrabajadoSegundos: (nuevoEstado === 'PAUSADA' || nuevoEstado === 'FINALIZADA' || nuevoEstado === 'CERRADA_POR_MECANICO') ? timerDisplay : ot.tiempoTrabajadoSegundos,
             inicio_proceso: nuevoEstado === 'EN_PROCESO' ? new Date().toISOString() : ot.inicio_proceso,
             historial: [
                 ...ot.historial,
@@ -486,6 +486,9 @@ export default function OrdenesTrabajoDetail() {
               <>
                  <Button onClick={() => handleActualizarEstadoRapido('PAUSADA')} className="bg-amber-500 hover:bg-amber-600 text-white font-bold">
                     Pausar OT
+                 </Button>
+                 <Button onClick={() => handleActualizarEstadoRapido('CERRADA_POR_MECANICO')} className="bg-purple-600 hover:bg-purple-700 text-white font-bold">
+                    <CheckCircle className="w-4 h-4 mr-2" /> Cerrar OT (Mecánico)
                  </Button>
               </>
             ) : null}
