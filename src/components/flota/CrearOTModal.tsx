@@ -5,14 +5,15 @@ import { useAppContext } from '../../context/AppContext';
 import { OrdenDeTrabajo } from '../../types';
 import { logActividad } from '../../lib/supabase';
 
-interface CrearOTModalProps {
+export interface CrearOTModalProps {
   isOpen: boolean;
   onClose: () => void;
   vehiculoPreseleccionadoId?: string;
+  otToEdit?: OrdenDeTrabajo | null;
 }
 
-export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, vehiculoPreseleccionadoId }) => {
-  const { ordenesTrabajo, crearOrdenTrabajo, vehiculos, tiposFalla, pautas, kitsRepuesto, personal } = useAppContext();
+export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, vehiculoPreseleccionadoId, otToEdit }) => {
+  const { ordenesTrabajo, crearOrdenTrabajo, actualizarOrdenTrabajo, vehiculos, tiposFalla, pautas, kitsRepuesto, personal } = useAppContext();
   const excludedRoles = ['super administrador', 'súper administrador', 'super admin', 'súper admin', 'administrador', 'gerente', 'administrativo'];
   
   const personalOperativoList = personal.filter(u => {
@@ -28,6 +29,20 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
     kilometrajeApertura: 0,
     fechaCreacion: new Date().toISOString(),
   });
+
+  React.useEffect(() => {
+    if (otToEdit) {
+      setFormData(otToEdit);
+    } else {
+      setFormData({
+        vehiculoId: vehiculoPreseleccionadoId || '',
+        tipo: 'PREVENTIVA',
+        prioridad: 'MEDIA',
+        kilometrajeApertura: 0,
+        fechaCreacion: new Date().toISOString(),
+      });
+    }
+  }, [otToEdit, vehiculoPreseleccionadoId, isOpen]);
 
   const vehiculoSeleccionado = vehiculos.find(v => v.id === formData.vehiculoId);
   
@@ -58,6 +73,12 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (otToEdit) {
+      actualizarOrdenTrabajo(formData as OrdenDeTrabajo);
+      onClose();
+      return;
+    }
+
     let insumosDesdeKit: any[] = [];
     if (formData.kitRepuestos) {
       const selectedKit = kitsRepuesto.find(k => k.nombre === formData.kitRepuestos);
@@ -291,7 +312,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
 
         <div className="flex justify-end gap-2 pt-4">
           <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button type="submit" className="bg-cyan-600">Generar Orden de Trabajo</Button>
+          <Button type="submit" className="bg-cyan-600">{otToEdit ? 'Guardar Cambios' : 'Generar Orden de Trabajo'}</Button>
         </div>
       </form>
     </Modal>

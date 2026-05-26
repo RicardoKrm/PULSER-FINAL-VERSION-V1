@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { Plus, Search, Filter, DollarSign, FileDown, Trash } from 'lucide-react';
+import { Plus, Search, Filter, DollarSign, FileDown, Trash, Edit } from 'lucide-react';
 import { CrearOTModal } from '../../components/flota/CrearOTModal';
 
 export default function GestionOrdenesTrabajo() {
@@ -14,6 +14,7 @@ export default function GestionOrdenesTrabajo() {
   const isMecanico = profile?.rol?.nombre === 'Mecánico' || profile?.rol?.nombre === 'Mecanico';
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [otToEdit, setOtToEdit] = useState<any>(null);
 
   const [filtroVehiculo, setFiltroVehiculo] = useState('Todos');
   const [filtroTipo, setFiltroTipo] = useState('Todos');
@@ -100,11 +101,11 @@ export default function GestionOrdenesTrabajo() {
         <h1 className="text-3xl font-bold">Órdenes de Trabajo</h1>
         <div className="flex items-center gap-4">
             <Button variant="outline" className="border-green-600 text-green-600 hover:bg-green-50 dark:bg-green-900/30"><FileDown className="w-4 h-4 mr-2" /> Exportar</Button>
-            <Button className="bg-cyan-600" onClick={() => setIsModalOpen(true)}><Plus className="w-4 h-4 mr-2" /> Crear Nueva OT</Button>
+            <Button className="bg-cyan-600" onClick={() => { setOtToEdit(null); setIsModalOpen(true); }}><Plus className="w-4 h-4 mr-2" /> Crear Nueva OT</Button>
         </div>
       </div>
       
-      <CrearOTModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <CrearOTModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} otToEdit={otToEdit} />
       
       <Card className="p-6">
         <h2 className="text-xl font-semibold mb-6 flex items-center gap-2"><Filter className="text-cyan-600 w-5 h-5"/> Filtros</h2>
@@ -158,6 +159,7 @@ export default function GestionOrdenesTrabajo() {
                                 <td className="p-4"><Badge className={`${getTipoColor(ot.tipo)} border dark:border-slate-800`}>{ot.tipo}</Badge></td>
                                 <td className="p-4"><Badge className={`${getEstadoColor(ot.estado)} border dark:border-slate-800`}>{ot.estado.replace('_', ' ')}</Badge></td>
                                 <td className="p-4 text-right">
+                                    <Button size="sm" variant="ghost" className="mr-2 text-cyan-600" onClick={() => { setOtToEdit(ot); setIsModalOpen(true); }}><Edit className="w-4 h-4"/></Button>
                                     <Button size="sm" variant="outline" className="mr-2" onClick={() => navigate(`/flota/ordenes-trabajo/${ot.id}`)}>Ver</Button>
                                     <Button size="sm" variant="ghost" className="text-red-500" onClick={() => eliminarOrdenTrabajo(ot.id)}><Trash className="w-4 h-4"/></Button>
                                 </td>

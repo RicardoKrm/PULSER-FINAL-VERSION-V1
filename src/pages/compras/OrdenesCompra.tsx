@@ -28,6 +28,8 @@ import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Modal } from '../../components/ui/Modal';
 
+import { useAppContext } from '../../context/AppContext';
+
 interface PedidoTaller {
   id: string;
   fecha: string;
@@ -68,24 +70,38 @@ interface LineaOC {
 
 export default function OrdenesCompra() {
   const navigate = useNavigate();
+  const { ordenesTrabajo, vehiculos } = useAppContext();
   const [view, setView] = useState<'panel' | 'historial' | 'detalle'>('panel');
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [showNuevaOCModal, setShowNuevaOCModal] = useState(false);
   const [proveedorSeleccionadoTaller, setProveedorSeleccionadoTaller] = useState('KAUFMANN');
   
-  const [pedidosTaller, setPedidosTaller] = useState<PedidoTaller[]>([
-    {
-      id: "30 OT-OT-0345",
-      fecha: "27/04/2026 10:36 HRS",
-      prioridad: "ALTA",
-      vehiculo: "30 OT-OT-0345",
-      repuesto: "CORREA 8 PK",
-      sugerencia: "SIN SUGERENCIA",
-      cantidad: 1,
-      motivo: "correa en mal estado",
-      selected: false
-    }
-  ]);
+  const [selectedPedidos, setSelectedPedidos] = useState<string[]>([]);
+
+  const pedidosTaller = React.useMemo(() => {
+     let pedidos: PedidoTaller[] = [];
+     ordenesTrabajo.forEach(ot => {
+         const vehiculo = vehiculos.find(v => v.id === ot.vehiculoId)?.patente || 'Desconocido';
+         if (ot.solicitudes) {
+             ot.solicitudes.forEach(sol => {
+                 if (sol.estado === 'PENDIENTE') {
+                     pedidos.push({
+                         id: sol.id,
+                         fecha: new Date(sol.fecha_solicitud).toLocaleString(),
+                         prioridad: ot.prioridad,
+                         vehiculo: vehiculo + ' (OT: ' + ot.folio + ')',
+                         repuesto: sol.repuesto_nombre,
+                         sugerencia: 'Sin sugerencia',
+                         cantidad: sol.cantidad,
+                         motivo: ot.observacionInicial || ot.diagnosticoEvaluacion || 'Repuesto para OT',
+                         selected: selectedPedidos.includes(sol.id)
+                     });
+                 }
+             });
+         }
+     });
+     return pedidos;
+  }, [ordenesTrabajo, vehiculos, selectedPedidos]);
 
   const [ordenesPendientes, setOrdenesPendientes] = useState<OrdenCompra[]>([
     { folio: "#5", fecha: "20/04/2026", proveedor: "KAUFMANN", monto: 0, estado: "PENDIENTE" },
@@ -165,12 +181,14 @@ export default function OrdenesCompra() {
 
     setOrdenesPendientes([{ folio: nuevoHistorialOC.folio, fecha: nuevoHistorialOC.fecha, proveedor: nuevoHistorialOC.proveedor, monto: nuevoHistorialOC.monto, estado: nuevoHistorialOC.estado }, ...ordenesPendientes]);
     setHistorialOrdenes([nuevoHistorialOC, ...historialOrdenes]);
-    setPedidosTaller(pedidosTaller.filter(p => !p.selected));
-    alert(`Órden de compra de taller ${folioStr} generada exitosamente.`);
+    setSelectedPedidos([]); // Clear selection instead of filtering out
+    alert(`Órden de compra de taller ${folioStr} generada exitosamente. Recuerda ir a la OT para actualizar el estado de las solicitudes.`);
   };
 
   const togglePedidoTallerSelection = (id: string) => {
-    setPedidosTaller(pedidosTaller.map(p => p.id === id ? { ...p, selected: !p.selected } : p));
+    setSelectedPedidos(prev => 
+       prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+    );
   };
 
   const handleViewDetail = (folio: string) => {

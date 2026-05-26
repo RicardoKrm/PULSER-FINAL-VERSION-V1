@@ -59,17 +59,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!activeCompanyId) return;
 
     const fetchAllData = async () => {
+      const pageSize = 1000;
       // Fetch Tareas
-      const { data: tareasData } = await supabase.from('tarea_estandar').select('*').eq('empresa_id', activeCompanyId);
-      if (tareasData) {
-        setTareasEstandar(tareasData.map(t => ({ id: t.id, descripcion: t.descripcion, tiempoEstandarMinutos: t.tiempo_estandar_minutos, costoManoObra: t.costo_base })));
+      let allTareasData: any[] = [];
+      let startT = 0;
+      let hasMoreTareas = true;
+      while (hasMoreTareas) {
+        const { data } = await supabase.from('mantenimiento_tarea').select('*').eq('empresa_id', activeCompanyId).range(startT, startT + pageSize - 1);
+        if (data && data.length > 0) {
+          allTareasData = [...allTareasData, ...data];
+          startT += pageSize;
+        } else {
+          hasMoreTareas = false;
+        }
       }
+      setTareasEstandar(allTareasData.map(t => ({
+          id: t.id, 
+          descripcion: t.descripcion, 
+          tiempoEstandarMinutos: t.tiempo_estandar_minutos, 
+          costoManoObra: t.costo_mano_obra 
+      })));
 
       // Fetch Tipos Falla
       let allFallasData: any[] = [];
       let hasMoreFallas = true;
       let startF = 0;
-      const pageSize = 1000;
       
       while (hasMoreFallas) {
         const { data } = await supabase
@@ -127,10 +141,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Fetch Repuestos
-      const { data: repData } = await supabase.from('repuesto').select('*').eq('empresa_id', activeCompanyId);
-      if (repData) {
-        setRepuestos(repData.map(r => ({ ...r, stock_actual: Number(r.stock_actual), costo_unitario: Number(r.costo_unitario) })));
+      let allRepuestosData: any[] = [];
+      let startR = 0;
+      let hasMoreRepuestos = true;
+      while (hasMoreRepuestos) {
+        const { data } = await supabase.from('logistica_repuestos').select('*').eq('empresa_id', activeCompanyId).range(startR, startR + pageSize - 1);
+        if (data && data.length > 0) {
+          allRepuestosData = [...allRepuestosData, ...data];
+          startR += pageSize;
+        } else {
+          hasMoreRepuestos = false;
+        }
       }
+      setRepuestos(allRepuestosData.map(r => ({ 
+          id: r.id, 
+          sku: r.sku || r.referencia || '', 
+          nombre: r.nombre, 
+          stock_actual: Number(r.stock) || 0, 
+          costo_unitario: Number(r.precio) || 0 
+      })));
 
       // Fetch Kits
       const { data: kitsData } = await supabase.from('kit_repuesto').select(`

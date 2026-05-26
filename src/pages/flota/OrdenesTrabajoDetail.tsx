@@ -6,21 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Ca
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
-import { ArrowLeft, Edit, Printer, Clock, Wrench, Boxes, History, ChevronDown, ChevronUp, Save, Trash2, Plus, FileText, CheckCircle, FileDown, Search, AlertCircle, PenTool, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { ArrowLeft, Edit, Printer, Clock, Wrench, Boxes, History, ChevronDown, ChevronUp, Save, Trash2, Plus, FileText, CheckCircle, FileDown, Search, AlertCircle, PenTool, ThumbsUp, ThumbsDown, DollarSign } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-
-const sumInsumosData = [
-  { id: 1, nombre: "Filtro Aceite Dirección Hidráulica Scania", sku: "38377546", stock: 96 },
-  { id: 2, nombre: "Filtro Aceite E III", sku: "A 457 180 11 09:MBB", stock: 99 },
-  { id: 3, nombre: "Filtro Aceite E V", sku: "A 457 180 00 09:MBB", stock: 100 },
-  { id: 4, nombre: "Filtro Aceite E V", sku: "A 457 180 00 09:HENGST", stock: 95 },
-  { id: 5, nombre: "Filtro Aire NCV3", sku: "A 0000903751:HENGST", stock: 20 },
-];
 
 export default function OrdenesTrabajoDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { ordenesTrabajo, vehiculos, kitsRepuesto, tareasEstandar, repuestos, personal, actualizarOrdenTrabajo } = useAppContext();
+  const { ordenesTrabajo, vehiculos, kitsRepuesto, tareasEstandar, repuestos, personal, pautas, actualizarOrdenTrabajo } = useAppContext();
   const { profile } = useAuth();
   const isSupervisorOrAdmin = profile?.rol?.nombre === 'Supervisor' || profile?.rol?.nombre === 'Administrador' || profile?.rol?.nombre === 'Admin' || profile?.rol?.nombre === 'Súper Admin';
   const isMecanico = profile?.rol?.nombre === 'Mecánico' || profile?.rol?.nombre === 'Mecanico';
@@ -30,6 +22,7 @@ export default function OrdenesTrabajoDetail() {
   const [selectedTecnico, setSelectedTecnico] = useState('');
 
   const [isTareaModalOpen, setIsTareaModalOpen] = useState(false);
+  const [tareaSearch, setTareaSearch] = useState('');
   const [isInsumoModalOpen, setIsInsumoModalOpen] = useState(false);
   const [insumoSearch, setInsumoSearch] = useState('');
 
@@ -51,13 +44,88 @@ export default function OrdenesTrabajoDetail() {
   }, [ot]);
   const vehiculo = vehiculos.find(v => v.id === ot?.vehiculoId);
 
+  const filteredPautas = (pautas || []).filter(p => {
+    if (!vehiculo?.modelo) return true;
+    const pautaModelo = (p.modeloVehiculo || '').toLowerCase();
+    if (!pautaModelo || pautaModelo === 'general' || pautaModelo === 'todos') return true;
+    return vehiculo.modelo.toLowerCase().includes(pautaModelo) || pautaModelo.includes(vehiculo.modelo.toLowerCase());
+  });
+
   const [nuevoEstado, setNuevoEstado] = useState(ot?.estado || 'ABIERTA');
-  const [kmCierre, setKmCierre] = useState(ot?.kilometrajeCierre?.toString() || '');
-  const [isUpdatingDb, setIsUpdatingDb] = useState(false);
+    const [kmCierre, setKmCierre] = useState(ot?.kilometrajeCierre?.toString() || '');
+    const [isUpdatingDb, setIsUpdatingDb] = useState(false);
 
-  if (!ot) return <div className="p-8 text-center text-slate-500 dark:text-slate-400">OT no encontrada</div>;
+    const [isPautaModalOpen, setIsPautaModalOpen] = useState(false);
+    const [infoView, setInfoView] = useState<'info' | 'costos'>('info');
 
-  const handleActualizarEstado = async () => {
+    const [timerDisplay, setTimerDisplay] = useState(ot?.tiempoTrabajadoSegundos || 0);
+
+    React.useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (ot?.estado === 'EN_PROCESO') {
+            interval = setInterval(() => {
+                setTimerDisplay(prev => prev + 1);
+            }, 1000);
+        } else {
+            setTimerDisplay(ot?.tiempoTrabajadoSegundos || 0);
+        }
+        return () => clearInterval(interval);
+    }, [ot?.estado, ot?.tiempoTrabajadoSegundos]);
+
+    const handleActualizarEstadoRapido = async (estadoStr: string) => {
+        if (!ot) return;
+        const updates: any = { estado: estadoStr as any };
+        if (estadoStr === 'EN_PROCESO' && !ot.inicio_proceso) {
+            updates.inicio_proceso = new Date().toISOString();
+        }
+        if (estadoStr === 'PAUSADA' || estadoStr === 'FINALIZADA') {
+            updates.tiempoTrabajadoSegundos = timerDisplay;
+        }
+
+        actualizarOrdenTrabajo({
+            ...ot,
+            ...updates,
+            historial: [
+                ...ot.historial,
+                {
+                    id: Math.random().toString(36).substr(2, 9),
+                    orden_id: ot.id,
+                    comentario: `Cambio de estado a ${estadoStr} (Trabajo Iniciado)`,
+                    created_at: new Date().toISOString(),
+                    estado_nuevo: estadoStr,
+                    usuario_nombre: profile?.nombre || 'Administrador'
+                }
+            ]
+        });
+        setNuevoEstado(estadoStr);
+    };
+
+    const handleGuardarDiagnostico = async () => {
+        if (!ot) return;
+        const textarea = document.getElementById('diag-textarea') as HTMLTextAreaElement;
+        const text = textarea ? textarea.value : '';
+        actualizarOrdenTrabajo({
+            ...ot,
+            diagnosticoEvaluacion: text,
+            historial: [
+                ...ot.historial,
+                {
+                    id: Math.random().toString(36).substr(2, 9),
+                    orden_id: ot.id,
+                    comentario: `Diagnóstico actualizado: ${text}`,
+                    created_at: new Date().toISOString(),
+                    usuario_nombre: profile?.nombre || 'Sistema'
+                }
+            ]
+        });
+        alert('Diagnóstico guardado correctamente');
+        togglePanel('diagnostico');
+    };
+
+    if (!ot) return <div className="p-8 text-center text-slate-500 dark:text-slate-400">OT no encontrada</div>;
+
+    const handleActualizarEstado = async () => {
+
     if (!ot) return;
     if (nuevoEstado === 'FINALIZADA') {
         const kmVal = Number(kmCierre);
@@ -364,7 +432,18 @@ export default function OrdenesTrabajoDetail() {
 
   const hasSolicitudesPendientes = (ot?.solicitudes?.filter(s => s.estado === 'PENDIENTE').length || 0) > 0;
 
-  const filteredInsumos = sumInsumosData.filter(i => i.nombre.toLowerCase().includes(insumoSearch.toLowerCase()) || i.sku.toLowerCase().includes(insumoSearch.toLowerCase()));
+  const filteredInsumos = repuestos.filter(i => {
+     const search = (insumoSearch || '').toLowerCase().trim();
+     if (!search) return true;
+     return (i.nombre || '').toLowerCase().includes(search) || 
+            (i.sku || '').toLowerCase().includes(search);
+  });
+
+  const filteredTareas = tareasEstandar.filter(t => {
+     const search = (tareaSearch || '').toLowerCase().trim();
+     if (!search) return true;
+     return (t.descripcion || '').toLowerCase().includes(search);
+  });
 
   return (
     <div className="space-y-6 p-6">
@@ -379,17 +458,28 @@ export default function OrdenesTrabajoDetail() {
       <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border dark:border-slate-800">
         <Button variant="ghost" onClick={() => navigate('/flota/ordenes-trabajo')}><ArrowLeft className="w-4 h-4 mr-2" />Volver</Button>
         <h1 className="text-xl font-bold">OT #{ot.folio} <Badge className="ml-2 bg-green-600 text-white">{ot.estado.replace('_', ' ')}</Badge></h1>
-        <div className="flex gap-2 font-bold">
+        <div className="flex gap-2 font-bold flex-wrap justify-end">
             {ot.tipo === 'INSPECCION' && (
               <Button onClick={() => navigate('/flota/neumaticos?tab=inspeccion')} className="bg-purple-600 hover:bg-purple-700 text-white">
                 <FileText className="w-4 h-4 mr-2" /> Realizar Inspección
               </Button>
             )}
-            <span className="flex items-center text-slate-600 dark:text-slate-400 mr-4"><Clock className="w-4 h-4 mr-1"/> {new Date(ot.tiempoTrabajadoSegundos * 1000).toISOString().substr(11, 8)}</span>
+            <span className="flex items-center text-slate-600 dark:text-slate-400 mr-4"><Clock className="w-4 h-4 mr-1"/> {new Date(timerDisplay * 1000).toISOString().substr(11, 8)}</span>
             
             <Button variant="outline" className="hidden lg:flex" onClick={() => window.print()}><Printer className="w-4 h-4 mr-2"/> Hoja OT</Button>
-            <Button variant="outline" className="hidden xl:flex" onClick={() => window.print()}><FileText className="w-4 h-4 mr-2"/> Cargo Personal</Button>
             <Button variant="outline" onClick={() => window.print()}><CheckCircle className="w-4 h-4 mr-2"/> Certificado</Button>
+
+            {ot.estado === 'PROGRAMADA' || ot.estado === 'ABIERTA' || ot.estado === 'PENDIENTE' ? (
+              <Button onClick={() => handleActualizarEstadoRapido('EN_PROCESO')} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm font-bold">
+                 Iniciar Trabajo
+              </Button>
+            ) : ot.estado === 'EN_PROCESO' ? (
+              <>
+                 <Button onClick={() => handleActualizarEstadoRapido('PAUSADA')} className="bg-amber-500 hover:bg-amber-600 text-white font-bold">
+                    Pausar OT
+                 </Button>
+              </>
+            ) : null}
 
             <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
                <PenTool className="w-4 h-4 mr-2" /> Firmar
@@ -400,32 +490,65 @@ export default function OrdenesTrabajoDetail() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-            <Card>
-                <CardHeader><CardTitle className="text-lg">Información General</CardTitle></CardHeader>
-                <CardContent className="grid grid-cols-2 gap-4 text-sm">
-                    <p><strong>Vehículo:</strong> {vehiculo?.patente || 'N/A'}</p>
-                    <p><strong>Técnico Responsable:</strong> {ot.tecnicoResponsable || 'Sin asignar'}</p>
-                    <p><strong>Tipo:</strong> {ot.tipo}</p>
-                    <p><strong>Prioridad:</strong> {ot.prioridad}</p>
-                    <p><strong>Fecha Creación:</strong> {new Date(ot.fechaCreacion).toLocaleDateString()}</p>
-                    <p><strong>KM Apertura:</strong> {ot.kilometrajeApertura.toLocaleString()}</p>
-                    <div className="col-span-2 bg-yellow-50 p-4 border dark:border-slate-800 border-yellow-200 rounded">
-                        <p className="font-bold text-yellow-800 uppercase text-xs mb-1">Instrucciones para el Mecánico:</p>
-                        <p className="text-yellow-900">{ot.observacionInicial || 'No se especificó un motivo.'}</p>
-                    </div>
-                </CardContent>
-            </Card>
+            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg w-full max-w-md mx-auto lg:mx-0">
+                <button 
+                   className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-all ${infoView === 'info' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                   onClick={() => setInfoView('info')}
+                >
+                   Información General
+                </button>
+                <button 
+                   className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-all ${infoView === 'costos' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                   onClick={() => setInfoView('costos')}
+                >
+                   Desglose de Costos
+                </button>
+            </div>
 
-            {isSupervisorOrAdmin && (
-               <Card>
-                   <CardHeader><CardTitle className="text-lg">Desglose de Costos</CardTitle></CardHeader>
-                   <CardContent className="grid grid-cols-3 gap-4 text-sm">
-                       <div className="text-center p-4 border rounded dark:border-slate-800"><strong>Insumos</strong><p className="text-xl font-mono text-cyan-600">${ot.costoInsumos.toLocaleString()}</p></div>
-                       <div className="text-center p-4 border rounded dark:border-slate-800"><strong>Mano de Obra (Tareas)</strong><p className="text-xl font-mono text-cyan-600">${ot.costoManoObraTareas.toLocaleString()}</p></div>
-                       <div className="text-center p-4 border rounded dark:border-slate-800"><strong>Mano de Obra (HH)</strong><p className="text-xl font-mono text-cyan-600">${ot.costoManoObraHH.toLocaleString()}</p></div>
-                       <div className="col-span-3 text-right text-lg font-bold">Total OT: <span className="font-mono text-green-600">${totalCosto.toLocaleString()}</span></div>
-                   </CardContent>
-               </Card>
+            {infoView === 'info' && (
+                <Card>
+                    <CardContent className="grid grid-cols-2 gap-4 text-sm pt-6">
+                        <p><strong>Vehículo:</strong> {vehiculo?.patente || 'N/A'}</p>
+                        <p><strong>Técnico Responsable:</strong> {ot.tecnicoResponsable || 'Sin asignar'}</p>
+                        <p><strong>Tipo:</strong> {ot.tipo}</p>
+                        <p><strong>Prioridad:</strong> {ot.prioridad}</p>
+                        <p><strong>Fecha Creación:</strong> {new Date(ot.fechaCreacion).toLocaleDateString()}</p>
+                        <p><strong>KM Apertura:</strong> {ot.kilometrajeApertura.toLocaleString()}</p>
+                        {ot.observaciones && (
+                            <div className="col-span-2 bg-slate-50 p-4 border dark:border-slate-700 dark:bg-slate-800/50 rounded">
+                                <p className="font-bold text-slate-700 dark:text-slate-300 uppercase text-xs mb-1">Observaciones Generales:</p>
+                                <p className="text-slate-800 dark:text-slate-200">{ot.observaciones}</p>
+                            </div>
+                        )}
+                        <div className="col-span-2 bg-yellow-50 p-4 border dark:border-slate-800 border-yellow-200 rounded">
+                            <p className="font-bold text-yellow-800 uppercase text-xs mb-1">Instrucciones para el Mecánico (Observación Inicial):</p>
+                            <p className="text-yellow-900">{ot.observacionInicial || 'No se especificó un motivo.'}</p>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {infoView === 'costos' && (
+                <Card>
+                    <CardContent className="pt-6 space-y-3">
+                        <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-900 px-3 py-2 rounded">
+                            <span className="flex items-center text-slate-700 dark:text-slate-300"><Wrench className="w-4 h-4 mr-2 text-blue-500" /> Costo en Insumos</span>
+                            <span className="font-mono">${ot.costoInsumos.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-900 px-3 py-2 rounded">
+                            <span className="flex items-center text-slate-700 dark:text-slate-300"><History className="w-4 h-4 mr-2 text-yellow-500" /> M. Obra (Tareas)</span>
+                            <span className="font-mono">${ot.costoManoObraTareas.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-900 px-3 py-2 rounded">
+                            <span className="flex items-center text-slate-700 dark:text-slate-300"><Clock className="w-4 h-4 mr-2 text-orange-500" /> M. Obra (HH)</span>
+                            <span className="font-mono">${ot.costoManoObraHH.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-3 border-t dark:border-slate-800 mt-4">
+                            <span className="font-bold text-slate-800 dark:text-slate-100 text-lg">Costo Total OT</span>
+                            <span className="font-bold text-emerald-500 text-lg">${totalCosto.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                        </div>
+                    </CardContent>
+                </Card>
             )}
 
             <div className="flex gap-2">
@@ -484,7 +607,7 @@ export default function OrdenesTrabajoDetail() {
                         <div>
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="font-bold">Solicitudes de Bodega / Compras Directas</h3>
-                                {isMecanico && <Button size="sm" onClick={() => setIsSolicitudModalOpen(true)}><Plus className="w-4 h-4 mr-2"/>Solicitar Repuesto</Button>}
+                                <Button size="sm" onClick={() => setIsSolicitudModalOpen(true)}><Plus className="w-4 h-4 mr-2"/>Solicitar Repuesto</Button>
                             </div>
                             {(!ot.solicitudes || ot.solicitudes.length === 0) ? (
                                 <p className="text-slate-500 italic">No hay solicitudes registradas.</p>
@@ -522,13 +645,47 @@ export default function OrdenesTrabajoDetail() {
 
         <div className="space-y-4">
             <AccordionPanel title="Diagnóstico / Evaluación" active={activePanels.diagnostico} onToggle={() => togglePanel('diagnostico')}>
-                <textarea className="w-full p-2 border rounded dark:border-slate-800 text-sm dark:bg-slate-800 dark:text-slate-100" placeholder="Ingrese el diagnóstico técnico aquí..." defaultValue={ot.diagnosticoEvaluacion} />
-                <Button className="w-full mt-2 bg-cyan-600"><Save className="w-4 h-4 mr-2" />Guardar Diagnóstico</Button>
+                <textarea id="diag-textarea" className="w-full p-2 border rounded dark:border-slate-800 text-sm dark:bg-slate-800 dark:text-slate-100" placeholder="Ingrese el diagnóstico técnico aquí..." defaultValue={ot.diagnosticoEvaluacion} />
+                <Button className="w-full mt-2 bg-cyan-600" onClick={handleGuardarDiagnostico}><Save className="w-4 h-4 mr-2" />Guardar Diagnóstico</Button>
             </AccordionPanel>
 
-            <AccordionPanel title="Pauta de Mantenimiento" active={false} onToggle={() => {}}>
-                <p className="text-sm mb-2">Asociada a: SM3-MINERAL</p>
-                <Button className="bg-cyan-500 w-full"><FileDown className="w-4 h-4 mr-2"/> Ver PDF</Button>
+            <AccordionPanel title="Pauta de Mantenimiento" active={activePanels.pauta} onToggle={() => togglePanel('pauta')}>
+                <p className="text-sm mb-2 text-slate-500">Filtradas por: {vehiculo?.modelo || 'Todos los modelos'}</p>
+                <select 
+                   className="w-full p-2 mb-4 border rounded dark:border-slate-800 text-sm dark:bg-slate-800 dark:text-slate-100"
+                   value={ot.pauta || ''}
+                   onChange={(e) => {
+                       actualizarOrdenTrabajo({
+                           ...ot,
+                           pauta: e.target.value,
+                           historial: [
+                               ...ot.historial,
+                               {
+                                   id: Math.random().toString(36).substr(2, 9),
+                                   orden_id: ot.id,
+                                   comentario: `Se cambió la pauta de mantenimiento a: ${e.target.value || 'Ninguna'}`,
+                                   created_at: new Date().toISOString(),
+                                   usuario_nombre: profile?.nombre || 'Administrador'
+                               }
+                           ]
+                       });
+                   }}
+                >
+                   <option value="">Seleccione una Pauta...</option>
+                   {filteredPautas.map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                </select>
+
+                {ot.pauta && filteredPautas.find(p => p.nombre === ot.pauta)?.archivoPdfUrl && (
+                    <Button 
+                        className="bg-cyan-500 w-full hover:bg-cyan-600" 
+                        onClick={() => {
+                            const url = filteredPautas.find(p => p.nombre === ot.pauta)?.archivoPdfUrl;
+                            if (url) window.open(url, '_blank', 'noopener,noreferrer');
+                        }}
+                    >
+                        <FileDown className="w-4 h-4 mr-2"/> Ver PDF
+                    </Button>
+                )}
             </AccordionPanel>
 
             <AccordionPanel title="Asignar Personal" active={activePanels.personal} onToggle={() => togglePanel('personal')}>
@@ -563,7 +720,25 @@ export default function OrdenesTrabajoDetail() {
 
                     <div>
                         <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold">Personal de Apoyo (Ayudantes)</p>
-                        <input type="text" className="w-full p-2 mt-1 border rounded dark:border-slate-800 text-sm dark:bg-slate-800 dark:text-slate-100" placeholder="Buscar ayudantes..." />
+                        <input 
+                            type="text" 
+                            list="ayudantes-list"
+                            className="w-full p-2 mt-1 border rounded dark:border-slate-800 text-sm dark:bg-slate-800 dark:text-slate-100" 
+                            placeholder="Buscar ayudantes..." 
+                            onChange={(e) => {
+                                // Normally this would push to an array of helpers, but for now we just handle it textually
+                                actualizarOrdenTrabajo({
+                                    ...ot,
+                                    personalOperativo: e.target.value,
+                                });
+                            }}
+                            defaultValue={ot.personalOperativo || ''}
+                        />
+                        <datalist id="ayudantes-list">
+                            {personal.map(p => (
+                                <option key={p.id} value={p.name}>{p.roleBadgeText || p.role}</option>
+                            ))}
+                        </datalist>
                     </div>
 
                     <Button onClick={handleGuardarAsignacion} disabled={isUpdatingDb} className="w-full bg-cyan-600 hover:bg-cyan-700">
@@ -581,9 +756,11 @@ export default function OrdenesTrabajoDetail() {
                             value={nuevoEstado}
                             onChange={(e) => setNuevoEstado(e.target.value)}
                         >
-                            <option value="ABIERTA">ABIERTA</option>
+                            <option value="PROGRAMADA">PROGRAMADA</option>
+                            <option value="PENDIENTE">PENDIENTE</option>
                             <option value="EN_PROCESO">EN PROCESO</option>
                             <option value="PAUSADA">PAUSADA</option>
+                            <option value="CERRADA_POR_MECANICO">CERRADA POR MECÁNICO</option>
                             <option value="FINALIZADA">FINALIZADA</option>
                         </select>
                     </div>
@@ -616,16 +793,25 @@ export default function OrdenesTrabajoDetail() {
       </div>
 
       <Modal isOpen={isTareaModalOpen} onClose={() => setIsTareaModalOpen(false)} title="Seleccionar Tarea Estándar">
-        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 mt-4">
-          {tareasEstandar.map(t => (
-            <div key={t.id} className="flex justify-between items-center p-3 border rounded-lg dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
-               <div>
-                  <p className="font-semibold text-sm">{t.descripcion}</p>
-                  <p className="text-xs text-slate-500">{t.tiempoEstandarMinutos} min | Valor: ${t.costoManoObra.toLocaleString()}</p>
-               </div>
-               <Button size="sm" onClick={() => agregarTarea(t)} className="bg-cyan-600">Añadir</Button>
-            </div>
-          ))}
+        <div className="mt-4">
+          <input 
+              type="text" 
+              placeholder="Buscar tarea..." 
+              value={tareaSearch}
+              onChange={(e) => setTareaSearch(e.target.value)}
+              className="w-full border rounded-lg p-2 pl-3 dark:bg-slate-800 dark:border-slate-700 outline-none focus:ring-1 focus:ring-cyan-500 mb-4" 
+          />
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+            {filteredTareas.slice(0, 50).map(t => (
+              <div key={t.id} className="flex justify-between items-center p-3 border rounded-lg dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                 <div>
+                    <p className="font-semibold text-sm">{t.descripcion}</p>
+                    <p className="text-xs text-slate-500">{t.tiempoEstandarMinutos} min | Valor: ${t.costoManoObra.toLocaleString()}</p>
+                 </div>
+                 <Button size="sm" onClick={() => agregarTarea(t)} className="bg-cyan-600">Añadir</Button>
+              </div>
+            ))}
+          </div>
         </div>
       </Modal>
 
@@ -672,11 +858,11 @@ export default function OrdenesTrabajoDetail() {
             />
           </div>
           <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
-            {filteredInsumos.length > 0 ? filteredInsumos.map(i => (
+            {filteredInsumos.slice(0, 50).length > 0 ? filteredInsumos.slice(0, 50).map(i => (
                <div key={i.id} className="flex justify-between items-center p-3 border rounded-lg dark:border-slate-700">
                   <div>
                     <p className="font-bold text-sm uppercase">{i.nombre}</p>
-                    <p className="text-xs text-slate-500">SKU: {i.sku} | Stock: <span className="text-emerald-500 font-semibold">{i.stock} disponibles ✓</span></p>
+                    <p className="text-xs text-slate-500">SKU: {i.sku} | Stock: <span className="text-emerald-500 font-semibold">{i.stock_actual} disponibles ✓</span></p>
                   </div>
                   <div className="flex gap-2 items-center">
                     <input type="number" defaultValue={1} min={1} className="w-16 border rounded p-1 text-center text-sm dark:bg-slate-800 dark:border-slate-700" />
