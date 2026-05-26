@@ -10,7 +10,7 @@ import { ArrowLeft, Edit, Printer, Clock, Wrench, Boxes, History, ChevronDown, C
 import { supabase } from '../../lib/supabase';
 import Swal from 'sweetalert2';
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 export default function OrdenesTrabajoDetail() {
   const { id } = useParams();
@@ -70,11 +70,14 @@ export default function OrdenesTrabajoDetail() {
   const [firmaURL, setFirmaURL] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [personalTemporal, setPersonalTemporal] = useState('');
+
   const ot = ordenesTrabajo.find(o => o.id === id || o.folio === id);
 
   React.useEffect(() => {
     if (ot) {
       setSelectedTecnico(ot.tecnicoResponsable || '');
+      setPersonalTemporal(ot.personalOperativo || '');
     }
   }, [ot]);
   const vehiculo = vehiculos.find(v => v.id === ot?.vehiculoId);
@@ -300,8 +303,6 @@ export default function OrdenesTrabajoDetail() {
     }
     togglePanel('estado');
   };
-
-  const [personalTemporal, setPersonalTemporal] = useState(ot?.personalOperativo || '');
 
   const togglePanel = (panel: string) => setActivePanels(prev => ({ ...prev, [panel]: !prev[panel] }));
 
@@ -579,9 +580,9 @@ export default function OrdenesTrabajoDetail() {
       format: 'a4'
     });
 
-    const primaryColor = [147, 51, 234]; // Purple theme
-    const secondaryColor = [71, 85, 105]; // Slate
-    const textColor = [15, 23, 42]; // Dark slate
+    const primaryColor: [number, number, number] = [147, 51, 234]; // Purple theme
+    const secondaryColor: [number, number, number] = [71, 85, 105]; // Slate
+    const textColor: [number, number, number] = [15, 23, 42]; // Dark slate
 
     // Helper: title banner / header
     doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -607,7 +608,7 @@ export default function OrdenesTrabajoDetail() {
     doc.line(10, 19, 200, 19);
 
     // 1. General information section in a nice grid table (2 columns)
-    const generalInfo = [
+    const generalInfo: any[] = [
       [
         { content: 'INFORMACIÓN DE LA ORDEN DE TRABAJO', colSpan: 4, styles: { fontStyle: 'bold', textColor: primaryColor, fontSize: 10 } }
       ],
@@ -649,7 +650,7 @@ export default function OrdenesTrabajoDetail() {
       ]
     ];
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: 32,
       body: generalInfo,
       theme: 'plain',
@@ -660,7 +661,7 @@ export default function OrdenesTrabajoDetail() {
         2: { cellWidth: 45 },
         3: { cellWidth: 55 }
       }
-    });
+    } as any);
 
     let currentY = (doc as any).lastAutoTable.finalY + 6;
 
@@ -675,7 +676,7 @@ export default function OrdenesTrabajoDetail() {
     doc.line(10, currentY + 1.5, 200, currentY + 1.5);
     currentY += 5;
 
-    const noteText = [
+    const noteText: any[] = [
       [
         { content: 'Instrucciones para el Mecánico (Observación Inicial):', styles: { fontStyle: 'bold', cellWidth: 50, fontSize: 8.5 } },
         { content: ot.observacionInicial || 'No se especificó un motivo.', styles: { fontSize: 8.5 } }
@@ -690,7 +691,7 @@ export default function OrdenesTrabajoDetail() {
       ]
     ];
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: currentY,
       body: noteText,
       theme: 'grid',
@@ -699,7 +700,7 @@ export default function OrdenesTrabajoDetail() {
       columnStyles: {
         0: { fillColor: [248, 250, 252], fontStyle: 'bold' }
       }
-    });
+    } as any);
 
     currentY = (doc as any).lastAutoTable.finalY + 6;
 
@@ -720,7 +721,7 @@ export default function OrdenesTrabajoDetail() {
         ])
       : [["-", "No se han asignado o realizado tareas para esta orden.", "-", "-"]];
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: currentY,
       head: [['#', 'Descripción de la Tarea', 'Tiempo Real', 'Costo Tarea']],
       body: tareasRows,
@@ -732,7 +733,7 @@ export default function OrdenesTrabajoDetail() {
         2: { cellWidth: 30, halign: 'center' },
         3: { cellWidth: 30, halign: 'right' }
       }
-    });
+    } as any);
 
     currentY = (doc as any).lastAutoTable.finalY + 6;
 
@@ -754,7 +755,7 @@ export default function OrdenesTrabajoDetail() {
         ])
       : [["-", "No se han ingresado repuestos ni insumos todavía.", "-", "-", "-"]];
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: currentY,
       head: [['#', 'Nombre del Insumo / Repuesto', 'Cantidad', 'Costo Unit.', 'Costo Total']],
       body: insumosRows,
@@ -767,7 +768,7 @@ export default function OrdenesTrabajoDetail() {
         3: { cellWidth: 25, halign: 'right' },
         4: { cellWidth: 25, halign: 'right' }
       }
-    });
+    } as any);
 
     currentY = (doc as any).lastAutoTable.finalY + 6;
 
@@ -790,7 +791,7 @@ export default function OrdenesTrabajoDetail() {
         new Date(s.fecha_solicitud).toLocaleDateString()
       ]);
 
-      (doc as any).autoTable({
+      autoTable(doc, {
         startY: currentY,
         head: [['#', 'Repuesto Solicitado', 'Cant.', 'Estado', 'Motivo Rechazo', 'Fecha Solicitud']],
         body: solRows,
@@ -803,7 +804,7 @@ export default function OrdenesTrabajoDetail() {
           3: { cellWidth: 25, halign: 'center' },
           5: { cellWidth: 25, halign: 'center' }
         }
-      });
+      } as any);
 
       currentY = (doc as any).lastAutoTable.finalY + 6;
     }
@@ -832,7 +833,7 @@ export default function OrdenesTrabajoDetail() {
           ])
       : [["-", "-", "-", "No se registran eventos en el historial de esta orden."]];
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: currentY,
       head: [['#', 'Fecha y Hora', 'Usuario / Rol', 'Acción / Suceso']],
       body: historialRows,
@@ -846,7 +847,7 @@ export default function OrdenesTrabajoDetail() {
         2: { cellWidth: 35 },
         3: { fontStyle: 'italic' }
       }
-    });
+    } as any);
 
     currentY = (doc as any).lastAutoTable.finalY + 6;
 

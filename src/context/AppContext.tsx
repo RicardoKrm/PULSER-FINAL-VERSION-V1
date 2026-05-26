@@ -202,46 +202,139 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // Fetch Ordenes de Trabajo
       const { data: otsData } = await supabase.from('orden_de_trabajo').select('*').eq('empresa_id', activeCompanyId);
       if (otsData) {
-        setOrdenesTrabajo(otsData.map(row => ({
-          id: row.id,
-          folio: row.folio,
-          vehiculoId: row.vehiculo_id,
-          tecnicoResponsable: row.tecnico_responsable || undefined,
-          responsable_id: row.responsable_id || undefined,
-          tipo: row.tipo as any,
-          estado: row.estado as any,
-          prioridad: row.prioridad as any,
-          inicio_proceso: row.inicio_proceso || undefined,
-          kilometrajeApertura: Number(row.kilometraje_apertura || 0),
-          kilometrajeCierre: row.kilometraje_cierre ? Number(row.kilometraje_cierre) : undefined,
-          fechaCreacion: row.fecha_creacion,
-          fechaProgramada: row.fecha_programada || undefined,
-          horaInicioProgramada: row.hora_inicio_programada || undefined,
-          horaTerminoProgramada: row.hora_termino_programada || undefined,
-          observacionInicial: row.observacion_inicial || undefined,
-          diagnosticoEvaluacion: row.diagnostico_evaluacion || undefined,
-          pauta: row.pauta || undefined,
-          kitRepuestos: row.kit_repuestos || undefined,
-          tipoFalla: row.tipo_falla || undefined,
-          sintomas: row.sintomas || undefined,
-          inspeccionTrenMotriz: row.inspeccion_tren_motriz || undefined,
-          eje: row.eje || undefined,
-          presionNeumatico: row.presion_neumatico ? Number(row.presion_neumatico) : undefined,
-          personalOperativo: row.personal_operativo || undefined,
-          proveedor: row.proveedor || undefined,
-          empresaExterna: row.empresa_externa || undefined,
-          rutEmpresa: row.rut_empresa || undefined,
-          valorHH: row.valor_hh ? Number(row.valor_hh) : undefined,
-          presupuestoAprobado: row.presupuesto_aprobado ? Number(row.presupuesto_aprobado) : undefined,
-          observaciones: row.observaciones || undefined,
-          costoInsumos: Number(row.costo_insumos || 0),
-          costoManoObraTareas: Number(row.costo_mano_obra_tareas || 0),
-          costoManoObraHH: Number(row.costo_mano_obra_hh || 0),
-          tiempoTrabajadoSegundos: Number(row.tiempo_trabajado_segundos || 0),
-          tareasRealizadas: [],
-          insumos: [],
-          historial: []
-        })));
+        let tareasAll: any[] = [];
+        let insumosAll: any[] = [];
+        let historialAll: any[] = [];
+        let solicitudesAll: any[] = [];
+
+        try {
+          const { data: tData } = await supabase.from('ot_tareas_realizadas').select('*');
+          if (tData) tareasAll = tData;
+        } catch (e) {
+          console.warn("Error loading ot_tareas_realizadas:", e);
+        }
+
+        try {
+          const { data: iData } = await supabase.from('detalle_insumo_ot').select('*');
+          if (iData) insumosAll = iData;
+        } catch (e) {
+          console.warn("Error loading detalle_insumo_ot:", e);
+        }
+
+        try {
+          const { data: hData } = await supabase.from('historial_ot').select('*').order('created_at', { ascending: true });
+          if (hData) historialAll = hData;
+        } catch (e) {
+          console.warn("Error loading historial_ot:", e);
+        }
+
+        try {
+          const { data: sData } = await supabase.from('solicitud_repuesto_ot').select('*').order('created_at', { ascending: true });
+          if (sData) solicitudesAll = sData;
+        } catch (e) {
+          console.warn("Error loading solicitud_repuesto_ot:", e);
+        }
+
+        setOrdenesTrabajo(otsData.map(row => {
+          const otId = row.id;
+
+          const otTareas = tareasAll
+            .filter((t: any) => t.orden_id === otId)
+            .map((t: any) => ({
+              id: t.id,
+              orden_id: t.orden_id,
+              tarea_estandar_id: t.tarea_estandar_id,
+              tiempo_real_minutos: Number(t.tiempo_real_minutos || 0),
+              costo_real: Number(t.costo_real || 0),
+              tarea_estandar: t.tarea_estandar || {
+                id: t.tarea_estandar_id,
+                descripcion: 'Tarea',
+                costoManoObra: Number(t.costo_real || 0)
+              }
+            }));
+
+          const otInsumos = insumosAll
+            .filter((i: any) => i.orden_id === otId)
+            .map((i: any) => ({
+              id: i.id,
+              orden_id: i.orden_id,
+              repuesto_id: i.repuesto_id,
+              cantidad: Number(i.cantidad || 0),
+              costo_unitario_aplicado: Number(i.costo_unitario_aplicado || i.costo_unitario || 0),
+              costo_total: Number(i.costo_total || i.cantidad * (i.costo_unitario_aplicado || i.costo_unitario || 0) || 0),
+              repuesto: i.repuesto || {
+                id: i.repuesto_id,
+                nombre: 'Repuesto/Insumo',
+                costo_unitario: Number(i.costo_unitario_aplicado || i.costo_unitario || 0)
+              }
+            }));
+
+          const otHistorial = historialAll
+            .filter((h: any) => h.orden_id === otId)
+            .map((h: any) => ({
+              id: h.id,
+              orden_id: h.orden_id,
+              usuario_nombre: h.usuario_nombre || 'Sistema',
+              comentario: h.comentario || '',
+              created_at: h.created_at || h.fecha_evento || new Date().toISOString()
+            }));
+
+          const otSolicitudes = solicitudesAll
+            .filter((s: any) => s.orden_id === otId)
+            .map((s: any) => ({
+              id: s.id,
+              orden_id: s.orden_id,
+              repuesto_id: s.repuesto_id,
+              repuesto_nombre: s.repuesto_nombre,
+              cantidad: Number(s.cantidad || 0),
+              estado: s.estado || 'PENDIENTE',
+              created_at: s.created_at || new Date().toISOString(),
+              usuario_nombre: s.usuario_nombre || 'Mecánico',
+              motivo_rechazo: s.motivo_rechazo || ''
+            }));
+
+          return {
+            id: row.id,
+            folio: row.folio,
+            vehiculoId: row.vehiculo_id,
+            tecnicoResponsable: row.tecnico_responsable || undefined,
+            responsable_id: row.responsable_id || undefined,
+            tipo: row.tipo as any,
+            estado: row.estado as any,
+            prioridad: row.prioridad as any,
+            inicio_proceso: row.inicio_proceso || undefined,
+            kilometrajeApertura: Number(row.kilometraje_apertura || 0),
+            kilometrajeCierre: row.kilometraje_cierre ? Number(row.kilometraje_cierre) : undefined,
+            fechaCreacion: row.fecha_creacion,
+            fechaProgramada: row.fecha_programada || undefined,
+            horaInicioProgramada: row.hora_inicio_programada || undefined,
+            horaTerminoProgramada: row.hora_termino_programada || undefined,
+            observacionInicial: row.observacion_inicial || undefined,
+            diagnosticoEvaluacion: row.diagnostico_evaluacion || undefined,
+            pauta: row.pauta || undefined,
+            kitRepuestos: row.kit_repuestos || undefined,
+            tipoFalla: row.tipo_falla || undefined,
+            sintomas: row.sintomas || undefined,
+            inspeccionTrenMotriz: row.inspeccion_tren_motriz || undefined,
+            eje: row.eje || undefined,
+            presionNeumatico: row.presion_neumatico ? Number(row.presion_neumatico) : undefined,
+            personalOperativo: row.personal_operativo || undefined,
+            proveedor: row.proveedor || undefined,
+            empresaExterna: row.empresa_externa || undefined,
+            rutEmpresa: row.rut_empresa || undefined,
+            valorHH: row.valor_hh ? Number(row.valor_hh) : undefined,
+            presupuestoAprobado: row.presupuesto_aprobado ? Number(row.presupuesto_aprobado) : undefined,
+            observaciones: row.observaciones || undefined,
+            costoInsumos: Number(row.costo_insumos || 0),
+            costoManoObraTareas: Number(row.costo_mano_obra_tareas || 0),
+            costoManoObraHH: Number(row.costo_mano_obra_hh || 0),
+            tiempoTrabajadoSegundos: Number(row.tiempo_trabajado_segundos || 0),
+            tareasRealizadas: otTareas,
+            insumos: otInsumos,
+            historial: otHistorial,
+            solicitudes: otSolicitudes
+          };
+        }));
       } else {
         setOrdenesTrabajo([]);
       }
@@ -327,6 +420,79 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         });
       } else {
         console.log("Work order successfully persistent in Supabase database!");
+        
+        // Save sub-tables matching the initialized work order (if any are pre-defined)
+        if (finalOT.tareasRealizadas && finalOT.tareasRealizadas.length > 0) {
+          const insertPayload = finalOT.tareasRealizadas.map(t => ({
+            id: t.id && t.id.length > 20 ? t.id : generateUUID(),
+            orden_id: finalOT.id,
+            tarea_estandar_id: t.tarea_estandar_id || null,
+            tiempo_real_minutos: t.tiempo_real_minutos || 0,
+            costo_real: t.costo_real || 0,
+            tarea_estandar: t.tarea_estandar || null
+          }));
+          await supabase.from('ot_tareas_realizadas').insert(insertPayload);
+        }
+        
+        if (finalOT.insumos && finalOT.insumos.length > 0) {
+          // Pre-ensure catalog entries exist to satisfy foreign keys
+          for (const item of finalOT.insumos) {
+            if (item.repuesto) {
+              try {
+                await supabase.from('repuesto').upsert({
+                  id: item.repuesto.id,
+                  sku: item.repuesto.sku || item.repuesto.referencia || Math.random().toString(36).substr(2, 9),
+                  nombre: item.repuesto.nombre || 'Repuesto',
+                  stock_actual: Number(item.repuesto.stock_actual || 0),
+                  costo_unitario: Number(item.repuesto.costo_unitario || item.repuesto.costo_unitario_aplicado || 0)
+                });
+              } catch (errRec) {
+                console.warn("Failed to pre-upsert repuesto, continuing:", errRec);
+              }
+            }
+          }
+
+          const insertPayload = finalOT.insumos.map(i => ({
+            id: i.id && i.id.length > 20 ? i.id : generateUUID(),
+            orden_id: finalOT.id,
+            repuesto_id: i.repuesto?.id || i.repuesto_id || null,
+            cantidad: i.cantidad || 0,
+            costo_unitario_aplicado: i.costo_unitario_aplicado || 0,
+            repuesto: i.repuesto || null
+          }));
+          await supabase.from('detalle_insumo_ot').insert(insertPayload);
+        }
+        
+        if (finalOT.historial && finalOT.historial.length > 0) {
+          const insertPayload = finalOT.historial.map(h => ({
+            id: h.id && h.id.length > 20 ? h.id : generateUUID(),
+            orden_id: finalOT.id,
+            usuario_nombre: h.usuario_nombre || 'Sistema',
+            comentario: h.comentario || '',
+            created_at: h.created_at || new Date().toISOString()
+          }));
+          await supabase.from('historial_ot').insert(insertPayload);
+        }
+
+        if (finalOT.solicitudes && finalOT.solicitudes.length > 0) {
+          try {
+            const insertPayload = finalOT.solicitudes.map(s => ({
+              id: s.id && s.id.length > 20 ? s.id : generateUUID(),
+              orden_id: finalOT.id,
+              repuesto_id: s.repuesto_id || null,
+              repuesto_nombre: s.repuesto_nombre || 'Insumo',
+              cantidad: s.cantidad || 0,
+              estado: s.estado || 'PENDIENTE',
+              usuario_nombre: s.usuario_nombre || 'Mecánico',
+              motivo_rechazo: s.motivo_rechazo || null,
+              created_at: s.created_at || new Date().toISOString()
+            }));
+            await supabase.from('solicitud_repuesto_ot').insert(insertPayload);
+          } catch (eSol) {
+            console.warn("Could not write solicitudes on creation:", eSol);
+          }
+        }
+
         Swal.fire({
           title: "¡Guardado Exitoso!",
           text: `La orden de trabajo ${finalOT.folio} se ha guardado correctamente en la base de datos.`,
@@ -412,6 +578,125 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         });
       } else {
         console.log("Work order successfully updated in Supabase database!");
+        
+        // Sync Child Tables
+        // Tareas Realizadas
+        if (otActualizada.tareasRealizadas) {
+          const { error: delTareasErr } = await supabase.from('ot_tareas_realizadas').delete().eq('orden_id', otActualizada.id);
+          if (delTareasErr) {
+            console.error("Error deleting old ot_tareas_realizadas:", delTareasErr);
+            throw new Error(`No se pudieron eliminar las tareas anteriores: ${delTareasErr.message}`);
+          }
+          if (otActualizada.tareasRealizadas.length > 0) {
+            const insertPayload = otActualizada.tareasRealizadas.map(t => ({
+              id: t.id && t.id.length > 20 ? t.id : generateUUID(), // ensure UUID
+              orden_id: otActualizada.id,
+              tarea_estandar_id: t.tarea_estandar_id || null,
+              tiempo_real_minutos: t.tiempo_real_minutos || 0,
+              costo_real: t.costo_real || 0,
+              tarea_estandar: t.tarea_estandar || null
+            }));
+            const { error: insTareasErr } = await supabase.from('ot_tareas_realizadas').insert(insertPayload);
+            if (insTareasErr) {
+              console.error("Error inserting ot_tareas_realizadas:", insTareasErr);
+              throw new Error(`No se pudieron guardar las tareas realizadas: ${insTareasErr.message}`);
+            }
+          }
+        }
+        
+        // Insumos y Repuestos
+        if (otActualizada.insumos) {
+          const { error: delInsumosErr } = await supabase.from('detalle_insumo_ot').delete().eq('orden_id', otActualizada.id);
+          if (delInsumosErr) {
+            console.error("Error deleting old detalle_insumo_ot:", delInsumosErr);
+            throw new Error(`No se pudieron limpiar los insumos anteriores: ${delInsumosErr.message}`);
+          }
+          if (otActualizada.insumos.length > 0) {
+            // Pre-ensure catalog entries exist to satisfy foreign keys
+            for (const item of otActualizada.insumos) {
+              if (item.repuesto) {
+                try {
+                  await supabase.from('repuesto').upsert({
+                    id: item.repuesto.id,
+                    sku: item.repuesto.sku || item.repuesto.referencia || Math.random().toString(36).substr(2, 9),
+                    nombre: item.repuesto.nombre || 'Repuesto',
+                    stock_actual: Number(item.repuesto.stock_actual || 0),
+                    costo_unitario: Number(item.repuesto.costo_unitario || item.repuesto.costo_unitario_aplicado || item.repuesto.costo_unitario || 0)
+                  });
+                } catch (errRec) {
+                  console.warn("Failed to pre-upsert repuesto, continuing:", errRec);
+                }
+              }
+            }
+
+            const insertPayload = otActualizada.insumos.map(i => ({
+              id: i.id && i.id.length > 20 ? i.id : generateUUID(),
+              orden_id: otActualizada.id,
+              repuesto_id: i.repuesto?.id || i.repuesto_id || null,
+              cantidad: i.cantidad || 0,
+              costo_unitario_aplicado: i.costo_unitario_aplicado || 0,
+              repuesto: i.repuesto || null
+            }));
+            const { error: insInsumosErr } = await supabase.from('detalle_insumo_ot').insert(insertPayload);
+            if (insInsumosErr) {
+              console.error("Error inserting detalle_insumo_ot:", insInsumosErr);
+              throw new Error(`No se pudieron registrar los insumos de repuesto: ${insInsumosErr.message}`);
+            }
+          }
+        }
+        
+        // Historial de la OT
+        if (otActualizada.historial) {
+          const { error: delHistErr } = await supabase.from('historial_ot').delete().eq('orden_id', otActualizada.id);
+          if (delHistErr) {
+            console.error("Error deleting old historial_ot:", delHistErr);
+            throw new Error(`No se pudo limpiar el historial anterior: ${delHistErr.message}`);
+          }
+          if (otActualizada.historial.length > 0) {
+            const insertPayload = otActualizada.historial.map(h => ({
+              id: h.id && h.id.length > 20 ? h.id : generateUUID(),
+              orden_id: otActualizada.id,
+              usuario_nombre: h.usuario_nombre || 'Sistema',
+              comentario: h.comentario || '',
+              created_at: h.created_at || new Date().toISOString()
+            }));
+            const { error: insHistErr } = await supabase.from('historial_ot').insert(insertPayload);
+            if (insHistErr) {
+              console.error("Error inserting historial_ot:", insHistErr);
+              throw new Error(`No se pudo guardar el historial: ${insHistErr.message}`);
+            }
+          }
+        }
+
+        // Solicitudes Bodega (Safe try-catch in case table is not ready yet)
+        if (otActualizada.solicitudes) {
+          try {
+            const { error: delSolErr } = await supabase.from('solicitud_repuesto_ot').delete().eq('orden_id', otActualizada.id);
+            if (delSolErr) {
+              console.error("Error deleting old solicitudes:", delSolErr);
+            }
+            if (otActualizada.solicitudes.length > 0) {
+              const insertPayload = otActualizada.solicitudes.map(s => ({
+                id: s.id && s.id.length > 20 ? s.id : generateUUID(),
+                orden_id: otActualizada.id,
+                repuesto_id: s.repuesto_id || null,
+                repuesto_nombre: s.repuesto_nombre || 'Insumo',
+                cantidad: s.cantidad || 0,
+                estado: s.estado || 'PENDIENTE',
+                usuario_nombre: s.usuario_nombre || 'Mecánico',
+                motivo_rechazo: s.motivo_rechazo || null,
+                created_at: s.created_at || new Date().toISOString()
+              }));
+              const { error: insSolErr } = await supabase.from('solicitud_repuesto_ot').insert(insertPayload);
+              if (insSolErr) {
+                console.error("Error inserting solicitudes:", insSolErr);
+              }
+            }
+          } catch (eSol) {
+            console.warn("Could not sync solicitudes to database:", eSol);
+          }
+        }
+
         Swal.fire({
           title: "¡Actualización Exitosa!",
           text: `La orden de trabajo ${otActualizada.folio} se ha actualizado correctamente.`,
@@ -424,8 +709,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       console.error(err);
       setOrdenesTrabajo(originalOts);
       Swal.fire({
-        title: "Error Inesperado",
-        text: `Ocurrió un error al intentar actualizar la OT: ${err.message || err}`,
+        title: "Error al actualizar",
+        text: err?.message || "Ocurrió un error inesperado al guardar los cambios en la base de datos.",
         icon: "error",
         confirmButtonColor: "#4f46e5"
       });

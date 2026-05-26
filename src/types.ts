@@ -110,9 +110,11 @@ export interface HistorialEvento {
 export interface Repuesto {
   id: string;
   sku: string;
+  referencia?: string;
   nombre: string;
   stock_actual: number;
   costo_unitario: number;
+  costo_unitario_aplicado?: number;
 }
 
 export interface DetalleInsumoOT {
@@ -148,12 +150,15 @@ export interface HistorialOT {
 export interface SolicitudRepuesto {
   id: string;
   orden_id: string;
+  repuesto_id?: string;
   repuesto_nombre: string;
   cantidad: number;
   estado: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
   motivo_rechazo?: string;
   solicitante_id?: string;
   fecha_solicitud: string;
+  usuario_nombre?: string;
+  created_at?: string;
 }
 
 export interface OrdenDeTrabajo {
