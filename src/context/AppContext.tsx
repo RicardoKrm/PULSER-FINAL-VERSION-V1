@@ -105,7 +105,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Fetch Vehiculos
-      const { data: vehiculosData } = await supabase.from('vehiculo').select('*');
+      const { data: vehiculosData } = await supabase.from('vehiculo').select('*').eq('empresa_id', activeCompanyId);
       if (vehiculosData) {
         setVehiculos(vehiculosData.map(v => ({
           id: v.id,
@@ -127,7 +127,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Fetch Repuestos
-      const { data: repData } = await supabase.from('repuesto').select('*');
+      const { data: repData } = await supabase.from('repuesto').select('*').eq('empresa_id', activeCompanyId);
       if (repData) {
         setRepuestos(repData.map(r => ({ ...r, stock_actual: Number(r.stock_actual), costo_unitario: Number(r.costo_unitario) })));
       }
@@ -136,7 +136,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const { data: kitsData } = await supabase.from('kit_repuesto').select(`
         id, nombre, descripcion,
         kit_repuesto_detalle ( repuesto, cantidad )
-      `);
+      `).eq('empresa_id', activeCompanyId);
       if (kitsData) {
         setKitsRepuesto(kitsData.map(k => ({
           id: k.id,
@@ -171,7 +171,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Fetch Ordenes de Trabajo
-      const { data: otsData } = await supabase.from('orden_de_trabajo').select('*');
+      const { data: otsData } = await supabase.from('orden_de_trabajo').select('*').eq('empresa_id', activeCompanyId);
       if (otsData) {
         setOrdenesTrabajo(otsData.map(row => ({
           id: row.id,
