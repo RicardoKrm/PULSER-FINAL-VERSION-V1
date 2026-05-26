@@ -77,8 +77,7 @@ export default function GestionSuministros() {
   
   const [bodegasList, setBodegasList] = React.useState<any[]>([]);
 
-  React.useEffect(() => {
-    const loadData = async () => {
+  const loadData = React.useCallback(async () => {
       // Intentar cargar desde supabase
       if (!currentCompany?.id) return;
       
@@ -90,19 +89,35 @@ export default function GestionSuministros() {
         setBodegasList([]);
       }
 
-      const { data: rData, error: rErr } = await supabase.from('logistica_repuestos').select('*').eq('empresa_id', currentCompany.id);
+      const { data: rData, error: rErr } = await supabase.from('logistica_repuestos').select(`
+        *,
+        logistica_bodegas (
+          nombre
+        )
+      `).eq('empresa_id', currentCompany.id);
+      
       if (!rErr && rData) {
-        setSumInsumosData(rData.map((r: any) => ({
-          ...r, 
-          min: r.min_stock,
-          ultMov: r.ult_mov ? new Date(r.ult_mov).toLocaleDateString() : '--'
-        })));
+        setSumInsumosData(rData.map((r: any) => {
+          const parsedPrecio = parseFloat(r.precio) || 0;
+          const parsedStock = parseInt(r.stock) || 0;
+          return {
+            ...r,
+            precio: parsedPrecio,
+            stock: parsedStock,
+            min: r.min_stock || 0,
+            valorTotal: parsedPrecio * parsedStock,
+            ultMov: r.ult_mov ? new Date(r.ult_mov).toLocaleDateString() : '--',
+            bodegaNombre: r.logistica_bodegas?.nombre || null
+          };
+        }));
       } else {
          setSumInsumosData([]);
       }
-    };
+    }, [currentCompany]);
+
+  React.useEffect(() => {
     loadData();
-  }, [currentCompany]);
+  }, [loadData]);
 
   const handleTerminalSubmit = async () => {
     if (!currentCompany?.id || !terminalForm.bodegaId) {
@@ -162,14 +177,7 @@ export default function GestionSuministros() {
           Swal.fire("Éxito", "Movimiento procesado", "success");
           
           // Refetch
-          const { data, error } = await supabase.from('logistica_repuestos').select('*').eq('empresa_id', currentCompany.id);
-          if (!error && data) {
-            setSumInsumosData(data.map((r: any) => ({
-              ...r, 
-              min: r.min_stock,
-              ultMov: r.ult_mov ? new Date(r.ult_mov).toLocaleDateString() : '--'
-            })));
-          }
+          await loadData();
        }
        
        setIsTerminalModalOpen(false);
@@ -186,11 +194,12 @@ export default function GestionSuministros() {
   const [activeView, setActiveView] = useState<'inventario' | 'auditoria' | 'validaciones'>('inventario');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBodega, setSelectedBodega] = useState('Todas las bodegas');
+  const [selectedUbicacion, setSelectedUbicacion] = useState('Todas las ubicaciones');
   const [selectedCalidad, setSelectedCalidad] = useState('Todas las calidades');
   const [selectedProveedor, setSelectedProveedor] = useState('Todos los proveedores');
   const [filterBajoStock, setFilterBajoStock] = useState(false);
   const [filterSinMov, setFilterSinMov] = useState(false);
-  const [selectedItems, setSelectedItems] = useState<number[]>([]);
+  const [selectedItems, setSelectedItems] = useState<any[]>([]);
   const [selectedRepuestoDetalle, setSelectedRepuestoDetalle] = useState<Insumo | null>(null);
   
   // States for Movimiento Masivo
@@ -280,28 +289,42 @@ export default function GestionSuministros() {
     return itemDate < sixMonthsAgo;
   };
 
+  // Unique lists for selects
+  const uniqueCalidades = Array.from(new Set(sumInsumosData.map(item => item.calidad?.toUpperCase()).filter(Boolean)));
+  const uniqueProveedores = Array.from(new Set(sumInsumosData.map(item => item.proveedor?.toUpperCase()).filter(Boolean)));
+  const uniqueUbicaciones = Array.from(new Set(sumInsumosData.map(item => item.ubicacion).filter(Boolean)));
+  // Collect actual bodegas loaded
+  const allBodegasOptions = Array.from(new Set(bodegasList.map(b => b.nombre).filter(Boolean)));
+
   // Filtering logic
   const filteredData = sumInsumosData.filter((item) => {
     // 1. Text Search (SKU / Nombre)
     const matchesSearch = 
       searchTerm === '' || 
-      item.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchTerm.toLowerCase());
+      item.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.sku?.toLowerCase().includes(searchTerm.toLowerCase());
 
     // 2. Bodega Filter
     const matchesBodega = 
       selectedBodega === 'Todas las bodegas' || 
-      item.ubicacion === selectedBodega;
+      item.bodegaNombre === selectedBodega;
 
-    // 3. Calidad Filter
+    // 3. Ubicacion Filter
+    const matchesUbicacion = 
+      selectedUbicacion === 'Todas las ubicaciones' ||
+      item.ubicacion === selectedUbicacion;
+
+    // 4. Calidad Filter (Case Insensitive)
     const matchesCalidad = 
       selectedCalidad === 'Todas las calidades' || 
-      item.calidad === selectedCalidad;
+      (!item.calidad && selectedCalidad === 'Todas las calidades') ||
+      (item.calidad && item.calidad.toUpperCase() === selectedCalidad.toUpperCase());
 
-    // 4. Proveedor Filter
+    // 4. Proveedor Filter (Case Insensitive)
     const matchesProveedor = 
       selectedProveedor === 'Todos los proveedores' || 
-      item.proveedor === selectedProveedor;
+      (!item.proveedor && selectedProveedor === 'Todos los proveedores') ||
+      (item.proveedor && item.proveedor.toUpperCase() === selectedProveedor.toUpperCase());
 
     // 5. Bajo Stock Filter
     const matchesBajoStock = filterBajoStock ? (item.stock < item.min) : true;
@@ -309,7 +332,7 @@ export default function GestionSuministros() {
     // 6. Sin Movimiento (6 meses)
     const matchesSinMov = filterSinMov ? isOlderThan6Months(item.ultMov) : true;
 
-    return matchesSearch && matchesBodega && matchesCalidad && matchesProveedor && matchesBajoStock && matchesSinMov;
+    return matchesSearch && matchesBodega && matchesUbicacion && matchesCalidad && matchesProveedor && matchesBajoStock && matchesSinMov;
   });
 
   const exportInventario = () => {
@@ -753,8 +776,19 @@ export default function GestionSuministros() {
           onChange={(e) => setSelectedBodega(e.target.value)}
         >
           <option>Todas las bodegas</option>
-          {bodegasList.map(b => (
-            <option key={b.id} value={b.nombre}>{b.nombre}</option>
+          {allBodegasOptions.map(bNombre => (
+            <option key={bNombre} value={bNombre}>{bNombre}</option>
+          ))}
+        </select>
+
+        <select 
+          className="border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800"
+          value={selectedUbicacion}
+          onChange={(e) => setSelectedUbicacion(e.target.value)}
+        >
+          <option>Todas las ubicaciones</option>
+          {uniqueUbicaciones.map(ub => (
+            <option key={ub} value={ub}>{ub}</option>
           ))}
           <option>INMOVILIZADO</option>
           <option>Sin Ubicación</option>
@@ -766,9 +800,9 @@ export default function GestionSuministros() {
           onChange={(e) => setSelectedCalidad(e.target.value)}
         >
           <option>Todas las calidades</option>
-          <option>Alternativo Genérico</option>
-          <option>Original</option>
-          <option>Otro</option>
+          {uniqueCalidades.map(cal => (
+            <option key={cal} value={cal}>{cal}</option>
+          ))}
         </select>
 
         <select 
@@ -777,9 +811,9 @@ export default function GestionSuministros() {
           onChange={(e) => setSelectedProveedor(e.target.value)}
         >
           <option>Todos los proveedores</option>
-          <option>Kaufmann</option>
-          <option>Epysa</option>
-          <option>Volvo</option>
+          {uniqueProveedores.map(prov => (
+            <option key={prov} value={prov}>{prov}</option>
+          ))}
         </select>
 
         <div className="flex items-center gap-2">
@@ -885,8 +919,8 @@ export default function GestionSuministros() {
                   </td>
                   <td className="px-4 py-3 font-mono text-xs">{item.sku}</td>
                   <td className="px-4 py-3">{item.proveedor}</td>
-                  <td className="px-4 py-3">{item.ubicacion}</td>
-                  <td className="px-4 py-3">{item.calidad}</td>
+                  <td className="px-4 py-3">{item.bodegaNombre ? `${item.bodegaNombre} - ${item.ubicacion}` : item.ubicacion}</td>
+                  <td className="px-4 py-3">{item.calidad?.toUpperCase() || '-'}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`font-bold ${item.isCritico ? 'bg-red-500 text-white px-2 py-0.5 rounded-md' : ''}`}>
                       {item.stock}
@@ -1086,11 +1120,24 @@ export default function GestionSuministros() {
           <div className="flex gap-4 pt-4">
             <Button 
               className="bg-[#8b5cf6] hover:bg-[#7c3aed] text-white px-8 py-2"
-              onClick={() => {
+              onClick={async () => {
                 if (destinationBodega) {
-                  setIsMoveModalOpen(false);
-                  setIsSuccessModalOpen(true);
-                  // Optionally clear items after move: setSelectedItems([]) string later
+                  try {
+                    const { error } = await supabase.from('logistica_repuestos')
+                      .update({ bodega_id: destinationBodega })
+                      .in('id', selectedItems);
+                      
+                    if (!error) {
+                      setIsMoveModalOpen(false);
+                      setIsSuccessModalOpen(true);
+                      await loadData();
+                    } else {
+                      Swal.fire("Error", "No se pudo realizar el movimiento", "error");
+                    }
+                  } catch (e) {
+                     console.error(e);
+                     Swal.fire("Error", "No se pudo realizar el movimiento", "error");
+                  }
                 }
               }}
               disabled={!destinationBodega}
@@ -1124,7 +1171,7 @@ export default function GestionSuministros() {
           </div>
           <h2 className="text-3xl font-medium text-slate-800 dark:text-slate-100">¡Éxito!</h2>
           <p className="text-slate-600 dark:text-slate-300 text-lg">
-            ¡Éxito! Se trasladaron {selectedItems.length} artículos a {destinationBodega}.
+            ¡Éxito! Se trasladaron {selectedItems.length} artículos a {bodegasList.find(b => b.id === destinationBodega)?.nombre || destinationBodega}.
           </p>
           <Button 
             className="bg-[#8b5cf6] hover:bg-[#7c3aed] text-white px-12 py-2 mt-4"
@@ -1423,14 +1470,7 @@ export default function GestionSuministros() {
                      await supabase.from('logistica_repuestos').insert([nuevo]);
                      
                      // Refetch
-                     const { data, error } = await supabase.from('logistica_repuestos').select('*').eq('empresa_id', currentCompany.id);
-                     if (!error && data) {
-                       setSumInsumosData(data.map((r: any) => ({
-                         ...r, 
-                         min: r.min_stock,
-                         ultMov: r.ult_mov ? new Date(r.ult_mov).toLocaleDateString() : '--'
-                       })));
-                     }
+                     await loadData();
                   }
                 } catch (e) {
                   console.error(e);
