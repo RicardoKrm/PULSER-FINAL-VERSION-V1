@@ -128,7 +128,7 @@ export default function OrdenesTrabajoDetail() {
         return () => clearInterval(interval);
     }, [ot?.estado, ot?.tiempoTrabajadoSegundos, ot?.inicio_proceso]);
 
-    const handleActualizarEstadoRapido = async (estadoStr: string, pausaInfo?: { id: string, nombre: string }) => {
+    const handleActualizarEstadoRapido = async (estadoStr: string, pausaInfo?: { id: string, nombre: string }, kmForzado?: number) => {
         if (!ot) return;
         const updates: any = { estado: estadoStr as any };
         const now = new Date().toISOString();
@@ -141,16 +141,20 @@ export default function OrdenesTrabajoDetail() {
         }
         if (estadoStr === 'FINALIZADA' || estadoStr === 'CERRADA_POR_MECANICO') {
             updates.termino_proceso = now;
-            let kmIngresado: string | null = null;
-            if (estadoStr === 'CERRADA_POR_MECANICO') {
-                kmIngresado = window.prompt('Por favor ingrese el Kilometraje de Cierre actual del vehículo:');
-            } else {
-                kmIngresado = kmCierre; // if called quickly, though UI shouldn't allow it without prompt
-                if (!kmIngresado) kmIngresado = window.prompt('Por favor ingrese el Kilometraje de Cierre actual del vehículo:');
+            
+            let kmVal = kmForzado;
+            if (kmVal === undefined) {
+                let kmIngresado: string | null = null;
+                if (estadoStr === 'CERRADA_POR_MECANICO') {
+                    kmIngresado = window.prompt('Por favor ingrese el Kilometraje de Cierre actual del vehículo:');
+                } else {
+                    kmIngresado = kmCierre; // if called quickly, though UI shouldn't allow it without prompt
+                    if (!kmIngresado) kmIngresado = window.prompt('Por favor ingrese el Kilometraje de Cierre actual del vehículo:');
+                }
+                kmVal = Number(kmIngresado);
             }
             
-            const kmVal = Number(kmIngresado);
-            if (!kmIngresado || isNaN(kmVal) || kmVal <= 0) {
+            if (isNaN(kmVal) || kmVal <= 0) {
                  alert('Debe ingresar un kilometraje válido para poder cerrar la OT.');
                  return;
             }
@@ -237,12 +241,32 @@ export default function OrdenesTrabajoDetail() {
     if (nuevoEstado === 'FINALIZADA' || nuevoEstado === 'CERRADA_POR_MECANICO') {
         let kmVal = Number(kmCierre);
         if (nuevoEstado === 'CERRADA_POR_MECANICO') {
-             const kmIngresado = window.prompt('Por favor ingrese el Kilometraje de Cierre actual del vehículo:');
-             if (!kmIngresado || isNaN(Number(kmIngresado)) || Number(kmIngresado) <= 0) {
-                  alert('Debe ingresar un kilometraje válido para poder cerrar la OT.');
-                  return;
-             }
-             kmVal = Number(kmIngresado);
+             // For Admin dropdown as well:
+             Swal.fire({
+                 title: 'Confirmar Cierre',
+                 text: 'Al cerrar la OT, se enviará una notificación para revisión. Por favor ingrese el kilometraje actual del vehículo:',
+                 icon: 'warning',
+                 input: 'number',
+                 inputAttributes: {
+                     min: (ot.kilometrajeApertura || 0).toString(),
+                     step: '1'
+                 },
+                 showCancelButton: true,
+                 confirmButtonColor: '#9333ea',
+                 cancelButtonColor: '#64748b',
+                 confirmButtonText: 'Sí, Cerrar OT',
+                 cancelButtonText: 'Cancelar',
+                 inputValidator: (value) => {
+                     if (!value || isNaN(Number(value))) return 'Debe ingresar un kilometraje válido.';
+                     if (Number(value) < (ot.kilometrajeApertura || 0)) return 'El kilometraje no puede ser menor al de apertura.';
+                     return null;
+                 }
+             }).then((result) => {
+                 if (result.isConfirmed) {
+                     handleActualizarEstadoRapido('CERRADA_POR_MECANICO', undefined, Number(result.value))
+                 }
+             })
+             return; // hand everything off to the rapid updater
         } else {
              if (!kmCierre || isNaN(kmVal) || kmVal <= 0) {
                  alert('Debe ingresar un Kilometraje de Cierre válido para finalizar la OT.');
@@ -1056,17 +1080,27 @@ export default function OrdenesTrabajoDetail() {
                  </Button>
                  <Button onClick={() => {
                      Swal.fire({
-                         title: '¿Estás seguro?',
-                         text: 'Al cerrar la OT, se enviará una alerta al supervisor para su revisión final. Deberás ingresar el kilometraje actual.',
+                         title: 'Confirmar Cierre',
+                         text: 'Al cerrar la OT, se enviará una notificación al supervisor o administrador para que la revise. Por favor ingrese el kilometraje actual del vehículo:',
                          icon: 'warning',
+                         input: 'number',
+                         inputAttributes: {
+                             min: (ot.kilometrajeApertura || 0).toString(),
+                             step: '1'
+                         },
                          showCancelButton: true,
                          confirmButtonColor: '#9333ea',
                          cancelButtonColor: '#64748b',
                          confirmButtonText: 'Sí, Cerrar OT',
-                         cancelButtonText: 'Cancelar'
+                         cancelButtonText: 'Cancelar',
+                         inputValidator: (value) => {
+                             if (!value || isNaN(Number(value))) return 'Debe ingresar un kilometraje válido.';
+                             if (Number(value) < (ot.kilometrajeApertura || 0)) return 'El kilometraje no puede ser menor al de apertura.';
+                             return null;
+                         }
                      }).then((result) => {
                          if (result.isConfirmed) {
-                             handleActualizarEstadoRapido('CERRADA_POR_MECANICO')
+                             handleActualizarEstadoRapido('CERRADA_POR_MECANICO', undefined, Number(result.value))
                          }
                      })
                  }} className="bg-purple-600 hover:bg-purple-700 text-white font-bold">
