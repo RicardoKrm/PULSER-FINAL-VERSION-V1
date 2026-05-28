@@ -44,12 +44,33 @@ const parseExcelDate = (excelDate: any) => {
     return date.toISOString().split('T')[0]; // Return YYYY-MM-DD
   }
   if (typeof excelDate === 'string') {
-    if (/^\d{4}-\d{2}-\d{2}/.test(excelDate)) return excelDate.substring(0, 10);
-    const parts = excelDate.split(/[-/]/);
+    const cleanStr = excelDate.trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(cleanStr)) {
+       // Si ya tiene el formato ISO
+       const parsed = new Date(cleanStr);
+       if (!isNaN(parsed.getTime())) return parsed.toISOString();
+       return cleanStr.substring(0, 10);
+    }
+    
+    const dateTimeParts = cleanStr.split(/[\sT]+/);
+    const datePart = dateTimeParts[0];
+    const timePart = dateTimeParts.length > 1 ? dateTimeParts.slice(1).join('') : '';
+
+    const parts = datePart.split(/[-/]/);
     if (parts.length === 3) {
       let [d, m, y] = parts;
+      if (d.length === 4) { // Formato YYYY-MM-DD
+         let temp = d;
+         d = y;
+         y = temp;
+      }
       if (y.length === 2) y = `20${y}`;
-      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      
+      const isoDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      if (timePart) {
+         return `${isoDate}T${timePart.length === 5 ? timePart + ':00' : timePart}Z`;
+      }
+      return isoDate;
     }
     return excelDate;
   }
@@ -205,7 +226,42 @@ const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any
   },
   ots: { 
     table: 'orden_de_trabajo', 
-    mapConfig: (r: any) => ({ numero_ot: r.NumeroOT, patente: r.Patente, estado: r.Estado, tipo_mantenimiento: r.TipoMantenimiento, costo_total: r.CostoTotal }) 
+    mapConfig: (r: any) => {
+      const getVal = (keywords: string[]) => {
+        const key = Object.keys(r).find(k => keywords.some(kw => k.toUpperCase().includes(kw)));
+        return key ? r[key] : undefined;
+      };
+      
+      const isPreventive = String(r.Tipo || getVal(['TIPO']) || '').toUpperCase().includes('PREVENTIV');
+      
+      let kmA = getVal(['APERTURA', 'KILOMETRA']); 
+      let kmC = getVal(['CIERRE', 'KILOMETRA (1)']);
+      // Si ambos tomaron la misma columna pero había dos de km
+      const keysKm = Object.keys(r).filter(k => k.toUpperCase().includes('KILOMETRA'));
+      if (keysKm.length >= 2) {
+          kmA = r[keysKm[0]];
+          kmC = r[keysKm[1]];
+      }
+
+      return {
+        folio: getVal(['FOLIO']) || r.NumeroOT || r.numero_ot || ("OT-" + Math.floor(Math.random()*1000)),
+        _patente: getVal(['PATENTE', 'PATE', 'VEHICULO P']),
+        _numero_interno: getVal(['INTERNO', 'VEHICULO I']),
+        estado: getVal(['ESTADO']) ? String(getVal(['ESTADO'])).toUpperCase() : 'ABIERTA',
+        tipo: isPreventive ? 'PREVENTIVA' : 'CORRECTIVA',
+        fecha_creacion: parseExcelDate(getVal(['CREACION', 'CREA'])),
+        fecha_programada: parseExcelDate(getVal(['CREACION', 'CREA'])),
+        inicio_proceso: parseExcelDate(getVal(['CREACION', 'CREA'])),
+        termino_proceso: parseExcelDate(getVal(['CIERRE', 'CIE'])),
+        kilometraje_apertura: parseFloat(String(kmA || 0).replace(/[^0-9.-]+/g,"")),
+        kilometraje_cierre: kmC ? parseFloat(String(kmC).replace(/[^0-9.-]+/g,"")) : undefined,
+        tecnico_responsable: getVal(['RESPONS', 'TECNI']),
+        costo_insumos: parseFloat(String(getVal(['INSUM']) || 0).replace(/[^0-9.-]+/g,"")),
+        costo_mano_obra_tareas: parseFloat(String(getVal(['MANO', 'COSTO MA']) || 0).replace(/[^0-9.-]+/g,"")),
+        observacion_inicial: getVal(['TAREA', 'OBSERV']),
+        tipo_falla: getVal(['FALLA'])
+      };
+    }
   },
   reservas: { 
     table: 'operacion_reserva', 
@@ -527,6 +583,50 @@ export default function CargaMasiva() {
             }
           }
         }
+      }
+
+      if (moduleId === 'ots') {
+           const { data: vehiculos } = await supabase.from('vehiculo').select('id, patente, numero_interno').eq('empresa_id', currentCompany?.id);
+           const vMapPatente = new Map();
+           const vMapInterno = new Map();
+           if (vehiculos) {
+               vehiculos.forEach(v => {
+                   if (v.patente) vMapPatente.set(v.patente.toUpperCase().trim(), v.id);
+                   if (v.numero_interno) vMapInterno.set(String(v.numero_interno).toUpperCase().trim(), v.id);
+               });
+           }
+           
+           for (let i = cleanData.length - 1; i >= 0; i--) {
+               const row = cleanData[i];
+               const p = row._patente ? String(row._patente).toUpperCase().trim() : '';
+               const ni = row._numero_interno ? String(row._numero_interno).toUpperCase().trim() : '';
+               
+               let vId = null;
+               const searchKeys = [ni, p, ni.replace(/-/g, ''), p.replace(/-/g, '')].filter(Boolean);
+               for (const k of searchKeys) {
+                  if (vMapInterno.has(k)) { vId = vMapInterno.get(k); break; }
+                  if (vMapPatente.has(k)) { vId = vMapPatente.get(k); break; }
+                  
+                  if (k.startsWith('DEMO')) {
+                    const demoNum = k.replace('DEMO', '');
+                    if (vMapInterno.has(demoNum)) { vId = vMapInterno.get(demoNum); break; }
+                  }
+               }
+               
+               if (vId) {
+                 row.vehiculo_id = vId;
+               } else {
+                 cleanData.splice(i, 1);
+                 console.warn(`Omitiendo OT sin vehículo mapeado: Patente=${p}, Interno=${ni}`);
+               }
+               
+               delete row._patente;
+               delete row._numero_interno;
+           }
+           
+           if (cleanData.length === 0) {
+             throw new Error("No se pudo asociar ninguna OT a los vehículos existentes. Revise las patentes y números internos.");
+           }
       }
 
       const { error } = await supabase.from(config.table).insert(cleanData);

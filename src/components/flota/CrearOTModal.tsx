@@ -335,7 +335,27 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
                   {personalOperativoList.map(m => <option key={m.id} value={m.name}>{m.name} ({m.roleBadgeText || m.rol?.nombre})</option>)}
               </select>
             </div>
-            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                  <label className="block text-sm font-medium">Fecha de Creación (OT)</label>
+                  <input 
+                    type="date" 
+                    className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" 
+                    value={(() => {
+                        const d = formData.fechaCreacion ? new Date(formData.fechaCreacion) : new Date();
+                        if (isNaN(d.getTime())) return '';
+                        return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+                    })()}
+                    onChange={(e) => {
+                        const d = formData.fechaCreacion ? new Date(formData.fechaCreacion) : new Date();
+                        const [y, m, day] = e.target.value.split('-').map(Number);
+                        if (!isNaN(y)) {
+                            d.setFullYear(y, m - 1, day);
+                            setFormData({ ...formData, fechaCreacion: d.toISOString() });
+                        }
+                    }}
+                  />
+              </div>
               <div>
                   <label className="block text-sm font-medium">Fecha Programada</label>
                   <input 
