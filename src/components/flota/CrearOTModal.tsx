@@ -33,7 +33,18 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
 
   React.useEffect(() => {
     if (otToEdit) {
-      setFormData(otToEdit);
+      let combinedDate = new Date().toISOString();
+      if (otToEdit.fechaProgramada) {
+         try {
+           const timeStr = otToEdit.horaInicioProgramada || "08:00";
+           const timeSegment = timeStr.length === 5 ? timeStr + ':00' : timeStr;
+           const d = new Date(`${otToEdit.fechaProgramada}T${timeSegment}`);
+           if (!isNaN(d.getTime())) {
+             combinedDate = d.toISOString();
+           }
+         } catch(e) {}
+      }
+      setFormData({ ...otToEdit, fechaProgramada: combinedDate });
     } else {
       setFormData({
         vehiculoId: vehiculoPreseleccionadoId || '',
@@ -100,8 +111,20 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
           autoInstruccion = 'Revisar vehículo según requerimiento.';
     }
 
+    const pd = new Date(formData.fechaProgramada || new Date().toISOString());
+    const fechaProgramadaOnly = `${pd.getFullYear()}-${String(pd.getMonth() + 1).padStart(2, '0')}-${String(pd.getDate()).padStart(2, '0')}`;
+    const horaInicioOnly = `${String(pd.getHours()).padStart(2, '0')}:${String(pd.getMinutes()).padStart(2, '0')}`;
+    const endDate = new Date(pd.getTime() + 2 * 60 * 60 * 1000); // Default 2 hours
+    const horaTerminoOnly = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
+
     if (otToEdit) {
-      actualizarOrdenTrabajo({ ...formData, observacionInicial: autoInstruccion } as OrdenDeTrabajo);
+      actualizarOrdenTrabajo({ 
+          ...formData, 
+          observacionInicial: autoInstruccion,
+          fechaProgramada: fechaProgramadaOnly,
+          horaInicioProgramada: horaInicioOnly,
+          horaTerminoProgramada: formData.horaTerminoProgramada || horaTerminoOnly
+      } as OrdenDeTrabajo);
       onClose();
       return;
     }
@@ -138,7 +161,9 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
       prioridad: formData.prioridad as any,
       kilometrajeApertura: Number(formData.kilometrajeApertura),
       fechaCreacion: formData.fechaCreacion || new Date().toISOString(),
-      fechaProgramada: formData.fechaProgramada || new Date().toISOString(),
+      fechaProgramada: fechaProgramadaOnly,
+      horaInicioProgramada: horaInicioOnly,
+      horaTerminoProgramada: horaTerminoOnly,
       tareasRealizadas: [],
       insumos: insumosDesdeKit,
       observacionInicial: autoInstruccion,
@@ -229,16 +254,6 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
                 <option value="ALTA">Alta</option>
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium">Fecha y Hora Programada</label>
-              <input 
-                type="datetime-local" 
-                name="fechaProgramada" 
-                className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" 
-                value={formData.fechaProgramada ? formData.fechaProgramada.slice(0, 16) : new Date().toISOString().slice(0, 16)} 
-                onChange={(e) => setFormData({ ...formData, fechaProgramada: new Date(e.target.value).toISOString() })} 
-              />
-            </div>
           </div>
         ))}
 
@@ -320,15 +335,56 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
                   {personalOperativoList.map(m => <option key={m.id} value={m.name}>{m.name} ({m.roleBadgeText || m.rol?.nombre})</option>)}
               </select>
             </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium">Fecha y Hora Programada</label>
-              <input 
-                type="datetime-local" 
-                name="fechaProgramada" 
-                className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" 
-                value={formData.fechaProgramada ? formData.fechaProgramada.slice(0, 16) : new Date().toISOString().slice(0, 16)} 
-                onChange={(e) => setFormData({ ...formData, fechaProgramada: new Date(e.target.value).toISOString() })} 
-              />
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                  <label className="block text-sm font-medium">Fecha Programada</label>
+                  <input 
+                    type="date" 
+                    className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" 
+                    value={(() => {
+                        const d = formData.fechaProgramada ? new Date(formData.fechaProgramada) : new Date();
+                        if (isNaN(d.getTime())) return '';
+                        return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+                    })()}
+                    onChange={(e) => {
+                        const d = formData.fechaProgramada ? new Date(formData.fechaProgramada) : new Date();
+                        const [y, m, day] = e.target.value.split('-').map(Number);
+                        if (!isNaN(y)) {
+                            d.setFullYear(y, m - 1, day);
+                            setFormData({ ...formData, fechaProgramada: d.toISOString() });
+                        }
+                    }}
+                  />
+              </div>
+              <div>
+                  <label className="block text-sm font-medium">Hora Programada (08:00 - 17:00)</label>
+                  <input 
+                    type="time" 
+                    min="08:00"
+                    max="17:00"
+                    className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" 
+                    value={(() => {
+                        const d = formData.fechaProgramada ? new Date(formData.fechaProgramada) : new Date();
+                        if (isNaN(d.getTime())) return '';
+                        return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+                    })()}
+                    onChange={(e) => {
+                        let val = e.target.value;
+                        const [inputH] = val.split(':').map(Number);
+                        if (!isNaN(inputH)) {
+                            if (inputH < 8) val = '08:00';
+                            if (inputH > 17 || (inputH === 17 && val.split(':')[1] !== '00')) val = '17:00';
+                        }
+                        
+                        const d = formData.fechaProgramada ? new Date(formData.fechaProgramada) : new Date();
+                        const [h, m] = val.split(':').map(Number);
+                        if (!isNaN(h)) {
+                            d.setHours(h, m);
+                            setFormData({ ...formData, fechaProgramada: d.toISOString() });
+                        }
+                    }}
+                  />
+              </div>
             </div>
           </div>
         ))}
