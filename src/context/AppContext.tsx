@@ -598,6 +598,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } else {
         console.log("Work order successfully updated in Supabase database!");
         
+        // ACTUALIZAR VEHÍCULO EXPLÍCITAMENTE AL CERRAR LA OT PREVENTIVA (RESET PIZARRA)
+        if ((otActualizada.estado === 'FINALIZADA' || otActualizada.estado === 'CERRADA_POR_MECANICO') && otActualizada.tipo === 'PREVENTIVA') {
+            const kmCierre = otActualizada.kilometrajeCierre ? Number(otActualizada.kilometrajeCierre) : 0;
+            if (kmCierre > 0 && otActualizada.vehiculoId) {
+                try {
+                    // Try to extract Tipo Mantenimiento from Pauta or generic logic
+                    const tipoMant = otActualizada.pauta || 'Mantenimiento Preventivo';
+                    const fechaMant = (otActualizada.termino_proceso || new Date().toISOString()).split('T')[0];
+                    
+                    const { data: vParams } = await supabase.from('vehiculo').select('kilometraje_actual, km_ultima_mantencion').eq('id', otActualizada.vehiculoId).single();
+                    const newKmMax = vParams ? Math.max(kmCierre, Number(vParams.kilometraje_actual || 0)) : kmCierre;
+                    const oldKmUlt = vParams ? Number(vParams.km_ultima_mantencion || 0) : 0;
+                    
+                    if (kmCierre >= oldKmUlt) {
+                        await supabase.from('vehiculo').update({
+                            km_ultima_mantencion: kmCierre,
+                            fecha_ultima_mantencion: fechaMant,
+                            tipo_ultimo_mant: tipoMant,
+                            kilometraje_actual: newKmMax,
+                            fecha_actualizacion_km: new Date().toISOString()
+                        }).eq('id', otActualizada.vehiculoId);
+                        
+                        await fetchAllData();
+                    }
+                } catch(ve) {
+                    console.error("Error updating vehicle on OT close:", ve);
+                }
+            }
+        }
+        
         // Sync Child Tables
         // Tareas Realizadas
         if (otActualizada.tareasRealizadas) {

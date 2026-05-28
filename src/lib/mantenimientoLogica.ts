@@ -1,3 +1,65 @@
+export interface PautaEstructura {
+    id: string;
+    nombre: string;
+    kilometraje_inicial: number;
+    intervalo_1: number;
+    intervalo_2?: number | null;
+    tipo_aplicacion?: string;
+}
+
+export interface HitoSecuencia {
+    iteracion_km: number;
+    nombre: string;
+}
+
+/**
+ * Genera la secuencia matemática de hitos kilométricos para una pauta preventiva específica.
+ * Replica exactamente la lógica cíclica de Pulser V2.
+ */
+export function generarSecuenciaParaPauta(pauta: PautaEstructura, kilometrajeActual: number): HitoSecuencia[] {
+    const secuencia: HitoSecuencia[] = [];
+    
+    const kmInicial = Number(pauta.kilometraje_inicial) || 0;
+    const int1 = Number(pauta.intervalo_1) || 0;
+    const int2 = pauta.intervalo_2 ? Number(pauta.intervalo_2) : 0;
+    const pautaName = pauta.nombre || '';
+
+    // 1. Agregar siempre el hito inicial
+    secuencia.push({ iteracion_km: kmInicial, nombre: pautaName });
+
+    // 2. Validar si es pauta de rodaje/inicial (las pautas de rodaje no se repiten)
+    const nameUpper = pautaName.toUpperCase().trim();
+    const isRodaje = nameUpper.startsWith('SI') || 
+                     nameUpper.startsWith('R') || 
+                     nameUpper.includes('INICIAL') || 
+                     (pauta.tipo_aplicacion && pauta.tipo_aplicacion.toUpperCase().includes('INICIAL'));
+
+    if (isRodaje || int1 <= 0) {
+        return secuencia; // Retorna solo el hito inicial
+    }
+
+    // 3. Generar secuencia cíclica hasta el límite (KM Actual + 500k)
+    let currentKm = kmInicial;
+    let usarInt1 = true;
+    const limiteKm = kilometrajeActual + 500000;
+
+    while (currentKm < limiteKm) {
+        if (int2 > 0) {
+            currentKm += usarInt1 ? int1 : int2;
+            usarInt1 = !usarInt1; // Alternar para el próximo salto
+        } else {
+            currentKm += int1;
+        }
+
+        // Agregar el hito solo si no supera el límite de proyección
+        if (currentKm < limiteKm) {
+            secuencia.push({ iteracion_km: currentKm, nombre: pautaName });
+        }
+    }
+
+    return secuencia;
+}
+
 // 1. Datos de entrada (Lo que viene de tu Base de Datos)
 export interface VehiculoDB {
     id: string | number;
@@ -151,6 +213,9 @@ export function calcularDatosPizarra(vehiculo: VehiculoDB): FilaPizarraMantenimi
              }
         } else {
              // Fallback si superamos la secuencia generada genéricamente
+             if (vehiculo.pautasSecuencia.length > 0) {
+                 tipoProximoMantencion = vehiculo.pautasSecuencia[vehiculo.pautasSecuencia.length - 1].nombre.split('-')[0].trim();
+             }
              proximoHitoVencimiento = (Math.round(kmActual / intervalo) * intervalo) + intervalo;
              if (estatus !== "VENCIDO") {
                   const kmsFaltantes = proximoHitoVencimiento - kmActual;
@@ -204,7 +269,6 @@ export function calcularDatosPizarra(vehiculo: VehiculoDB): FilaPizarraMantenimi
         if (kmsFaltantes <= 0) {
             // Paso 6: Caso Vencido
             fechaProxima = new Date(hoy);
-            semaforo10Dias = true;
         } else {
             // Paso 4: Calcular días restantes
             const diasRestantes = Math.round(kmsFaltantes / kmPromDia);
@@ -212,15 +276,22 @@ export function calcularDatosPizarra(vehiculo: VehiculoDB): FilaPizarraMantenimi
             // Paso 5: Proyectar la fecha exacta
             fechaProxima = new Date(hoy);
             fechaProxima.setDate(fechaProxima.getDate() + diasRestantes);
-            
-            // Paso 7: Semáforo 10 días
-            if (diasRestantes <= 10 && diasRestantes >= 0) {
-                semaforo10Dias = true;
-            }
         }
     } else {
         // Si no hay km_prox_mant
         fechaProxima = null;
+    }
+
+    if (fechaProxima) {
+        const diffTime = fechaProxima.getTime() - hoy.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        if (diffDays >= 0 && diffDays <= 10) {
+            semaforo10Dias = true;
+        }
+    }
+
+    if (!tipoProximoMantencion || tipoProximoMantencion === "Siguiente Pauta") {
+        tipoProximoMantencion = vehiculo.tipoUltimaPauta || "N/A";
     }
 
     // --- 4. RETORNO DEL OBJETO FORMATEADO PARA LA TABLA ---

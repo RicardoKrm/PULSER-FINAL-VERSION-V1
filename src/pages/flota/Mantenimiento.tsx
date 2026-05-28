@@ -14,7 +14,7 @@ import {
 import { CrearOTModal } from '../../components/flota/CrearOTModal';
 import { CrearVehiculoModal } from '../../components/flota/CrearVehiculoModal';
 import { Modal } from '../../components/ui/Modal';
-import { calcularDatosPizarra, FilaPizarraMantenimiento } from '../../lib/mantenimientoLogica';
+import { calcularDatosPizarra, FilaPizarraMantenimiento, generarSecuenciaParaPauta, HitoSecuencia } from '../../lib/mantenimientoLogica';
 import { useAppContext } from '../../context/AppContext';
 
 export default function PizarraMantenimiento() {
@@ -122,7 +122,7 @@ export default function PizarraMantenimiento() {
             const pautasSecuenciaStr = v.tipo_ultimo_mant || v.tipo_ult_pauta || detalles.tipo_ultimo_mant || detalles.tipo_ult_pauta || '';
             const fechaUltMant = v.fecha_ultima_mantencion || v.fecha_ult_mantencion || detalles.fecha_ultima_mantencion || null;
 
-            let pautasSecuencia: { iteracion_km: number; nombre: string }[] = [];
+            let pautasSecuencia: HitoSecuencia[] = [];
 
             if (pautasData) {
               const pautasDelVehiculo = pautasData.filter(p => {
@@ -140,36 +140,8 @@ export default function PizarraMantenimiento() {
               });
 
               pautasDelVehiculo.forEach(p => {
-                 const km_ini = p.kilometraje_inicial || 0;
-                 const int1 = p.intervalo_1 || 0;
-                 const int2 = p.intervalo_2 || 0;
-                 
-                 const pautaName = String(p.nombre);
-                 
-                 // 1. Inicia en el kilometraje_inicial
-                 let currentKm = km_ini;
-                 pautasSecuencia.push({ iteracion_km: currentKm, nombre: pautaName });
-
-                 // 2. Si tiene intervalo 1 y NO es Rodaje
-                 const pautaNameUpper = pautaName.toUpperCase().trim();
-                 const isRodaje = pautaNameUpper.startsWith('SI') || pautaNameUpper.startsWith('R') || pautaNameUpper.includes('INICIAL');
-
-                 if (int1 > 0 && !isRodaje) {
-                     let useInt1 = true;
-                     let nextKm = currentKm + (useInt1 ? int1 : int2 || int1);
-
-                     // 3. Iterar hasta kmActual + 500000
-                     while (nextKm <= kmsActuales + 500000) {
-                          pautasSecuencia.push({ iteracion_km: nextKm, nombre: pautaName });
-                          
-                          if (int2 > 0) {
-                              useInt1 = !useInt1;
-                              nextKm += (useInt1 ? int1 : int2);
-                          } else {
-                              nextKm += int1;
-                          }
-                     }
-                 }
+                 const secuenciaPauta = generarSecuenciaParaPauta(p as any, kmsActuales);
+                 pautasSecuencia = [...pautasSecuencia, ...secuenciaPauta];
               });
               
               // 4. Sort sequence mathematically
@@ -258,6 +230,9 @@ export default function PizarraMantenimiento() {
     if (newKmVal > oldKmVal) {
         const diffKm = newKmVal - oldKmVal;
         baseKmPromedio = Math.round(diffKm / diffDays);
+        if (baseKmPromedio <= 0) baseKmPromedio = 51;
+    } else if (baseKmPromedio === 0) {
+        baseKmPromedio = 51;
     }
 
     try {
@@ -271,6 +246,8 @@ export default function PizarraMantenimiento() {
 
         const payload: any = {
             kilometraje_actual: newKmVal,
+            fecha_actualizacion_km: newDate.toISOString(),
+            km_promedio_dia: baseKmPromedio,
             updated_at: newDate.toISOString(),
             detalles: existingDetalles
         };

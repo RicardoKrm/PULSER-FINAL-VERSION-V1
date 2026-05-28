@@ -636,64 +636,6 @@ export default function CargaMasiva() {
         throw new Error(error.message);
       }
 
-      if (moduleId === 'ots') {
-         try {
-             const vehiclesToUpdate = new Map();
-             cleanData.forEach((ot: any) => {
-                 if (ot.vehiculo_id && ot.estado === 'FINALIZADA' && ot.tipo === 'PREVENTIVA') {
-                     const vId = ot.vehiculo_id;
-                     const km = parseFloat(ot.kilometraje_cierre) || 0;
-                     const fecha = ot.termino_proceso || ot.fecha_creacion;
-                     let tipoPauta = 'Mantenimiento Preventivo';
-                     
-                     // Intentar extraer el tipo de mantención de las tareas u observaciones
-                     const taskStr = String(ot.observacion_inicial || ot.tipo_falla || '').toUpperCase();
-                     if (taskStr) {
-                         const match = taskStr.match(/(SM\d+|MANTENIMIENTO[\sA-Z0-9]*|REVISION[\sA-Z0-9]*)/);
-                         if (match) tipoPauta = match[0].trim();
-                         else tipoPauta = taskStr.substring(0, 50);
-                     }
-                            
-                     if (!vehiclesToUpdate.has(vId)) {
-                         vehiclesToUpdate.set(vId, { km_ultima_mantencion: km, fecha_ultima_mantencion: fecha, tipo_ultimo_mant: tipoPauta });
-                     } else {
-                         const existing = vehiclesToUpdate.get(vId);
-                         if (km > existing.km_ultima_mantencion) {
-                             vehiclesToUpdate.set(vId, { km_ultima_mantencion: km, fecha_ultima_mantencion: fecha, tipo_ultimo_mant: tipoPauta });
-                         }
-                     }
-                 }
-             });
-             
-             if (vehiclesToUpdate.size > 0) {
-                 const { data: currentVehicles } = await supabase.from('vehiculo').select('id, km_ultima_mantencion, kilometraje_actual').in('id', Array.from(vehiclesToUpdate.keys()));
-                 
-                 for (const cv of currentVehicles || []) {
-                     const newVal = vehiclesToUpdate.get(cv.id);
-                     const currentKm = cv.km_ultima_mantencion ? parseFloat(cv.km_ultima_mantencion) : 0;
-                     
-                     if (newVal.km_ultima_mantencion >= currentKm) {
-                         const updatedKmActual = Math.max(parseFloat(cv.kilometraje_actual || '0'), newVal.km_ultima_mantencion);
-                         await supabase.from('vehiculo').update({
-                             km_ultima_mantencion: newVal.km_ultima_mantencion,
-                             fecha_ultima_mantencion: newVal.fecha_ultima_mantencion ? newVal.fecha_ultima_mantencion.split('T')[0] : null,
-                             tipo_ultimo_mant: newVal.tipo_ultimo_mant,
-                             kilometraje_actual: updatedKmActual
-                         }).eq('id', cv.id);
-                     } else {
-                         // Aún si la mantención reportada no es la *última*, si el kilometraje de cierre es mayor al actual, lo actualizamos.
-                         const reportedMaxKm = Math.max(newVal.km_ultima_mantencion, parseFloat(cv.kilometraje_actual || '0'));
-                         if (reportedMaxKm > parseFloat(cv.kilometraje_actual || '0')) {
-                             await supabase.from('vehiculo').update({ kilometraje_actual: reportedMaxKm }).eq('id', cv.id);
-                         }
-                     }
-                 }
-             }
-         } catch (updateErr) {
-             console.error("Error al post-actualizar los vehículos:", updateErr);
-         }
-      }
-
       setResults(prev => ({ 
         ...prev, 
         [moduleId]: { 
