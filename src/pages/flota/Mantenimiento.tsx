@@ -15,9 +15,11 @@ import { CrearOTModal } from '../../components/flota/CrearOTModal';
 import { CrearVehiculoModal } from '../../components/flota/CrearVehiculoModal';
 import { Modal } from '../../components/ui/Modal';
 import { calcularDatosPizarra, FilaPizarraMantenimiento } from '../../lib/mantenimientoLogica';
+import { useAppContext } from '../../context/AppContext';
 
 export default function PizarraMantenimiento() {
   const { currentCompany } = useCompany();
+  const { ordenesTrabajo } = useAppContext();
   const [busqueda, setBusqueda] = useState('');
   const [mostrarFiltros, setMostrarFiltros] = useState(true);
   const [actionMenuOpen, setActionMenuOpen] = useState<string | number | null>(null);
@@ -571,9 +573,15 @@ export default function PizarraMantenimiento() {
     </Card>
   );
 
-  const mockOTs = (vehiculo: any) => [];
+  const getRealOTs = (vehiculo: any) => {
+    if (!vehiculo) return [];
+    return ordenesTrabajo
+      .filter(o => o.vehiculoId === vehiculo.id)
+      .sort((a, b) => new Date(b.fechaCreacion).getTime() - new Date(a.fechaCreacion).getTime());
+  };
 
   if (historialVehiculo) {
+    const otsVehiculo = getRealOTs(historialVehiculo);
     return (
       <div className="space-y-6">
          <div className="flex justify-between items-start pt-2">
@@ -602,22 +610,27 @@ export default function PizarraMantenimiento() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {mockOTs(historialVehiculo).map(ot => (
+                    {otsVehiculo.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="px-6 py-8 text-center text-slate-500">No hay órdenes de trabajo en el historial.</td>
+                      </tr>
+                    )}
+                    {otsVehiculo.map(ot => (
                       <tr key={ot.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors h-16">
                         <td className="px-6 whitespace-nowrap font-medium text-slate-800 dark:text-slate-300">{ot.folio}</td>
                         <td className="px-6 whitespace-nowrap text-slate-600 dark:text-slate-400">{ot.tipo}</td>
                         <td className="px-6 whitespace-nowrap text-slate-600 dark:text-slate-400">{ot.prioridad}</td>
                         <td className="px-6 whitespace-nowrap justify-center p-0 align-middle">
                           <div className="flex justify-center items-center h-full w-full">
-                            <span className="inline-flex items-center px-4 py-1 rounded-full text-[11px] font-bold bg-[#10b981] text-white shadow-sm">
-                              {ot.estado}
+                            <span className={`inline-flex items-center px-4 py-1 rounded-full text-[11px] font-bold text-white shadow-sm ${ot.estado === 'FINALIZADA' ? 'bg-[#10b981]' : ot.estado === 'ABIERTA' || ot.estado === 'PROGRAMADA' ? 'bg-blue-500' : 'bg-amber-500'}`}>
+                              {ot.estado.replace('_', ' ')}
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 whitespace-nowrap text-slate-600 dark:text-slate-400">{ot.fechaCreacion}</td>
-                        <td className="px-6 whitespace-nowrap text-slate-600 dark:text-slate-400">{ot.fechaCierre}</td>
+                        <td className="px-6 whitespace-nowrap text-slate-600 dark:text-slate-400">{new Date(ot.fechaCreacion).toLocaleDateString()}</td>
+                        <td className="px-6 whitespace-nowrap text-slate-600 dark:text-slate-400">{ot.estado === 'FINALIZADA' || ot.estado === 'CERRADA_POR_MECANICO' ? new Date(ot.fechaCreacion).toLocaleDateString() : 'N/A'}</td>
                         <td className="px-6 whitespace-nowrap text-slate-600 dark:text-slate-400">
-                          ${ot.costo.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          ${((ot.costoInsumos || 0) + (ot.costoManoObraHH || 0) + (ot.costoManoObraTareas || 0)).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                         <td className="px-6 whitespace-nowrap text-center">
                           <div className="flex justify-center">

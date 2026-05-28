@@ -204,6 +204,10 @@ export default function OrdenesTrabajoDetail() {
     const handleActualizarEstado = async () => {
 
     if (!ot) return;
+    if (nuevoEstado === 'PAUSADA') {
+        setIsPausaModalOpen(true);
+        return;
+    }
     if (nuevoEstado === 'FINALIZADA') {
         const kmVal = Number(kmCierre);
         if (!kmCierre || isNaN(kmVal) || kmVal <= 0) {
@@ -573,7 +577,7 @@ export default function OrdenesTrabajoDetail() {
      }
   };
 
-  const handleExportarPDF = () => {
+  const handleExportarPDF = (imprimir: boolean = false) => {
     if (!ot) return;
 
     // Create a new jsPDF instance
@@ -920,14 +924,19 @@ export default function OrdenesTrabajoDetail() {
       doc.text('Este documento digital representa el avance de proceso y la hoja de auditoría de Orden de Trabajo.', 105, 291, { align: 'center' });
     }
 
-    doc.save(`HOJA_OT_${ot.folio}.pdf`);
+    if (imprimir) {
+      doc.autoPrint();
+      window.open(doc.output('bloburl'), '_blank');
+    } else {
+      doc.save(`HOJA_OT_${ot.folio}.pdf`);
 
-    Swal.fire({
-      title: '¡PDF Generado!',
-      text: 'Se ha descargado la Hoja de Orden de Trabajo con el avance actual y el historial completo de eventos.',
-      icon: 'success',
-      confirmButtonColor: '#9333ea'
-    });
+      Swal.fire({
+        title: '¡PDF Generado!',
+        text: 'Se ha descargado la Hoja de Orden de Trabajo con el avance actual y el historial completo de eventos.',
+        icon: 'success',
+        confirmButtonColor: '#9333ea'
+      });
+    }
   };
 
   const hasSolicitudesPendientes = (ot?.solicitudes?.filter(s => s.estado === 'PENDIENTE').length || 0) > 0;
@@ -966,8 +975,33 @@ export default function OrdenesTrabajoDetail() {
             )}
             <span className="flex items-center text-slate-600 dark:text-slate-400 mr-4"><Clock className="w-4 h-4 mr-1"/> {new Date(timerDisplay * 1000).toISOString().substr(11, 8)}</span>
             
-            <Button variant="outline" className="hidden lg:flex" onClick={handleExportarPDF}><Printer className="w-4 h-4 mr-2"/> Hoja OT</Button>
-            <Button variant="outline" onClick={() => window.print()}><CheckCircle className="w-4 h-4 mr-2"/> Certificado</Button>
+            <Button variant="outline" className="hidden lg:flex" onClick={() => handleExportarPDF(false)}><FileDown className="w-4 h-4 mr-2"/> Descargar OT</Button>
+            <Button variant="outline" className="hidden lg:flex" onClick={() => handleExportarPDF(true)}><Printer className="w-4 h-4 mr-2"/> Imprimir OT</Button>
+            <Button variant="outline" onClick={() => {
+                 const doc = new jsPDF();
+                 doc.setFontSize(22);
+                 doc.setTextColor(147, 51, 234);
+                 doc.text("Certificado de Mantenimiento", 105, 20, { align: "center" });
+                 doc.setFontSize(12);
+                 doc.setTextColor(0, 0, 0);
+                 doc.text(`Vehículo: ${vehiculo?.patente || 'N/A'}`, 20, 40);
+                 doc.text(`OT Folio: ${ot.folio}`, 20, 50);
+                 doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 20, 60);
+                 doc.text(`Kilometraje Cierre: ${ot.kilometrajeCierre || 'N/A'}`, 20, 70);
+                 doc.text(`Técnico Responsable: ${ot.tecnicoResponsable || 'N/A'}`, 20, 80);
+                 doc.text(`Tareas Realizadas:`, 20, 100);
+                 let y = 110;
+                 ot.tareasRealizadas.forEach(t => {
+                     doc.text(`- ${t.tarea_estandar?.descripcion || 'Tarea'}`, 25, y);
+                     y += 8;
+                 });
+                 if (ot.firmaCertificado) {
+                     doc.text("Firma de Conformidad:", 20, y + 20);
+                     doc.addImage(ot.firmaCertificado, "PNG", 20, y + 25, 40, 20);
+                 }
+                 doc.autoPrint();
+                 window.open(doc.output('bloburl'), '_blank');
+            }}><CheckCircle className="w-4 h-4 mr-2"/> Imprimir Certificado</Button>
 
             {ot.estado === 'PROGRAMADA' || ot.estado === 'ABIERTA' || ot.estado === 'PENDIENTE' || ot.estado === 'PAUSADA' ? (
               <Button onClick={() => handleActualizarEstadoRapido('EN_PROCESO')} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm font-bold">
@@ -1030,6 +1064,7 @@ export default function OrdenesTrabajoDetail() {
                     <CardContent className="grid grid-cols-2 gap-4 text-sm pt-6">
                         <p><strong>Vehículo:</strong> {vehiculo?.patente || 'N/A'}</p>
                         <p><strong>Técnico Responsable:</strong> {ot.tecnicoResponsable || 'Sin asignar'}</p>
+                        <p><strong>Ayudantes:</strong> {ot.personalOperativo || 'Sin asignar'}</p>
                         <p><strong>Tipo:</strong> {ot.tipo}</p>
                         <p><strong>Prioridad:</strong> {ot.prioridad}</p>
                         <p><strong>Fecha Creación:</strong> {new Date(ot.fechaCreacion).toLocaleDateString()}</p>
@@ -1229,7 +1264,7 @@ export default function OrdenesTrabajoDetail() {
                             if (url) window.open(url, '_blank', 'noopener,noreferrer');
                         }}
                     >
-                        <FileDown className="w-4 h-4 mr-2"/> Ver PDF
+                        <FileDown className="w-4 h-4 mr-2"/> Ver / Imprimir Pauta PDF
                     </Button>
                 )}
             </AccordionPanel>

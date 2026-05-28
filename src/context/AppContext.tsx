@@ -742,7 +742,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             }
 
             // Recargar datos para que se actualice la vista de inventarios
-            await fetchAllData();
+            // await fetchAllData(); // Removed to prevent race condition breaking optimistic OT update
           } catch (eDelta) {
             console.error("Error al descontar de bodega:", eDelta);
           }

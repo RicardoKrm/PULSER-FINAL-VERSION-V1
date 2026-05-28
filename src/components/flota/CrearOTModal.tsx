@@ -219,11 +219,21 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
             </div>
             <div>
               <label className="block text-sm font-medium">Prioridad</label>
-              <select name="prioridad" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange}>
+              <select name="prioridad" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} defaultValue="MEDIA">
                 <option value="BAJA">Baja</option>
                 <option value="MEDIA">Media</option>
                 <option value="ALTA">Alta</option>
               </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Fecha y Hora (Creación/Programación)</label>
+              <input 
+                type="datetime-local" 
+                name="fechaCreacion" 
+                className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" 
+                value={formData.fechaCreacion ? formData.fechaCreacion.slice(0, 16) : new Date().toISOString().slice(0, 16)} 
+                onChange={(e) => setFormData({ ...formData, fechaCreacion: new Date(e.target.value).toISOString() })} 
+              />
             </div>
           </div>
         ))}
