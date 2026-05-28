@@ -28,6 +28,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
     prioridad: 'MEDIA',
     kilometrajeApertura: 0,
     fechaCreacion: new Date().toISOString(),
+    fechaProgramada: new Date().toISOString()
   });
 
   React.useEffect(() => {
@@ -40,6 +41,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
         prioridad: 'MEDIA',
         kilometrajeApertura: 0,
         fechaCreacion: new Date().toISOString(),
+        fechaProgramada: new Date().toISOString()
       });
     }
   }, [otToEdit, vehiculoPreseleccionadoId, isOpen]);
@@ -136,6 +138,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
       prioridad: formData.prioridad as any,
       kilometrajeApertura: Number(formData.kilometrajeApertura),
       fechaCreacion: formData.fechaCreacion || new Date().toISOString(),
+      fechaProgramada: formData.fechaProgramada || new Date().toISOString(),
       tareasRealizadas: [],
       insumos: insumosDesdeKit,
       observacionInicial: autoInstruccion,
@@ -226,13 +229,13 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium">Fecha y Hora (Creación/Programación)</label>
+              <label className="block text-sm font-medium">Fecha y Hora Programada</label>
               <input 
                 type="datetime-local" 
-                name="fechaCreacion" 
+                name="fechaProgramada" 
                 className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" 
-                value={formData.fechaCreacion ? formData.fechaCreacion.slice(0, 16) : new Date().toISOString().slice(0, 16)} 
-                onChange={(e) => setFormData({ ...formData, fechaCreacion: new Date(e.target.value).toISOString() })} 
+                value={formData.fechaProgramada ? formData.fechaProgramada.slice(0, 16) : new Date().toISOString().slice(0, 16)} 
+                onChange={(e) => setFormData({ ...formData, fechaProgramada: new Date(e.target.value).toISOString() })} 
               />
             </div>
           </div>
@@ -310,8 +313,14 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium">Fecha Programada</label>
-              <input type="date" name="fechaProgramada" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
+              <label className="block text-sm font-medium">Fecha y Hora Programada</label>
+              <input 
+                type="datetime-local" 
+                name="fechaProgramada" 
+                className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" 
+                value={formData.fechaProgramada ? formData.fechaProgramada.slice(0, 16) : new Date().toISOString().slice(0, 16)} 
+                onChange={(e) => setFormData({ ...formData, fechaProgramada: new Date(e.target.value).toISOString() })} 
+              />
             </div>
           </div>
         ))}

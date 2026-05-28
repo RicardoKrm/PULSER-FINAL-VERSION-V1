@@ -576,7 +576,7 @@ export default function PizarraMantenimiento() {
   const getRealOTs = (vehiculo: any) => {
     if (!vehiculo) return [];
     return ordenesTrabajo
-      .filter(o => o.vehiculoId === vehiculo.id)
+      .filter(o => String(o.vehiculoId) === String(vehiculo.id))
       .sort((a, b) => new Date(b.fechaCreacion).getTime() - new Date(a.fechaCreacion).getTime());
   };
 

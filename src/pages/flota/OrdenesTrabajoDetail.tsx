@@ -131,42 +131,106 @@ export default function OrdenesTrabajoDetail() {
     const handleActualizarEstadoRapido = async (estadoStr: string, pausaInfo?: { id: string, nombre: string }) => {
         if (!ot) return;
         const updates: any = { estado: estadoStr as any };
+        const now = new Date().toISOString();
+
         if (estadoStr === 'EN_PROCESO') {
-            updates.inicio_proceso = new Date().toISOString();
+            updates.inicio_proceso = now;
         }
         if (estadoStr === 'PAUSADA' || estadoStr === 'FINALIZADA' || estadoStr === 'CERRADA_POR_MECANICO') {
             updates.tiempoTrabajadoSegundos = timerDisplay;
         }
-        if (estadoStr === 'CERRADA_POR_MECANICO') {
-            const kmIngresado = window.prompt('Por favor ingrese el Kilometraje de Cierre actual del vehículo:');
-            if (!kmIngresado || isNaN(Number(kmIngresado)) || Number(kmIngresado) <= 0) {
+        if (estadoStr === 'FINALIZADA' || estadoStr === 'CERRADA_POR_MECANICO') {
+            updates.termino_proceso = now;
+            let kmIngresado: string | null = null;
+            if (estadoStr === 'CERRADA_POR_MECANICO') {
+                kmIngresado = window.prompt('Por favor ingrese el Kilometraje de Cierre actual del vehículo:');
+            } else {
+                kmIngresado = kmCierre; // if called quickly, though UI shouldn't allow it without prompt
+                if (!kmIngresado) kmIngresado = window.prompt('Por favor ingrese el Kilometraje de Cierre actual del vehículo:');
+            }
+            
+            const kmVal = Number(kmIngresado);
+            if (!kmIngresado || isNaN(kmVal) || kmVal <= 0) {
                  alert('Debe ingresar un kilometraje válido para poder cerrar la OT.');
                  return;
             }
-            updates.kilometrajeCierre = Number(kmIngresado);
+            if (kmVal < (ot.kilometrajeApertura || 0)) {
+                 alert('El Kilometraje de Cierre no puede ser menor al Kilometraje de Apertura de la OT.');
+                 return;
+            }
+            updates.kilometrajeCierre = kmVal;
+            
+            // REGLA DE ORO: 1. Impacto en Vehículo (Odómetro) y 2. Pizarra (Reset)
+            const { data: dbVehiculo, error: selectErr } = await supabase
+                .from('vehiculo')
+                .select('*')
+                .eq('id', ot.vehiculoId)
+                .single();
+
+            if (!selectErr && dbVehiculo) {
+                let updatedData: any = {};
+                let updatedDetalles = dbVehiculo.detalles || {};
+                
+                updatedData.kilometraje_actual = kmVal;
+                updatedData.updated_at = now;
+
+                if (ot.tipo === 'PREVENTIVA' || ot.tipo === 'PREVENTIVA_NEUMATICOS' || ot.tipo === 'MANTENIMIENTO_PREVENTIVO' || ot.tipo === 'MANTENIMIENTO' || ot.tipo === 'INSPECCION' || ot.tipo === 'CORRECTIVA') {
+                    updatedData.km_ultima_mantencion = kmVal;
+                    updatedData.fecha_ultima_mantencion = now;
+                    updatedDetalles.km_ultima_mantencion = kmVal;
+                    updatedDetalles.fecha_ultima_mantencion = now;
+                    updatedDetalles.tipo_ult_pauta = ot.pauta || ot.tipo;
+                    updatedData.detalles = updatedDetalles;
+                }
+
+                await supabase.from('vehiculo').update(updatedData).eq('id', ot.vehiculoId);
+            }
+
+            // REGLA DE ORO: 3. Impacto en Inventario (Descuento)
+            if (ot.insumos && ot.insumos.length > 0) {
+                for (const insumo of ot.insumos) {
+                    if (insumo.repuesto_id && insumo.repuesto_id.length > 20) {
+                        const { data: repData, error: repErr } = await supabase.from('repuesto').select('stock_actual').eq('id', insumo.repuesto_id).single();
+                        if (!repErr && repData) {
+                            const newStock = Math.max(0, (repData.stock_actual || 0) - (insumo.cantidad || 0));
+                            await supabase.from('repuesto').update({ stock_actual: newStock, updated_at: now }).eq('id', insumo.repuesto_id);
+                        }
+                    }
+                }
+            }
         }
 
         let comentario = `Cambio de estado a ${estadoStr}`;
         if (estadoStr === 'EN_PROCESO') comentario += ' (Trabajo Iniciado)';
         if (estadoStr === 'PAUSADA' && pausaInfo) comentario += ` - Motivo: ${pausaInfo.nombre}`;
 
-        actualizarOrdenTrabajo({
-            ...ot,
-            ...updates,
-            pausa_id: pausaInfo ? pausaInfo.id : undefined,
-            historial: [
-                ...ot.historial,
-                {
-                    id: Math.random().toString(36).substr(2, 9),
-                    orden_id: ot.id,
-                    comentario: comentario,
-                    created_at: new Date().toISOString(),
-                    estado_nuevo: estadoStr,
-                    usuario_nombre: profile?.nombre || 'General'
-                }
-            ]
-        });
-        setNuevoEstado(estadoStr);
+        setIsUpdatingDb(true);
+        try {
+            await actualizarOrdenTrabajo({
+                ...ot,
+                ...updates,
+                pausa_id: pausaInfo ? pausaInfo.id : undefined,
+                historial: [
+                    ...ot.historial,
+                    {
+                        id: Math.random().toString(36).substr(2, 9),
+                        orden_id: ot.id,
+                        comentario: comentario,
+                        created_at: now,
+                        estado_nuevo: estadoStr,
+                        usuario_nombre: profile?.nombre || 'General'
+                    }
+                ]
+            });
+            if (estadoStr === 'FINALIZADA' || estadoStr === 'CERRADA_POR_MECANICO') {
+                alert(`OT ${estadoStr} con éxito. La Pizarra de Mantenimiento se actualizó.`);
+            }
+        } catch (e) {
+             console.error("Error updating OT state:", e);
+        } finally {
+            setIsUpdatingDb(false);
+            setNuevoEstado(estadoStr);
+        }
     };
 
     const confirmarPausa = () => {
@@ -208,18 +272,32 @@ export default function OrdenesTrabajoDetail() {
         setIsPausaModalOpen(true);
         return;
     }
-    if (nuevoEstado === 'FINALIZADA') {
-        const kmVal = Number(kmCierre);
-        if (!kmCierre || isNaN(kmVal) || kmVal <= 0) {
-            alert('Debe ingresar un Kilometraje de Cierre válido para finalizar la OT.');
+    if (nuevoEstado === 'FINALIZADA' || nuevoEstado === 'CERRADA_POR_MECANICO') {
+        let kmVal = Number(kmCierre);
+        if (nuevoEstado === 'CERRADA_POR_MECANICO') {
+             const kmIngresado = window.prompt('Por favor ingrese el Kilometraje de Cierre actual del vehículo:');
+             if (!kmIngresado || isNaN(Number(kmIngresado)) || Number(kmIngresado) <= 0) {
+                  alert('Debe ingresar un kilometraje válido para poder cerrar la OT.');
+                  return;
+             }
+             kmVal = Number(kmIngresado);
+        } else {
+             if (!kmCierre || isNaN(kmVal) || kmVal <= 0) {
+                 alert('Debe ingresar un Kilometraje de Cierre válido para finalizar la OT.');
+                 return;
+             }
+        }
+
+        if (kmVal < (ot.kilometrajeApertura || 0)) {
+            alert('El Kilometraje de Cierre no puede ser menor al Kilometraje de Apertura de la OT.');
             return;
         }
 
         setIsUpdatingDb(true);
         try {
-            // Actualización de la OT en base de datos si existe, en este caso 
-            // el context maneja local, pero podemos sincronizar Vehiculo a Supabase directo
-            // de acuerdo a la instrucción
+            const now = new Date().toISOString();
+
+            // REGLA DE ORO: 1. Impacto en Vehículo (Odómetro) y 2. Pizarra (Reset)
             const { data: dbVehiculo, error: selectErr } = await supabase
                 .from('vehiculo')
                 .select('*')
@@ -227,64 +305,68 @@ export default function OrdenesTrabajoDetail() {
                 .single();
 
             if (!selectErr && dbVehiculo) {
-                // 1. Actualizar el KM actual del vehículo si el de la OT es mayor
                 let updatedData: any = {};
                 let updatedDetalles = dbVehiculo.detalles || {};
                 
-                if (kmVal > (dbVehiculo.kilometraje_actual || 0)) {
-                    updatedData.kilometraje_actual = kmVal;
-                    updatedData.updated_at = new Date().toISOString();
-                }
+                updatedData.kilometraje_actual = kmVal;
+                updatedData.updated_at = now;
 
-                // 2. Guardar caché de Pauta si es preventiva
-                if (ot.tipo === 'PREVENTIVA' || ot.tipo === 'PREVENTIVA_NEUMATICOS') {
-                    // Update detalles object directly exactly like python logic mapping
+                if (ot.tipo === 'PREVENTIVA' || ot.tipo === 'PREVENTIVA_NEUMATICOS' || ot.tipo === 'MANTENIMIENTO_PREVENTIVO' || ot.tipo === 'MANTENIMIENTO' || ot.tipo === 'INSPECCION' || ot.tipo === 'CORRECTIVA') {
+                    // Update root variables to reset Pizarra
+                    updatedData.km_ultima_mantencion = kmVal;
+                    updatedData.fecha_ultima_mantencion = now;
+                    
+                    // Update detalles object as fallback
                     updatedDetalles.km_ultima_mantencion = kmVal;
-                    updatedDetalles.fecha_ultima_mantencion = new Date().toISOString();
-                    updatedDetalles.tipo_ult_pauta = ot.pauta || 'Sin Pauta Especificada';
+                    updatedDetalles.fecha_ultima_mantencion = now;
+                    updatedDetalles.tipo_ult_pauta = ot.pauta || ot.tipo;
                     
                     updatedData.detalles = updatedDetalles;
                 }
 
-                if (Object.keys(updatedData).length > 0) {
-                    const { error: updateErr } = await supabase
-                        .from('vehiculo')
-                        .update(updatedData)
-                        .eq('id', ot.vehiculoId);
-                    
-                    if (updateErr) {
-                        console.error('Error updating Vehiculo:', updateErr);
-                        alert('Advertencia: No se pudo actualizar el vehículo en la BD.');
-                    }
-                }
-            } else if (selectErr) {
-                console.warn("Vehículo no encontrado en BD para sincronizar.", selectErr);
+                await supabase.from('vehiculo').update(updatedData).eq('id', ot.vehiculoId);
             }
 
-            // Continuar con actualizacion en AppContext para UI
-            actualizarOrdenTrabajo({
+            // REGLA DE ORO: 3. Impacto en Inventario (Descuento)
+            if (ot.insumos && ot.insumos.length > 0) {
+                for (const insumo of ot.insumos) {
+                    if (insumo.repuesto_id && insumo.repuesto_id.length > 20) { // Valid UUID expected
+                        const { data: repData, error: repErr } = await supabase.from('repuesto').select('stock_actual').eq('id', insumo.repuesto_id).single();
+                        if (!repErr && repData) {
+                            const newStock = Math.max(0, (repData.stock_actual || 0) - (insumo.cantidad || 0));
+                            await supabase.from('repuesto').update({ stock_actual: newStock, updated_at: now }).eq('id', insumo.repuesto_id);
+                        }
+                    }
+                }
+            }
+
+            // Continuar con actualizacion en AppContext para UI y Backend
+            await actualizarOrdenTrabajo({
                 ...ot,
                 estado: nuevoEstado as any,
                 kilometrajeCierre: kmVal,
                 tiempoTrabajadoSegundos: (nuevoEstado === 'PAUSADA' || nuevoEstado === 'FINALIZADA' || nuevoEstado === 'CERRADA_POR_MECANICO') ? timerDisplay : ot.tiempoTrabajadoSegundos,
-                inicio_proceso: nuevoEstado === 'EN_PROCESO' ? new Date().toISOString() : ot.inicio_proceso,
+                inicio_proceso: nuevoEstado === 'EN_PROCESO' ? now : ot.inicio_proceso,
+                termino_proceso: now,
                 historial: [
                     ...ot.historial,
                     {
                         id: Math.random().toString(36).substr(2, 9),
                         orden_id: ot.id,
                         comentario: `Cierre de OT a los ${kmVal} km`,
-                        created_at: new Date().toISOString(),
+                        created_at: now,
                         estado_nuevo: nuevoEstado,
-                        usuario_nombre: 'Taller'
+                        usuario_nombre: profile?.nombre || 'Taller'
                     }
                 ]
             });
-            alert('OT Finalizada y Pizarra de Mantenimiento actualizada.');
+            alert('OT Finalizada con éxito. La Pizarra de Mantenimiento se ha actualizado.');
         } catch (error) {
-            console.error(error);
+            console.error('Error finalizando OT:', error);
+            alert('Hubo un error al cerrar la OT.');
         } finally {
             setIsUpdatingDb(false);
+            setNuevoEstado(nuevoEstado);
         }
     } else {
         // Just state update
@@ -407,6 +489,13 @@ export default function OrdenesTrabajoDetail() {
       ]
     });
     setIsTareaModalOpen(false);
+    Swal.fire({
+      title: 'Añadido',
+      text: 'Tarea agregada exitosamente.',
+      icon: 'success',
+      timer: 1500,
+      showConfirmButton: false
+    });
   };
 
   const agregarInsumo = (repuesto: any, cantidadToUse: number = 1) => {
@@ -447,6 +536,13 @@ export default function OrdenesTrabajoDetail() {
     setIsInsumoModalOpen(false);
     setInsumoSearch('');
     setInsumoQuantities({});
+    Swal.fire({
+      title: 'Añadido',
+      text: 'Resupuesto/Insumo agregado exitosamente.',
+      icon: 'success',
+      timer: 1500,
+      showConfirmButton: false
+    });
   };
 
   const eliminarTarea = (tareaId: string) => {
@@ -926,7 +1022,17 @@ export default function OrdenesTrabajoDetail() {
 
     if (imprimir) {
       doc.autoPrint();
-      window.open(doc.output('bloburl'), '_blank');
+      const blob = doc.output('blob');
+      const blobURL = URL.createObjectURL(blob);
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = blobURL;
+      document.body.appendChild(iframe);
+      iframe.onload = () => {
+         setTimeout(() => {
+            iframe.contentWindow?.print();
+         }, 500);
+      };
     } else {
       doc.save(`HOJA_OT_${ot.folio}.pdf`);
 
@@ -966,7 +1072,13 @@ export default function OrdenesTrabajoDetail() {
 
       <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border dark:border-slate-800">
         <Button variant="ghost" onClick={() => navigate('/flota/ordenes-trabajo')}><ArrowLeft className="w-4 h-4 mr-2" />Volver</Button>
-        <h1 className="text-xl font-bold">OT #{ot.folio} <Badge className="ml-2 bg-green-600 text-white">{ot.estado.replace('_', ' ')}</Badge></h1>
+        <div className="flex flex-col items-center">
+            <h1 className="text-xl font-bold">OT #{ot.folio} <Badge className="ml-2 bg-green-600 text-white">{ot.estado.replace('_', ' ')}</Badge></h1>
+            <p className="text-xs text-slate-500 mt-1">
+                Responsable: <span className="font-semibold text-slate-700 dark:text-slate-300">{ot.tecnicoResponsable || 'N/A'}</span> 
+                {ot.personalOperativo && <span> | Apoyo: <span className="font-semibold text-slate-700 dark:text-slate-300">{ot.personalOperativo}</span></span>}
+            </p>
+        </div>
         <div className="flex gap-2 font-bold flex-wrap justify-end">
             {ot.tipo === 'INSPECCION' && (
               <Button onClick={() => navigate('/flota/neumaticos?tab=inspeccion')} className="bg-purple-600 hover:bg-purple-700 text-white">
@@ -1000,7 +1112,17 @@ export default function OrdenesTrabajoDetail() {
                      doc.addImage(ot.firmaCertificado, "PNG", 20, y + 25, 40, 20);
                  }
                  doc.autoPrint();
-                 window.open(doc.output('bloburl'), '_blank');
+                 const blob = doc.output('blob');
+                 const blobURL = URL.createObjectURL(blob);
+                 const iframe = document.createElement('iframe');
+                 iframe.style.display = 'none';
+                 iframe.src = blobURL;
+                 document.body.appendChild(iframe);
+                 iframe.onload = () => {
+                    setTimeout(() => {
+                       iframe.contentWindow?.print();
+                    }, 500);
+                 };
             }}><CheckCircle className="w-4 h-4 mr-2"/> Imprimir Certificado</Button>
 
             {ot.estado === 'PROGRAMADA' || ot.estado === 'ABIERTA' || ot.estado === 'PENDIENTE' || ot.estado === 'PAUSADA' ? (
@@ -1256,12 +1378,58 @@ export default function OrdenesTrabajoDetail() {
                    {filteredPautas.map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
                 </select>
 
-                {ot.pauta && filteredPautas.find(p => p.nombre === ot.pauta)?.archivoPdfUrl && (
+                {ot.pauta && (
                     <Button 
-                        className="bg-cyan-500 w-full hover:bg-cyan-600" 
+                        className="bg-cyan-500 w-full hover:bg-cyan-600 mt-2" 
                         onClick={() => {
-                            const url = filteredPautas.find(p => p.nombre === ot.pauta)?.archivoPdfUrl;
-                            if (url) window.open(url, '_blank', 'noopener,noreferrer');
+                            const pautaObj = filteredPautas.find(p => p.nombre === ot.pauta);
+                            if (pautaObj && (pautaObj as any).archivoPdfUrl) {
+                                window.open((pautaObj as any).archivoPdfUrl, '_blank', 'noopener,noreferrer');
+                            } else {
+                                // Generate generic pauta PDF
+                                const pdf = new jsPDF();
+                                pdf.setFontSize(22);
+                                pdf.setTextColor(6, 182, 212); // cyan
+                                pdf.text(`PAUTA: ${ot.pauta}`, 105, 20, { align: "center" });
+                                pdf.setFontSize(12);
+                                pdf.setTextColor(0, 0, 0);
+                                pdf.text(`Vehículo: ${vehiculo?.patente || 'N/A'}`, 20, 40);
+                                pdf.text(`OT Folio: ${ot.folio}`, 20, 50);
+                                pdf.text(`Fecha: ${new Date().toLocaleDateString()}`, 20, 60);
+                                
+                                pdf.setFont('Helvetica', 'bold');
+                                pdf.text("Checklist de Mantenimiento:", 20, 80);
+                                pdf.setFont('Helvetica', 'normal');
+                                
+                                let y = 95;
+                                const items = [
+                                    "Revisión de Niveles (Aceite, Refrigerante)",
+                                    "Inspección Visual de Neumáticos",
+                                    "Revisión de Frenos",
+                                    "Inspección de Luces e Intermitentes",
+                                    "Lubricación General del Chasis",
+                                    "Filtro de Aire - Limpieza/Cambio"
+                                ];
+                                
+                                items.forEach(t => {
+                                    pdf.rect(20, y - 4, 5, 5); // Empty checkbox
+                                    pdf.text(t, 30, y);
+                                    y += 10;
+                                });
+                                
+                                pdf.autoPrint();
+                                const blob = pdf.output('blob');
+                                const blobURL = URL.createObjectURL(blob);
+                                const iframe = document.createElement('iframe');
+                                iframe.style.display = 'none';
+                                iframe.src = blobURL;
+                                document.body.appendChild(iframe);
+                                iframe.onload = () => {
+                                   setTimeout(() => {
+                                      iframe.contentWindow?.print();
+                                   }, 500);
+                                };
+                            }
                         }}
                     >
                         <FileDown className="w-4 h-4 mr-2"/> Ver / Imprimir Pauta PDF
@@ -1398,17 +1566,14 @@ export default function OrdenesTrabajoDetail() {
 
       <Modal isOpen={isPausaModalOpen} onClose={() => setIsPausaModalOpen(false)} title="Motivo de Pausa">
          <div className="space-y-4">
-            <p className="text-sm text-slate-600 dark:text-slate-400">Seleccione un motivo oficial de pausa antes de detener el cronómetro y el trabajo.</p>
-            <select 
+            <p className="text-sm text-slate-600 dark:text-slate-400">Ingrese un motivo oficial de pausa antes de detener el cronómetro y el trabajo.</p>
+            <input 
+               type="text"
                className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700"
+               placeholder="Ej: Aprobación de repuestos..."
                value={motivoPausaSeleccionado}
                onChange={(e) => setMotivoPausaSeleccionado(e.target.value)}
-            >
-               <option value="">Seleccionar motivo...</option>
-               {tiposPausa.map(t => (
-                  <option key={t.id} value={t.id}>{t.nombre}</option>
-               ))}
-            </select>
+            />
             <div className="flex gap-2 justify-end">
                <Button variant="outline" onClick={() => setIsPausaModalOpen(false)}>Cancelar</Button>
                <Button className="bg-amber-500 hover:bg-amber-600 text-white" onClick={confirmarPausa} disabled={!motivoPausaSeleccionado}>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
-import { ChevronLeft, ChevronRight, Clock, GripVertical, Search, AlertCircle, Plus, Calendar as CalendarIcon, Check, MoreHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, GripVertical, Search, AlertCircle, Plus, Calendar as CalendarIcon, Check, MoreHorizontal, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { CrearOTModal } from '../../components/flota/CrearOTModal';
@@ -739,6 +739,13 @@ export default function PizarraProgramacion() {
      );
   };
 
+  const atrasadasOts = ordenesTrabajo.filter(ot => {
+    if (ot.estado !== 'PROGRAMADA') return false;
+    const progDate = ot.fechaProgramada || ot.fechaCreacion;
+    if (!progDate) return false;
+    return new Date(progDate).getTime() < new Date().getTime();
+  });
+
   return (
     <div className="h-[calc(100vh-4rem)] -mt-6 -mx-6 flex bg-white dark:bg-slate-900 font-sans text-slate-800 dark:text-slate-200">
       
@@ -780,7 +787,7 @@ export default function PizarraProgramacion() {
                         }}
                         className={cn("w-6 h-6 flex items-center justify-center rounded-full mx-auto cursor-pointer transition-colors", 
                            d === currentDate.getDate() && viewMode === 'Día' ? "bg-blue-600 text-white font-bold" : "hover:bg-slate-200 dark:hover:bg-slate-700",
-                           d === 14 && viewMode !== 'Día' ? "ring-2 ring-blue-500 font-bold" : "" // Highlight today if not selected
+                           d === new Date().getDate() && currentDate.getMonth() === new Date().getMonth() && viewMode !== 'Día' ? "ring-2 ring-blue-500 font-bold" : "" // Highlight today if not selected
                         )}
                       >
                         {d}
@@ -934,6 +941,25 @@ export default function PizarraProgramacion() {
                <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-600 dark:text-slate-400"><CalendarIcon className="w-5 h-5" /></button>
             </div>
          </div>
+
+         {atrasadasOts.length > 0 && (
+           <div className="bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-900 px-4 py-3 flex items-center justify-between shrink-0">
+             <div className="flex items-center gap-2 text-red-800 dark:text-red-400">
+               <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+               <p className="text-sm font-medium">
+                 {atrasadasOts.length} {atrasadasOts.length === 1 ? 'orden de trabajo programada está retrasada' : 'órdenes de trabajo programadas están retrasadas'} respecto a su hora de inicio.
+               </p>
+             </div>
+             <button 
+               onClick={() => {
+                 setDayEventsModal({ isOpen: true, date: Date.now(), events: atrasadasOts });
+               }}
+               className="text-xs font-semibold bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 px-3 py-1.5 rounded-md hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
+             >
+               Ver Detalles
+             </button>
+           </div>
+         )}
 
          {/* Calendar Views */}
          <div className="flex-1 overflow-hidden flex flex-col bg-slate-50/30 dark:bg-slate-950/50">
