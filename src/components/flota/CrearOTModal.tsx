@@ -219,11 +219,11 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
             </div>
             <div>
               <label className="block text-sm font-medium">Kilometraje Apertura</label>
-              <input type="number" name="kilometrajeApertura" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
+              <input type="number" name="kilometrajeApertura" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={formData.kilometrajeApertura || ''} onChange={handleChange} />
             </div>
             <div>
               <label className="block text-sm font-medium">Prioridad</label>
-              <select name="prioridad" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} defaultValue="MEDIA">
+              <select name="prioridad" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} value={formData.prioridad || "MEDIA"}>
                 <option value="BAJA">Baja</option>
                 <option value="MEDIA">Media</option>
                 <option value="ALTA">Alta</option>
@@ -248,14 +248,14 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
               <>
                   <div>
                     <label className="block text-sm font-medium">Pauta Mantenimiento</label>
-                    <select name="pauta" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange}>
+                    <select name="pauta" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={formData.pauta || ''} onChange={handleChange}>
                         <option value="">---------</option>
                         {filteredPautas.map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium">Kit Repuestos</label>
-                    <select name="kitRepuestos" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange}>
+                    <select name="kitRepuestos" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={formData.kitRepuestos || ''} onChange={handleChange}>
                         <option value="">---------</option>
                         {kitsRepuesto.map(k => <option key={k.id} value={k.nombre}>{k.nombre}</option>)}
                     </select>
@@ -266,14 +266,14 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
                <>
                 <div>
                   <label className="block text-sm font-medium">Tipo de Falla</label>
-                  <select name="tipoFalla" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange}>
+                  <select name="tipoFalla" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={formData.tipoFalla || ''} onChange={handleChange}>
                       <option value="">---------</option>
                       {filteredTiposFalla.map(tf => <option key={tf.id} value={tf.nombre}>{tf.nombre}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium">Síntomas</label>
-                  <input type="text" name="sintomas" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
+                  <input type="text" name="sintomas" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={formData.sintomas || ''} onChange={handleChange} />
                 </div>
                </>
             )}
@@ -281,7 +281,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
               <>
                 <div>
                   <label className="block text-sm font-medium">Inspección Tren Motriz</label>
-                  <select name="inspeccionTrenMotriz" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange}>
+                  <select name="inspeccionTrenMotriz" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={formData.inspeccionTrenMotriz || ''} onChange={handleChange}>
                      <option value="">Configuración Ejes...</option>
                      <option value="4x2">4x2 (6 Ruedas)</option>
                      <option value="6x2">6x2 (8 Ruedas)</option>
@@ -291,14 +291,14 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
                 </div>
                 <div>
                   <label className="block text-sm font-medium">Eje</label>
-                  <input type="text" name="eje" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
+                  <input type="text" name="eje" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={formData.eje || ''} onChange={handleChange} />
                 </div>
               </>
             )}
             {(formData.tipo.includes('NEUMATICOS')) && (
                 <div>
                     <label className="block text-sm font-medium">Presión Neumático (PSI)</label>
-                    <input type="number" name="presionNeumatico" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
+                    <input type="number" name="presionNeumatico" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={formData.presionNeumatico || ''} onChange={handleChange} />
                 </div>
             )}
           </div>
@@ -337,27 +337,27 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
              <div>
                <label className="block text-sm font-medium">Proveedor</label>
-               <input type="text" name="proveedor" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
+               <input type="text" name="proveedor" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={formData.proveedor || ''} onChange={handleChange} />
              </div>
              <div>
                <label className="block text-sm font-medium">Empresa Externa</label>
-               <input type="text" name="empresaExterna" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
+               <input type="text" name="empresaExterna" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={formData.empresaExterna || ''} onChange={handleChange} />
              </div>
              <div>
                <label className="block text-sm font-medium">RUT Empresa</label>
-               <input type="text" name="rutEmpresa" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
+               <input type="text" name="rutEmpresa" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={formData.rutEmpresa || ''} onChange={handleChange} />
              </div>
              <div>
                <label className="block text-sm font-medium">Valor HH</label>
-               <input type="number" name="valorHH" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
+               <input type="number" name="valorHH" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={formData.valorHH || ''} onChange={handleChange} />
              </div>
              <div>
                 <label className="block text-sm font-medium">Presupuesto Aprobado</label>
-                <input type="number" name="presupuestoAprobado" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
+                <input type="number" name="presupuestoAprobado" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={formData.presupuestoAprobado || ''} onChange={handleChange} />
              </div>
              <div>
                 <label className="block text-sm font-medium">Observaciones</label>
-                <input type="text" name="observaciones" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} />
+                <input type="text" name="observaciones" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={formData.observaciones || ''} onChange={handleChange} />
              </div>
           </div>
         ))}
