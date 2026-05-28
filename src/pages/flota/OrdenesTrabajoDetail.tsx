@@ -159,45 +159,7 @@ export default function OrdenesTrabajoDetail() {
                  return;
             }
             updates.kilometrajeCierre = kmVal;
-            
-            // REGLA DE ORO: 1. Impacto en Vehículo (Odómetro) y 2. Pizarra (Reset)
-            const { data: dbVehiculo, error: selectErr } = await supabase
-                .from('vehiculo')
-                .select('*')
-                .eq('id', ot.vehiculoId)
-                .single();
-
-            if (!selectErr && dbVehiculo) {
-                let updatedData: any = {};
-                let updatedDetalles = dbVehiculo.detalles || {};
-                
-                updatedData.kilometraje_actual = kmVal;
-                updatedData.updated_at = now;
-
-                if (ot.tipo === 'PREVENTIVA' || ot.tipo === 'PREVENTIVA_NEUMATICOS' || ot.tipo === 'MANTENIMIENTO_PREVENTIVO' || ot.tipo === 'MANTENIMIENTO' || ot.tipo === 'INSPECCION' || ot.tipo === 'CORRECTIVA') {
-                    updatedData.km_ultima_mantencion = kmVal;
-                    updatedData.fecha_ultima_mantencion = now;
-                    updatedDetalles.km_ultima_mantencion = kmVal;
-                    updatedDetalles.fecha_ultima_mantencion = now;
-                    updatedDetalles.tipo_ult_pauta = ot.pauta || ot.tipo;
-                    updatedData.detalles = updatedDetalles;
-                }
-
-                await supabase.from('vehiculo').update(updatedData).eq('id', ot.vehiculoId);
-            }
-
-            // REGLA DE ORO: 3. Impacto en Inventario (Descuento)
-            if (ot.insumos && ot.insumos.length > 0) {
-                for (const insumo of ot.insumos) {
-                    if (insumo.repuesto_id && insumo.repuesto_id.length > 20) {
-                        const { data: repData, error: repErr } = await supabase.from('repuesto').select('stock_actual').eq('id', insumo.repuesto_id).single();
-                        if (!repErr && repData) {
-                            const newStock = Math.max(0, (repData.stock_actual || 0) - (insumo.cantidad || 0));
-                            await supabase.from('repuesto').update({ stock_actual: newStock, updated_at: now }).eq('id', insumo.repuesto_id);
-                        }
-                    }
-                }
-            }
+            // The Supabase trigger 'procesar_cierre_ot' will handle the Vehicle updating properly.
         }
 
         let comentario = `Cambio de estado a ${estadoStr}`;
@@ -295,52 +257,10 @@ export default function OrdenesTrabajoDetail() {
 
         setIsUpdatingDb(true);
         try {
-            const now = new Date().toISOString();
-
-            // REGLA DE ORO: 1. Impacto en Vehículo (Odómetro) y 2. Pizarra (Reset)
-            const { data: dbVehiculo, error: selectErr } = await supabase
-                .from('vehiculo')
-                .select('*')
-                .eq('id', ot.vehiculoId)
-                .single();
-
-            if (!selectErr && dbVehiculo) {
-                let updatedData: any = {};
-                let updatedDetalles = dbVehiculo.detalles || {};
-                
-                updatedData.kilometraje_actual = kmVal;
-                updatedData.updated_at = now;
-
-                if (ot.tipo === 'PREVENTIVA' || ot.tipo === 'PREVENTIVA_NEUMATICOS' || ot.tipo === 'MANTENIMIENTO_PREVENTIVO' || ot.tipo === 'MANTENIMIENTO' || ot.tipo === 'INSPECCION' || ot.tipo === 'CORRECTIVA') {
-                    // Update root variables to reset Pizarra
-                    updatedData.km_ultima_mantencion = kmVal;
-                    updatedData.fecha_ultima_mantencion = now;
-                    
-                    // Update detalles object as fallback
-                    updatedDetalles.km_ultima_mantencion = kmVal;
-                    updatedDetalles.fecha_ultima_mantencion = now;
-                    updatedDetalles.tipo_ult_pauta = ot.pauta || ot.tipo;
-                    
-                    updatedData.detalles = updatedDetalles;
-                }
-
-                await supabase.from('vehiculo').update(updatedData).eq('id', ot.vehiculoId);
-            }
-
-            // REGLA DE ORO: 3. Impacto en Inventario (Descuento)
-            if (ot.insumos && ot.insumos.length > 0) {
-                for (const insumo of ot.insumos) {
-                    if (insumo.repuesto_id && insumo.repuesto_id.length > 20) { // Valid UUID expected
-                        const { data: repData, error: repErr } = await supabase.from('repuesto').select('stock_actual').eq('id', insumo.repuesto_id).single();
-                        if (!repErr && repData) {
-                            const newStock = Math.max(0, (repData.stock_actual || 0) - (insumo.cantidad || 0));
-                            await supabase.from('repuesto').update({ stock_actual: newStock, updated_at: now }).eq('id', insumo.repuesto_id);
-                        }
-                    }
-                }
-            }
-
             // Continuar con actualizacion en AppContext para UI y Backend
+            // Nota: Se delega a Supabase Trigger / Lógica central la transacción 
+            // de vehículo e inventario
+            const now = new Date().toISOString();
             await actualizarOrdenTrabajo({
                 ...ot,
                 estado: nuevoEstado as any,

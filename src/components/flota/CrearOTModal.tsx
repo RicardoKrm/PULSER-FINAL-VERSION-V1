@@ -149,6 +149,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
       inspeccionTrenMotriz: formData.inspeccionTrenMotriz,
       eje: formData.eje,
       presionNeumatico: formData.presionNeumatico ? Number(formData.presionNeumatico) : undefined,
+      tecnicoResponsable: formData.tecnicoResponsable,
       personalOperativo: formData.personalOperativo,
       proveedor: formData.proveedor,
       empresaExterna: formData.empresaExterna,
@@ -306,13 +307,20 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
         {renderSection("ASIGNACIÓN Y TIEMPO", (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium">Personal Operativo</label>
-              <select name="personalOperativo" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} required>
+              <label className="block text-sm font-medium">Responsable Principal</label>
+              <select name="tecnicoResponsable" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} value={formData.tecnicoResponsable || ''} required>
                   <option value="">---------</option>
                   {personalOperativoList.map(m => <option key={m.id} value={m.name}>{m.name} ({m.roleBadgeText || m.rol?.nombre})</option>)}
               </select>
             </div>
             <div>
+              <label className="block text-sm font-medium">Personal de Apoyo / Ayudante (Opcional)</label>
+              <select name="personalOperativo" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} value={formData.personalOperativo || ''}>
+                  <option value="">Ninguno</option>
+                  {personalOperativoList.map(m => <option key={m.id} value={m.name}>{m.name} ({m.roleBadgeText || m.rol?.nombre})</option>)}
+              </select>
+            </div>
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium">Fecha y Hora Programada</label>
               <input 
                 type="datetime-local" 
