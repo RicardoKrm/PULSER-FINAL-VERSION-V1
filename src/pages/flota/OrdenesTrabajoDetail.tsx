@@ -1487,13 +1487,16 @@ export default function OrdenesTrabajoDetail() {
       <Modal isOpen={isPausaModalOpen} onClose={() => setIsPausaModalOpen(false)} title="Motivo de Pausa">
          <div className="space-y-4">
             <p className="text-sm text-slate-600 dark:text-slate-400">Ingrese un motivo oficial de pausa antes de detener el cronómetro y el trabajo.</p>
-            <input 
-               type="text"
-               className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700"
-               placeholder="Ej: Aprobación de repuestos..."
+            <select
+               className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700 bg-white dark:text-white"
                value={motivoPausaSeleccionado}
                onChange={(e) => setMotivoPausaSeleccionado(e.target.value)}
-            />
+            >
+               <option value="">Seleccione un motivo...</option>
+               {tiposPausa.map(tp => (
+                  <option key={tp.id} value={tp.id}>{tp.nombre}</option>
+               ))}
+            </select>
             <div className="flex gap-2 justify-end">
                <Button variant="outline" onClick={() => setIsPausaModalOpen(false)}>Cancelar</Button>
                <Button className="bg-amber-500 hover:bg-amber-600 text-white" onClick={confirmarPausa} disabled={!motivoPausaSeleccionado}>

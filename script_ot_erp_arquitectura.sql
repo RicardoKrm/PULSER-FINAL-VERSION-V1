@@ -94,6 +94,7 @@ CREATE OR REPLACE FUNCTION procesar_cierre_ot()
 RETURNS TRIGGER AS $$
 DECLARE
     r RECORD;
+    v_tipo_mant TEXT;
 BEGIN
     -- Cuando la OT se pasa a FINALIZADA
     IF NEW.estado = 'FINALIZADA' AND (OLD.estado IS DISTINCT FROM 'FINALIZADA') THEN
@@ -117,9 +118,16 @@ BEGIN
         -- 3. RESETEAR LA PIZARRA DE MANTENIMIENTO (SÓLO PREVENTIVAS)
         -- Esto es lo que hace que la alerta roja/amarilla vuelva a verde en el Dashboard
         IF NEW.tipo = 'PREVENTIVA' AND NEW.pauta_mantenimiento_id IS NOT NULL THEN
+            
+            -- Obtener el nombre del tipo de mantencion de la pauta
+            SELECT nombre INTO v_tipo_mant
+            FROM public.pauta_mantenimiento
+            WHERE id = NEW.pauta_mantenimiento_id;
+            
             UPDATE public.vehiculo
             SET km_ultima_mantencion = NEW.kilometraje_cierre,
-                fecha_ultima_mantencion = CURRENT_DATE
+                fecha_ultima_mantencion = CURRENT_DATE::text,
+                tipo_ultimo_mant = v_tipo_mant
             WHERE id = NEW.vehiculo_id;
         END IF;
 
