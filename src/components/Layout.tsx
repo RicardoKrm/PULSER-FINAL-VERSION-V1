@@ -144,32 +144,38 @@ export default function Layout() {
     // If no role at all, default to full nav
     if (!roleName) return navigation;
     
-    // Super Admins and Admin see everything
+    const perms = profile?.rol?.permisos || [];
+
+    // Priorize DB explicit permissions if they are configured
+    if (Array.isArray(perms) && perms.length > 0) {
+      return navigation.reduce((acc, item) => {
+        if (perms.includes(item.title)) {
+          let filteredSubmodules = item.submodules;
+          if (item.submodules) {
+            filteredSubmodules = item.submodules.filter((sub) => 
+               perms.includes(`${item.title}:${sub.title}`) || sub.title === 'Gestión de Rutas'
+            );
+          }
+          acc.push({ ...item, submodules: filteredSubmodules && filteredSubmodules.length > 0 ? filteredSubmodules : undefined });
+        }
+        return acc;
+      }, [] as typeof navigation);
+    }
+    
+    // Fallback: if no DB permissions configured, Super Admins can see everything EXCEPT 'Crear Servicio' by default
     if (['Súper Administrador', 'Super Administrador', 'Administrador', 'Admin'].includes(roleName)) {
-      return navigation;
+      return navigation.map(item => {
+        if (item.submodules) {
+          return {
+            ...item,
+            submodules: item.submodules.filter(sub => sub.title !== 'Crear Servicio')
+          };
+        }
+        return item;
+      });
     }
 
-    const perms = profile?.rol?.permisos || [];
-    if (!Array.isArray(perms) || perms.length === 0) return [];
-
-    return navigation.reduce((acc, item) => {
-      // Check if the user has access to the main module
-      if (perms.includes(item.title)) {
-        // Filter submodules if the item has them
-        let filteredSubmodules = item.submodules;
-        if (item.submodules) {
-          filteredSubmodules = item.submodules.filter((sub) => 
-            perms.includes(`${item.title}:${sub.title}`) || sub.title === 'Gestión de Rutas'
-          );
-        }
-        
-        acc.push({
-          ...item,
-          submodules: filteredSubmodules && filteredSubmodules.length > 0 ? filteredSubmodules : undefined
-        });
-      }
-      return acc;
-    }, [] as typeof navigation);
+    return [];
   }, [profile?.rol, currentUser?.cargo, navigation]);
 
   // Expand parent menu if child is active on load

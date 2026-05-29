@@ -50,12 +50,13 @@ export default function ReservasTurismo() {
           rut_empresa: dbR.cliente_rut || ''
         },
         pasajeros: dbR.detalles?.pasajeros || { nombre: '', telefono: '', cantidad: dbR.pasajeros_cantidad || 1 },
+        pasajerosList: dbR.detalles?.pasajerosList || [],
         lugares: {
           origen: dbR.origen || '',
           destino: dbR.destino || '',
           numeroVuelo: dbR.detalles?.lugares?.numeroVuelo || ''
         },
-        logistica: dbR.detalles?.logistica || { maletasGrandes: 0, maletasChicas: 0, sillaBebe: false, cantidadSillas: 0 },
+        logistica: dbR.detalles?.logistica || { maletasGrandes: 0, maletasChicas: 0, sillaBebe: false, alzador: false, cantidadSillas: 0 },
         servicio: dbR.detalles?.servicio || '',
         tipoVehiculo: dbR.detalles?.tipoVehiculo || 'SUV',
         fecha: dbR.fecha_reserva ? new Date(dbR.fecha_reserva).toISOString().split('T')[0] : '',
@@ -70,8 +71,10 @@ export default function ReservasTurismo() {
           formaPago: 'Efectivo',
           tipoDocumento: 'Boleta',
           cobrado: false,
-          montoNeto: 0
+          montoNeto: 0,
+          fechaDeposito: ''
         },
+        archivosAdicionales: dbR.detalles?.archivosAdicionales || [],
         comentarios: dbR.detalles?.comentarios || { conductor: '', interno: '' },
         estado: dbR.estado_viaje?.toLowerCase() || 'pendiente',
         auditLogs: dbR.detalles?.auditLogs || []
@@ -148,8 +151,9 @@ export default function ReservasTurismo() {
     categoria: 'Web' as ReservaTurismo['categoria'],
     cliente: { nombre: '', email: '', telefono: '', dni_pasaporte: '', rut_empresa: '' },
     pasajeros: { nombre: '', telefono: '', cantidad: 1 },
+    pasajerosList: [],
     lugares: { origen: '', destino: '', numeroVuelo: '' },
-    logistica: { maletasGrandes: 0, maletasChicas: 0, sillaBebe: false, cantidadSillas: 0 },
+    logistica: { maletasGrandes: 0, maletasChicas: 0, sillaBebe: false, alzador: false, cantidadSillas: 0 },
     servicio: '',
     tipoVehiculo: 'SUV' as ReservaTurismo['tipoVehiculo'],
     fecha: '',
@@ -162,8 +166,10 @@ export default function ReservasTurismo() {
       porcentajeComision: 10,
       formaPago: 'Efectivo' as ReservaTurismo['finanzas']['formaPago'],
       tipoDocumento: 'Boleta' as ReservaTurismo['finanzas']['tipoDocumento'],
-      cobrado: false
+      cobrado: false,
+      fechaDeposito: ''
     },
+    archivosAdicionales: [],
     comentarios: { conductor: '', interno: '' }
   };
 
@@ -273,6 +279,8 @@ export default function ReservasTurismo() {
       detalles: {
         cliente: { dni_pasaporte: formReserva.cliente.dni_pasaporte },
         pasajeros: formReserva.pasajeros,
+        pasajerosList: formReserva.pasajerosList,
+        archivosAdicionales: formReserva.archivosAdicionales,
         lugares: formReserva.lugares,
         logistica: formReserva.logistica,
         servicio: formReserva.servicio,
@@ -545,6 +553,16 @@ export default function ReservasTurismo() {
                              </div>
                              <span className="font-bold">{reservaSeleccionada.pasajeros.cantidad} PAX</span>
                           </div>
+                          {reservaSeleccionada.pasajerosList && reservaSeleccionada.pasajerosList.length > 0 && (
+                            <div className="bg-slate-100 dark:bg-slate-900/50 p-2 rounded max-h-[100px] overflow-y-auto">
+                              {reservaSeleccionada.pasajerosList.map((p, i) => (
+                                <div key={i} className="text-[10px] mb-1 pb-1 border-b dark:border-slate-800 last:border-0 last:mb-0 last:pb-0">
+                                  <b>{p.nombre}</b> <span className="text-slate-500">({p.telefono})</span><br/>
+                                  Ruta: {p.origen} → {p.destino}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                           <div className="flex justify-between items-center text-sm">
                              <div className="flex items-center text-slate-600 dark:text-slate-400">
                                 <Luggage className="h-4 w-4 mr-2 text-orange-400" /> Maletas Grandes (23K)
@@ -559,9 +577,14 @@ export default function ReservasTurismo() {
                           </div>
                           <div className="flex justify-between items-center text-sm">
                              <div className="flex items-center text-slate-600 dark:text-slate-400">
-                                <Baby className="h-4 w-4 mr-2 text-pink-400" /> Sillas Bebé
+                                <Baby className="h-4 w-4 mr-2 text-pink-400" /> Sillas / Alzador
                              </div>
-                             <span className="font-bold">{reservaSeleccionada.logistica.sillaBebe ? `SÍ (${reservaSeleccionada.logistica.cantidadSillas})` : 'NO'}</span>
+                             <span className="font-bold text-[10px]">
+    {[
+      reservaSeleccionada.logistica.sillaBebe ? `Silla(${reservaSeleccionada.logistica.cantidadSillas})` : '',
+      reservaSeleccionada.logistica.alzador ? `Alzador(${reservaSeleccionada.logistica.cantidadSillas})` : ''
+    ].filter(Boolean).join(' | ') || 'NO'}
+   </span>
                           </div>
                        </div>
                     </section>
@@ -651,9 +674,19 @@ export default function ReservasTurismo() {
                                <span className="font-bold">{reservaSeleccionada.finanzas.folioFactura || 'Sin Folio'}</span>
                             </div>
                             <div className="flex justify-between items-center text-xs">
-                               <span className="text-slate-500 dark:text-slate-400">Pago:</span>
-                               <span className="font-bold underline decoration-blue-400">{reservaSeleccionada.finanzas.formaPago}</span>
-                            </div>
+      <span className="text-slate-500 dark:text-slate-400">Pago:</span>
+      <span className="font-bold underline decoration-blue-400">{reservaSeleccionada.finanzas.formaPago}</span>
+   </div>
+   <div className="flex justify-between items-center text-xs">
+      <span className="text-slate-500 dark:text-slate-400">Estado de Pago:</span>
+      <span className={`font-bold ${reservaSeleccionada.finanzas.cobrado ? 'text-green-600' : 'text-orange-500'}`}>{reservaSeleccionada.finanzas.cobrado ? 'PAGADO' : 'PENDIENTE'}</span>
+   </div>
+   {reservaSeleccionada.finanzas.formaPago === 'Transferencia' && reservaSeleccionada.finanzas.fechaDeposito && (
+      <div className="flex justify-between items-center text-xs">
+         <span className="text-slate-500 dark:text-slate-400">Fecha Depósito:</span>
+         <span className="font-bold">{reservaSeleccionada.finanzas.fechaDeposito}</span>
+      </div>
+   )}
                             <div className="flex justify-between items-center pt-2 border-t mt-2">
                                <label className="flex items-center text-xs font-bold gap-2">
                                   <input type="checkbox" checked={reservaSeleccionada.finanzas.cobrado} readOnly className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-green-600 focus:ring-green-500 dark:text-slate-100" />
@@ -664,7 +697,19 @@ export default function ReservasTurismo() {
                                 )}
                             </div>
                          </div>
-                         <Button className="w-full bg-blue-600 hover:bg-blue-700 shadow-md">
+                         {reservaSeleccionada.archivosAdicionales && reservaSeleccionada.archivosAdicionales.length > 0 && (
+      <div className="pt-2 border-t dark:border-slate-800 space-y-2">
+         <span className="text-[9px] font-bold text-slate-500 uppercase">Documentos / Gastos Adjuntos</span>
+         <div className="grid grid-cols-1 gap-1">
+           {reservaSeleccionada.archivosAdicionales.map((arch, index) => (
+              <a key={index} href={arch.url} target="_blank" rel="noopener noreferrer" className="text-[10px] flex items-center gap-1 text-blue-600 hover:underline">
+                 <FileText className="h-3 w-3" /> {arch.nombre}
+              </a>
+           ))}
+         </div>
+      </div>
+   )}
+   <Button className="w-full bg-blue-600 hover:bg-blue-700 shadow-md">
                            <FileText className="h-4 w-4 mr-2" /> Emitir SII (Komer)
                          </Button>
                       </div>
@@ -690,7 +735,7 @@ export default function ReservasTurismo() {
             <CardHeader className="flex flex-row items-center justify-between border-b bg-blue-600 text-white px-6 py-4">
               <div className="flex items-center gap-3">
                  <MapPin className="h-6 w-6" />
-                 <CardTitle className="text-xl">Formulario de Agendamiento Maestro</CardTitle>
+                 <CardTitle className="text-xl">Formulario de Reserva</CardTitle>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setMostrarFormulario(false)} className="text-white hover:bg-blue-700 rounded-full">
                 <XCircle className="h-6 w-6" />
@@ -716,9 +761,9 @@ export default function ReservasTurismo() {
                 {/* Bloque 1: Cliente y Categoría */}
                 <div className="p-6 grid md:grid-cols-3 gap-6 bg-slate-50 dark:bg-slate-900/50">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Categoría de Servicio</label>
+                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Categoría de Reserva</label>
                     <div className="grid grid-cols-2 gap-2">
-                      {['Web', 'Minera', 'Extranjero', 'Operador'].map((cat) => (
+                      {['Web', 'Whatsapp'].map((cat) => (
                         <button
                           key={cat}
                           type="button"
@@ -755,7 +800,7 @@ export default function ReservasTurismo() {
                       <div className="relative group">
                          <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500 focus-within:text-blue-500" />
                          <input 
-                          type="email" placeholder="Email de Facturación"
+                          type="email" placeholder="Email de Facturación (Opcional)"
                           className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                           value={formReserva.cliente.email}
                           onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, email: e.target.value}})}
@@ -764,7 +809,7 @@ export default function ReservasTurismo() {
                       <div className="relative group">
                          <Hash className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500 focus-within:text-blue-500" />
                          <input 
-                          type="text" required placeholder="DNI / Pasaporte"
+                          type="text" placeholder="DNI / Pasaporte / RUT Opcional"
                           className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                           value={formReserva.cliente.dni_pasaporte}
                           onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, dni_pasaporte: e.target.value}})}
@@ -788,22 +833,56 @@ export default function ReservasTurismo() {
                             onChange={(e) => setFormReserva({...formReserva, pasajeros: {...formReserva.pasajeros, nombre: e.target.value}})}
                          />
                          <div className="grid grid-cols-2 gap-3">
-                            <div className="relative">
-                               <Phone className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500" />
-                               <input 
-                                  type="text" required placeholder="Teléfono Pax"
-                                  className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-slate-50 dark:bg-slate-800/50 dark:text-slate-100"
-                                  value={formReserva.pasajeros.telefono}
-                                  onChange={(e) => setFormReserva({...formReserva, pasajeros: {...formReserva.pasajeros, telefono: e.target.value}})}
-                               />
+                             <div className="relative">
+                                <Phone className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500" />
+                                <input 
+                                   type="text" placeholder="Teléfono Pax (Opcional)"
+                                   className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-slate-50 dark:bg-slate-800/50 dark:text-slate-100"
+                                   value={formReserva.pasajeros.telefono}
+                                   onChange={(e) => setFormReserva({...formReserva, pasajeros: {...formReserva.pasajeros, telefono: e.target.value}})}
+                                />
+                             </div>
+                             <input 
+                                type="number" required placeholder="Total PAX" min="1"
+                                className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-slate-50 dark:bg-slate-800/50 text-center dark:text-slate-100"
+                                value={formReserva.pasajeros.cantidad}
+                                onChange={(e) => setFormReserva({...formReserva, pasajeros: {...formReserva.pasajeros, cantidad: parseInt(e.target.value)}})}
+                             />
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-200 dark:border-slate-800/50 mt-2">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-[10px] font-bold text-slate-500">Pasajeros Adicionales con Rutas</span>
+                              <button 
+                                type="button" 
+                                onClick={() => setFormReserva({...formReserva, pasajerosList: [...formReserva.pasajerosList, {nombre: '', telefono: '', origen: '', destino: ''}]})}
+                                className="text-[10px] font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded"
+                              >
+                                + Agregar Pasajero
+                              </button>
                             </div>
-                            <input 
-                               type="number" required placeholder="Total PAX" min="1"
-                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-slate-50 dark:bg-slate-800/50 text-center dark:text-slate-100"
-                               value={formReserva.pasajeros.cantidad}
-                               onChange={(e) => setFormReserva({...formReserva, pasajeros: {...formReserva.pasajeros, cantidad: parseInt(e.target.value)}})}
-                            />
-                         </div>
+                            {formReserva.pasajerosList.map((p, idx) => (
+                              <div key={idx} className="bg-white dark:bg-slate-900/30 p-2 rounded border border-slate-100 dark:border-slate-800 mb-2 relative">
+                                <button type="button" onClick={() => {
+                                  const list = [...formReserva.pasajerosList];
+                                  list.splice(idx, 1);
+                                  setFormReserva({...formReserva, pasajerosList: list});
+                                }} className="absolute top-1 right-1 text-red-500 hover:text-red-700">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                  </svg>
+                                </button>
+                                <div className="grid grid-cols-2 gap-2 mb-2 pr-6">
+                                  <input type="text" placeholder="Nombre" className="w-full px-2 py-1 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={p.nombre} onChange={e => { const l = [...formReserva.pasajerosList]; l[idx].nombre = e.target.value; setFormReserva({...formReserva, pasajerosList: l}); }} />
+                                  <input type="text" placeholder="Teléfono" className="w-full px-2 py-1 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={p.telefono} onChange={e => { const l = [...formReserva.pasajerosList]; l[idx].telefono = e.target.value; setFormReserva({...formReserva, pasajerosList: l}); }} />
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <input type="text" placeholder="Origen" className="w-full px-2 py-1 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={p.origen} onChange={e => { const l = [...formReserva.pasajerosList]; l[idx].origen = e.target.value; setFormReserva({...formReserva, pasajerosList: l}); }} />
+                                  <input type="text" placeholder="Destino" className="w-full px-2 py-1 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={p.destino} onChange={e => { const l = [...formReserva.pasajerosList]; l[idx].destino = e.target.value; setFormReserva({...formReserva, pasajerosList: l}); }} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                       </div>
                    </div>
 
@@ -880,7 +959,7 @@ export default function ReservasTurismo() {
                             onChange={(e) => setFormReserva({...formReserva, lugares: {...formReserva.lugares, destino: e.target.value}})}
                          />
                          <input 
-                            type="text" required placeholder="Nombre del Servicio (ej: City Tour Premium)"
+                            type="text" required placeholder="Nombre de la Reserva (ej: City Tour Premium)"
                             className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 font-bold dark:text-slate-100"
                             value={formReserva.servicio}
                             onChange={(e) => setFormReserva({...formReserva, servicio: e.target.value})}
@@ -967,30 +1046,78 @@ export default function ReservasTurismo() {
                                onChange={(e) => setFormReserva({...formReserva, finanzas: {...formReserva.finanzas, gastosAdicionales: parseInt(e.target.value)}})}
                             />
                          </div>
-                         <div className="flex flex-col gap-1">
-                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Forma de Pago</span>
-                            <select 
-                               required className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                               value={formReserva.finanzas.formaPago}
-                               onChange={(e) => setFormReserva({...formReserva, finanzas: {...formReserva.finanzas, formaPago: e.target.value as any}})}
-                            >
-                               <option value="Efectivo">Efectivo</option>
-                               <option value="Transferencia">Transferencia</option>
-                               <option value="Convenio PF">Convenio PF</option>
-                               <option value="Tarjeta">Tarjeta</option>
-                            </select>
-                         </div>
-                         <div className="flex flex-col gap-1">
-                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Tipo Documento</span>
-                            <select 
-                               required className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                               value={formReserva.finanzas.tipoDocumento}
-                               onChange={(e) => setFormReserva({...formReserva, finanzas: {...formReserva.finanzas, tipoDocumento: e.target.value as any}})}
-                            >
-                               <option value="Boleta">Boleta</option>
-                               <option value="Factura">Factura</option>
-                            </select>
-                         </div>
+                         <div className="col-span-2 grid grid-cols-2 gap-3">
+    <div className="flex flex-col gap-1">
+      <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Forma de Pago</span>
+      <select 
+          required className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
+          value={formReserva.finanzas.formaPago}
+          onChange={(e) => setFormReserva({...formReserva, finanzas: {...formReserva.finanzas, formaPago: e.target.value as any}})}
+      >
+          <option value="Efectivo">Efectivo</option>
+          <option value="Transferencia">Transferencia</option>
+          <option value="Convenio PF">Convenio PF</option>
+          <option value="Tarjeta">Tarjeta</option>
+      </select>
+    </div>
+    <div className="flex flex-col gap-1">
+      <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Tipo Documento</span>
+      <select 
+          required className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
+          value={formReserva.finanzas.tipoDocumento}
+          onChange={(e) => setFormReserva({...formReserva, finanzas: {...formReserva.finanzas, tipoDocumento: e.target.value as any}})}
+      >
+          <option value="Boleta">Boleta</option>
+          <option value="Factura">Factura</option>
+      </select>
+    </div>
+    {formReserva.finanzas.formaPago === 'Transferencia' && (
+      <div className="flex flex-col gap-1">
+        <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Fecha de Depósito</span>
+        <input 
+          type="date"
+          className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
+          value={formReserva.finanzas.fechaDeposito || ''}
+          onChange={(e) => setFormReserva({...formReserva, finanzas: {...formReserva.finanzas, fechaDeposito: e.target.value}})}
+        />
+      </div>
+    )}
+    <div className="flex flex-col gap-1 col-span-2">
+      <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Archivos Adjuntos (Fotos, PDF)</span>
+      <input 
+        type="file" multiple
+        className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
+        onChange={(e) => {
+          if (e.target.files) {
+            const newFiles = Array.from(e.target.files).map(f => ({
+              nombre: f.name,
+              url: URL.createObjectURL(f),
+              tipo: (f.type.includes('image') ? 'Imagen' : 'Documento') as 'Imagen'|'Documento'|'Otro'
+            }));
+            setFormReserva({...formReserva, archivosAdicionales: [...(formReserva.archivosAdicionales || []), ...newFiles]});
+          }
+        }}
+      />
+      {formReserva.archivosAdicionales && formReserva.archivosAdicionales.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {formReserva.archivosAdicionales.map((arch, index) => (
+            <div key={index} className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs flex items-center gap-2">
+              <span className="truncate max-w-[150px]">{arch.nombre}</span>
+              <button 
+                type="button"
+                className="text-red-500"
+                onClick={() => {
+                  const arr = [...formReserva.archivosAdicionales!];
+                  arr.splice(index, 1);
+                  setFormReserva({...formReserva, archivosAdicionales: arr});
+                }}
+              >×</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
                       </div>
                    </div>
 

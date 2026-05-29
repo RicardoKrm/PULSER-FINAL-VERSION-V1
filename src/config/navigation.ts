@@ -71,6 +71,7 @@ export const navigation = [
       { title: 'Contratos Clientes', icon: Briefcase, href: '/operaciones/contratos' },
       { title: 'Crear Servicio', icon: ClipboardList, href: '/operaciones/servicios' },
       { title: 'Reservas', icon: Calendar, href: '/operaciones/reservas' },
+      { title: 'Mantenedores', icon: ClipboardList, href: '/operaciones/mantenedores' },
       { title: 'Programación', icon: CalendarClock, href: '/operaciones/programacion' },
       { title: 'Control Documental', icon: FileCheck, href: '/operaciones/control-documental' },
       { title: 'Historial', icon: Activity, href: '/operaciones/historial' },

@@ -17,6 +17,7 @@ import FlotaAlertas from './pages/flota/Alertas';
 import Contratos from './pages/operaciones/Contratos';
 import CrearServicio from './pages/operaciones/CrearServicio';
 import Programacion from './pages/operaciones/Programacion';
+import Mantenedores from './pages/operaciones/Mantenedores';
 import Reservas from './pages/operaciones/Reservas';
 import GPS from './pages/operaciones/GPS';
 import PortalConductor from './pages/operaciones/PortalConductor';
@@ -95,6 +96,7 @@ const router = createBrowserRouter([
       { path: "operaciones/contratos", element: <Contratos /> },
       { path: "operaciones/servicios", element: <CrearServicio /> },
       { path: "operaciones/reservas", element: <Reservas /> },
+      { path: "operaciones/mantenedores", element: <Mantenedores /> },
       { path: "operaciones/programacion", element: <Programacion /> },
       { path: "operaciones/gps", element: <GPS /> },
       { path: "operaciones/portal-conductor", element: <PortalConductor /> },

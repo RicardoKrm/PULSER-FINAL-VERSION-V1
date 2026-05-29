@@ -24,7 +24,7 @@ export interface Collaborator {
 export interface ReservaTurismo {
   id: string;
   op: string;
-  categoria: 'Web' | 'Minera' | 'Extranjero' | 'Operador';
+  categoria: 'Web' | 'Whatsapp' | 'Minera' | 'Extranjero' | 'Operador';
   cliente: {
     nombre: string;
     email: string;
@@ -37,6 +37,12 @@ export interface ReservaTurismo {
     telefono: string;
     cantidad: number;
   };
+  pasajerosList: {
+    nombre: string;
+    telefono: string;
+    origen: string;
+    destino: string;
+  }[];
   lugares: {
     origen: string;
     destino: string;
@@ -46,10 +52,11 @@ export interface ReservaTurismo {
     maletasGrandes: number;
     maletasChicas: number;
     sillaBebe: boolean;
+    alzador: boolean;
     cantidadSillas: number;
   };
   servicio: string;
-  tipoVehiculo: 'SUV' | 'Van' | 'Sedán';
+  tipoVehiculo: 'Auto' | 'SUV' | 'Van' | 'Minibus' | 'Bus' | 'Otros';
   fecha: string;
   horaInicio: string;
   horaTermino: string;
@@ -66,6 +73,11 @@ export interface ReservaTurismo {
     folioFactura?: string;
     fechaDeposito?: string;
   };
+  archivosAdicionales?: {
+    nombre: string;
+    url: string;
+    tipo: 'Imagen' | 'Documento' | 'Otro';
+  }[];
   comentarios: {
     conductor: string;
     interno: string;
