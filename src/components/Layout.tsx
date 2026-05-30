@@ -146,23 +146,7 @@ export default function Layout() {
     
     const perms = profile?.rol?.permisos || [];
 
-    // Priorize DB explicit permissions if they are configured
-    if (Array.isArray(perms) && perms.length > 0) {
-      return navigation.reduce((acc, item) => {
-        if (perms.includes(item.title)) {
-          let filteredSubmodules = item.submodules;
-          if (item.submodules) {
-            filteredSubmodules = item.submodules.filter((sub) => 
-               perms.includes(`${item.title}:${sub.title}`) || sub.title === 'Gestión de Rutas'
-            );
-          }
-          acc.push({ ...item, submodules: filteredSubmodules && filteredSubmodules.length > 0 ? filteredSubmodules : undefined });
-        }
-        return acc;
-      }, [] as typeof navigation);
-    }
-    
-    // Fallback: if no DB permissions configured, Super Admins can see everything EXCEPT 'Crear Servicio' by default
+    // Super Admins can see everything by default EXCEPT 'Crear Servicio' (based on configuration)
     if (['Súper Administrador', 'Super Administrador', 'Administrador', 'Admin'].includes(roleName)) {
       return navigation.map(item => {
         if (item.submodules) {
@@ -173,6 +157,22 @@ export default function Layout() {
         }
         return item;
       });
+    }
+
+    // Explicit permissions configured in DB
+    if (Array.isArray(perms) && perms.length > 0) {
+      return navigation.reduce((acc, item) => {
+        if (perms.includes(item.title)) {
+          let filteredSubmodules = item.submodules;
+          if (item.submodules) {
+            filteredSubmodules = item.submodules.filter((sub) => 
+               perms.includes(`${item.title}:${sub.title}`) || sub.title === 'Gestión de Rutas' || sub.title === 'Mantenedores'
+            );
+          }
+          acc.push({ ...item, submodules: filteredSubmodules && filteredSubmodules.length > 0 ? filteredSubmodules : undefined });
+        }
+        return acc;
+      }, [] as typeof navigation);
     }
 
     return [];

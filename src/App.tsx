@@ -75,6 +75,7 @@ import { ThemeProvider } from './components/ThemeProvider';
 import { CompanyProvider } from './contexts/CompanyContext';
 import { AppProvider } from './context/AppContext';
 import { AuthProvider } from './context/AuthContext';
+import { Toaster } from 'react-hot-toast';
 
 import Login from './pages/Login';
 
@@ -168,6 +169,7 @@ export default function App() {
         <CompanyProvider>
           <AppProvider>
             <RouterProvider router={router} />
+            <Toaster position="top-right" />
           </AppProvider>
         </CompanyProvider>
       </AuthProvider>

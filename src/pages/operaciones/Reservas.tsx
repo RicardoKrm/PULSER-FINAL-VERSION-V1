@@ -153,9 +153,10 @@ export default function ReservasTurismo() {
     pasajeros: { nombre: '', telefono: '', cantidad: 1 },
     pasajerosList: [],
     lugares: { origen: '', destino: '', numeroVuelo: '' },
-    logistica: { maletasGrandes: 0, maletasChicas: 0, sillaBebe: false, alzador: false, cantidadSillas: 0 },
+    logistica: { maletasGrandes: 0, maletasChicas: 0, sillaBebe: false, alzador: false, cantidadSillas: 0, cantidadAlzadores: 0 },
     servicio: '',
-    tipoVehiculo: 'SUV' as ReservaTurismo['tipoVehiculo'],
+    tipoVehiculo: 'SUV' as ReservaTurismo['tipoVehiculo'] | 'Mini Bus' | 'Bus',
+    enlaceMapa: '',
     fecha: '',
     horaInicio: '',
     conductorId: '',
@@ -184,6 +185,41 @@ export default function ReservasTurismo() {
   useEffect(() => {
     localStorage.setItem('formReservaDraft', JSON.stringify(formReserva));
   }, [formReserva]);
+
+  const empresasConvenio = useMemo(() => Array.from(new Set(reservasTurismo.map(r => r.cliente.nombre).filter(Boolean))), [reservasTurismo]);
+  const lugaresComunes = useMemo(() => {
+    const list = new Set([...reservasTurismo.map(r => r.lugares.origen), ...reservasTurismo.map(r => r.lugares.destino)].filter(Boolean));
+    ['Aeropuerto', 'Terminal de Bus', 'Nacional', 'Internacional'].forEach(l => list.add(l));
+    return Array.from(list);
+  }, [reservasTurismo]);
+
+  const telefonosComunes = useMemo(() => {
+    const list = new Set(reservasTurismo.map(r => r.pasajeros.telefono).filter(Boolean));
+    return Array.from(list);
+  }, [reservasTurismo]);
+
+  const handlePhoneBlur = () => {
+    if (!formReserva.pasajeros.telefono) return;
+    const match = reservasTurismo.find(r => r.pasajeros.telefono === formReserva.pasajeros.telefono);
+    if (match) {
+      setFormReserva(prev => ({
+        ...prev,
+        pasajeros: {
+          ...prev.pasajeros,
+          nombre: prev.pasajeros.nombre || match.pasajeros.nombre
+        },
+        cliente: {
+          ...prev.cliente,
+          nombre: prev.cliente.nombre || match.cliente.nombre
+        },
+        lugares: {
+          ...prev.lugares,
+          origen: prev.lugares.origen || match.lugares.origen,
+          destino: prev.lugares.destino || match.lugares.destino
+        }
+      }));
+    }
+  };
 
   const [userCompanies, setUserCompanies] = useState<{id: string, nombre: string}[]>([]);
   const [newEmpresaId, setNewEmpresaId] = useState('');
@@ -285,6 +321,7 @@ export default function ReservasTurismo() {
         logistica: formReserva.logistica,
         servicio: formReserva.servicio,
         tipoVehiculo: formReserva.tipoVehiculo,
+        enlaceMapa: (formReserva as any).enlaceMapa,
         horaInicio: formReserva.horaInicio,
         finanzas: {
           ...formReserva.finanzas,
@@ -782,22 +819,40 @@ export default function ReservasTurismo() {
                   <div className="space-y-2 col-span-2">
                     <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Datos del Cliente Reservante</label>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="relative group">
+                      <div className="relative group col-span-2">
+                         <Phone className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500 focus-within:text-blue-500" />
+                         <input 
+                            type="text" placeholder="Teléfono Pax (buscar...)"
+                            list="telefonos-list"
+                            className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm font-bold bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                            value={formReserva.pasajeros.telefono}
+                            onChange={(e) => setFormReserva({...formReserva, pasajeros: {...formReserva.pasajeros, telefono: e.target.value}})}
+                            onBlur={handlePhoneBlur}
+                         />
+                         <datalist id="telefonos-list">
+                           {telefonosComunes.map((tel, idx) => <option key={idx} value={tel} />)}
+                         </datalist>
+                      </div>
+                      <div className="relative group col-span-2 sm:col-span-1">
                         <Users className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500 group-focus-within:text-blue-500" />
                         <input 
                           type="text" required placeholder="Nombre / Empresa Principal"
+                          list="empresas-list"
                           className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                           value={formReserva.cliente.nombre}
                           onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, nombre: e.target.value}})}
                         />
+                        <datalist id="empresas-list">
+                          {empresasConvenio.map((empresa, idx) => <option key={idx} value={empresa} />)}
+                        </datalist>
                       </div>
                       <input 
                         type="text" placeholder="RUT Empresa (Opcional)"
-                        className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                        className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100 col-span-2 sm:col-span-1"
                         value={formReserva.cliente.rut_empresa}
                         onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, rut_empresa: e.target.value}})}
                       />
-                      <div className="relative group">
+                      <div className="relative group col-span-2">
                          <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500 focus-within:text-blue-500" />
                          <input 
                           type="email" placeholder="Email de Facturación (Opcional)"
@@ -806,49 +861,161 @@ export default function ReservasTurismo() {
                           onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, email: e.target.value}})}
                         />
                       </div>
-                      <div className="relative group">
-                         <Hash className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500 focus-within:text-blue-500" />
-                         <input 
-                          type="text" placeholder="DNI / Pasaporte / RUT Opcional"
-                          className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                          value={formReserva.cliente.dni_pasaporte}
-                          onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, dni_pasaporte: e.target.value}})}
-                        />
-                      </div>
+                      <select 
+                        className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100 col-span-2"
+                        value={(formReserva.cliente as any).tipoCliente || 'Particular'}
+                        onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, tipoCliente: e.target.value}})}
+                      >
+                         <option value="Particular">Particular</option>
+                         <option value="Empresa / Convenio">Empresa / Convenio</option>
+                         <option value="Agencia">Agencia</option>
+                      </select>
                     </div>
                   </div>
                 </div>
 
-                {/* Bloque 2: Pasajeros y Maletas */}
-                <div className="p-6 grid md:grid-cols-2 gap-8">
+                {/* Bloque 2: Ruta y Horario */}
+                <div className="p-6 grid md:grid-cols-2 gap-8 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
+                   <div className="space-y-4">
+                      <h3 className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-emerald-500" /> RUTA Y SEGUIMIENTO
+                      </h3>
+                      <div className="space-y-3">
+                         <div className="grid grid-cols-2 gap-3">
+                            <input 
+                               type="text" required placeholder="Origen (ej: Hotel / Oficina)"
+                               list="lugares-list"
+                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                               value={formReserva.lugares.origen}
+                               onChange={(e) => setFormReserva({...formReserva, lugares: {...formReserva.lugares, origen: e.target.value}})}
+                            />
+                            <input 
+                               type="text" placeholder="N° Vuelo (Tracking)"
+                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                               value={formReserva.lugares.numeroVuelo}
+                               onChange={(e) => setFormReserva({...formReserva, lugares: {...formReserva.lugares, numeroVuelo: e.target.value}})}
+                            />
+                         </div>
+                         <div className="grid grid-cols-2 gap-3">
+                            <input 
+                               type="text" required placeholder="Destino Final del Servicio"
+                               list="lugares-list"
+                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                               value={formReserva.lugares.destino}
+                               onChange={(e) => setFormReserva({...formReserva, lugares: {...formReserva.lugares, destino: e.target.value}})}
+                            />
+                            <div className="flex gap-1 relative">
+                               <input 
+                                  type="url" placeholder="Enlace Google Maps (Opc)"
+                                  className="w-full pl-8 pr-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                                  value={(formReserva as any).enlaceMapa || ''}
+                                  onChange={(e) => setFormReserva({...formReserva, enlaceMapa: e.target.value as any})}
+                               />
+                               <MapPin className="absolute left-2.5 top-2.5 h-4 w-4 text-emerald-500" />
+                               {formReserva.lugares.origen && formReserva.lugares.destino && !(formReserva as any).enlaceMapa && (
+                                  <button
+                                     type="button"
+                                     title="Generar link de Maps"
+                                     onClick={() => {
+                                        const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(formReserva.lugares.origen)}&destination=${encodeURIComponent(formReserva.lugares.destino)}`;
+                                        setFormReserva({...formReserva, enlaceMapa: url as any});
+                                     }}
+                                     className="bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 font-bold text-xs px-2 py-1 rounded hover:bg-emerald-200"
+                                  >
+                                      Generar
+                                  </button>
+                               )}
+                            </div>
+                         </div>
+                         <datalist id="lugares-list">
+                           {lugaresComunes.map((l, idx) => <option key={idx} value={l} />)}
+                         </datalist>
+                         <input 
+                            type="text" required placeholder="Nombre de la Reserva (ej: City Tour Premium)"
+                            className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 font-bold dark:text-slate-100"
+                            value={formReserva.servicio}
+                            onChange={(e) => setFormReserva({...formReserva, servicio: e.target.value})}
+                         />
+                      </div>
+                   </div>
+
+                   <div className="space-y-4">
+                      <h3 className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                        <CalendarIcon className="h-4 w-4 text-fuchsia-500" /> DÍA Y HORA DE RESERVA
+                      </h3>
+                      <div className="grid grid-cols-3 gap-3">
+                         <div className="col-span-1">
+                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Fecha</span>
+                            <input 
+                               type="date" required
+                               className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                               value={formReserva.fecha}
+                               onChange={(e) => setFormReserva({...formReserva, fecha: e.target.value})}
+                            />
+                         </div>
+                         <div className="col-span-2">
+                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Hora Inicio</span>
+                            <input 
+                               type="time" required
+                               className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                               value={formReserva.horaInicio}
+                               onChange={(e) => setFormReserva({...formReserva, horaInicio: e.target.value})}
+                            />
+                         </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                         <div className="col-span-1">
+                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Vehículo</span>
+                            <select 
+                               required className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                               value={formReserva.tipoVehiculo}
+                               onChange={(e) => setFormReserva({...formReserva, tipoVehiculo: e.target.value as any})}
+                            >
+                               <option value="SUV">SUV</option>
+                               <option value="Van">Van</option>
+                               <option value="Mini Bus">Mini Bus</option>
+                               <option value="Bus">Bus</option>
+                               <option value="Sedán">Sedán</option>
+                            </select>
+                         </div>
+                         <div className="col-span-2">
+                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Asignar Chofer</span>
+                            <select 
+                               className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                               value={formReserva.conductorId}
+                               onChange={(e) => setFormReserva({...formReserva, conductorId: e.target.value})}
+                            >
+                               <option value="">Seleccione Conductor (Opcional)</option>
+                               {conductores.map(c => (
+                                 <option key={c.id} value={c.id}>{c.nombre} ({c.estado})</option>
+                               ))}
+                            </select>
+                         </div>
+                      </div>
+                   </div>
+                </div>
+
+                {/* Bloque 3: Pasajeros y Maletas */}
+                <div className="p-6 grid md:grid-cols-2 gap-8 border-b border-slate-100 dark:border-slate-800">
                    <div className="space-y-4">
                       <h3 className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-2">
                         <Users className="h-4 w-4 text-blue-500" /> DETALLES DEL PASAJERO (PAX)
                       </h3>
                       <div className="space-y-3">
-                         <input 
-                            type="text" required placeholder="Nombre de quien viaja"
-                            className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-slate-50 dark:bg-slate-800/50 dark:text-slate-100"
-                            value={formReserva.pasajeros.nombre}
-                            onChange={(e) => setFormReserva({...formReserva, pasajeros: {...formReserva.pasajeros, nombre: e.target.value}})}
-                         />
                          <div className="grid grid-cols-2 gap-3">
-                             <div className="relative">
-                                <Phone className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500" />
-                                <input 
-                                   type="text" placeholder="Teléfono Pax (Opcional)"
-                                   className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-slate-50 dark:bg-slate-800/50 dark:text-slate-100"
-                                   value={formReserva.pasajeros.telefono}
-                                   onChange={(e) => setFormReserva({...formReserva, pasajeros: {...formReserva.pasajeros, telefono: e.target.value}})}
-                                />
-                             </div>
-                             <input 
-                                type="number" required placeholder="Total PAX" min="1"
-                                className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-slate-50 dark:bg-slate-800/50 text-center dark:text-slate-100"
-                                value={formReserva.pasajeros.cantidad}
-                                onChange={(e) => setFormReserva({...formReserva, pasajeros: {...formReserva.pasajeros, cantidad: parseInt(e.target.value)}})}
-                             />
-                          </div>
+                            <input 
+                               type="text" required placeholder="Nombre de quien viaja"
+                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-slate-50 dark:bg-slate-800/50 dark:text-slate-100"
+                               value={formReserva.pasajeros.nombre}
+                               onChange={(e) => setFormReserva({...formReserva, pasajeros: {...formReserva.pasajeros, nombre: e.target.value}})}
+                            />
+                            <input 
+                               type="number" required placeholder="Total PAX" min="1"
+                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-slate-50 dark:bg-slate-800/50 text-center dark:text-slate-100"
+                               value={formReserva.pasajeros.cantidad}
+                               onChange={(e) => setFormReserva({...formReserva, pasajeros: {...formReserva.pasajeros, cantidad: parseInt(e.target.value)}})}
+                            />
+                         </div>
 
                           <div className="pt-2 border-t border-slate-200 dark:border-slate-800/50 mt-2">
                             <div className="flex justify-between items-center mb-2">
@@ -910,112 +1077,25 @@ export default function ReservasTurismo() {
                             />
                          </div>
                          <div className="flex flex-col gap-1">
-                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase text-center">Silla Bebé</span>
-                            <div className="flex items-center gap-2 h-full justify-center">
-                               <input 
-                                 type="checkbox" 
-                                 className="h-5 w-5 rounded border-slate-300 dark:border-slate-700 text-blue-600"
-                                 checked={formReserva.logistica.sillaBebe}
-                                 onChange={(e) => setFormReserva({...formReserva, logistica: {...formReserva.logistica, sillaBebe: e.target.checked}})}
-                               />
-                               {formReserva.logistica.sillaBebe && (
-                                 <input 
-                                   type="number" min="1" className="w-10 px-1 py-1 border rounded dark:border-slate-800 text-xs text-center dark:bg-slate-800/50 dark:text-slate-100"
-                                   value={formReserva.logistica.cantidadSillas}
-                                   onChange={(e) => setFormReserva({...formReserva, logistica: {...formReserva.logistica, cantidadSillas: parseInt(e.target.value)}})}
-                                 />
-                               )}
-                            </div>
-                         </div>
-                      </div>
-                   </div>
-                </div>
-
-                {/* Bloque 3: Ruta y Horario */}
-                <div className="p-6 grid md:grid-cols-2 gap-8 bg-slate-50 dark:bg-slate-900/50">
-                   <div className="space-y-4">
-                      <h3 className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-emerald-500" /> RUTA Y SEGUIMIENTO
-                      </h3>
-                      <div className="space-y-3">
-                         <div className="grid grid-cols-2 gap-3">
-                            <input 
-                               type="text" required placeholder="Origen (ej: Hotel / Oficina)"
-                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                               value={formReserva.lugares.origen}
-                               onChange={(e) => setFormReserva({...formReserva, lugares: {...formReserva.lugares, origen: e.target.value}})}
-                            />
-                            <input 
-                               type="text" placeholder="N° Vuelo (Tracking)"
-                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                               value={formReserva.lugares.numeroVuelo}
-                               onChange={(e) => setFormReserva({...formReserva, lugares: {...formReserva.lugares, numeroVuelo: e.target.value}})}
-                            />
-                         </div>
-                         <input 
-                            type="text" required placeholder="Destino Final del Servicio"
-                            className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                            value={formReserva.lugares.destino}
-                            onChange={(e) => setFormReserva({...formReserva, lugares: {...formReserva.lugares, destino: e.target.value}})}
-                         />
-                         <input 
-                            type="text" required placeholder="Nombre de la Reserva (ej: City Tour Premium)"
-                            className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 font-bold dark:text-slate-100"
-                            value={formReserva.servicio}
-                            onChange={(e) => setFormReserva({...formReserva, servicio: e.target.value})}
-                         />
-                      </div>
-                   </div>
-
-                   <div className="space-y-4">
-                      <h3 className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                        <CalendarIcon className="h-4 w-4 text-fuchsia-500" /> TEMPORALIDAD
-                      </h3>
-                      <div className="grid grid-cols-3 gap-3">
-                         <div className="col-span-1">
-                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Fecha</span>
-                            <input 
-                               type="date" required
-                               className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                               value={formReserva.fecha}
-                               onChange={(e) => setFormReserva({...formReserva, fecha: e.target.value})}
-                            />
-                         </div>
-                         <div className="col-span-2">
-                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Hora Inicio</span>
-                            <input 
-                               type="time" required
-                               className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                               value={formReserva.horaInicio}
-                               onChange={(e) => setFormReserva({...formReserva, horaInicio: e.target.value})}
-                            />
-                         </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-3">
-                         <div className="col-span-1">
-                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Vehículo</span>
-                            <select 
-                               required className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                               value={formReserva.tipoVehiculo}
-                               onChange={(e) => setFormReserva({...formReserva, tipoVehiculo: e.target.value as any})}
-                            >
-                               <option value="SUV">SUV</option>
-                               <option value="Van">Van</option>
-                               <option value="Sedán">Sedán</option>
-                            </select>
-                         </div>
-                         <div className="col-span-2">
-                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Asignar Chofer</span>
-                            <select 
-                               required className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                               value={formReserva.conductorId}
-                               onChange={(e) => setFormReserva({...formReserva, conductorId: e.target.value})}
-                            >
-                               <option value="">Seleccione Conductor</option>
-                               {conductores.map(c => (
-                                 <option key={c.id} value={c.id}>{c.nombre} ({c.estado})</option>
-                               ))}
-                            </select>
+                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase text-center">Silla Bebé / Alzador</span>
+                             <div className="flex flex-col gap-1 mt-1">
+                                <div className="flex justify-between items-center px-2">
+                                  <span className="text-[10px] text-slate-500 font-bold">Sillas:</span>
+                                  <input 
+                                    type="number" min="0" className="w-12 px-1 py-1 border rounded dark:border-slate-800 text-xs text-center dark:bg-slate-800/50 dark:text-slate-100"
+                                    value={formReserva.logistica.cantidadSillas || ''}
+                                    onChange={(e) => setFormReserva({...formReserva, logistica: {...formReserva.logistica, cantidadSillas: parseInt(e.target.value) || 0, sillaBebe: parseInt(e.target.value) > 0}})}
+                                  />
+                                </div>
+                                <div className="flex justify-between items-center px-2">
+                                  <span className="text-[10px] text-slate-500 font-bold">Alzas:</span>
+                                  <input 
+                                    type="number" min="0" className="w-12 px-1 py-1 border rounded dark:border-slate-800 text-xs text-center dark:bg-slate-800/50 dark:text-slate-100"
+                                    value={(formReserva.logistica as any).cantidadAlzadores || ''}
+                                    onChange={(e) => setFormReserva({...formReserva, logistica: {...formReserva.logistica, cantidadAlzadores: parseInt(e.target.value) || 0, alzador: parseInt(e.target.value) > 0}})}
+                                  />
+                                </div>
+                             </div>
                          </div>
                       </div>
                    </div>
@@ -1056,6 +1136,8 @@ export default function ReservasTurismo() {
       >
           <option value="Efectivo">Efectivo</option>
           <option value="Transferencia">Transferencia</option>
+          <option value="Webpay">Webpay</option>
+          <option value="Link de Pago">Link de Pago</option>
           <option value="Convenio PF">Convenio PF</option>
           <option value="Tarjeta">Tarjeta</option>
       </select>
@@ -1089,7 +1171,7 @@ export default function ReservasTurismo() {
         className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
         onChange={(e) => {
           if (e.target.files) {
-            const newFiles = Array.from(e.target.files).map(f => ({
+            const newFiles = Array.from(e.target.files).map((f: File) => ({
               nombre: f.name,
               url: URL.createObjectURL(f),
               tipo: (f.type.includes('image') ? 'Imagen' : 'Documento') as 'Imagen'|'Documento'|'Otro'
