@@ -24,13 +24,14 @@ export interface Collaborator {
 export interface ReservaTurismo {
   id: string;
   op: string;
-  categoria: 'Web' | 'Whatsapp' | 'Minera' | 'Extranjero' | 'Operador';
+  categoria: 'Web' | 'Whatsapp' | 'Minera' | 'Extranjero' | 'Operador' | 'Correo';
   cliente: {
     nombre: string;
     email: string;
     telefono: string;
     dni_pasaporte: string;
     rut_empresa: string;
+    tipoCliente?: string;
   };
   pasajeros: {
     nombre: string;
@@ -56,6 +57,7 @@ export interface ReservaTurismo {
     cantidadSillas: number;
   };
   servicio: string;
+  enlaceMapa?: string;
   tipoVehiculo: 'Auto' | 'SUV' | 'Van' | 'Minibus' | 'Bus' | 'Otros';
   fecha: string;
   horaInicio: string;

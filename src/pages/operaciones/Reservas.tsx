@@ -47,7 +47,8 @@ export default function ReservasTurismo() {
           email: dbR.cliente_email || '',
           telefono: dbR.cliente_telefono || '',
           dni_pasaporte: dbR.detalles?.cliente?.dni_pasaporte || '',
-          rut_empresa: dbR.cliente_rut || ''
+          rut_empresa: dbR.cliente_rut || '',
+          tipoCliente: dbR.detalles?.cliente?.tipoCliente || 'Particular'
         },
         pasajeros: dbR.detalles?.pasajeros || { nombre: '', telefono: '', cantidad: dbR.pasajeros_cantidad || 1 },
         pasajerosList: dbR.detalles?.pasajerosList || [],
@@ -59,6 +60,7 @@ export default function ReservasTurismo() {
         logistica: dbR.detalles?.logistica || { maletasGrandes: 0, maletasChicas: 0, sillaBebe: false, alzador: false, cantidadSillas: 0 },
         servicio: dbR.detalles?.servicio || '',
         tipoVehiculo: dbR.detalles?.tipoVehiculo || 'SUV',
+        enlaceMapa: dbR.detalles?.enlaceMapa || '',
         fecha: dbR.fecha_reserva ? new Date(dbR.fecha_reserva).toISOString().split('T')[0] : '',
         horaInicio: dbR.detalles?.horaInicio || '',
         horaTermino: dbR.detalles?.horaTermino || '',
@@ -84,10 +86,12 @@ export default function ReservasTurismo() {
 
       let condQuery = supabase.from('colaborador').select('id, nombre, estado').in('rol', ['Conductor', 'Chofer', 'Conductor Interprovincial', 'Conductor Interno Mina']);
       let vehQuery = supabase.from('vehiculo').select('id, patente, marca, estado');
+      let rutasQuery = supabase.from('operacion_ruta').select('*').order('created_at', { ascending: false });
       
       if (activeCompanyId !== 'GLOBAL') {
         condQuery = condQuery.eq('empresa_id', activeCompanyId);
         vehQuery = vehQuery.eq('empresa_id', activeCompanyId);
+        rutasQuery = rutasQuery.eq('empresa_id', activeCompanyId);
       }
 
       const { data: condData } = await condQuery;
@@ -95,6 +99,9 @@ export default function ReservasTurismo() {
 
       const { data: vehData } = await vehQuery;
       if (vehData) setVehiculos(vehData);
+
+      const { data: rutasData } = await rutasQuery;
+      if (rutasData) setRutasGuardadas(rutasData);
 
       if (activeCompanyId === 'GLOBAL') {
         const { data: userData } = await supabase.auth.getUser();
@@ -144,18 +151,25 @@ export default function ReservasTurismo() {
   // State for Modal / Details
   const [reservaSeleccionada, setReservaSeleccionada] = useState<ReservaTurismo | null>(null);
   const [mostrarDetalle, setMostrarDetalle] = useState(false);
-  const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [mostrarFormulario, setMostrarFormulario] = useState(() => {
+    try {
+      return localStorage.getItem('mostrarFormularioDraft') === 'true';
+    } catch { return false; }
+  });
+  const [rutasGuardadas, setRutasGuardadas] = useState<any[]>([]);
+  const [mostrarCrearRuta, setMostrarCrearRuta] = useState(false);
+  const [nuevaRutaForm, setNuevaRutaForm] = useState({ nombre: '', origen: '', destino: '', enlaceMapa: '' });
 
   // New Reservation Form State
   const initialFormState = {
     categoria: 'Web' as ReservaTurismo['categoria'],
-    cliente: { nombre: '', email: '', telefono: '', dni_pasaporte: '', rut_empresa: '' },
+    cliente: { nombre: '', email: '', telefono: '', dni_pasaporte: '', rut_empresa: '', tipoCliente: 'Particular' },
     pasajeros: { nombre: '', telefono: '', cantidad: 1 },
     pasajerosList: [],
     lugares: { origen: '', destino: '', numeroVuelo: '' },
     logistica: { maletasGrandes: 0, maletasChicas: 0, sillaBebe: false, alzador: false, cantidadSillas: 0, cantidadAlzadores: 0 },
     servicio: '',
-    tipoVehiculo: 'SUV' as ReservaTurismo['tipoVehiculo'] | 'Mini Bus' | 'Bus',
+    tipoVehiculo: 'SUV' as ReservaTurismo['tipoVehiculo'] | 'Mini Bus' | 'Bus' | 'Otros',
     enlaceMapa: '',
     fecha: '',
     horaInicio: '',
@@ -184,7 +198,8 @@ export default function ReservasTurismo() {
 
   useEffect(() => {
     localStorage.setItem('formReservaDraft', JSON.stringify(formReserva));
-  }, [formReserva]);
+    localStorage.setItem('mostrarFormularioDraft', mostrarFormulario.toString());
+  }, [formReserva, mostrarFormulario]);
 
   const empresasConvenio = useMemo(() => Array.from(new Set(reservasTurismo.map(r => r.cliente.nombre).filter(Boolean))), [reservasTurismo]);
   const lugaresComunes = useMemo(() => {
@@ -198,19 +213,20 @@ export default function ReservasTurismo() {
     return Array.from(list);
   }, [reservasTurismo]);
 
-  const handlePhoneBlur = () => {
-    if (!formReserva.pasajeros.telefono) return;
-    const match = reservasTurismo.find(r => r.pasajeros.telefono === formReserva.pasajeros.telefono);
+  const handlePhoneChange = (val: string) => {
+    setFormReserva(prev => ({...prev, pasajeros: {...prev.pasajeros, telefono: val}}));
+    const match = reservasTurismo.find(r => r.pasajeros.telefono === val);
     if (match) {
       setFormReserva(prev => ({
         ...prev,
         pasajeros: {
           ...prev.pasajeros,
+          telefono: val,
           nombre: prev.pasajeros.nombre || match.pasajeros.nombre
         },
         cliente: {
           ...prev.cliente,
-          nombre: prev.cliente.nombre || match.cliente.nombre
+          nombre: prev.cliente.nombre || match.cliente.nombre || prev.pasajeros.nombre || match.pasajeros.nombre
         },
         lugares: {
           ...prev.lugares,
@@ -313,7 +329,7 @@ export default function ReservasTurismo() {
       conductor_id: formReserva.conductorId || null,
       vehiculo_id: formReserva.vehiculoId || null,
       detalles: {
-        cliente: { dni_pasaporte: formReserva.cliente.dni_pasaporte },
+        cliente: formReserva.cliente,
         pasajeros: formReserva.pasajeros,
         pasajerosList: formReserva.pasajerosList,
         archivosAdicionales: formReserva.archivosAdicionales,
@@ -369,6 +385,8 @@ export default function ReservasTurismo() {
   const getCategoryTheme = (cat: ReservaTurismo['categoria']) => {
     switch (cat) {
       case 'Web': return { card: 'bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800', textBase: 'text-blue-700 dark:text-blue-400', innerBox: 'border-blue-400 dark:border-blue-700 bg-white dark:bg-slate-800/50', innerText: 'text-blue-700 dark:text-blue-300', button: 'border-blue-500 text-blue-600 dark:text-blue-400', iconBox: 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400' };
+      case 'Whatsapp': return { card: 'bg-green-50/50 dark:bg-green-900/20 border-green-200 dark:border-green-800', textBase: 'text-green-700 dark:text-green-400', innerBox: 'border-green-400 dark:border-green-700 bg-white dark:bg-slate-800/50', innerText: 'text-green-700 dark:text-green-300', button: 'border-green-500 text-green-600 dark:text-green-400', iconBox: 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400' };
+      case 'Correo': return { card: 'bg-rose-50/50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800', textBase: 'text-rose-700 dark:text-rose-400', innerBox: 'border-rose-400 dark:border-rose-700 bg-white dark:bg-slate-800/50', innerText: 'text-rose-700 dark:text-rose-300', button: 'border-rose-500 text-rose-600 dark:text-rose-400', iconBox: 'bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-400' };
       case 'Minera': return { card: 'bg-emerald-50/50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800', textBase: 'text-emerald-700 dark:text-emerald-400', innerBox: 'border-emerald-600 dark:border-emerald-700 bg-white dark:bg-slate-800/50', innerText: 'text-emerald-700 dark:text-emerald-300', button: 'border-emerald-600 text-emerald-700 dark:text-emerald-400', iconBox: 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400' };
       case 'Extranjero': return { card: 'bg-fuchsia-50/40 dark:bg-fuchsia-900/20 border-fuchsia-200 dark:border-fuchsia-800', textBase: 'text-fuchsia-700 dark:text-fuchsia-400', innerBox: 'border-fuchsia-500 dark:border-fuchsia-700 bg-white dark:bg-slate-800/50', innerText: 'text-fuchsia-700 dark:text-fuchsia-300', button: 'border-fuchsia-500 text-fuchsia-600 dark:text-fuchsia-400', iconBox: 'bg-fuchsia-100 dark:bg-fuchsia-900/50 text-fuchsia-700 dark:text-fuchsia-400' };
       case 'Operador': return { card: 'bg-orange-50/50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800', textBase: 'text-orange-700 dark:text-orange-400', innerBox: 'border-orange-500 dark:border-orange-700 bg-white dark:bg-slate-800/50', innerText: 'text-orange-700 dark:text-orange-300', button: 'border-orange-500 text-orange-600 dark:text-orange-400', iconBox: 'bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-400' };
@@ -391,7 +409,7 @@ export default function ReservasTurismo() {
         </div>
         <div className="flex space-x-2">
           <Button 
-            onClick={() => { setFormReserva(initialFormState); setMostrarFormulario(true); }}
+            onClick={() => setMostrarFormulario(true)}
             className="bg-blue-600 hover:bg-blue-700 text-white shadow-md"
           >
             <Plus className="h-4 w-4 mr-2" /> Nueva Reserva
@@ -765,6 +783,76 @@ export default function ReservasTurismo() {
         </div>
       )}
 
+      {mostrarCrearRuta && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 dark:bg-slate-800/80 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-sm bg-white dark:bg-slate-900 shadow-2xl overflow-hidden rounded-xl animate-in fade-in zoom-in-95 duration-200">
+            <CardHeader className="flex flex-row items-center justify-between border-b dark:border-slate-800 bg-emerald-600 text-white px-5 py-4">
+              <CardTitle className="text-sm font-bold flex items-center gap-2">
+                 <MapPin className="h-4 w-4" /> Crear Ruta Maestra
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setMostrarCrearRuta(false)} className="text-white hover:bg-emerald-700/50 rounded-full h-8 w-8 p-0">
+                <XCircle className="h-5 w-5" />
+              </Button>
+            </CardHeader>
+            <CardContent className="p-5 space-y-4">
+                <div>
+                   <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Nombre de la Ruta</label>
+                   <input 
+                     type="text" placeholder="Ej: Stgo - Viña"
+                     className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-slate-900/50 dark:border-slate-800 font-bold dark:text-slate-100"
+                     value={nuevaRutaForm.nombre}
+                     onChange={(e) => setNuevaRutaForm({...nuevaRutaForm, nombre: e.target.value})}
+                   />
+                </div>
+                <div>
+                   <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Origen</label>
+                   <input 
+                      type="text" placeholder="Hotel Hyatt, Santiago"
+                      className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-slate-900/50 dark:border-slate-800 dark:text-slate-100"
+                      value={nuevaRutaForm.origen}
+                      onChange={(e) => setNuevaRutaForm({...nuevaRutaForm, origen: e.target.value})}
+                   />
+                </div>
+                <div>
+                   <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1 block">Destino</label>
+                   <input 
+                      type="text" placeholder="Aeropuerto AMB"
+                      className="w-full px-3 py-2 border rounded-lg text-sm dark:bg-slate-900/50 dark:border-slate-800 dark:text-slate-100"
+                      value={nuevaRutaForm.destino}
+                      onChange={(e) => setNuevaRutaForm({...nuevaRutaForm, destino: e.target.value})}
+                   />
+                </div>
+                <div className="pt-2">
+                   <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold" onClick={async () => {
+                      if (!nuevaRutaForm.nombre || !nuevaRutaForm.origen || !nuevaRutaForm.destino) return alert('Completa los campos');
+                      const linkMap = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(nuevaRutaForm.origen)}&destination=${encodeURIComponent(nuevaRutaForm.destino)}`;
+                      
+                      const empresaIDToUse = activeCompanyId === 'GLOBAL' ? newEmpresaId : activeCompanyId;
+                      const payload = {
+                         empresa_id: empresaIDToUse || 1,
+                         nombre: nuevaRutaForm.nombre,
+                         origen: nuevaRutaForm.origen,
+                         destino: nuevaRutaForm.destino,
+                         distancia_km: 0,
+                         tiempo_estimado_mins: 0
+                      };
+                      
+                      const { error } = await supabase.from('operacion_ruta').insert([payload]);
+                      if (!error) {
+                         setRutasGuardadas([...rutasGuardadas, { id: Date.now().toString(), ...payload }]);
+                         setMostrarCrearRuta(false);
+                         setFormReserva({...formReserva, lugares: { ...formReserva.lugares, origen: nuevaRutaForm.origen, destino: nuevaRutaForm.destino }, enlaceMapa: linkMap as any});
+                         setNuevaRutaForm({ nombre: '', origen: '', destino: '', enlaceMapa: '' });
+                      } else { alert('Error al guardar la ruta.'); }
+                   }}>
+                     Guardar y Seleccionar
+                   </Button>
+                </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Formulario Nueva Reserva / Clonación */}
       {mostrarFormulario && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 dark:bg-slate-800/50/80 backdrop-blur-md p-4">
@@ -800,7 +888,7 @@ export default function ReservasTurismo() {
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Categoría de Reserva</label>
                     <div className="grid grid-cols-2 gap-2">
-                      {['Web', 'Whatsapp'].map((cat) => (
+                      {['Web', 'Whatsapp', 'Correo'].map((cat) => (
                         <button
                           key={cat}
                           type="button"
@@ -818,51 +906,9 @@ export default function ReservasTurismo() {
                   </div>
                   <div className="space-y-2 col-span-2">
                     <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Datos del Cliente Reservante</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="relative group col-span-2">
-                         <Phone className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500 focus-within:text-blue-500" />
-                         <input 
-                            type="text" placeholder="Teléfono Pax (buscar...)"
-                            list="telefonos-list"
-                            className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm font-bold bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                            value={formReserva.pasajeros.telefono}
-                            onChange={(e) => setFormReserva({...formReserva, pasajeros: {...formReserva.pasajeros, telefono: e.target.value}})}
-                            onBlur={handlePhoneBlur}
-                         />
-                         <datalist id="telefonos-list">
-                           {telefonosComunes.map((tel, idx) => <option key={idx} value={tel} />)}
-                         </datalist>
-                      </div>
-                      <div className="relative group col-span-2 sm:col-span-1">
-                        <Users className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500 group-focus-within:text-blue-500" />
-                        <input 
-                          type="text" required placeholder="Nombre / Empresa Principal"
-                          list="empresas-list"
-                          className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                          value={formReserva.cliente.nombre}
-                          onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, nombre: e.target.value}})}
-                        />
-                        <datalist id="empresas-list">
-                          {empresasConvenio.map((empresa, idx) => <option key={idx} value={empresa} />)}
-                        </datalist>
-                      </div>
-                      <input 
-                        type="text" placeholder="RUT Empresa (Opcional)"
-                        className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100 col-span-2 sm:col-span-1"
-                        value={formReserva.cliente.rut_empresa}
-                        onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, rut_empresa: e.target.value}})}
-                      />
-                      <div className="relative group col-span-2">
-                         <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500 focus-within:text-blue-500" />
-                         <input 
-                          type="email" placeholder="Email de Facturación (Opcional)"
-                          className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                          value={formReserva.cliente.email}
-                          onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, email: e.target.value}})}
-                        />
-                      </div>
+                    <div className="flex flex-col gap-3">
                       <select 
-                        className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100 col-span-2"
+                        className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm font-bold bg-white dark:bg-slate-800/50 dark:text-slate-100"
                         value={(formReserva.cliente as any).tipoCliente || 'Particular'}
                         onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, tipoCliente: e.target.value}})}
                       >
@@ -870,6 +916,51 @@ export default function ReservasTurismo() {
                          <option value="Empresa / Convenio">Empresa / Convenio</option>
                          <option value="Agencia">Agencia</option>
                       </select>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="relative group">
+                          <Users className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500 group-focus-within:text-blue-500" />
+                          <input 
+                            type="text" required placeholder="Nombre / Empresa Principal"
+                            list="empresas-list"
+                            className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                            value={formReserva.cliente.nombre}
+                            onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, nombre: e.target.value}})}
+                          />
+                          <datalist id="empresas-list">
+                            {empresasConvenio.map((empresa, idx) => <option key={idx} value={empresa} />)}
+                          </datalist>
+                        </div>
+                        <div className="relative group">
+                           <Phone className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500 focus-within:text-blue-500" />
+                           <input 
+                              type="text" placeholder="Teléfono Pax (buscar...)"
+                              list="telefonos-list"
+                              className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm font-bold bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                              value={formReserva.pasajeros.telefono}
+                              onChange={(e) => handlePhoneChange(e.target.value)}
+                           />
+                           <datalist id="telefonos-list">
+                             {telefonosComunes.map((tel, idx) => <option key={idx} value={tel} />)}
+                           </datalist>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="relative group">
+                           <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500 focus-within:text-blue-500" />
+                           <input 
+                            type="email" placeholder="Email de Facturación (Opcional)"
+                            className="w-full pl-10 pr-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                            value={formReserva.cliente.email}
+                            onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, email: e.target.value}})}
+                          />
+                        </div>
+                        <input 
+                          type="text" placeholder="RUT Empresa (Opcional)"
+                          className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                          value={formReserva.cliente.rut_empresa}
+                          onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, rut_empresa: e.target.value}})}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -877,9 +968,37 @@ export default function ReservasTurismo() {
                 {/* Bloque 2: Ruta y Horario */}
                 <div className="p-6 grid md:grid-cols-2 gap-8 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
                    <div className="space-y-4">
-                      <h3 className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-emerald-500" /> RUTA Y SEGUIMIENTO
-                      </h3>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-emerald-500" /> RUTA Y SEGUIMIENTO
+                        </h3>
+                        <button type="button" onClick={() => setMostrarCrearRuta(true)} className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline">
+                          + Nueva Ruta Maestra
+                        </button>
+                      </div>
+                      {rutasGuardadas.length > 0 && (
+                        <div className="mb-2">
+                          <select
+                            className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-emerald-50 dark:bg-emerald-900/10 font-bold text-emerald-700 dark:text-emerald-400 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all shadow-sm"
+                            onChange={(e) => {
+                              const ruta = rutasGuardadas.find(r => r.id === e.target.value);
+                              if (ruta) {
+                                const mapLink = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(ruta.origen)}&destination=${encodeURIComponent(ruta.destino)}`;
+                                setFormReserva({
+                                  ...formReserva,
+                                  lugares: { ...formReserva.lugares, origen: ruta.origen, destino: ruta.destino },
+                                  enlaceMapa: mapLink as any
+                                });
+                              }
+                            }}
+                          >
+                            <option value="">Cargar Ruta Maestra Guardada...</option>
+                            {rutasGuardadas.map(r => (
+                              <option key={r.id} value={r.id}>{r.nombre || `${r.origen} - ${r.destino}`}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                       <div className="space-y-3">
                          <div className="grid grid-cols-2 gap-3">
                             <input 
@@ -924,6 +1043,16 @@ export default function ReservasTurismo() {
                                   >
                                       Generar
                                   </button>
+                               )}
+                               {(formReserva as any).enlaceMapa && (
+                                  <a 
+                                     href={(formReserva as any).enlaceMapa} 
+                                     target="_blank" 
+                                     rel="noopener noreferrer"
+                                     className="bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400 font-bold text-xs px-3 py-2 rounded hover:bg-blue-200 flex items-center justify-center whitespace-nowrap"
+                                  >
+                                      Abrir Ruta
+                                  </a>
                                )}
                             </div>
                          </div>
@@ -976,6 +1105,7 @@ export default function ReservasTurismo() {
                                <option value="Mini Bus">Mini Bus</option>
                                <option value="Bus">Bus</option>
                                <option value="Sedán">Sedán</option>
+                               <option value="Otros">Otros</option>
                             </select>
                          </div>
                          <div className="col-span-2">
@@ -1246,7 +1376,11 @@ export default function ReservasTurismo() {
                       </div>
                    </div>
                    <div className="flex gap-3 w-full md:w-auto">
-                      <Button type="button" variant="outline" onClick={() => setMostrarFormulario(false)} className="flex-1 md:flex-none">Descartar</Button>
+                      <Button type="button" variant="outline" onClick={() => {
+                         setFormReserva(initialFormState);
+                         setMostrarFormulario(false);
+                         localStorage.removeItem('formReservaDraft');
+                      }} className="flex-1 md:flex-none">Descartar</Button>
                       <Button type="submit" className="bg-blue-600 hover:bg-blue-700 h-10 px-10 shadow-lg flex-1 md:flex-none">Confirmar y Guardar Reserva</Button>
                    </div>
                 </div>
