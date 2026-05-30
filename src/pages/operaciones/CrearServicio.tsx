@@ -71,6 +71,17 @@ export default function CrearServicio() {
   useEffect(() => { localStorage.setItem('formCrearServicio_newIngreso', String(newIngreso)); }, [newIngreso]);
   useEffect(() => { localStorage.setItem('formCrearServicio_newCosto', String(newCosto)); }, [newCosto]);
 
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (newContrato || newFecha || newTipoCarga || newOrigen || newDestino) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [newContrato, newFecha, newTipoCarga, newOrigen, newDestino]);
+
   const clearFormCache = () => {
     localStorage.removeItem('formCrearServicio_newContrato');
     localStorage.removeItem('formCrearServicio_newFecha');

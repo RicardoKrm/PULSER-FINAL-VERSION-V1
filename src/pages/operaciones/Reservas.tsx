@@ -199,6 +199,15 @@ export default function ReservasTurismo() {
   useEffect(() => {
     localStorage.setItem('formReservaDraft', JSON.stringify(formReserva));
     localStorage.setItem('mostrarFormularioDraft', mostrarFormulario.toString());
+    
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+       if (mostrarFormulario) {
+         e.preventDefault();
+         e.returnValue = '';
+       }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [formReserva, mostrarFormulario]);
 
   const empresasConvenio = useMemo(() => Array.from(new Set(reservasTurismo.map(r => r.cliente.nombre).filter(Boolean))), [reservasTurismo]);

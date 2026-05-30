@@ -7,6 +7,8 @@ import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
 import { useAuth } from '../../context/AuthContext';
 
+import { useNavigate } from 'react-router-dom';
+
 // Utilidades de Fechas
 function getStartOfWeek(date: Date) {
   const result = new Date(date);
@@ -57,6 +59,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0 to 23
 export default function Programacion() {
   const { activeCompanyId, currentCompany } = useCompany();
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<'Día' | 'Semana' | 'Mes' | 'Tabla'>('Semana');
   const [currentDate, setCurrentDate] = useState<Date>(INIT_DATE);
   const [draggedItem, setDraggedItem] = useState<any>(null);
@@ -1242,7 +1245,7 @@ export default function Programacion() {
               <div>
                  {editingBlock.notas && editingBlock.notas.length > 20 && (
                    <button onClick={() => {
-                        window.location.href = `/operaciones/servicios?edit=${editingBlock.notas}`;
+                        navigate(`/operaciones/servicios?edit=${editingBlock.notas}`);
                    }} className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1">
                       Ir a Detalles del Servicio <ArrowRight className="w-3 h-3" />
                    </button>

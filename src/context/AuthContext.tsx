@@ -87,7 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user || null);
       if (session?.user?.id) {
-        setLoading(true);
+        // Do not set loading to true to prevent unmounting entire application on token refreshes/window focus.
         loadProfile(session.user.id, session.user.email).finally(() => setLoading(false));
       } else {
         setProfile(null);
