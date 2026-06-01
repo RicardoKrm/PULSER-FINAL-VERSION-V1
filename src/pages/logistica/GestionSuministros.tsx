@@ -1943,10 +1943,14 @@ export default function GestionSuministros() {
               className="bg-cyan-600 hover:bg-cyan-700 text-white"
               disabled={!newRepuestoForm.nombre || !newRepuestoForm.numeroParte}
               onClick={async () => {
+                const provName = proveedores.find(p => p.id === newRepuestoForm.proveedorId)?.nombre || newRepuestoForm.proveedorId || "--";
+                const bodegaName = bodegasList.find(b => b.id === newRepuestoForm.bodegaId)?.nombre || "bodega no especificada";
+
                 const nuevo = {
+                  empresa_id: currentCompany?.id,
                   nombre: newRepuestoForm.nombre,
                   sku: newRepuestoForm.numeroParte,
-                  proveedor: newRepuestoForm.proveedorId || "--",
+                  proveedor: provName,
                   ubicacion: newRepuestoForm.ubicacion || "Sin Ubicación",
                   calidad: newRepuestoForm.calidad,
                   stock: newRepuestoForm.stockActual,
@@ -1960,23 +1964,34 @@ export default function GestionSuministros() {
                 };
 
                 try {
-                  if (currentCompany?.id) {
-                     await supabase.from('logistica_repuestos').insert([nuevo]);
-                     
-                     // Refetch
-                     await loadData();
+                  if (!currentCompany?.id) {
+                    alert("Error: No hay empresa seleccionada.");
+                    return;
                   }
+                  
+                  const { error } = await supabase.from('logistica_repuestos').insert([nuevo]);
+                  
+                  if (error) {
+                    console.error("Error al guardar:", error);
+                    alert("Hubo un error al guardar: " + error.message);
+                    return;
+                  }
+                  
+                  // Refetch
+                  await loadData();
+                  
+                  setIsNewRepuestoModalOpen(false);
+                  alert(`Se agregó ${newRepuestoForm.nombre} con ${newRepuestoForm.stockActual} cantidad a la ${bodegaName}.`);
+                  
+                  setNewRepuestoForm({
+                    nombre: '', numeroParte: '', calidad: 'ORIGINAL', origen: 'OEM', 
+                    nivelCriticidad: 'INSUMO', stockActual: 0, stockMinimo: 0, 
+                    diasStockObjetivo: 30, ubicacion: '', precioUnitario: 0, bodegaId: '1', proveedorId: ''
+                  });
                 } catch (e) {
                   console.error(e);
+                  alert("Error al intentar guardar el repuesto.");
                 }
-
-                setIsNewRepuestoModalOpen(false);
-                setNewRepuestoForm({
-                  nombre: '', numeroParte: '', calidad: 'ORIGINAL', origen: 'OEM', 
-                  nivelCriticidad: 'INSUMO', stockActual: 0, stockMinimo: 0, 
-                  diasStockObjetivo: 30, ubicacion: '', precioUnitario: 0, bodegaId: '1', proveedorId: ''
-                });
-                alert("Repuesto credo exitosamente.");
               }}
             >
               Guardar Repuesto

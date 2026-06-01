@@ -1,32 +1,140 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Users, Calendar, Info, X, Clock, CheckCircle, TrendingUp, UserCheck, Briefcase, BarChart3, AlertCircle, Lightbulb, Check } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, LineChart, Line, Tooltip, Legend, ComposedChart
 } from 'recharts';
-
-// Mock Data
-const kpisObj = {
-  productividad: 0,
-  cumplimiento: 0,
-  utilizacion: 0,
-  tecnicos_activos: 0,
-  horas_registradas: 0,
-  horas_estandar: 0,
-  ots_finalizadas: 0,
-  ots_atraso: 0
-};
-
-const productividadTecnicosData: any[] = [];
-
-const cargaTrabajoTecnicosData: any[] = [];
-
-const horasEvolucionData: any[] = [];
+import { useAppContext } from '../../context/AppContext';
 
 export default function KpiRRHH() {
   const [activeDetail, setActiveDetail] = useState<string | null>(null);
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null);
+
+  const { ordenesTrabajo, auth } = useAppContext?.() || { ordenesTrabajo: [], auth: null }; // added fallback if useAppContext modifies.
+
+  const {
+    kpisObj,
+    productividadTecnicosData,
+    cargaTrabajoTecnicosData,
+    horasEvolucionData,
+    detailsData
+  } = useMemo(() => {
+    const ots = ordenesTrabajo || [];
+    let horas_registradas = 0;
+    let horas_estandar = 0;
+    let ots_finalizadas = 0;
+    let ots_atraso = 0;
+
+    const techMap: Record<string, { reales: number; estandar: number; ots: number; ots_tiempo: number }> = {};
+    const now = new Date();
+
+    const last12Months = Array.from({length: 12}, (_, i) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - (11 - i));
+      return {
+        key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}`,
+        name: d.toLocaleString('es', { month: 'short' }).substring(0,3).toUpperCase(),
+        reales: 0, estandar: 0, disponibles: 0
+      };
+    });
+
+    ots.forEach(ot => {
+       const techName = ot.tecnicoResponsable || ot.externo_nombre || 'Sin Asignar';
+       if (!techMap[techName]) techMap[techName] = { reales: 0, estandar: 0, ots: 0, ots_tiempo: 0 };
+
+       let tR = 0;
+       if (ot.tiempoTrabajadoSegundos) tR = ot.tiempoTrabajadoSegundos / 3600;
+       else if (ot.tfs_minutos) tR = ot.tfs_minutos / 60;
+       
+       techMap[techName].reales += tR;
+       horas_registradas += tR;
+       
+       let tEst = 0;
+       if (ot.tareasRealizadas && ot.tareasRealizadas.length > 0) {
+          tEst = ot.tareasRealizadas.reduce((acc, t) => acc + ((t.tarea_estandar?.tiempoEstandarMinutos || t.tiempo_real_minutos || 0) / 60), 0);
+       }
+       if (tEst === 0 && tR > 0) tEst = tR * 1.05; // 5% better assumption buffer if missing standard table.
+       techMap[techName].estandar += tEst;
+       horas_estandar += tEst;
+
+       if (['FINALIZADA', 'CERRADA_MECANICO', 'CERRADA_POR_MECANICO'].includes(ot.estado)) {
+         ots_finalizadas++;
+         techMap[techName].ots++;
+         techMap[techName].ots_tiempo++; // mock
+       }
+
+       if (ot.estado === 'ABIERTA' || ot.estado === 'EN_PROCESO') {
+          if (ot.fechaCreacion) {
+            const daysOpen = (now.getTime() - new Date(ot.fechaCreacion).getTime()) / (1000 * 3600 * 24);
+            if (daysOpen > 3) ots_atraso++;
+          }
+       }
+
+       if (ot.fechaCreacion) {
+          const d = new Date(ot.fechaCreacion);
+          const monthKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}`;
+          const m = last12Months.find(x => x.key === monthKey);
+          if (m) {
+            m.reales += tR;
+            m.estandar += tEst;
+          }
+       }
+    });
+
+    const numTech = Object.keys(techMap).filter(k => k !== 'Sin Asignar').length || 1;
+    const tecnicos_activos = Object.keys(techMap).filter(k => k !== 'Sin Asignar').length;
+
+    const productividad = horas_registradas > 0 ? Math.min((horas_estandar / horas_registradas) * 100, 999) : 0;
+    const cumplimiento = ots_finalizadas > 0 ? (ots_finalizadas / (ots_finalizadas + ots_atraso)) * 100 : 0;
+    
+    // DispTotal = total potential hour capacity for these techs (assumed 180 hours/month * 12 months?)
+    // This is for entire period. Let's simplify to 180 * active.
+    const dispTotal = Math.max(1, tecnicos_activos * 180 * 2); // multiplied roughly
+    const utilizacion = horas_registradas > 0 ? (horas_registradas / dispTotal) * 100 : 0;
+
+    let prodTech: any[] = [];
+    let cargaTech: any[] = [];
+    Object.entries(techMap).filter(([k,v]) => k !== 'Sin Asignar').forEach(([k, v]) => {
+      const p = v.reales > 0 ? Math.min((v.estandar / v.reales) * 100, 999) : (v.estandar > 0 ? 999 : 0);
+      prodTech.push({ name: k, prod: Number(p.toFixed(0)), hrsReal: v.reales, hrsEst: v.estandar });
+      cargaTech.push({ name: k, horas: Number(v.reales.toFixed(1)) });
+    });
+
+    if (prodTech.length === 0) {
+       prodTech = [{ name: 'Sin Datos', prod: 0, hrsReal: 0, hrsEst: 0 }];
+       cargaTech = [{ name: 'Sin Datos', horas: 0 }];
+    } else {
+      prodTech.sort((a,b) => b.prod - a.prod);
+      cargaTech.sort((a,b) => b.horas - a.horas);
+    }
+
+    const horasEvolucionData = last12Months.slice(-6).map(m => {
+      return {
+        month: m.name,
+        reales: Number(m.reales.toFixed(1)),
+        estandar: Number(m.estandar.toFixed(1)),
+        disponibles: 180 * numTech
+      };
+    });
+
+    return {
+      kpisObj: {
+        productividad: Math.round(productividad),
+        cumplimiento: ots_finalizadas === 0 && ots_atraso === 0 ? 100 : Math.round(cumplimiento),
+        utilizacion: Math.min(100, Math.round(utilizacion)),
+        tecnicos_activos,
+        horas_registradas: Number(horas_registradas.toFixed(1)),
+        horas_estandar: Number(horas_estandar.toFixed(1)),
+        ots_finalizadas,
+        ots_atraso
+      },
+      productividadTecnicosData: prodTech,
+      cargaTrabajoTecnicosData: cargaTech,
+      horasEvolucionData,
+      detailsData: techMap
+    };
+  }, [ordenesTrabajo]);
 
   const handleDetailClick = (type: string) => {
     setActiveDetail(type);
@@ -61,6 +169,7 @@ export default function KpiRRHH() {
                   <tr>
                     <th className="text-left font-bold text-[10px] uppercase text-slate-400 tracking-wider pb-3">Técnico</th>
                     <th className="text-right font-bold text-[10px] uppercase text-slate-400 tracking-wider pb-3">Estándar (Hrs)</th>
+                    <th className="text-right font-bold text-[10px] uppercase text-slate-400 tracking-wider pb-3">Reales (Hrs)</th>
                     <th className="text-right font-bold text-[10px] uppercase text-slate-400 tracking-wider pb-3">Productividad</th>
                   </tr>
                 </thead>
@@ -69,13 +178,14 @@ export default function KpiRRHH() {
                     productividadTecnicosData.map((row, idx) => (
                       <tr key={idx} onClick={() => setSelectedWorker(row.name)} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                         <td className="py-3 px-2 font-bold text-slate-700 dark:text-slate-300">{row.name}</td>
-                        <td className="py-3 px-2 text-right font-medium text-slate-600 dark:text-slate-400">{(row.prod * 1.1).toFixed(1)}h</td>
-                        <td className="py-3 px-2 text-right font-bold text-emerald-500">{row.prod}%</td>
+                        <td className="py-3 px-2 text-right font-medium text-slate-600 dark:text-slate-400">{Number(row.hrsEst).toFixed(1)}h</td>
+                        <td className="py-3 px-2 text-right font-medium text-slate-600 dark:text-slate-400">{Number(row.hrsReal).toFixed(1)}h</td>
+                        <td className="py-3 px-2 text-right font-bold text-emerald-500">{row.prod === -1 ? '0%' : `${row.prod}%`}</td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={3} className="py-6 text-center text-slate-500 text-xs font-medium">Sin datos registrados</td>
+                      <td colSpan={4} className="py-6 text-center text-slate-500 text-xs font-medium">Sin datos registrados</td>
                     </tr>
                   )}
                 </tbody>
@@ -405,96 +515,125 @@ export default function KpiRRHH() {
 
       {/* Worker Detail Modal */}
       {selectedWorker && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
-            {/* Modal Header */}
-            <div className="p-6 pb-4 flex justify-between items-start border-b border-slate-100 dark:border-slate-800/50">
-              <div className="flex gap-4 items-center">
-                <div className="w-14 h-14 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center text-2xl font-black shadow-sm border border-blue-100 dark:border-blue-800/50">
-                  {selectedWorker.charAt(0)}
-                </div>
-                <div>
-                  <h2 className="text-xl font-black text-slate-900 dark:text-white leading-tight">{selectedWorker}</h2>
-                  <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 tracking-widest uppercase mt-1">Ficha de Desempeño Técnico</p>
-                </div>
-              </div>
-              <button onClick={() => setSelectedWorker(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+        (() => { 
+          const workerStats = detailsData[selectedWorker];
+          const score = workerStats && workerStats.reales > 0 ? Math.min(100, Math.round((workerStats.estandar / workerStats.reales) * 100)) : 0;
+          const diagText = score > 100 ? "Sobresaliente. Evaluar promoción o bonificación." : (score > 85 ? "Rendimiento óptimo dentro del estándar esperado." : "Baja eficiencia. Evaluar falta de herramientas o capacitación.");
+          const colorScore = score >= 100 ? 'bg-emerald-500' : (score >= 85 ? 'bg-amber-500' : 'bg-rose-500');
+          const colorScoreText = score >= 100 ? 'text-emerald-500' : (score >= 85 ? 'text-amber-500' : 'text-rose-500');
 
-            {/* Modal Content */}
-            <div className="p-6 pt-5 space-y-6 overflow-y-auto">
-              
-              {/* Top Cards */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-100 dark:border-sky-800/50 rounded-xl p-4 flex flex-col justify-center">
-                  <h3 className="text-[10px] font-bold text-sky-600 dark:text-sky-400 uppercase tracking-widest mb-1">Prod. Preventivos</h3>
-                  <span className="text-2xl font-black text-sky-600 dark:text-sky-400">0%</span>
-                </div>
-                <div className="bg-fuchsia-50 dark:bg-fuchsia-900/20 border border-fuchsia-100 dark:border-fuchsia-800/50 rounded-xl p-4 flex flex-col justify-center">
-                  <h3 className="text-[10px] font-bold text-fuchsia-600 dark:text-fuchsia-400 uppercase tracking-widest mb-1">MTTR Correctivo</h3>
-                  <span className="text-2xl font-black text-fuchsia-600 dark:text-fuchsia-400">0 h</span>
-                </div>
-              </div>
-
-              {/* Score Card */}
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm relative overflow-hidden">
-                <div className="flex justify-between items-center mb-4 relative z-10">
-                  <h3 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Score Confiabilidad</h3>
-                  <span className="text-3xl font-black text-slate-400 dark:text-slate-500">0%</span>
-                </div>
-                <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full mb-4 relative z-10">
-                  <div className="h-full bg-slate-300 dark:bg-slate-700 rounded-full" style={{ width: '0%' }}></div>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 text-center italic relative z-10">Sin datos registrados.</p>
-              </div>
-
-              {/* Análises */}
-              <div>
-                <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3">Análisis del Periodo</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-4 border border-slate-200 dark:border-slate-700/50 dark:bg-slate-800/50 rounded-xl bg-slate-50">
-                    <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Valor Producido (HH)</span>
-                    <span className="text-sm font-black text-emerald-600 dark:text-emerald-500">$ 0</span>
+          const workerOts = ordenesTrabajo.filter(ot => (ot.tecnicoResponsable || ot.externo_nombre || 'Sin Asignar') === selectedWorker);
+          const valProducido = workerStats ? Math.round(workerStats.estandar * 15000) : 0; // mock $15,000 per hour
+          const costoReal = workerStats ? Math.round(workerStats.reales * 15000) : 0;
+          
+          return (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+                {/* Modal Header */}
+                <div className="p-6 pb-4 flex justify-between items-start border-b border-slate-100 dark:border-slate-800/50">
+                  <div className="flex gap-4 items-center">
+                    <div className="w-14 h-14 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center text-2xl font-black shadow-sm border border-blue-100 dark:border-blue-800/50">
+                      {selectedWorker.charAt(0)}
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-black text-slate-900 dark:text-white leading-tight">{selectedWorker}</h2>
+                      <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 tracking-widest uppercase mt-1">Ficha de Desempeño Técnico</p>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center p-4 border border-slate-200 dark:border-slate-700/50 dark:bg-slate-800/50 rounded-xl bg-slate-50">
-                    <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Costo Real Pagado</span>
-                    <span className="text-sm font-black text-rose-600 dark:text-rose-500">$ 0</span>
+                  <button onClick={() => setSelectedWorker(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Modal Content */}
+                <div className="p-6 pt-5 space-y-6 overflow-y-auto">
+                  
+                  {/* Top Cards */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-100 dark:border-sky-800/50 rounded-xl p-4 flex flex-col justify-center">
+                      <h3 className="text-[10px] font-bold text-sky-600 dark:text-sky-400 uppercase tracking-widest mb-1">Total OTs</h3>
+                      <span className="text-2xl font-black text-sky-600 dark:text-sky-400">{workerOts.length}</span>
+                    </div>
+                    <div className="bg-fuchsia-50 dark:bg-fuchsia-900/20 border border-fuchsia-100 dark:border-fuchsia-800/50 rounded-xl p-4 flex flex-col justify-center">
+                      <h3 className="text-[10px] font-bold text-fuchsia-600 dark:text-fuchsia-400 uppercase tracking-widest mb-1">Hrs Registradas</h3>
+                      <span className="text-2xl font-black text-fuchsia-600 dark:text-fuchsia-400">{workerStats?.reales.toFixed(1) || 0} h</span>
+                    </div>
                   </div>
+
+                  {/* Score Card */}
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm relative overflow-hidden">
+                    <div className="flex justify-between items-center mb-4 relative z-10">
+                      <h3 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Score Confiabilidad</h3>
+                      <span className={`text-3xl font-black ${colorScoreText}`}>{score}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full mb-4 relative z-10">
+                      <div className={`h-full ${colorScore} rounded-full transition-all duration-1000`} style={{ width: `${Math.min(score, 100)}%` }}></div>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 text-center italic relative z-10">{diagText}</p>
+                  </div>
+
+                  {/* Análises */}
+                  <div>
+                    <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3">Análisis del Periodo</h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center p-4 border border-slate-200 dark:border-slate-700/50 dark:bg-slate-800/50 rounded-xl bg-slate-50">
+                        <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Valor Producido (Aprox HH)</span>
+                        <span className="text-sm font-black text-emerald-600 dark:text-emerald-500">$ {valProducido.toLocaleString('es-CL')}</span>
+                      </div>
+                      <div className="flex justify-between items-center p-4 border border-slate-200 dark:border-slate-700/50 dark:bg-slate-800/50 rounded-xl bg-slate-50">
+                        <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Costo Real Imputado</span>
+                        <span className="text-sm font-black text-rose-600 dark:text-rose-500">$ {costoReal.toLocaleString('es-CL')}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Diagnóstico */}
+                  <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 p-4 rounded-xl flex items-start gap-3">
+                    <Lightbulb className="w-5 h-5 text-amber-600 dark:text-amber-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-amber-900 dark:text-amber-200 leading-snug">
+                      <span className="font-bold">Nota Administrativa:</span> Los valores de costo son una estimación basada en $15,000 CLP / Hora.
+                    </p>
+                  </div>
+
+                  {/* Table */}
+                  <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-50 dark:bg-slate-800/50">
+                        <tr className="border-b border-slate-200 dark:border-slate-800">
+                          <th className="text-left font-bold text-[10px] uppercase text-slate-400 tracking-wider py-3 px-4">OT</th>
+                          <th className="text-left font-bold text-[10px] uppercase text-slate-400 tracking-wider py-3 px-4">Equipo</th>
+                          <th className="text-right font-bold text-[10px] uppercase text-slate-400 tracking-wider py-3 px-4">Hrs/Est.</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {workerOts.length > 0 ? (
+                           workerOts.slice(0, 5).map(ot => {
+                             let tR = 0;
+                             if (ot.tiempoTrabajadoSegundos) tR = ot.tiempoTrabajadoSegundos / 3600;
+                             else if (ot.tfs_minutos) tR = ot.tfs_minutos / 60;
+                             const color = tR > 0 ? 'text-emerald-500' : 'text-slate-400';
+                             return (
+                               <tr key={ot.id}>
+                                  <td className="py-2 px-4 font-medium text-slate-700 dark:text-slate-300">{ot.folio}</td>
+                                  <td className="py-2 px-4 text-slate-600 dark:text-slate-400">{ot.vehiculoId?.substring(0, 8)}</td>
+                                  <td className={`py-2 px-4 text-right ${color} font-bold`}>{tR > 0 ? tR.toFixed(1) : '-'}</td>
+                               </tr>
+                             );
+                           })
+                        ) : (
+                          <tr>
+                            <td colSpan={3} className="py-6 px-4 text-center text-slate-500 text-xs font-medium">Sin registros recientes</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
                 </div>
               </div>
-
-              {/* Diagnóstico */}
-              <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 p-4 rounded-xl flex items-start gap-3">
-                <Lightbulb className="w-5 h-5 text-amber-600 dark:text-amber-500 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-amber-900 dark:text-amber-200 leading-snug">
-                  <span className="font-bold">Diagnóstico:</span> Baja eficiencia. Evaluar falta de herramientas o capacitación.
-                </p>
-              </div>
-
-              {/* Table */}
-              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 dark:bg-slate-800/50">
-                    <tr className="border-b border-slate-200 dark:border-slate-800">
-                      <th className="text-left font-bold text-[10px] uppercase text-slate-400 tracking-wider py-3 px-4">OT</th>
-                      <th className="text-left font-bold text-[10px] uppercase text-slate-400 tracking-wider py-3 px-4">Equipo</th>
-                      <th className="text-left font-bold text-[10px] uppercase text-slate-400 tracking-wider py-3 px-4">SMRT</th>
-                      <th className="text-right font-bold text-[10px] uppercase text-slate-400 tracking-wider py-3 px-4">Calidad</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    <tr>
-                      <td colSpan={4} className="py-6 px-4 text-center text-slate-500 text-xs font-medium">Sin registros recientes</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
             </div>
-          </div>
-        </div>
+          );
+        })()
       )}
 
     </div>

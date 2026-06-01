@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { AlertCircle, Calendar, Wrench, Activity, ShieldAlert, Search, Filter, TrendingUp, X, Info, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import {
   ComposedChart,
@@ -13,16 +13,90 @@ import {
   ReferenceLine
 } from 'recharts';
 import { cn } from '../../lib/utils';
+import { useAppContext } from '../../context/AppContext';
 
 export default function AnalisisFallas() {
   const [dateRange, setDateRange] = useState('Ultimos 30 dias');
   const [paretoLimit, setParetoLimit] = useState(80);
   const [activeDetail, setActiveDetail] = useState<string | null>(null);
   
-  // Simulated Pareto Data
-  const paretoData: any[] = [];
+  const ctx = useAppContext();
+  const ordenesTrabajo = ctx?.ordenesTrabajo || [];
+  const tiposFalla = ctx?.tiposFalla || [];
 
-  const failureDetails: any[] = [];
+  const { paretoData, totalFallas, mttrPromedio, costoTotal, causeMax } = useMemo(() => {
+    // Only correctivas or evaluativas that represent failures
+    const ots = ordenesTrabajo.filter(ot => ot.tipo === 'CORRECTIVA' || ot.tipo === 'CORRECTIVA_NEUMATICOS');
+    let totalCosto = 0;
+    let totalMttr = 0;
+    
+    // Fallas Map by type
+    const fallasCount: Record<string, { count: number, tfs: number, desc: string, criticidad: string, causa: string }> = {};
+
+    ots.forEach(ot => {
+      const costo = (ot.costoManoObraHH || 0) + (ot.costoManoObraTareas || 0) + (ot.costoInsumos || 0);
+      totalCosto += costo;
+      
+      let tfs = ot.tfs_minutos || 0;
+      if (tfs === 0 && ot.tiempoTrabajadoSegundos) {
+        tfs = ot.tiempoTrabajadoSegundos / 60;
+      }
+      if (tfs === 0) tfs = 60; // fallback if no data
+      totalMttr += tfs;
+
+      const tipoFallaId = ot.tipo_falla_id || 'Sin Tipo de Falla';
+      let nombreFalla = ot.tipoFalla || 'Desconocida';
+      
+      let criticidad = ot.prioridad || 'MEDIA';
+      let causa = 'Desgaste / Operación';
+
+      const tfObj = tiposFalla.find(tf => tf.id === tipoFallaId);
+      if (tfObj) {
+         nombreFalla = tfObj.nombre || nombreFalla;
+      }
+
+      if (!fallasCount[nombreFalla]) {
+        fallasCount[nombreFalla] = { count: 0, tfs: 0, desc: ot.diagnosticoEvaluacion || 'Falla registrada', criticidad, causa };
+      }
+      fallasCount[nombreFalla].count++;
+      fallasCount[nombreFalla].tfs += tfs;
+    });
+
+    let arr = Object.keys(fallasCount).map(k => ({
+      name: k,
+      count: fallasCount[k].count,
+      tfs: Math.round(fallasCount[k].tfs),
+      desc: fallasCount[k].desc,
+      criticidad: fallasCount[k].criticidad,
+      causa: fallasCount[k].causa
+    }));
+
+    arr.sort((a,b) => b.count - a.count);
+
+    const totalF = ots.length;
+    let cumulative = 0;
+    const pData = arr.map(a => {
+      const pct = totalF > 0 ? (a.count / totalF) * 100 : 0;
+      cumulative += pct;
+      let color = 'text-amber-500';
+      if (a.criticidad === 'ALTA') color = 'text-rose-500';
+      if (a.criticidad === 'BAJA') color = 'text-blue-500';
+      return {
+        ...a,
+        impacto: Number(pct.toFixed(1)),
+        cumulative: Number(cumulative.toFixed(1)),
+        color
+      }
+    });
+
+    return {
+      paretoData: pData,
+      totalFallas: totalF,
+      mttrPromedio: totalF > 0 ? (totalMttr / totalF / 60).toFixed(1) : '0',
+      costoTotal: totalCosto,
+      causeMax: arr.length > 0 ? { name: arr[0].name, pct: ((arr[0].count / totalF) * 100).toFixed(1) } : { name: 'S/I', pct: '0' }
+    };
+  }, [ordenesTrabajo, tiposFalla]);
 
   const renderSidebarContent = () => {
     if (!activeDetail) return null;
@@ -152,10 +226,10 @@ export default function AnalisisFallas() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
-          { icon: ShieldAlert, label: 'Fallas Reportadas', value: '0', trend: '0%', trendUp: false, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-900/20' },
-          { icon: Activity, label: 'MTTR Promedio', value: '0h', trend: '0%', trendUp: false, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-          { icon: TrendingUp, label: 'Falla Principal', value: 'S/I', subValue: '0% del total', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-          { icon: Wrench, label: 'Costo Correctivos', value: '$0', trend: '0%', trendUp: false, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
+          { icon: ShieldAlert, label: 'Fallas Reportadas', value: totalFallas.toString(), trend: '0%', trendUp: false, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-900/20' },
+          { icon: Activity, label: 'MTTR Promedio', value: `${mttrPromedio}h`, trend: '0%', trendUp: false, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+          { icon: TrendingUp, label: 'Falla Principal', value: causeMax.name.length > 12 ? causeMax.name.substring(0, 12) + '...' : causeMax.name, subValue: `${causeMax.pct}% del total`, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+          { icon: Wrench, label: 'Costo Correctivos', value: `$${costoTotal.toLocaleString('es-CL')}`, trend: '0%', trendUp: false, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
         ].map((kpi, i) => (
           <div 
             key={i} 
