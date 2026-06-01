@@ -20,6 +20,7 @@ export default function ReservasTurismo() {
   const [reservasTurismo, setReservasTurismo] = useState<ReservaTurismo[]>([]);
   const [conductores, setConductores] = useState<any[]>([]);
   const [vehiculos, setVehiculos] = useState<any[]>([]);
+  const [categoriasDisponibles, setCategoriasDisponibles] = useState<string[]>(['Web', 'Whatsapp', 'Correo', 'Minera', 'Extranjero', 'Operador']);
 
   const loadData = async () => {
     if (!activeCompanyId) return;
@@ -83,6 +84,11 @@ export default function ReservasTurismo() {
       }));
 
       setReservasTurismo(formattedReservas);
+
+      const defaultCategorias = ['Web', 'Whatsapp', 'Correo', 'Minera', 'Extranjero', 'Operador'];
+      const dbCategories = (reservasData || []).map((dbR: any) => dbR.categoria).filter(Boolean);
+      const uniqueCats = Array.from(new Set([...defaultCategorias, ...dbCategories])) as string[];
+      setCategoriasDisponibles(uniqueCats);
 
       let condQuery = supabase.from('colaborador').select('id, nombre, estado').in('rol', ['Conductor', 'Chofer', 'Conductor Interprovincial', 'Conductor Interno Mina']);
       let vehQuery = supabase.from('vehiculo').select('id, patente, marca, estado');
@@ -455,10 +461,9 @@ export default function ReservasTurismo() {
               onChange={(e) => setFiltroCategoria(e.target.value)}
             >
               <option value="">Todas las Categorías</option>
-              <option value="Web">Web (Azul)</option>
-              <option value="Minera">Minera (Verde)</option>
-              <option value="Extranjero">Extranjero (Fucsia)</option>
-              <option value="Operador">Operador (Naranja)</option>
+              {categoriasDisponibles.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
             </select>
             <select 
               className="px-3 py-2 border rounded rounded-md dark:border-slate-800 text-sm focus:ring-2 focus:ring-blue-500"
@@ -920,7 +925,7 @@ export default function ReservasTurismo() {
                         value={formReserva.categoria}
                         onChange={(e) => setFormReserva({ ...formReserva, categoria: e.target.value as any })}
                       >
-                        {['Web', 'Whatsapp', 'Correo', 'Minera', 'Extranjero', 'Operador'].map((cat) => (
+                        {categoriasDisponibles.map((cat) => (
                           <option key={cat} value={cat}>{cat}</option>
                         ))}
                       </select>
