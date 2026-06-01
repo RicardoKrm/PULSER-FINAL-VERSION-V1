@@ -99,6 +99,8 @@ export interface Vehiculo {
   patente: string;
   modelo?: string;
   marca?: string;
+  ano?: number | string;
+  vin?: string;
 }
 
 export interface Tarea {

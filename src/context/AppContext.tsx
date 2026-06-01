@@ -122,12 +122,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // Fetch Vehiculos
       const { data: vehiculosData } = await supabase.from('vehiculo').select('*').eq('empresa_id', activeCompanyId);
       if (vehiculosData) {
-        setVehiculos(vehiculosData.map(v => ({
-          id: v.id,
-          patente: v.patente || v.numero_interno || 'Sin Patente',
-          modelo: v.modelo || '',
-          marca: v.marca || ''
-        })));
+        setVehiculos(vehiculosData.map(v => {
+          const detalles = v.detalles || {};
+          return {
+            id: v.id,
+            patente: v.patente || v.numero_interno || 'Sin Patente',
+            modelo: v.modelo || detalles.modelo || '',
+            marca: v.marca || detalles.marca || '',
+            ano: v.anio || v.ano || detalles.ano || detalles.anio || '',
+            vin: v.vin || v.chasis || detalles.vin || detalles.chasis || ''
+          };
+        }));
       }
 
       // Fetch Pautas

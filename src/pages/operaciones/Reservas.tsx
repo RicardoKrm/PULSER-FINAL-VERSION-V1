@@ -896,22 +896,15 @@ export default function ReservasTurismo() {
                 <div className="p-6 grid md:grid-cols-3 gap-6 bg-slate-50 dark:bg-slate-900/50">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Categoría de Reserva</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {['Web', 'Whatsapp', 'Correo'].map((cat) => (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => setFormReserva({ ...formReserva, categoria: cat as any })}
-                          className={`px-3 py-2 text-xs font-bold border rounded-lg dark:border-slate-800 transition-all ${
-                            formReserva.categoria === cat 
-                              ? 'bg-blue-600 border-blue-600 text-white shadow-md transform scale-105' 
-                              : 'bg-white dark:bg-slate-800/50 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-blue-400'
-                          }`}
-                        >
-                          {cat}
-                        </button>
+                    <select 
+                      className="w-full mt-2 px-3 py-2 border rounded-lg dark:border-slate-800 text-sm font-bold bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                      value={formReserva.categoria}
+                      onChange={(e) => setFormReserva({ ...formReserva, categoria: e.target.value as any })}
+                    >
+                      {['Web', 'Whatsapp', 'Correo', 'Minera', 'Extranjero', 'Operador'].map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
                       ))}
-                    </div>
+                    </select>
                   </div>
                   <div className="space-y-2 col-span-2">
                     <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Datos del Cliente Reservante</label>
@@ -974,41 +967,46 @@ export default function ReservasTurismo() {
                   </div>
                 </div>
 
-                {/* Bloque 2: Ruta y Horario */}
+                                {/* Bloque 2 & 3: Pasajeros + Ruta (Left) and Horario + Logistica (Right) */}
                 <div className="p-6 grid md:grid-cols-2 gap-8 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
-                   <div className="space-y-4">
+                   {/* Left Side: Pasajeros y Ruta */}
+                   <div className="space-y-6">
                       <div className="flex items-center justify-between">
-                        <h3 className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-emerald-500" /> RUTA Y SEGUIMIENTO
-                        </h3>
-                        <button type="button" onClick={() => setMostrarCrearRuta(true)} className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline">
-                          + Nueva Ruta Maestra
-                        </button>
+                         <h3 className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                           <Users className="h-4 w-4 text-blue-500" /><MapPin className="h-4 w-4 text-emerald-500 -ml-1" /> DETALLES DEL PASAJERO (PAX) Y RUTA
+                         </h3>
+                         <button type="button" onClick={() => setMostrarCrearRuta(true)} className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline">
+                           + Nueva Ruta Maestra
+                         </button>
                       </div>
-                      {rutasGuardadas.length > 0 && (
-                        <div className="mb-2">
-                          <select
-                            className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-emerald-50 dark:bg-emerald-900/10 font-bold text-emerald-700 dark:text-emerald-400 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all shadow-sm"
-                            onChange={(e) => {
-                              const ruta = rutasGuardadas.find(r => r.id === e.target.value);
-                              if (ruta) {
-                                const mapLink = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(ruta.origen)}&destination=${encodeURIComponent(ruta.destino)}`;
-                                setFormReserva({
-                                  ...formReserva,
-                                  lugares: { ...formReserva.lugares, origen: ruta.origen, destino: ruta.destino },
-                                  enlaceMapa: mapLink as any
-                                });
-                              }
-                            }}
-                          >
-                            <option value="">Cargar Ruta Maestra Guardada...</option>
-                            {rutasGuardadas.map(r => (
-                              <option key={r.id} value={r.id}>{r.nombre || `${r.origen} - ${r.destino}`}</option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
+
                       <div className="space-y-3">
+                         <div className="flex justify-between items-center mb-2 px-1">
+                           <span className="text-[10px] font-bold text-slate-500">Pasajeros Adicionales con Rutas</span>
+                           <button 
+                             type="button" 
+                             onClick={() => setFormReserva({...formReserva, pasajerosList: [...formReserva.pasajerosList, {nombre: '', telefono: '', origen: '', destino: ''}]})}
+                             className="text-[10px] font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded"
+                           >
+                             + Agregar Pasajero
+                           </button>
+                         </div>
+                         
+                         <div className="grid grid-cols-2 gap-3">
+                            <input 
+                               type="text" required placeholder="Nombre de quien viaja"
+                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                               value={formReserva.pasajeros.nombre}
+                               onChange={(e) => setFormReserva({...formReserva, pasajeros: {...formReserva.pasajeros, nombre: e.target.value}})}
+                            />
+                            <input 
+                               type="text" placeholder="Teléfono"
+                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                               value={formReserva.pasajeros.telefono}
+                               onChange={(e) => setFormReserva({...formReserva, pasajeros: {...formReserva.pasajeros, telefono: e.target.value}})}
+                            />
+                         </div>
+                         
                          <div className="grid grid-cols-2 gap-3">
                             <input 
                                type="text" required placeholder="Origen (ej: Hotel / Oficina)"
@@ -1018,21 +1016,34 @@ export default function ReservasTurismo() {
                                onChange={(e) => setFormReserva({...formReserva, lugares: {...formReserva.lugares, origen: e.target.value}})}
                             />
                             <input 
-                               type="text" placeholder="N° Vuelo (Tracking)"
-                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                               value={formReserva.lugares.numeroVuelo}
-                               onChange={(e) => setFormReserva({...formReserva, lugares: {...formReserva.lugares, numeroVuelo: e.target.value}})}
-                            />
-                         </div>
-                         <div className="grid grid-cols-2 gap-3">
-                            <input 
-                               type="text" required placeholder="Destino Final del Servicio"
+                               type="text" required placeholder="Destino Final"
                                list="lugares-list"
                                className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
                                value={formReserva.lugares.destino}
                                onChange={(e) => setFormReserva({...formReserva, lugares: {...formReserva.lugares, destino: e.target.value}})}
                             />
-                            <div className="flex gap-1 relative">
+                         </div>
+
+                         <div className="grid grid-cols-2 gap-3">
+                            <input 
+                               type="text" placeholder="N° Vuelo (Tracking)"
+                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                               value={formReserva.lugares.numeroVuelo}
+                               onChange={(e) => setFormReserva({...formReserva, lugares: {...formReserva.lugares, numeroVuelo: e.target.value}})}
+                            />
+                            <div className="flex flex-col relative">
+                               <span className="absolute -top-3 left-1 text-[10px] text-slate-500 font-bold bg-slate-50 dark:bg-slate-900/50 px-1">Numero de pasajeros</span>
+                               <input 
+                                  type="number" required min="1"
+                                  className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-slate-100 dark:bg-slate-800 text-center dark:text-slate-100 font-bold"
+                                  value={isNaN(formReserva.pasajeros.cantidad) ? '' : formReserva.pasajeros.cantidad}
+                                  onChange={(e) => setFormReserva({...formReserva, pasajeros: {...formReserva.pasajeros, cantidad: parseInt(e.target.value) || 0}})}
+                               />
+                            </div>
+                         </div>
+                         
+                         <div className="flex gap-2 relative items-center">
+                            <div className="flex-1 relative">
                                <input 
                                   type="url" placeholder="Enlace Google Maps (Opc)"
                                   className="w-full pl-8 pr-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
@@ -1040,207 +1051,169 @@ export default function ReservasTurismo() {
                                   onChange={(e) => setFormReserva({...formReserva, enlaceMapa: e.target.value as any})}
                                />
                                <MapPin className="absolute left-2.5 top-2.5 h-4 w-4 text-emerald-500" />
-                               {formReserva.lugares.origen && formReserva.lugares.destino && !(formReserva as any).enlaceMapa && (
-                                  <button
-                                     type="button"
-                                     title="Generar link de Maps"
-                                     onClick={() => {
-                                        const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(formReserva.lugares.origen)}&destination=${encodeURIComponent(formReserva.lugares.destino)}`;
-                                        setFormReserva({...formReserva, enlaceMapa: url as any});
-                                     }}
-                                     className="bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 font-bold text-xs px-2 py-1 rounded hover:bg-emerald-200"
-                                  >
-                                      Generar
-                                  </button>
-                               )}
-                               {(formReserva as any).enlaceMapa && (
-                                  <a 
-                                     href={(formReserva as any).enlaceMapa} 
-                                     target="_blank" 
-                                     rel="noopener noreferrer"
-                                     className="bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400 font-bold text-xs px-3 py-2 rounded hover:bg-blue-200 flex items-center justify-center whitespace-nowrap"
-                                  >
-                                      Abrir Ruta
-                                  </a>
-                               )}
                             </div>
+                            
+                            {formReserva.lugares.origen && formReserva.lugares.destino && !(formReserva as any).enlaceMapa && (
+                               <button
+                                  type="button"
+                                  title="Generar link de Maps"
+                                  onClick={() => {
+                                     const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(formReserva.lugares.origen)}&destination=${encodeURIComponent(formReserva.lugares.destino)}`;
+                                     setFormReserva({...formReserva, enlaceMapa: url as any});
+                                  }}
+                                  className="bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 font-bold text-xs px-3 py-2 rounded md:rounded-lg hover:bg-emerald-200"
+                               >
+                                   Generar
+                               </button>
+                            )}
+                            {(formReserva as any).enlaceMapa && (
+                               <a 
+                                  href={(formReserva as any).enlaceMapa} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400 font-bold text-xs px-4 py-2 rounded-lg hover:bg-blue-200 flex items-center justify-center whitespace-nowrap shadow-sm"
+                               >
+                                   Abrir Ruta
+                               </a>
+                            )}
                          </div>
+
+                         {formReserva.pasajerosList.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
+                               {formReserva.pasajerosList.map((p, idx) => (
+                                 <div key={idx} className="bg-white dark:bg-slate-900/30 p-2 rounded border border-slate-100 dark:border-slate-800 mb-2 relative">
+                                   <button type="button" onClick={() => {
+                                     const list = [...formReserva.pasajerosList];
+                                     list.splice(idx, 1);
+                                     setFormReserva({...formReserva, pasajerosList: list});
+                                   }} className="absolute top-1 right-1 text-red-500 hover:text-red-700">
+                                     <XCircle className="h-4 w-4" />
+                                   </button>
+                                   <div className="grid grid-cols-2 gap-2 mb-2 pr-6">
+                                     <input type="text" placeholder="Nombre" className="w-full px-2 py-1 text-xs border rounded-md dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={p.nombre} onChange={e => { const l = [...formReserva.pasajerosList]; l[idx].nombre = e.target.value; setFormReserva({...formReserva, pasajerosList: l}); }} />
+                                     <input type="text" placeholder="Teléfono" className="w-full px-2 py-1 text-xs border rounded-md dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={p.telefono} onChange={e => { const l = [...formReserva.pasajerosList]; l[idx].telefono = e.target.value; setFormReserva({...formReserva, pasajerosList: l}); }} />
+                                   </div>
+                                   <div className="grid grid-cols-2 gap-2">
+                                     <input type="text" placeholder="Origen" className="w-full px-2 py-1 text-xs border rounded-md dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={p.origen} onChange={e => { const l = [...formReserva.pasajerosList]; l[idx].origen = e.target.value; setFormReserva({...formReserva, pasajerosList: l}); }} />
+                                     <input type="text" placeholder="Destino" className="w-full px-2 py-1 text-xs border rounded-md dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={p.destino} onChange={e => { const l = [...formReserva.pasajerosList]; l[idx].destino = e.target.value; setFormReserva({...formReserva, pasajerosList: l}); }} />
+                                   </div>
+                                 </div>
+                               ))}
+                            </div>
+                         )}
+
                          <datalist id="lugares-list">
                            {lugaresComunes.map((l, idx) => <option key={idx} value={l} />)}
                          </datalist>
-                         <input 
-                            type="text" required placeholder="Nombre de la Reserva (ej: City Tour Premium)"
-                            className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 font-bold dark:text-slate-100"
-                            value={formReserva.servicio}
-                            onChange={(e) => setFormReserva({...formReserva, servicio: e.target.value})}
-                         />
                       </div>
                    </div>
 
-                   <div className="space-y-4">
-                      <h3 className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                        <CalendarIcon className="h-4 w-4 text-fuchsia-500" /> DÍA Y HORA DE RESERVA
-                      </h3>
-                      <div className="grid grid-cols-3 gap-3">
-                         <div className="col-span-1">
-                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Fecha</span>
-                            <input 
-                               type="date" required
-                               className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                               value={formReserva.fecha}
-                               onChange={(e) => setFormReserva({...formReserva, fecha: e.target.value})}
-                            />
-                         </div>
-                         <div className="col-span-2">
-                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Hora Inicio</span>
-                            <input 
-                               type="time" required
-                               className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                               value={formReserva.horaInicio}
-                               onChange={(e) => setFormReserva({...formReserva, horaInicio: e.target.value})}
-                            />
-                         </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-3">
-                         <div className="col-span-1">
-                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Vehículo</span>
-                            <select 
-                               required className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                               value={formReserva.tipoVehiculo}
-                               onChange={(e) => setFormReserva({...formReserva, tipoVehiculo: e.target.value as any})}
-                            >
-                               <option value="SUV">SUV</option>
-                               <option value="Van">Van</option>
-                               <option value="Mini Bus">Mini Bus</option>
-                               <option value="Bus">Bus</option>
-                               <option value="Sedán">Sedán</option>
-                               <option value="Otros">Otros</option>
-                            </select>
-                         </div>
-                         <div className="col-span-2">
-                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Asignar Chofer</span>
-                            <select 
-                               className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                               value={formReserva.conductorId}
-                               onChange={(e) => setFormReserva({...formReserva, conductorId: e.target.value})}
-                            >
-                               <option value="">Seleccione Conductor (Opcional)</option>
-                               {conductores.map(c => (
-                                 <option key={c.id} value={c.id}>{c.nombre} ({c.estado})</option>
-                               ))}
-                            </select>
-                         </div>
-                      </div>
-                   </div>
-                </div>
-
-                {/* Bloque 3: Pasajeros y Maletas */}
-                <div className="p-6 grid md:grid-cols-2 gap-8 border-b border-slate-100 dark:border-slate-800">
-                   <div className="space-y-4">
-                      <h3 className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                        <Users className="h-4 w-4 text-blue-500" /> DETALLES DEL PASAJERO (PAX)
-                      </h3>
-                      <div className="space-y-3">
-                         <div className="grid grid-cols-2 gap-3">
-                            <input 
-                               type="text" required placeholder="Nombre de quien viaja"
-                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-slate-50 dark:bg-slate-800/50 dark:text-slate-100"
-                               value={formReserva.pasajeros.nombre}
-                               onChange={(e) => setFormReserva({...formReserva, pasajeros: {...formReserva.pasajeros, nombre: e.target.value}})}
-                            />
-                            <input 
-                               type="number" required placeholder="Total PAX" min="1"
-                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-slate-50 dark:bg-slate-800/50 text-center dark:text-slate-100"
-                               value={formReserva.pasajeros.cantidad}
-                               onChange={(e) => setFormReserva({...formReserva, pasajeros: {...formReserva.pasajeros, cantidad: parseInt(e.target.value)}})}
-                            />
-                         </div>
-
-                          <div className="pt-2 border-t border-slate-200 dark:border-slate-800/50 mt-2">
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="text-[10px] font-bold text-slate-500">Pasajeros Adicionales con Rutas</span>
-                              <button 
-                                type="button" 
-                                onClick={() => setFormReserva({...formReserva, pasajerosList: [...formReserva.pasajerosList, {nombre: '', telefono: '', origen: '', destino: ''}]})}
-                                className="text-[10px] font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded"
-                              >
-                                + Agregar Pasajero
-                              </button>
+                   {/* Right Side: Día/Hora + Logistica */}
+                   <div className="space-y-6">
+                      <div className="space-y-4">
+                         <h3 className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                           <CalendarIcon className="h-4 w-4 text-fuchsia-500" /> DÍA Y HORA DE RESERVA
+                         </h3>
+                         <div className="grid grid-cols-3 gap-3">
+                            <div className="col-span-1">
+                               <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Fecha</span>
+                               <input 
+                                  type="date" required
+                                  className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100 font-medium"
+                                  value={formReserva.fecha}
+                                  onChange={(e) => setFormReserva({...formReserva, fecha: e.target.value})}
+                               />
                             </div>
-                            {formReserva.pasajerosList.map((p, idx) => (
-                              <div key={idx} className="bg-white dark:bg-slate-900/30 p-2 rounded border border-slate-100 dark:border-slate-800 mb-2 relative">
-                                <button type="button" onClick={() => {
-                                  const list = [...formReserva.pasajerosList];
-                                  list.splice(idx, 1);
-                                  setFormReserva({...formReserva, pasajerosList: list});
-                                }} className="absolute top-1 right-1 text-red-500 hover:text-red-700">
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                  </svg>
-                                </button>
-                                <div className="grid grid-cols-2 gap-2 mb-2 pr-6">
-                                  <input type="text" placeholder="Nombre" className="w-full px-2 py-1 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={p.nombre} onChange={e => { const l = [...formReserva.pasajerosList]; l[idx].nombre = e.target.value; setFormReserva({...formReserva, pasajerosList: l}); }} />
-                                  <input type="text" placeholder="Teléfono" className="w-full px-2 py-1 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={p.telefono} onChange={e => { const l = [...formReserva.pasajerosList]; l[idx].telefono = e.target.value; setFormReserva({...formReserva, pasajerosList: l}); }} />
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <input type="text" placeholder="Origen" className="w-full px-2 py-1 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={p.origen} onChange={e => { const l = [...formReserva.pasajerosList]; l[idx].origen = e.target.value; setFormReserva({...formReserva, pasajerosList: l}); }} />
-                                  <input type="text" placeholder="Destino" className="w-full px-2 py-1 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={p.destino} onChange={e => { const l = [...formReserva.pasajerosList]; l[idx].destino = e.target.value; setFormReserva({...formReserva, pasajerosList: l}); }} />
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                            <div className="col-span-2">
+                               <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Hora Inicio</span>
+                               <input 
+                                  type="time" required
+                                  className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100 font-medium"
+                                  value={formReserva.horaInicio}
+                                  onChange={(e) => setFormReserva({...formReserva, horaInicio: e.target.value})}
+                               />
+                            </div>
+                         </div>
+                         <div className="grid grid-cols-3 gap-3">
+                            <div className="col-span-1">
+                               <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Vehículo</span>
+                               <select 
+                                  required className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100 font-medium"
+                                  value={formReserva.tipoVehiculo}
+                                  onChange={(e) => setFormReserva({...formReserva, tipoVehiculo: e.target.value as any})}
+                               >
+                                  <option value="SUV">SUV</option>
+                                  <option value="Van">Van</option>
+                                  <option value="Mini Bus">Mini Bus</option>
+                                  <option value="Bus">Bus</option>
+                                  <option value="Sedán">Sedán</option>
+                                  <option value="Otros">Otros</option>
+                               </select>
+                            </div>
+                            <div className="col-span-2">
+                               <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">Asignar Chofer</span>
+                               <select 
+                                  className="w-full px-2 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100 font-medium"
+                                  value={formReserva.conductorId}
+                                  onChange={(e) => setFormReserva({...formReserva, conductorId: e.target.value})}
+                               >
+                                  <option value="">Seleccione Conductor (Opcional)</option>
+                                  {conductores.map(c => (
+                                    <option key={c.id} value={c.id}>{c.nombre} ({c.estado})</option>
+                                  ))}
+                               </select>
+                            </div>
+                         </div>
                       </div>
-                   </div>
 
-                   <div className="space-y-4">
-                      <h3 className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                        <Luggage className="h-4 w-4 text-orange-500" /> LOGÍSTICA DE CARGA
-                      </h3>
-                      <div className="grid grid-cols-3 gap-3">
-                         <div className="flex flex-col gap-1">
-                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase text-center">Maletas G (23K)</span>
-                            <input 
-                               type="number" required min="0"
-                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm text-center bg-slate-50 dark:bg-slate-800/50 dark:text-slate-100"
-                               value={formReserva.logistica.maletasGrandes}
-                               onChange={(e) => setFormReserva({...formReserva, logistica: {...formReserva.logistica, maletasGrandes: parseInt(e.target.value)}})}
-                            />
-                         </div>
-                         <div className="flex flex-col gap-1">
-                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase text-center">Maletas Cabina</span>
-                            <input 
-                               type="number" required min="0"
-                               className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm text-center bg-slate-50 dark:bg-slate-800/50 dark:text-slate-100"
-                               value={formReserva.logistica.maletasChicas}
-                               onChange={(e) => setFormReserva({...formReserva, logistica: {...formReserva.logistica, maletasChicas: parseInt(e.target.value)}})}
-                            />
-                         </div>
-                         <div className="flex flex-col gap-1">
-                            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase text-center">Silla Bebé / Alzador</span>
-                             <div className="flex flex-col gap-1 mt-1">
-                                <div className="flex justify-between items-center px-2">
-                                  <span className="text-[10px] text-slate-500 font-bold">Sillas:</span>
-                                  <input 
-                                    type="number" min="0" className="w-12 px-1 py-1 border rounded dark:border-slate-800 text-xs text-center dark:bg-slate-800/50 dark:text-slate-100"
-                                    value={formReserva.logistica.cantidadSillas || ''}
-                                    onChange={(e) => setFormReserva({...formReserva, logistica: {...formReserva.logistica, cantidadSillas: parseInt(e.target.value) || 0, sillaBebe: parseInt(e.target.value) > 0}})}
-                                  />
-                                </div>
-                                <div className="flex justify-between items-center px-2">
-                                  <span className="text-[10px] text-slate-500 font-bold">Alzas:</span>
-                                  <input 
-                                    type="number" min="0" className="w-12 px-1 py-1 border rounded dark:border-slate-800 text-xs text-center dark:bg-slate-800/50 dark:text-slate-100"
-                                    value={(formReserva.logistica as any).cantidadAlzadores || ''}
-                                    onChange={(e) => setFormReserva({...formReserva, logistica: {...formReserva.logistica, cantidadAlzadores: parseInt(e.target.value) || 0, alzador: parseInt(e.target.value) > 0}})}
-                                  />
-                                </div>
-                             </div>
+                      <div className="space-y-4">
+                         <h3 className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                           <Luggage className="h-4 w-4 text-orange-500" /> LOGÍSTICA DE CARGA
+                         </h3>
+                         <div className="grid grid-cols-3 gap-3">
+                            <div className="flex flex-col gap-1">
+                               <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase text-center">Maletas G (23K)</span>
+                               <input 
+                                  type="number" required min="0"
+                                  className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm text-center bg-white dark:bg-slate-800/50 dark:text-slate-100 font-bold"
+                                  value={isNaN(formReserva.logistica.maletasGrandes) ? '' : formReserva.logistica.maletasGrandes}
+                                  onChange={(e) => setFormReserva({...formReserva, logistica: {...formReserva.logistica, maletasGrandes: parseInt(e.target.value) || 0}})}
+                               />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                               <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase text-center">Maletas Cabina</span>
+                               <input 
+                                  type="number" required min="0"
+                                  className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm text-center bg-white dark:bg-slate-800/50 dark:text-slate-100 font-bold"
+                                  value={isNaN(formReserva.logistica.maletasChicas) ? '' : formReserva.logistica.maletasChicas}
+                                  onChange={(e) => setFormReserva({...formReserva, logistica: {...formReserva.logistica, maletasChicas: parseInt(e.target.value) || 0}})}
+                               />
+                            </div>
+                            <div className="flex flex-col gap-1 pl-1">
+                               <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase text-center mb-1">Silla Bebé / Alzador</span>
+                               <div className="flex justify-between items-center px-1 mb-1 bg-white dark:bg-slate-900/50 rounded">
+                                 <span className="text-[10px] text-slate-500 font-bold">Sillas:</span>
+                                 <input 
+                                   type="number" min="0" className="w-10 px-1 py-0.5 border rounded dark:border-slate-800 text-xs text-center dark:bg-slate-800/50 dark:text-slate-100"
+                                   value={formReserva.logistica.cantidadSillas || ''}
+                                   onChange={(e) => setFormReserva({...formReserva, logistica: {...formReserva.logistica, cantidadSillas: parseInt(e.target.value) || 0, sillaBebe: parseInt(e.target.value) > 0}})}
+                                 />
+                               </div>
+                               <div className="flex justify-between items-center px-1 bg-white dark:bg-slate-900/50 rounded">
+                                 <span className="text-[10px] text-slate-500 font-bold">Alzas:</span>
+                                 <input 
+                                   type="number" min="0" className="w-10 px-1 py-0.5 border rounded dark:border-slate-800 text-xs text-center dark:bg-slate-800/50 dark:text-slate-100"
+                                   value={(formReserva.logistica as any).cantidadAlzadores || ''}
+                                   onChange={(e) => setFormReserva({...formReserva, logistica: {...formReserva.logistica, cantidadAlzadores: parseInt(e.target.value) || 0, alzador: parseInt(e.target.value) > 0}})}
+                                 />
+                               </div>
+                            </div>
                          </div>
                       </div>
                    </div>
                 </div>
 
-                {/* Bloque 4: Finanzas y Cobranza */}
+{/* Bloque 4: Finanzas y Cobranza */}
                 <div className="p-6 grid md:grid-cols-2 gap-8 bg-green-50/50 dark:bg-green-900/10">
                    <div className="space-y-4">
                       <h3 className="text-xs font-black text-green-700 dark:text-green-500 flex items-center gap-2">
@@ -1252,8 +1225,8 @@ export default function ReservasTurismo() {
                             <input 
                                type="number" required placeholder="$ Total Pactado"
                                className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 font-bold dark:text-slate-100"
-                               value={formReserva.finanzas.montoBruto}
-                               onChange={(e) => setFormReserva({...formReserva, finanzas: {...formReserva.finanzas, montoBruto: parseInt(e.target.value)}})}
+                               value={isNaN(formReserva.finanzas.montoBruto) ? '' : formReserva.finanzas.montoBruto}
+                               onChange={(e) => setFormReserva({...formReserva, finanzas: {...formReserva.finanzas, montoBruto: parseInt(e.target.value) || 0}})}
                             />
                          </div>
                          <div className="flex flex-col gap-1">
@@ -1261,8 +1234,8 @@ export default function ReservasTurismo() {
                             <input 
                                type="number" required placeholder="$ Gastos"
                                className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                               value={formReserva.finanzas.gastosAdicionales}
-                               onChange={(e) => setFormReserva({...formReserva, finanzas: {...formReserva.finanzas, gastosAdicionales: parseInt(e.target.value)}})}
+                               value={isNaN(formReserva.finanzas.gastosAdicionales) ? '' : formReserva.finanzas.gastosAdicionales}
+                               onChange={(e) => setFormReserva({...formReserva, finanzas: {...formReserva.finanzas, gastosAdicionales: parseInt(e.target.value) || 0}})}
                             />
                          </div>
                          <div className="col-span-2 grid grid-cols-2 gap-3">
