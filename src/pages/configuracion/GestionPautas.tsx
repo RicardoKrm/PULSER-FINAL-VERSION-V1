@@ -64,6 +64,7 @@ export default function GestionPautas() {
   const [archivoPdf, setArchivoPdf] = useState<File | null>(null);
   const [tipoAplicacion, setTipoAplicacion] = useState('');
   const [tipoAceite, setTipoAceite] = useState('');
+  const [searchTareaTerm, setSearchTareaTerm] = useState('');
 
   // Form state Modelo
   const [nombreModelo, setNombreModelo] = useState('');
@@ -244,6 +245,7 @@ export default function GestionPautas() {
     setArchivoPdf(null);
     setTipoAplicacion('');
     setTipoAceite('');
+    setSearchTareaTerm('');
   };
 
   const handleDelete = (id: string, name: string) => {
@@ -478,11 +480,23 @@ export default function GestionPautas() {
 
            <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tareas</label>
+              <div className="relative mb-2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input 
+                  type="text" 
+                  placeholder="Buscar tareas..." 
+                  value={searchTareaTerm}
+                  onChange={(e) => setSearchTareaTerm(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 border border-slate-300 dark:border-slate-700 rounded-md text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white dark:bg-slate-900 dark:text-white"
+                />
+              </div>
               <div className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md max-h-48 overflow-y-auto p-2">
                  {tareasDisponibles.length === 0 ? (
                     <p className="text-xs text-slate-500 p-2 text-center">No hay tareas disponibles. Crea tareas en Gestión de Tareas.</p>
                  ) : (
-                    tareasDisponibles.map(t => (
+                    tareasDisponibles
+                      .filter(t => t.descripcion.toLowerCase().includes(searchTareaTerm.toLowerCase()))
+                      .map(t => (
                        <label key={t.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded cursor-pointer">
                           <input 
                             type="checkbox" 
@@ -493,6 +507,9 @@ export default function GestionPautas() {
                           <span className="text-sm text-slate-700 dark:text-slate-300">{t.descripcion}</span>
                        </label>
                     ))
+                 )}
+                 {tareasDisponibles.length > 0 && tareasDisponibles.filter(t => t.descripcion.toLowerCase().includes(searchTareaTerm.toLowerCase())).length === 0 && (
+                   <p className="text-xs text-slate-500 p-2 text-center">No se encontraron tareas con esa búsqueda.</p>
                  )}
               </div>
            </div>

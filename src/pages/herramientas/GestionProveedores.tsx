@@ -5,10 +5,12 @@ import { Modal } from '../../components/ui/Modal';
 import { Trash, Plus, Search, Building2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
+import { useAppContext } from '../../context/AppContext';
 import Swal from 'sweetalert2';
 
 export default function GestionProveedores() {
   const { currentCompany } = useCompany();
+  const { crearProveedor, eliminarProveedor: eliminarProvContext } = useAppContext();
   const [proveedores, setProveedores] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
@@ -60,7 +62,7 @@ export default function GestionProveedores() {
     };
 
     try {
-      const { error } = await supabase.from('proveedores_directorio').insert([newProv]);
+      const { data, error } = await supabase.from('proveedores_directorio').insert([newProv]).select();
       
       if (error) {
          // Fallback a localStorage si falla la BD
@@ -69,6 +71,16 @@ export default function GestionProveedores() {
          localStorage.setItem('proveedores_' + currentCompany.id, JSON.stringify(updated));
       } else {
          fetchProveedores();
+         if (data && data[0]) {
+             crearProveedor({
+                id: data[0].id,
+                nombre: data[0].nombre,
+                rut: data[0].rut || undefined,
+                direccion: data[0].direccion || undefined,
+                telefono: data[0].telefono || undefined,
+                email: data[0].email || undefined
+             });
+         }
       }
       
       setNombre('');
@@ -103,6 +115,7 @@ export default function GestionProveedores() {
            localStorage.setItem('proveedores_' + currentCompany.id, JSON.stringify(updated));
         } else {
            fetchProveedores();
+           eliminarProvContext(id);
         }
         Swal.fire('Eliminado', '', 'success');
       } catch (e) {

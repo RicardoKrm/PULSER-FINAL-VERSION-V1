@@ -1,4 +1,4 @@
-import React, { useState, memo, useMemo } from 'react';
+import React, { useState, memo, useMemo, useEffect } from 'react';
 import { DollarSign, Filter, Calendar, FileText, FileSpreadsheet, TrendingDown, TrendingUp, Search, RefreshCw, X, ArrowRight, ChevronRight, BarChart2 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -6,6 +6,8 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAppContext } from '../../context/AppContext';
+import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value);
@@ -128,8 +130,59 @@ const RentabilidadChartInteractive = memo(({ data }: { data: any[] }) => {
 
 export default function PanelTco() {
   const { ordenesTrabajo, vehiculos } = useAppContext();
+  const { activeCompanyId } = useCompany();
   const [showFilters, setShowFilters] = useState(true);
   const [isFiltering, setIsFiltering] = useState(false);
+
+  const [combustibleData, setCombustibleData] = useState<any[]>([]);
+  const [contratosData, setContratosData] = useState<any[]>([]);
+  const [reservasData, setReservasData] = useState<any[]>([]);
+  const [registrosFData, setRegistrosFData] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!activeCompanyId) return;
+
+    const fetchRealData = async () => {
+      // Combustible
+      const { data: cData } = await supabase.from('registro_combustible').select('vehiculo_id, costo_total, fecha').eq('empresa_id', activeCompanyId);
+      if (cData) setCombustibleData(cData);
+
+      // Contratos
+      const { data: coData } = await supabase.from('operacion_contrato').select('valor_total, activo, fecha_inicio, fecha_termino').eq('empresa_id', activeCompanyId);
+      if (coData) setContratosData(coData);
+
+      // Reservas
+      const { data: rData } = await supabase.from('operacion_reserva').select('monto_total, fecha_reserva, vehiculo_id').eq('empresa_id', activeCompanyId);
+      if (rData) setReservasData(rData);
+      
+      // Registros Financieros from vehiculo and empresa
+      let registrosExt: any[] = [];
+      const { data: vehData } = await supabase.from('vehiculo').select('id, detalles').eq('empresa_id', activeCompanyId);
+      if (vehData) {
+        vehData.forEach(v => {
+          if (v.detalles?.registros_financieros && Array.isArray(v.detalles.registros_financieros)) {
+            v.detalles.registros_financieros.forEach((rf: any) => {
+              if (rf.tipo === 'Gasto') {
+                registrosExt.push({ ...rf, vehiculo_id: v.id });
+              }
+            });
+          }
+        });
+      }
+      
+      const { data: empData } = await supabase.from('empresa').select('id, detalles').eq('id', activeCompanyId).single();
+      if (empData && empData.detalles?.registros_financieros && Array.isArray(empData.detalles.registros_financieros)) {
+         empData.detalles.registros_financieros.forEach((rf: any) => {
+            if (rf.tipo === 'Gasto') {
+               registrosExt.push({ ...rf, empresa_id: empData.id });
+            }
+         });
+      }
+      setRegistrosFData(registrosExt);
+    };
+
+    fetchRealData();
+  }, [activeCompanyId]);
 
   const simulateFiltering = () => {
     setIsFiltering(true);
@@ -156,11 +209,13 @@ export default function PanelTco() {
     let mttoEva = 0;
 
     const vStats: Record<string, {
-      prev: number, corr: number, eva: number, totalCosto: number
+      prev: number, corr: number, eva: number, totalCosto: number,
+      ingreso: number, combustible: number, peajes: number,
+      salarios: number, lubricantes: number, neumaticos: number, extraordinario: number
     }> = {};
 
     vehiculos.forEach(v => {
-      vStats[v.id] = { prev: 0, corr: 0, eva: 0, totalCosto: 0 };
+      vStats[v.id] = { prev: 0, corr: 0, eva: 0, totalCosto: 0, ingreso: 0, combustible: 0, peajes: 0, salarios: 0, lubricantes: 0, neumaticos: 0, extraordinario: 0 };
     });
 
     ordenesTrabajo.forEach(ot => {
@@ -181,19 +236,70 @@ export default function PanelTco() {
       }
     });
 
-    // Let's invent some fixed / fuel / income values proportionally just to show TCO
-    const ingresoFijo = costosTotales * 1.5; 
-    const ingresoVariable = costosTotales * 0.3;
+    let combustible = 0;
+    combustibleData.forEach(c => {
+        const costo = Number(c.costo_total || 0);
+        combustible += costo;
+        costosTotales += costo;
+        if (c.vehiculo_id && vStats[c.vehiculo_id]) {
+            vStats[c.vehiculo_id].combustible += costo;
+            vStats[c.vehiculo_id].totalCosto += costo;
+        }
+    });
+
+    let ingresoFijo = 0;
+    contratosData.forEach(c => {
+        ingresoFijo += Number(c.valor_total || 0);
+    });
+
+    let ingresoVariable = 0;
+    reservasData.forEach(r => {
+        const monto = Number(r.monto_total || 0);
+        ingresoVariable += monto;
+        if (r.vehiculo_id && vStats[r.vehiculo_id]) {
+           vStats[r.vehiculo_id].ingreso += monto;
+        }
+    });
+
+    let peajes = 0;
+    let salarios = 0;
+    let lubricantes = 0;
+    let neumaticos = 0;
+    let extraordinario = 0;
+
+    registrosFData.forEach(rf => {
+        const monto = Number(rf.monto || 0);
+        costosTotales += monto;
+        const cat = rf.categoria || '';
+        
+        const applyToVid = (vid: string, field: string) => {
+            if (vid && vStats[vid]) {
+                (vStats[vid] as any)[field] += monto;
+                vStats[vid].totalCosto += monto;
+            }
+        };
+
+        if (cat.includes('Peaje') || cat.includes('Estacionamiento')) {
+            peajes += monto;
+            applyToVid(rf.vehiculo_id, 'peajes');
+        } else if (cat.includes('Sueldo') || cat.includes('Salario') || cat.includes('Honorario') || cat.includes('Nómina') || cat.includes('Seguro')) {
+            salarios += monto;
+            applyToVid(rf.vehiculo_id, 'salarios');
+        } else if (cat.includes('Lubricante') || cat.includes('Fluido')) {
+            lubricantes += monto;
+            applyToVid(rf.vehiculo_id, 'lubricantes');
+        } else if (cat.includes('Neumático') || cat.includes('Llanta')) {
+            neumaticos += monto;
+            applyToVid(rf.vehiculo_id, 'neumaticos');
+        } else if (cat.includes('Multa') || cat.includes('Extraordinario')) {
+            extraordinario += monto;
+            applyToVid(rf.vehiculo_id, 'extraordinario');
+        }
+    });
+
     const ingresosTotales = ingresoFijo + ingresoVariable;
-    
-    // Other fixed costs
-    const combustible = costosTotales * 0.4;
-    const salarios = costosTotales * 0.3;
-    const peajes = costosTotales * 0.1;
-    costosTotales += combustible + salarios + peajes;
-    
     const utilidadBruta = ingresosTotales - costosTotales;
-    const margen = ingresosTotales > 0 ? (utilidadBruta / ingresosTotales) * 100 : 0;
+    const margen = ingresosTotales > 0 ? (utilidadBruta / ingresosTotales) * 100 : (costosTotales > 0 ? -100 : 0);
 
     const desgloseData = [
       {
@@ -207,90 +313,132 @@ export default function PanelTco() {
       }
     ];
 
-    const rentabilidadVehiculo = vehiculos.slice(0, 8).map(v => {
-      const vs = vStats[v.id] || { prev: 0, corr: 0, eva: 0, totalCosto: 0 };
-      const baseCost = vs.totalCosto || 1000000;
+    const rentabilidadVehiculo = vehiculos.map(v => {
+      const vs = vStats[v.id] || { prev: 0, corr: 0, eva: 0, totalCosto: 0, ingreso: 0, combustible: 0, peajes: 0, salarios: 0, lubricantes: 0, neumaticos: 0, extraordinario: 0 };
+      const proportionalFixedIncome = (ingresoFijo / (vehiculos.length || 1));
+      
       return {
         name: v.patente || v.modelo || `Vehículo ${v.id}`,
-        ingresoContrato: baseCost * 1.5,
-        costoFijo: baseCost * 0.2,
-        combustible: baseCost * 0.3,
-        neumaticos: baseCost * 0.05,
-        peajes: baseCost * 0.05,
-        lubricantes: baseCost * 0.02,
-        extraordinario: 0,
+        ingresoContrato: proportionalFixedIncome,
+        ingresoVariable: vs.ingreso,
+        costoFijo: vs.salarios,
+        combustible: vs.combustible,
+        neumaticos: vs.neumaticos,
+        peajes: vs.peajes,
+        lubricantes: vs.lubricantes,
+        extraordinario: vs.extraordinario,
         mttoPreventivo: vs.prev,
         mttoCorrectivo: vs.corr,
         mttoEvaluativo: vs.eva
       };
-    });
+    }).sort((a,b) => (b.ingresoContrato + b.ingresoVariable) - (a.ingresoContrato + a.ingresoVariable)).slice(0, 8);
 
     const distribucionCostos = [
-      { name: 'Mantenimiento', value: (mttoPrev + mttoCorr + mttoEva) || 1, color: '#fca5a5' },
-      { name: 'Combustible', value: combustible || 1, color: '#f87171' },
-      { name: 'Salarios y Seguros', value: salarios || 1, color: '#fcd34d' },
-      { name: 'Peajes/Infra', value: peajes || 1, color: '#c4b5fd' }
-    ];
+      { name: 'Mantenimiento', value: (mttoPrev + mttoCorr + mttoEva), color: '#fca5a5' },
+      { name: 'Combustible', value: combustible, color: '#f87171' },
+      { name: 'Salarios y Seguros', value: salarios, color: '#fcd34d' },
+      { name: 'Peajes/Infra', value: peajes, color: '#c4b5fd' },
+      { name: 'Lubricantes', value: lubricantes, color: '#6ee7b7' },
+      { name: 'Neumátic/Llanta', value: neumaticos, color: '#fdba74' },
+      { name: 'Extraord(Multas)', value: extraordinario, color: '#d6d3d1' }
+    ].filter(d => d.value > 0);
 
-    const evolucionMensual = [
-      { month: 'Ene', ingresos: 12000000, costos: 8000000 },
-      { month: 'Feb', ingresos: 12500000, costos: 8200000 },
-      { month: 'Mar', ingresos: 13000000, costos: 8500000 },
-      { month: 'Abr', ingresos: 12800000, costos: 8400000 },
-      { month: 'May', ingresos: 13500000, costos: 8800000 },
-      { month: 'Jun', ingresos: 14000000, costos: 9200000 },
-      { month: 'Jul', ingresos: 14500000, costos: 9500000 },
-      { month: 'Ago', ingresos: 15000000, costos: 9800000 },
-    ];
+    if (distribucionCostos.length === 0) {
+      distribucionCostos.push({ name: 'Sin Costos', value: 1, color: '#e2e8f0' });
+    }
 
-    const costoPorKm = [
-      { month: 'Ene', costo: 450 }, { month: 'Feb', costo: 460 },
-      { month: 'Mar', costo: 455 }, { month: 'Abr', costo: 440 },
-      { month: 'May', costo: 450 }, { month: 'Jun', costo: 465 },
-      { month: 'Jul', costo: 470 }, { month: 'Ago', costo: 460 }
-    ];
+    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const monthlyData: Record<string, { ingresos: number, costos: number }> = {};
+    monthNames.forEach(m => monthlyData[m] = { ingresos: 0, costos: 0 });
 
-    const margenMarca = [
-      { name: 'Scania', margen: 28 },
-      { name: 'Volvo', margen: 25 },
-      { name: 'Mercedes', margen: 22 },
-      { name: 'Freightliner', margen: 19 }
-    ];
+    const getMonthStr = (dateStr: string) => {
+        if (!dateStr) return null;
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return null;
+        return monthNames[d.getMonth()];
+    };
 
-    const costosRuta = [
-      { name: 'Norte Grande', costo: 25000000 },
-      { name: 'Sur Austral', costo: 18000000 },
-      { name: 'Centro Costa', costo: 12000000 }
-    ];
+    ordenesTrabajo.forEach(ot => {
+        const m = getMonthStr(ot.fechaCreacion || ot.created_at || ot.inicio_proceso);
+        if (m) {
+            monthlyData[m].costos += (ot.costoManoObraTareas || 0) + (ot.costoInsumos || 0) + (ot.costoManoObraHH || 0);
+        }
+    });
 
-    const proyeccionPresupuesto = [
-      { month: 'Ene', presupuesto: 7500000, real: 7200000 },
-      { month: 'Feb', presupuesto: 7500000, real: 7600000 },
-      { month: 'Mar', presupuesto: 8000000, real: 8100000 },
-      { month: 'Abr', presupuesto: 8000000, real: 7900000 },
-      { month: 'May', presupuesto: 8500000, real: 8600000 },
-      { month: 'Jun', presupuesto: 8500000, real: 8900000 },
-      { month: 'Jul', presupuesto: 9000000, real: 9400000 },
-    ];
+    combustibleData.forEach(c => {
+        const m = getMonthStr(c.fecha);
+        if (m) monthlyData[m].costos += Number(c.costo_total || 0);
+    });
+
+    reservasData.forEach(r => {
+        const m = getMonthStr(r.fecha_reserva);
+        if (m) monthlyData[m].ingresos += Number(r.monto_total || 0);
+    });
+
+    contratosData.forEach(c => {
+        const m = getMonthStr(c.fecha_inicio);
+        if (m) monthlyData[m].ingresos += Number(c.valor_total || 0);
+    });
+
+    registrosFData.forEach(rf => {
+        const m = getMonthStr(rf.fecha);
+        if (m) monthlyData[m].costos += Number(rf.monto || 0);
+    });
+
+    const evolucionMensual = monthNames.map(month => ({
+        month,
+        ingresos: monthlyData[month].ingresos,
+        costos: monthlyData[month].costos
+    })).filter(em => em.ingresos > 0 || em.costos > 0);
+    
+    if (evolucionMensual.length === 0) {
+        evolucionMensual.push({ month: 'Mes Actual', ingresos: 0, costos: 0 });
+    }
+
+    const proyeccionPresupuesto = evolucionMensual.map(em => ({
+        month: em.month,
+        presupuesto: em.costos > 0 ? (em.costos * 0.9) : 0, // Mocked budget as 90% of real costs just to have a visual guide 
+        real: em.costos
+    }));
+
+    const margenMarcaData: Record<string, { ingresos: number, costos: number }> = {};
+    vehiculos.forEach(v => {
+       const marca = v.marca || 'Otra';
+       if (!margenMarcaData[marca]) margenMarcaData[marca] = { ingresos: 0, costos: 0 };
+       
+       const vs = vStats[v.id];
+       if (vs) {
+          margenMarcaData[marca].costos += vs.totalCosto;
+          margenMarcaData[marca].ingresos += vs.ingreso + (ingresoFijo / (vehiculos.length || 1));
+       }
+    });
+
+    const margenMarca = Object.keys(margenMarcaData).map(marca => {
+       const ingresos = margenMarcaData[marca].ingresos;
+       const costos = margenMarcaData[marca].costos;
+       const util = ingresos - costos;
+       const m = ingresos > 0 ? (util / ingresos) * 100 : (costos > 0 ? -100 : 0);
+       return { name: marca, margen: Number(m.toFixed(1)) };
+    }).sort((a, b) => b.margen - a.margen).slice(0, 5);
 
     return {
       kpis: {
         ingresosTotales,
         costosTotales,
         utilidadBruta,
-        margen: margen.toFixed(1)
+        margen: isFinite(margen) ? margen.toFixed(1) : "0.0"
       },
       desgloseData,
       rentabilidadVehiculo,
       distribucionCostos,
       evolucionMensual,
       mantenimientoTipo: [],
-      costoPorKm,
+      costoPorKm: [],
       margenMarca,
-      costosRuta,
+      costosRuta: [],
       proyeccionPresupuesto
     };
-  }, [ordenesTrabajo, vehiculos]);
+  }, [ordenesTrabajo, vehiculos, combustibleData, contratosData, reservasData, registrosFData]);
 
   return (
     <div className="p-6 w-full max-w-[1600px] mx-auto space-y-6 relative min-h-screen">

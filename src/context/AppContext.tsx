@@ -181,6 +181,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         })));
       }
 
+      // Fetch Proveedores
+      const { data: provData } = await supabase.from('proveedores_directorio').select('*').eq('empresa_id', activeCompanyId);
+      if (provData) {
+        setProveedores(provData.map(p => ({
+          id: p.id,
+          nombre: p.nombre,
+          rut: p.rut || undefined,
+          direccion: p.direccion || undefined,
+          telefono: p.telefono || undefined,
+          email: p.email || undefined
+        })));
+      } else {
+        setProveedores([]);
+      }
+
       // Fetch Personal
       const { data: colabData } = await supabase.from('colaborador').select('*').eq('empresa_id', activeCompanyId);
       if (colabData) {
