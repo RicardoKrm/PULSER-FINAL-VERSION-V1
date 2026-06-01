@@ -1,4 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import fs from 'fs';
+import path from 'path';
+
+const fileAlertas = path.resolve('src/pages/flota/Alertas.tsx');
+let contentAlertas = fs.readFileSync(fileAlertas, 'utf8');
+
+const replacementAlertas = `import React, { useState, useEffect } from 'react';
 import { Clock, AlertCircle, AlertTriangle, ChevronRight, Calculator } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useCompany } from '../../contexts/CompanyContext';
@@ -39,7 +45,7 @@ export default function OperacionesAlertas() {
 
           if (pautasData) {
               const pautasDelVehiculo = pautasData.filter(p => {
-                 const normalizeStr = (s: any) => String(s || '').normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toUpperCase();
+                 const normalizeStr = (s: any) => String(s || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
                  const vehModelo = normalizeStr(v.modelo);
                  const pModelo = normalizeStr(p.modelo?.nombre);
                  
@@ -71,34 +77,21 @@ export default function OperacionesAlertas() {
 
           const vehDB: VehiculoDB = {
             id: v.id,
-            numeroInterno: v.numero_interno?.toString() || '',
-            patente: v.patente || '',
+            numeroInterno: v.numero_interno || '',
+            patente: v.patente || v.numero_interno || 'Sin PPU',
             kilometrajeActual: kmsActuales,
-            fechaActualizacionKm: v.updated_at ? new Date(v.updated_at) : new Date(),
-            intervaloMantencionKm: kmInterv,
-            kmPromedioDia: v.km_promedio_dia || detalles.kmPromedioDia || 0,
             kmUltimaMantencion: kmUltMant,
-            fechaUltimaMantencion: (v.fecha_ultima_mantencion || v.fecha_ult_mantencion || detalles.fecha_ultima_mantencion) ? new Date(v.fecha_ultima_mantencion || v.fecha_ult_mantencion || detalles.fecha_ultima_mantencion) : null,
-            tipoUltimaPauta: v.tipo_ultimo_mant || v.tipo_ult_pauta || detalles.tipo_ultimo_mant || detalles.tipo_ult_pauta || '',
-            pautasSecuencia,
-            marca: v.marca || detalles.marca || '',
-            modelo: v.modelo || detalles.modelo || '',
-            ano: v.anio || v.ano || detalles.ano || detalles.anio || '',
-            chasis: v.chasis || detalles.chasis || '',
-            motor: v.motor || detalles.motor || '',
-            norma: v.norma_euro || v.norma || detalles.norma_euro || detalles.norma || '',
-            aplicacion: v.aplicacion || detalles.aplicacion || '',
-            tipoAceite: v.tipo_aceite || v.tipoAceite || detalles.tipo_aceite || detalles.tipoAceite || '',
-            fecha_matriculacion: v.fecha_matriculacion || detalles.fecha_matriculacion || '',
-            detalles,
-            intervaloMantenimiento: kmInterv,
-            tipoIntervalo: v.tipo_intervalo || 'KM',
-            factorConversionHoras: v.factor_conversion_horas || null
+            intervaloMantencionKm: kmInterv,
+            kmPromedioDia: v.km_promedio_dia || detalles.km_promedio_dia || 150,
+            fechaUltimaMantencion: (v.fecha_ultima_mantencion || detalles.fecha_ultima_mantencion) ? new Date(v.fecha_ultima_mantencion || detalles.fecha_ultima_mantencion) : null,
+            fechaActualizacionKm: v.fecha_actualizacion_km ? new Date(v.fecha_actualizacion_km) : new Date(),
+            tipoUltimaPauta: v.tipo_ultimo_mant || detalles.tipo_ultimo_mant || v.tipo_ult_pauta || detalles.tipo_ult_pauta || '',
+            pautasSecuencia
           };
           
           try {
             const calculo = calcularDatosPizarra(vehDB);
-            if (calculo.estatus === 'VENCIDO') {
+            if (calculo.estatus === 'VENCIDO' || calculo.estatus === 'PROXIMO') {
               alertasVehiculos.push({
                 id: v.id,
                 vehiculo: calculo.numeroInterno || calculo.ppu,
@@ -106,8 +99,8 @@ export default function OperacionesAlertas() {
                 kmActual: calculo.kmActual.toLocaleString(),
                 pauta: calculo.pautaVencida || calculo.tipoProximoMantencion || '--',
                 kmPauta: calculo.kmProximoMantencion?.toLocaleString() || '--',
-                kmFaltantes: '-' + String(calculo.kmVencido?.toLocaleString() || 0),
-                estado: 'Vencido',
+                kmFaltantes: calculo.estatus === 'VENCIDO' ? '-' + String(calculo.kmVencido?.toLocaleString() || 0) : String(Math.abs(vehDB.kilometrajeActual - (calculo.kmProximoMantencion || 0)).toLocaleString()),
+                estado: calculo.estatus === 'VENCIDO' ? 'Vencido' : 'Próximo',
                 numeroInterno: calculo.numeroInterno // store for sorting
               });
             }
@@ -131,15 +124,8 @@ export default function OperacionesAlertas() {
           }
           
           let atrasada = false;
-          
-          // Check if it started and passed TFS time
-          if (ot.inicio_proceso && ot.tfs_minutos) {
-              const inicio = new Date(ot.inicio_proceso);
-              const finEstimado = new Date(inicio.getTime() + (ot.tfs_minutos * 60000));
-              if (now > finEstimado) atrasada = true;
-          }
           // Check if passed scheduled time
-          else if (ot.fecha_programada || ot.fechaProgramada) {
+          if (ot.fecha_programada || ot.fechaProgramada) {
              const fp = new Date(ot.fecha_programada || ot.fechaProgramada);
              if (ot.hora_termino_programada || ot.horaTerminoProgramada) {
                const [h, m] = (ot.hora_termino_programada || ot.horaTerminoProgramada).split(':');
@@ -164,7 +150,7 @@ export default function OperacionesAlertas() {
           folio: 'OT-' + String(ot.numero_ot || ot.id).padStart(4, '0'),
           vehiculo: ot.vehiculo?.numero_interno || ot.vehiculo?.patente || 'ST',
           tipo: ot.tipo_ot || ot.tipo || 'General',
-          prioridad: String(ot.prioridad || 'ALTA').toUpperCase(), 
+          prioridad: ot.prioridad || 'ALTA', // Defaulting since we filtered overdue
           estado: ot.estado,
           fecha: new Date(ot.created_at).toLocaleDateString()
         })));
@@ -356,3 +342,7 @@ export default function OperacionesAlertas() {
     </div>
   );
 }
+`;
+
+fs.writeFileSync(fileAlertas, replacementAlertas);
+console.log("Patched Alertas.tsx");
