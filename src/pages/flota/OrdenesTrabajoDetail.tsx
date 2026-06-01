@@ -653,8 +653,8 @@ export default function OrdenesTrabajoDetail() {
         [`Marca y Modelo:`, `${vehiculo?.marca || ''} ${vehiculo?.modelo || ''}`],
         [`Año Fabricación / VIN:`, `${vehiculo?.ano || 'N/A'} / ${vehiculo?.vin || 'N/A'}`],
         [`Kilometraje de Cierre:`, `${ot.kilometrajeCierre ? ot.kilometrajeCierre.toLocaleString() + ' km' : 'N/A'}`],
-        [`Técnico Responsable:`, `${ot.tecnicoResponsable || 'N/A'}`],
         [`Tipo de Mantenimiento:`, `${ot.tipo || 'N/A'}`],
+        [`Pauta Realizada:`, `${ot.pauta || 'N/A'}`],
         [`Fecha de Emisión:`, `${new Date().toLocaleDateString()}`]
     ];
 
@@ -729,20 +729,12 @@ export default function OrdenesTrabajoDetail() {
     doc.setFontSize(10);
     doc.setFont('Helvetica', 'bold');
     
-    doc.line(30, currentY, 90, currentY);
-    doc.text("Firma o Sello Técnico Responsable", 60, currentY + 5, { align: "center" });
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.text(`Nombre: ${ot.tecnicoResponsable || '_______________________'}`, 60, currentY + 10, { align: "center" });
-
-    doc.setFontSize(10);
-    doc.setFont('Helvetica', 'bold');
-    doc.line(120, currentY, 180, currentY);
-    doc.text("V° B° Supervisor / Jefatura de Taller", 150, currentY + 5, { align: "center" });
+    doc.line(70, currentY, 140, currentY);
+    doc.text("V° B° Supervisor / Jefatura de Taller", 105, currentY + 5, { align: "center" });
 
     if (ot.firmaCertificado) {
         try {
-            doc.addImage(ot.firmaCertificado, "PNG", 45, currentY - 25, 30, 20);
+            doc.addImage(ot.firmaCertificado, "PNG", 85, currentY - 25, 40, 20);
         } catch (e) {
             console.error('Error rendered firma en certificado', e);
         }
