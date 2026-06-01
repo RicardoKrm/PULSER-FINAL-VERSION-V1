@@ -25,14 +25,15 @@ export default function KpiFlota() {
     avanceCorrectivas,
     badActors,
     rankingData,
-    detailsData
+    detailsData,
+    motivosPausaData
   } = useMemo(() => {
     const totalOTs = ordenesTrabajo.length;
     
     // Distribución
     const preventivas = ordenesTrabajo.filter(ot => ot.tipo.includes('PREVENTIVA'));
-    const correctivas = ordenesTrabajo.filter(ot => ot.tipo.includes('CORRECTIVA'));
-    const evaluativas = ordenesTrabajo.filter(ot => !ot.tipo.includes('PREVENTIVA') && !ot.tipo.includes('CORRECTIVA'));
+    const correctivas = ordenesTrabajo.filter(ot => ot.tipo.includes('CORRECTIVA') || ot.tipo.includes('INSPECCION'));
+    const evaluativas = ordenesTrabajo.filter(ot => !ot.tipo.includes('PREVENTIVA') && !ot.tipo.includes('CORRECTIVA') && !ot.tipo.includes('INSPECCION'));
     
     const prevCount = preventivas.length;
     const corrCount = correctivas.length;
@@ -47,7 +48,7 @@ export default function KpiFlota() {
     const prevPendientes = prevCount - prevCompletadas;
     const avancePreventivas = [
       { name: 'Completadas', value: prevCompletadas || 0 },
-      { name: 'Pendientes', value: prevPendientes || 1 }
+      { name: 'Pendientes', value: prevPendientes || (prevCompletadas === 0 ? 1 : 0) } // use 1 if all 0 to show grey/amber instead of vanishing
     ];
 
     // Avance Correctivas
@@ -55,13 +56,13 @@ export default function KpiFlota() {
     const corrPendientes = corrCount - corrCompletadas;
     const avanceCorrectivas = [
       { name: 'Completadas', value: corrCompletadas || 0 },
-      { name: 'Pendientes', value: corrPendientes || 1 }
+      { name: 'Pendientes', value: corrPendientes || (corrCompletadas === 0 ? 1 : 0) }
     ];
 
     // Vehículos Cost Map
-    const vMap: Record<string, { prev: number, corr: number, eva: number, cost: number }> = {};
+    const vMap: Record<string, { prev: number, corr: number, eva: number, cost: number, downTime: number }> = {};
     vehiculos.forEach(v => {
-      vMap[v.id] = { prev: 0, corr: 0, eva: 0, cost: 0 };
+      vMap[v.id] = { prev: 0, corr: 0, eva: 0, cost: 0, downTime: 0 };
     });
 
     let totalCosto = 0;
@@ -69,9 +70,15 @@ export default function KpiFlota() {
       const costo = (ot.costoManoObraTareas || 0) + (ot.costoInsumos || 0) + (ot.costoManoObraHH || 0);
       totalCosto += costo;
       
+      let dT = 0;
+      if (ot.tiempoTrabajadoSegundos) dT += ot.tiempoTrabajadoSegundos / 3600;
+      if (ot.tfs_minutos) dT += ot.tfs_minutos / 60;
+      if (dT === 0) dT = 10; // estimate 10h if no data
+      
       const v = ot.vehiculoId || ot.vehiculo_id;
       if (v && vMap[v]) {
         vMap[v].cost += costo;
+        vMap[v].downTime += dT;
         if (ot.tipo.includes('PREVENTIVA')) vMap[v].prev++;
         else if (ot.tipo.includes('CORRECTIVA')) vMap[v].corr++;
         else vMap[v].eva++;
@@ -81,10 +88,13 @@ export default function KpiFlota() {
     const rankingDataObj = vehiculos.map(v => {
       const stats = vMap[v.id];
       const totalOtsV = stats.prev + stats.corr + stats.eva;
-      // Mock formulas for MTBF / Conf just to show plausible data if no real time span
+      // MTBF = Theoretical Hours (720 per month) / Events
       const mtbf = totalOtsV > 0 ? (720 / totalOtsV) : 720; 
       // conf: R(24) = e^(-24/MTBF)
       const conf = Math.exp(-24 / mtbf);
+
+      let disp = 100 * (1 - (stats.downTime / 720));
+      if (disp < 0) disp = 0;
 
       return {
         id: v.id,
@@ -98,7 +108,7 @@ export default function KpiFlota() {
         mtbf: `${Math.round(mtbf)}h`,
         c: `${(conf * 100).toFixed(1)}%`,
         confNum: conf,
-        dispNum: 100 // Mock disp per vehicle
+        dispNum: disp
       };
     }).sort((a, b) => b.costVal - a.costVal);
 
@@ -106,29 +116,71 @@ export default function KpiFlota() {
     const rankingData = rankingDataObj;
 
     const detailsData = rankingDataObj.map(r => ({
-      id: r.id, v: r.v, mtbf: r.mtbf, conf: r.c, name: r.name
+      ...r,
+      conf: r.c
     }));
 
-    // Mock generic line charts for now unless we do full timeseries
-    const dispMensualData = [
-      { name: 'Ene', disp: 95 }, { name: 'Feb', disp: 94 }, { name: 'Mar', disp: 96 },
-      { name: 'Abr', disp: 93 }, { name: 'May', disp: 92 }, { name: 'Jun', disp: 91 },
-      { name: 'Jul', disp: 94 }, { name: 'Ago', disp: 95 }, { name: 'Sep', disp: 97 },
-      { name: 'Oct', disp: 96 }, { name: 'Nov', disp: 95 }, { name: 'Dic', disp: 94 }
-    ];
+    // Generate monthly data from real OTs
+    const last12Months = Array.from({length: 12}, (_, i) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - (11 - i));
+      return { 
+        month: d.getMonth(), 
+        year: d.getFullYear(), 
+        name: d.toLocaleString('es', { month: 'short', timeZone: 'UTC' }).substring(0,3).toUpperCase(),
+        ots: 0,
+        downtime: 0
+      };
+    });
 
-    const confMensualData = [
-      { name: 'Ene', conf: 85 }, { name: 'Feb', conf: 86 }, { name: 'Mar', conf: 84 },
-      { name: 'Abr', conf: 82 }, { name: 'May', conf: 80 }, { name: 'Jun', conf: 78 },
-      { name: 'Jul', conf: 81 }, { name: 'Ago', conf: 83 }, { name: 'Sep', conf: 85 },
-      { name: 'Oct', conf: 87 }, { name: 'Nov', conf: 86 }, { name: 'Dic', conf: 85 }
-    ];
+    ordenesTrabajo.forEach(ot => {
+      if (!ot.fechaCreacion) return;
+      const d = new Date(ot.fechaCreacion);
+      const m = last12Months.find(x => x.month === d.getMonth() && x.year === d.getFullYear());
+      if (m) {
+        m.ots++;
+        if (ot.tiempoTrabajadoSegundos) m.downtime += ot.tiempoTrabajadoSegundos / 3600;
+        else if (ot.tfs_minutos) m.downtime += ot.tfs_minutos / 60;
+        else m.downtime += 10; // guess 10h if no data
+      }
+    });
+
+    const vCount = vehiculos.length || 1;
+    const hrsMes = vCount * 720;
+    
+    const dispMensualData = last12Months.map(m => {
+       const d = Math.max(0, 100 * (1 - (m.downtime / hrsMes)));
+       return { name: m.name, disp: Number(d.toFixed(1)) };
+    });
+
+    const confMensualData = last12Months.map(m => {
+       const mtbf = m.ots > 0 ? (hrsMes / m.ots) : hrsMes;
+       const conf = Math.exp(-24 / mtbf) * 100;
+       return { name: m.name, conf: Number(conf.toFixed(1)) };
+    });
 
     const dispVsConfData = dispMensualData.map((d, i) => ({
       name: d.name,
       disp: d.disp,
       conf: confMensualData[i].conf
     }));
+
+    const motivoCount: Record<string, number> = {};
+    ordenesTrabajo.forEach(ot => {
+      if (ot.historial) {
+        ot.historial.forEach(h => {
+          if (h.estado_nuevo === 'PAUSADA') {
+            const motivo = h.comentario ? h.comentario.trim() : 'Sin Especificar';
+            motivoCount[motivo] = (motivoCount[motivo] || 0) + 1;
+          }
+        });
+      }
+    });
+
+    let motivosPausaData = Object.entries(motivoCount).map(([name, count]) => ({ name, count }));
+    if (motivosPausaData.length === 0) {
+      motivosPausaData = [{ name: 'Sin Pausas Editadas', count: 0 }];
+    }
 
     return {
       totales: { totalOTs, prevCount, corrCount, totalCosto },
@@ -140,7 +192,8 @@ export default function KpiFlota() {
       detailsData,
       dispMensualData,
       confMensualData,
-      dispVsConfData
+      dispVsConfData,
+      motivosPausaData
     };
   }, [ordenesTrabajo, vehiculos]);
 
@@ -148,18 +201,13 @@ export default function KpiFlota() {
   const globalPrevPct = totales.totalOTs > 0 ? (totales.prevCount / totales.totalOTs) * 100 : 0;
   const globalCorrPct = totales.totalOTs > 0 ? (totales.corrCount / totales.totalOTs) * 100 : 0;
   
-  // Fake MTBF / Disp global just to show something
-  const globalDisp = "94.5"; // Hardcoded global or calculated
-  const globalMtbf = "320"; 
-  const globalConf = (Math.exp(-24 / 320) * 100).toFixed(1);
-
-  // Default pause motives mapped from OTs paused maybe?
-  const motivosPausaData = [
-    { name: 'Repuestos', count: 12 },
-    { name: 'Personal', count: 8 },
-    { name: 'Autorización', count: 5 },
-    { name: 'Turno', count: 3 }
-  ];
+  // Real global MTBF / Disp calculation
+  const totalDowntimeGlobal = dispMensualData.reduce((acc, m) => acc + ((100 - m.disp) / 100) * (vehiculos.length || 1) * 720, 0);
+  const totalTheoretical = 12 * (vehiculos.length || 1) * 720;
+  const globalDisp = totalTheoretical > 0 ? (100 * (1 - totalDowntimeGlobal / totalTheoretical)).toFixed(1) : "100"; 
+  const mtbfGlobal = totales.totalOTs > 0 ? totalTheoretical / totales.totalOTs : totalTheoretical;
+  const globalMtbf = Math.round(mtbfGlobal).toString(); 
+  const globalConf = (Math.exp(-24 / mtbfGlobal) * 100).toFixed(1);
 
   const handleDetailClick = (type: string) => {
     setActiveDetail(type);
@@ -203,7 +251,7 @@ export default function KpiFlota() {
                       <tr key={row.id}>
                         <td className="py-3 font-bold text-slate-700 dark:text-slate-300">{row.v}</td>
                         <td className="py-3 text-right font-medium text-slate-600 dark:text-slate-400">720h</td>
-                        <td className="py-3 text-right font-bold text-emerald-500">{(95 + Math.random() * 5).toFixed(1)}%</td>
+                        <td className="py-3 text-right font-bold text-emerald-500">{row.dispNum.toFixed(1)}%</td>
                       </tr>
                     ))
                   ) : (
@@ -306,12 +354,14 @@ export default function KpiFlota() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {detailsData.length > 0 ? (
                     detailsData.map((row) => {
-                      const prev = Math.floor(70 + Math.random() * 30);
+                      const totalOts = row.prev + row.corr + row.eva;
+                      const prevPct = totalOts > 0 ? (row.prev / totalOts) * 100 : 0;
+                      const corrPct = totalOts > 0 ? (row.corr / totalOts) * 100 : 0;
                       return (
                         <tr key={row.id}>
                           <td className="py-3 px-2 font-bold text-slate-700 dark:text-slate-300">{row.v}</td>
-                          <td className="py-3 px-2 text-right font-bold text-blue-500 dark:text-blue-400">{prev}%</td>
-                          <td className="py-3 px-2 text-right font-bold text-rose-500 dark:text-rose-400">{100 - prev}%</td>
+                          <td className="py-3 px-2 text-right font-bold text-blue-500 dark:text-blue-400">{Math.round(prevPct)}%</td>
+                          <td className="py-3 px-2 text-right font-bold text-rose-500 dark:text-rose-400">{Math.round(corrPct)}%</td>
                         </tr>
                       );
                     })
@@ -647,7 +697,7 @@ export default function KpiFlota() {
                 <PieChart>
                   <Pie data={avancePreventivas} innerRadius="60%" outerRadius="90%" dataKey="value" stroke="none" startAngle={90} endAngle={-270}>
                     <Cell fill="#10b981" />
-                    <Cell fill="#f1f5f9" />
+                    <Cell fill="#f59e0b" />
                   </Pie>
                   <Tooltip />
                 </PieChart>
@@ -655,7 +705,7 @@ export default function KpiFlota() {
             </div>
             <div className="flex items-center gap-4 text-xs font-bold text-slate-700 dark:text-slate-300">
               <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-emerald-500" /> OK</div>
-              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-slate-100 dark:bg-slate-700" /> Pend</div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-amber-500" /> Pend</div>
             </div>
           </div>
 
@@ -666,7 +716,7 @@ export default function KpiFlota() {
                 <PieChart>
                   <Pie data={avanceCorrectivas} innerRadius="60%" outerRadius="90%" dataKey="value" stroke="none" startAngle={90} endAngle={-270}>
                     <Cell fill="#fb7185" />
-                    <Cell fill="#f1f5f9" />
+                    <Cell fill="#f59e0b" />
                   </Pie>
                   <Tooltip />
                 </PieChart>
@@ -674,7 +724,7 @@ export default function KpiFlota() {
             </div>
             <div className="flex items-center gap-4 text-xs font-bold text-slate-700 dark:text-slate-300">
               <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-rose-400" /> OK</div>
-              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-slate-100 dark:bg-slate-700" /> Pend</div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-amber-500" /> Pend</div>
             </div>
           </div>
 
