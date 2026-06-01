@@ -24,7 +24,7 @@ export interface Collaborator {
 export interface ReservaTurismo {
   id: string;
   op: string;
-  categoria: 'Web' | 'Whatsapp' | 'Minera' | 'Extranjero' | 'Operador' | 'Correo';
+  categoria: string;
   cliente: {
     nombre: string;
     email: string;

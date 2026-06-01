@@ -679,26 +679,32 @@ export default function OrdenesTrabajoDetail() {
     doc.setFont('Helvetica', 'normal');
     if (ot.tareasRealizadas && ot.tareasRealizadas.length > 0) {
         ot.tareasRealizadas.forEach((t, idx) => {
-            if (currentY > 200) {
-                doc.addPage();
-                doc.setDrawColor(15, 23, 42);
-                doc.setLineWidth(1);
-                doc.rect(10, 10, 190, 277);
-                doc.setLineWidth(0.3);
-                doc.rect(12, 12, 186, 273);
-                currentY = 25;
-                doc.setTextColor(15, 23, 42);
-            }
-            doc.text(`• ${t.tarea_estandar?.descripcion || 'Tarea ejecutada'}`, 25, currentY);
-            currentY += 6;
+            const textLines = doc.splitTextToSize(`• ${t.tarea_estandar?.descripcion || 'Tarea ejecutada'}`, 160);
+            textLines.forEach((line: string) => {
+                if (currentY > 260) {
+                    doc.addPage();
+                    doc.setDrawColor(15, 23, 42);
+                    doc.setLineWidth(1);
+                    doc.rect(10, 10, 190, 277);
+                    doc.setLineWidth(0.3);
+                    doc.rect(12, 12, 186, 273);
+                    currentY = 25;
+                    doc.setTextColor(15, 23, 42);
+                }
+                doc.text(line, 25, currentY);
+                currentY += 6;
+            });
         });
     } else {
         doc.text("No existen tareas específicas detalladas en este documento.", 25, currentY);
         currentY += 6;
     }
 
+    const textDeclaracion = "Por el presente documento, se certifica técnica y profesionalmente que el vehículo individualizado en la Sección 1 ha sido sometido a los procesos de revisión y mantenimiento estipulados según los protocolos vigentes. Los repuestos e insumos utilizados cumplen con los estándares de calidad requeridos.\n\nSe deja constancia que los sistemas intervenidos fueron probados y calibrados, encontrándose el vehículo en condiciones operativas óptimas para su funcionamiento seguro en las rutas, conforme a las tareas listadas en la presente orden de trabajo. Este certificado avala exclusivamente los trabajos descritos y no cubre eventualidades por desgaste natural posterior, uso indebido u omisiones fuera de esta intervención.";
+    const splitText = doc.splitTextToSize(textDeclaracion, 160);
+
     currentY += 15;
-    if (currentY > 190) {
+    if (currentY + (splitText.length * 5) + 40 > 270) {
         doc.addPage();
         doc.setDrawColor(15, 23, 42);
         doc.setLineWidth(1);
@@ -718,9 +724,7 @@ export default function OrdenesTrabajoDetail() {
 
     doc.setFontSize(10);
     doc.setFont('Helvetica', 'normal');
-    const textDeclaracion = "Por el presente documento, se certifica técnica y profesionalmente que el vehículo individualizado en la Sección 1 ha sido sometido a los procesos de revisión y mantenimiento estipulados según los protocolos vigentes. Los repuestos e insumos utilizados cumplen con los estándares de calidad requeridos.\n\nSe deja constancia que los sistemas intervenidos fueron probados y calibrados, encontrándose el vehículo en condiciones operativas óptimas para su funcionamiento seguro en las rutas, conforme a las tareas listadas en la presente orden de trabajo. Este certificado avala exclusivamente los trabajos descritos y no cubre eventualidades por desgaste natural posterior, uso indebido u omisiones fuera de esta intervención.";
     
-    const splitText = doc.splitTextToSize(textDeclaracion, 160);
     doc.text(splitText, 25, currentY);
     
     currentY += (splitText.length * 5) + 35;

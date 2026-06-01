@@ -158,6 +158,7 @@ export default function ReservasTurismo() {
   });
   const [rutasGuardadas, setRutasGuardadas] = useState<any[]>([]);
   const [mostrarCrearRuta, setMostrarCrearRuta] = useState(false);
+  const [isCustomCategoria, setIsCustomCategoria] = useState(false);
   const [nuevaRutaForm, setNuevaRutaForm] = useState({ nombre: '', origen: '', destino: '', enlaceMapa: '' });
 
   // New Reservation Form State
@@ -895,16 +896,35 @@ export default function ReservasTurismo() {
                 {/* Bloque 1: Cliente y Categoría */}
                 <div className="p-6 grid md:grid-cols-3 gap-6 bg-slate-50 dark:bg-slate-900/50">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Categoría de Reserva</label>
-                    <select 
-                      className="w-full mt-2 px-3 py-2 border rounded-lg dark:border-slate-800 text-sm font-bold bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                      value={formReserva.categoria}
-                      onChange={(e) => setFormReserva({ ...formReserva, categoria: e.target.value as any })}
-                    >
-                      {['Web', 'Whatsapp', 'Correo', 'Minera', 'Extranjero', 'Operador'].map((cat) => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Categoría de Reserva</label>
+                      <button 
+                        type="button" 
+                        onClick={() => setIsCustomCategoria(!isCustomCategoria)} 
+                        className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                      >
+                        {isCustomCategoria ? 'Usar Lista' : '+ Nueva Categoría'}
+                      </button>
+                    </div>
+                    {isCustomCategoria ? (
+                      <input 
+                        type="text" 
+                        className="w-full mt-2 px-3 py-2 border rounded-lg dark:border-slate-800 text-sm font-bold bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                        value={formReserva.categoria}
+                        onChange={(e) => setFormReserva({ ...formReserva, categoria: e.target.value as any })}
+                        placeholder="Ej. VIP, Especial..."
+                      />
+                    ) : (
+                      <select 
+                        className="w-full mt-2 px-3 py-2 border rounded-lg dark:border-slate-800 text-sm font-bold bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                        value={formReserva.categoria}
+                        onChange={(e) => setFormReserva({ ...formReserva, categoria: e.target.value as any })}
+                      >
+                        {['Web', 'Whatsapp', 'Correo', 'Minera', 'Extranjero', 'Operador'].map((cat) => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                   <div className="space-y-2 col-span-2">
                     <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Datos del Cliente Reservante</label>
