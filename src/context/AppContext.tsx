@@ -33,6 +33,7 @@ interface AppContextType {
   eliminarKitRepuesto: (id: string) => void;
   crearProveedor: (proveedor: Proveedor) => void;
   eliminarProveedor: (id: string) => void;
+  agregarTareaEstandar?: (tarea: TareaEstandar) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -893,8 +894,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setProveedores(proveedores.filter(p => p.id !== id));
   };
 
+  const agregarTareaEstandar = (tarea: TareaEstandar) => {
+    setTareasEstandar(prev => [...prev, tarea]);
+  };
+
   return (
-    <AppContext.Provider value={{ reservasTurismo, ordenesTrabajo, conductores, vehiculos, pautas, tareasEstandar, tiposFalla, kitsRepuesto, repuestos, setRepuestos, usuarios, currentUser, setCurrentUser, proveedores, personal, setPersonal, crearReservaTurismo, crearOrdenTrabajo, eliminarOrdenTrabajo, actualizarOrdenTrabajo, crearTipoFalla, eliminarTipoFalla, actualizarTipoFalla, crearKitRepuesto, eliminarKitRepuesto, crearProveedor, eliminarProveedor }}>
+    <AppContext.Provider value={{ reservasTurismo, ordenesTrabajo, conductores, vehiculos, pautas, tareasEstandar, tiposFalla, kitsRepuesto, repuestos, setRepuestos, usuarios, currentUser, setCurrentUser, proveedores, personal, setPersonal, crearReservaTurismo, crearOrdenTrabajo, eliminarOrdenTrabajo, actualizarOrdenTrabajo, crearTipoFalla, eliminarTipoFalla, actualizarTipoFalla, crearKitRepuesto, eliminarKitRepuesto, crearProveedor, eliminarProveedor, agregarTareaEstandar }}>
       {children}
     </AppContext.Provider>
   );

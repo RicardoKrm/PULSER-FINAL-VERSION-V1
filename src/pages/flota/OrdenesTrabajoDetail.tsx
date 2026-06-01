@@ -6,41 +6,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Ca
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
+import { CrearTareaModal } from '../../components/flota/CrearTareaModal';
 import { ArrowLeft, Edit, Printer, Clock, Wrench, Boxes, History, ChevronDown, ChevronUp, Save, Trash2, Plus, FileText, CheckCircle, FileDown, Search, AlertCircle, PenTool, ThumbsUp, ThumbsDown, DollarSign } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import Swal from 'sweetalert2';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { usePermissions } from '../../hooks/usePermissions';
 
 export default function OrdenesTrabajoDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { ordenesTrabajo, vehiculos, kitsRepuesto, tareasEstandar, repuestos, personal, pautas, actualizarOrdenTrabajo } = useAppContext();
+  const { ordenesTrabajo, vehiculos, kitsRepuesto, tareasEstandar, repuestos, personal, pautas, actualizarOrdenTrabajo, agregarTareaEstandar } = useAppContext();
   const { profile } = useAuth();
   
-  const [userPermissions, setUserPermissions] = useState<string[]>([]);
-  React.useEffect(() => {
-     let isMounted = true;
-     const fetchPerms = async () => {
-         const basePerms = profile?.rol?.permisos || [];
-         if (profile?.rol?.nombre) {
-             const { data } = await supabase.from('cargo').select('permisos').eq('nombre', profile.rol.nombre).single();
-             if (isMounted) {
-                 if (data && data.permisos) {
-                     setUserPermissions([...new Set([...basePerms, ...data.permisos])]);
-                 } else {
-                     setUserPermissions(basePerms);
-                 }
-             }
-         } else if (isMounted) {
-             setUserPermissions(basePerms);
-         }
-     }
-     fetchPerms();
-     return () => { isMounted = false; };
-  }, [profile]);
-
-  const hasPermission = (perm: string) => userPermissions.includes(perm);
+  const { hasPermission } = usePermissions();
   // Solo el dueño del sistema tiene acceso total por defecto. Los demás se rigen por los permisos configurables.
   const isSaaSAdmin = profile?.rol?.nombre === 'Súper Administrador';
   
@@ -57,6 +37,7 @@ export default function OrdenesTrabajoDetail() {
   const [selectedTecnico, setSelectedTecnico] = useState('');
 
   const [isTareaModalOpen, setIsTareaModalOpen] = useState(false);
+  const [isCrearTareaModalOpen, setIsCrearTareaModalOpen] = useState(false);
   const [tareaSearch, setTareaSearch] = useState('');
   const [isInsumoModalOpen, setIsInsumoModalOpen] = useState(false);
   const [insumoSearch, setInsumoSearch] = useState('');
@@ -617,6 +598,162 @@ export default function OrdenesTrabajoDetail() {
      }
   };
 
+  const handleImprimirCertificado = () => {
+    if (!ot) return;
+    const doc = new jsPDF();
+    
+    // Add a formal border
+    doc.setDrawColor(15, 23, 42);
+    doc.setLineWidth(1);
+    doc.rect(10, 10, 190, 277);
+    
+    // Inner border
+    doc.setLineWidth(0.3);
+    doc.rect(12, 12, 186, 273);
+
+    // Header Style
+    doc.setFillColor(15, 23, 42); // slate-900
+    doc.rect(12, 12, 186, 30, 'F');
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(255, 255, 255);
+    doc.text("CERTIFICADO DE CONFORMIDAD TÉCNICA", 105, 26, { align: "center" });
+    
+    // Subheader
+    doc.setFontSize(10);
+    doc.setFont('Helvetica', 'normal');
+    doc.text(`Documento Oficial de Mantenimiento | Folio O.T.: #${ot.folio}`, 105, 35, { align: "center" });
+
+    // Body
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(12);
+    doc.setFont('Helvetica', 'bold');
+    doc.text("1. IDENTIFICACIÓN DEL VEHÍCULO Y DEL SERVICIO", 20, 55);
+    doc.setLineWidth(0.5);
+    doc.line(20, 57, 190, 57);
+
+    doc.setFontSize(10);
+    doc.setFont('Helvetica', 'normal');
+    const info = [
+        [`Patente / Matrícula:`, `${vehiculo?.patente || 'N/A'}`],
+        [`Marca y Modelo:`, `${vehiculo?.marca || ''} ${vehiculo?.modelo || ''}`],
+        [`Año Fabricación / VIN:`, `${vehiculo?.ano || 'N/A'} / ${vehiculo?.vin || 'N/A'}`],
+        [`Kilometraje de Cierre:`, `${ot.kilometrajeCierre ? ot.kilometrajeCierre.toLocaleString() + ' km' : 'N/A'}`],
+        [`Técnico Responsable:`, `${ot.tecnicoResponsable || 'N/A'}`],
+        [`Tipo de Mantenimiento:`, `${ot.tipo || 'N/A'}`],
+        [`Fecha de Emisión:`, `${new Date().toLocaleDateString()}`]
+    ];
+
+    let currentY = 65;
+    info.forEach(row => {
+        doc.setFont('Helvetica', 'bold');
+        doc.text(row[0], 25, currentY);
+        doc.setFont('Helvetica', 'normal');
+        doc.text(row[1], 80, currentY);
+        currentY += 7;
+    });
+
+    currentY += 10;
+    doc.setFontSize(12);
+    doc.setFont('Helvetica', 'bold');
+    doc.text("2. RESUMEN DE INTERVENCIONES APROBADAS", 20, currentY);
+    doc.setLineWidth(0.5);
+    doc.line(20, currentY + 2, 190, currentY + 2);
+    currentY += 10;
+
+    doc.setFontSize(10);
+    doc.setFont('Helvetica', 'normal');
+    if (ot.tareasRealizadas && ot.tareasRealizadas.length > 0) {
+        ot.tareasRealizadas.forEach((t, idx) => {
+            if (currentY > 200) {
+                doc.addPage();
+                doc.setDrawColor(15, 23, 42);
+                doc.setLineWidth(1);
+                doc.rect(10, 10, 190, 277);
+                doc.setLineWidth(0.3);
+                doc.rect(12, 12, 186, 273);
+                currentY = 25;
+                doc.setTextColor(15, 23, 42);
+            }
+            doc.text(`• ${t.tarea_estandar?.descripcion || 'Tarea ejecutada'}`, 25, currentY);
+            currentY += 6;
+        });
+    } else {
+        doc.text("No existen tareas específicas detalladas en este documento.", 25, currentY);
+        currentY += 6;
+    }
+
+    currentY += 15;
+    if (currentY > 190) {
+        doc.addPage();
+        doc.setDrawColor(15, 23, 42);
+        doc.setLineWidth(1);
+        doc.rect(10, 10, 190, 277);
+        doc.setLineWidth(0.3);
+        doc.rect(12, 12, 186, 273);
+        currentY = 25;
+        doc.setTextColor(15, 23, 42);
+    }
+
+    doc.setFontSize(12);
+    doc.setFont('Helvetica', 'bold');
+    doc.text("3. DECLARACIÓN FORMAL DE CONFORMIDAD TÉCNICA", 20, currentY);
+    doc.setLineWidth(0.5);
+    doc.line(20, currentY + 2, 190, currentY + 2);
+    currentY += 15;
+
+    doc.setFontSize(10);
+    doc.setFont('Helvetica', 'normal');
+    const textDeclaracion = "Por el presente documento, se certifica técnica y profesionalmente que el vehículo individualizado en la Sección 1 ha sido sometido a los procesos de revisión y mantenimiento estipulados según los protocolos vigentes. Los repuestos e insumos utilizados cumplen con los estándares de calidad requeridos.\n\nSe deja constancia que los sistemas intervenidos fueron probados y calibrados, encontrándose el vehículo en condiciones operativas óptimas para su funcionamiento seguro en las rutas, conforme a las tareas listadas en la presente orden de trabajo. Este certificado avala exclusivamente los trabajos descritos y no cubre eventualidades por desgaste natural posterior, uso indebido u omisiones fuera de esta intervención.";
+    
+    const splitText = doc.splitTextToSize(textDeclaracion, 160);
+    doc.text(splitText, 25, currentY);
+    
+    currentY += (splitText.length * 5) + 35;
+
+    // Signatures
+    doc.setFontSize(10);
+    doc.setFont('Helvetica', 'bold');
+    
+    doc.line(30, currentY, 90, currentY);
+    doc.text("Firma o Sello Técnico Responsable", 60, currentY + 5, { align: "center" });
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text(`Nombre: ${ot.tecnicoResponsable || '_______________________'}`, 60, currentY + 10, { align: "center" });
+
+    doc.setFontSize(10);
+    doc.setFont('Helvetica', 'bold');
+    doc.line(120, currentY, 180, currentY);
+    doc.text("V° B° Supervisor / Jefatura de Taller", 150, currentY + 5, { align: "center" });
+
+    if (ot.firmaCertificado) {
+        try {
+            doc.addImage(ot.firmaCertificado, "PNG", 45, currentY - 25, 30, 20);
+        } catch (e) {
+            console.error('Error rendered firma en certificado', e);
+        }
+    }
+
+    // Footer
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text("Este certificado digital es emitido por el Sistema de Gestión de Flota y Mantenimiento.", 105, 278, { align: "center" });
+    doc.text(`Folio Interno: #${ot.folio} - Fecha Impresión: ${new Date().toLocaleString()}`, 105, 282, { align: "center" });
+
+    doc.autoPrint();
+    const blob = doc.output('blob');
+    const blobURL = URL.createObjectURL(blob);
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = blobURL;
+    document.body.appendChild(iframe);
+    iframe.onload = () => {
+       setTimeout(() => {
+          iframe.contentWindow?.print();
+       }, 500);
+    };
+  };
+
   const handleExportarPDF = (imprimir: boolean = false) => {
     if (!ot) return;
 
@@ -856,54 +993,12 @@ export default function OrdenesTrabajoDetail() {
       currentY = (doc as any).lastAutoTable.finalY + 6;
     }
 
-    if (currentY > 210) {
-      doc.addPage();
-      currentY = 20;
-    }
-
-    // 6. HISTORIAL DE PROCESO (How is the OT process going - "todo lo que se hizo en ella")
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.text('HISTORIAL Y SEGUIMIENTO DEL PROCESO', 10, currentY);
-    doc.line(10, currentY + 1.5, 200, currentY + 1.5);
-    currentY += 5;
-
-    const historialRows = ot.historial && ot.historial.length > 0
-      ? [...ot.historial]
-          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-          .map((h, idx) => [
-            idx + 1,
-            new Date(h.created_at).toLocaleString(),
-            h.usuario_nombre || 'Sistema',
-            h.comentario
-          ])
-      : [["-", "-", "-", "No se registran eventos en el historial de esta orden."]];
-
-    autoTable(doc, {
-      startY: currentY,
-      head: [['#', 'Fecha y Hora', 'Usuario / Rol', 'Acción / Suceso']],
-      body: historialRows,
-      theme: 'grid',
-      headStyles: { fillColor: [71, 85, 105], fontSize: 8.5 },
-      styles: { fontSize: 8, cellPadding: 2, textColor: textColor },
-      gridStyles: { borderWidth: 0.1, borderColor: [226, 232, 240] },
-      columnStyles: {
-        0: { cellWidth: 10 },
-        1: { cellWidth: 40 },
-        2: { cellWidth: 35 },
-        3: { fontStyle: 'italic' }
-      }
-    } as any);
-
-    currentY = (doc as any).lastAutoTable.finalY + 6;
-
     if (currentY > 220) {
       doc.addPage();
       currentY = 20;
     }
 
-    // 7. Costs summary & signatures
+    // 6. Costs summary & signatures
     if (canViewCostos) {
       doc.setFillColor(248, 250, 252);
       doc.rect(130, currentY, 70, 30, 'F');
@@ -953,6 +1048,43 @@ export default function OrdenesTrabajoDetail() {
         console.error('Error rendering signature in PDF', e);
       }
     }
+
+    // --- 7. HISTORIAL DE PROCESO (Al final del todo) ---
+    doc.addPage();
+    let histY = 20;
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text('HISTORIAL Y SEGUIMIENTO DEL PROCESO', 10, histY);
+    doc.line(10, histY + 1.5, 200, histY + 1.5);
+    histY += 5;
+
+    const historialRows = ot.historial && ot.historial.length > 0
+      ? [...ot.historial]
+          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+          .map((h, idx) => [
+            idx + 1,
+            new Date(h.created_at).toLocaleString(),
+            h.usuario_nombre || 'Sistema',
+            h.comentario
+          ])
+      : [["-", "-", "-", "No se registran eventos en el historial de esta orden."]];
+
+    autoTable(doc, {
+      startY: histY,
+      head: [['#', 'Fecha y Hora', 'Usuario / Rol', 'Acción / Suceso']],
+      body: historialRows,
+      theme: 'grid',
+      headStyles: { fillColor: [71, 85, 105], fontSize: 8.5 },
+      styles: { fontSize: 8, cellPadding: 2, textColor: textColor },
+      gridStyles: { borderWidth: 0.1, borderColor: [226, 232, 240] },
+      columnStyles: {
+        0: { cellWidth: 10 },
+        1: { cellWidth: 40 },
+        2: { cellWidth: 35 },
+        3: { fontStyle: 'italic' }
+      }
+    } as any);
 
     const totalPages = (doc as any).internal.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
@@ -1033,41 +1165,7 @@ export default function OrdenesTrabajoDetail() {
             
             <Button variant="outline" className="hidden lg:flex" onClick={() => handleExportarPDF(false)}><FileDown className="w-4 h-4 mr-2"/> Descargar OT</Button>
             <Button variant="outline" className="hidden lg:flex" onClick={() => handleExportarPDF(true)}><Printer className="w-4 h-4 mr-2"/> Imprimir OT</Button>
-            <Button variant="outline" onClick={() => {
-                 const doc = new jsPDF();
-                 doc.setFontSize(22);
-                 doc.setTextColor(147, 51, 234);
-                 doc.text("Certificado de Mantenimiento", 105, 20, { align: "center" });
-                 doc.setFontSize(12);
-                 doc.setTextColor(0, 0, 0);
-                 doc.text(`Vehículo: ${vehiculo?.patente || 'N/A'}`, 20, 40);
-                 doc.text(`OT Folio: ${ot.folio}`, 20, 50);
-                 doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 20, 60);
-                 doc.text(`Kilometraje Cierre: ${ot.kilometrajeCierre || 'N/A'}`, 20, 70);
-                 doc.text(`Técnico Responsable: ${ot.tecnicoResponsable || 'N/A'}`, 20, 80);
-                 doc.text(`Tareas Realizadas:`, 20, 100);
-                 let y = 110;
-                 ot.tareasRealizadas.forEach(t => {
-                     doc.text(`- ${t.tarea_estandar?.descripcion || 'Tarea'}`, 25, y);
-                     y += 8;
-                 });
-                 if (ot.firmaCertificado) {
-                     doc.text("Firma de Conformidad:", 20, y + 20);
-                     doc.addImage(ot.firmaCertificado, "PNG", 20, y + 25, 40, 20);
-                 }
-                 doc.autoPrint();
-                 const blob = doc.output('blob');
-                 const blobURL = URL.createObjectURL(blob);
-                 const iframe = document.createElement('iframe');
-                 iframe.style.display = 'none';
-                 iframe.src = blobURL;
-                 document.body.appendChild(iframe);
-                 iframe.onload = () => {
-                    setTimeout(() => {
-                       iframe.contentWindow?.print();
-                    }, 500);
-                 };
-            }}><CheckCircle className="w-4 h-4 mr-2"/> Imprimir Certificado</Button>
+            <Button variant="outline" onClick={handleImprimirCertificado}><CheckCircle className="w-4 h-4 mr-2"/> Imprimir Certificado</Button>
 
             {ot.estado === 'PROGRAMADA' || ot.estado === 'ABIERTA' || ot.estado === 'PENDIENTE' || ot.estado === 'PAUSADA' ? (
               <Button onClick={() => handleActualizarEstadoRapido('EN_PROCESO')} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm font-bold">
@@ -1193,7 +1291,21 @@ export default function OrdenesTrabajoDetail() {
                 <CardContent className="pt-6">
                     {activeTab === 'tareas' && (
                         <div>
-                            <div className="flex justify-between items-center mb-4"><h3 className="font-bold">Tareas</h3>{canManageTareas && <Button size="sm" onClick={() => setIsTareaModalOpen(true)}><Plus className="w-4 h-4 mr-2"/>añadir tarea</Button>}</div>
+                            <div className="flex justify-between items-center mb-4">
+                              <h3 className="font-bold">Tareas</h3>
+                              {canManageTareas && (
+                                <div className="flex gap-2">
+                                  <Button size="sm" onClick={() => setIsCrearTareaModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                                    <Plus className="w-4 h-4 mr-2"/>
+                                    Crear Tarea
+                                  </Button>
+                                  <Button size="sm" onClick={() => setIsTareaModalOpen(true)}>
+                                    <Plus className="w-4 h-4 mr-2"/>
+                                    Añadir Tarea
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
                             {ot.tareasRealizadas.map(t => (
                                 <div key={t.id} className="flex justify-between items-center p-2 border-b last:border-0 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:bg-slate-900/50 transition-colors">
                                     <span className="flex-1 text-slate-800 dark:text-slate-200">{t.tarea_estandar?.descripcion || 'Tarea'}</span>
@@ -1570,6 +1682,17 @@ export default function OrdenesTrabajoDetail() {
             </div>
          </div>
       </Modal>
+
+      <CrearTareaModal
+        isOpen={isCrearTareaModalOpen}
+        onClose={() => setIsCrearTareaModalOpen(false)}
+        onCrear={(nuevaTarea) => {
+          if (agregarTareaEstandar) agregarTareaEstandar(nuevaTarea);
+          // And optionally select it or just close it. Let's just open the add tarea modal so the user can select it
+          setIsCrearTareaModalOpen(false);
+          setIsTareaModalOpen(true);
+        }}
+      />
 
       <Modal isOpen={isInsumoModalOpen} onClose={() => setIsInsumoModalOpen(false)} title="Buscar Repuesto en Inventario">
         <div className="mt-4">

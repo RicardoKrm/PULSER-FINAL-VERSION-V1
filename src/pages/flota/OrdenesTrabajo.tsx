@@ -7,10 +7,13 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Plus, Search, Filter, DollarSign, FileDown, Trash, Edit } from 'lucide-react';
 import { CrearOTModal } from '../../components/flota/CrearOTModal';
+import { usePermissions } from '../../hooks/usePermissions';
 
 export default function GestionOrdenesTrabajo() {
   const { ordenesTrabajo, vehiculos, eliminarOrdenTrabajo } = useAppContext();
   const { profile } = useAuth();
+  const { hasPermission } = usePermissions();
+  const canCrearOT = hasPermission('Módulo de Mantenimiento:Crear Órdenes');
   const isMecanico = profile?.rol?.nombre === 'Mecánico' || profile?.rol?.nombre === 'Mecanico';
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -101,7 +104,9 @@ export default function GestionOrdenesTrabajo() {
         <h1 className="text-3xl font-bold">Órdenes de Trabajo</h1>
         <div className="flex items-center gap-4">
             <Button variant="outline" className="border-green-600 text-green-600 hover:bg-green-50 dark:bg-green-900/30"><FileDown className="w-4 h-4 mr-2" /> Exportar</Button>
-            <Button className="bg-cyan-600" onClick={() => { setOtToEdit(null); setIsModalOpen(true); }}><Plus className="w-4 h-4 mr-2" /> Crear Nueva OT</Button>
+            {canCrearOT && (
+              <Button className="bg-cyan-600" onClick={() => { setOtToEdit(null); setIsModalOpen(true); }}><Plus className="w-4 h-4 mr-2" /> Crear Nueva OT</Button>
+            )}
         </div>
       </div>
       

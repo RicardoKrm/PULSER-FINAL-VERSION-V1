@@ -16,10 +16,14 @@ import { CrearVehiculoModal } from '../../components/flota/CrearVehiculoModal';
 import { Modal } from '../../components/ui/Modal';
 import { calcularDatosPizarra, FilaPizarraMantenimiento, generarSecuenciaParaPauta, HitoSecuencia } from '../../lib/mantenimientoLogica';
 import { useAppContext } from '../../context/AppContext';
+import { usePermissions } from '../../hooks/usePermissions';
 
 export default function PizarraMantenimiento() {
   const { currentCompany } = useCompany();
   const { ordenesTrabajo } = useAppContext();
+  const { hasPermission } = usePermissions();
+  const canCrearOT = hasPermission('Módulo de Mantenimiento:Crear Órdenes');
+  const canVerVehiculos = hasPermission('Módulo de Flota:Ver Vehículos');
   const [busqueda, setBusqueda] = useState('');
   const [mostrarFiltros, setMostrarFiltros] = useState(true);
   const [actionMenuOpen, setActionMenuOpen] = useState<string | number | null>(null);

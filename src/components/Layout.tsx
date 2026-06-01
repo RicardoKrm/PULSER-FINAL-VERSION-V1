@@ -166,7 +166,7 @@ export default function Layout() {
           let filteredSubmodules = item.submodules;
           if (item.submodules) {
             filteredSubmodules = item.submodules.filter((sub) => 
-               perms.includes(`${item.title}:${sub.title}`) || sub.title === 'Gestión de Rutas' || sub.title === 'Mantenedores'
+               perms.includes(`${item.title}:${sub.title}`)
             );
           }
           acc.push({ ...item, submodules: filteredSubmodules && filteredSubmodules.length > 0 ? filteredSubmodules : undefined });

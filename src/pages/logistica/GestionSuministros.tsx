@@ -71,7 +71,7 @@ interface ValidacionData {
 const mockValidacionesData: ValidacionData[] = [];
 
 export default function GestionSuministros() {
-  const { proveedores } = useAppContext();
+  const { proveedores, ordenesTrabajo, actualizarOrdenTrabajo } = useAppContext();
   const { currentCompany } = useCompany();
   const navigate = useNavigate();
   const [sumInsumosData, setSumInsumosData] = React.useState<Insumo[]>([]);
@@ -211,7 +211,7 @@ export default function GestionSuministros() {
     }
   };
 
-  const [activeView, setActiveView] = useState<'inventario' | 'auditoria' | 'validaciones'>('inventario');
+  const [activeView, setActiveView] = useState<'inventario' | 'auditoria' | 'validaciones' | 'solicitudesOT'>('inventario');
   const [entriesPerPage, setEntriesPerPage] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
   const [auditoriaData, setAuditoriaData] = React.useState<any[]>([]);
@@ -925,6 +925,146 @@ export default function GestionSuministros() {
     );
   }
 
+  const entregarSolicitudOt = (otId: string, solicitudId: string) => {
+    const ot = ordenesTrabajo.find(o => o.id === otId);
+    if (!ot || !ot.solicitudes) return;
+    
+    const nuevasSolicitudes = ot.solicitudes.map(s => {
+       if (s.id === solicitudId) {
+          return { ...s, estado: 'ENTREGADA' };
+       }
+       return s;
+    });
+
+    actualizarOrdenTrabajo({
+      ...ot,
+      solicitudes: nuevasSolicitudes,
+      historial: [
+        ...ot.historial,
+        {
+          id: Math.random().toString(36).substr(2, 9),
+          orden_id: ot.id,
+          comentario: `Bodega: Repuesto entregado (${ot.solicitudes.find(s => s.id === solicitudId)?.repuesto_nombre})`,
+          created_at: new Date().toISOString(),
+          usuario_nombre: 'Logística / Bodega'
+        }
+      ]
+    });
+    
+    Swal.fire("Entregado", "El repuesto ha sido marcado como entregado a Taller.", "success");
+  };
+
+  if (activeView === 'solicitudesOT') {
+    // Get all OT solicitudes
+    const solicitudesOt = ordenesTrabajo.flatMap(ot => 
+      (ot.solicitudes || []).map(s => ({
+        ...s,
+        ot_id: ot.id,
+        ot_folio: ot.folio,
+        vehiculo: ot.vehiculo?.patente || 'Desconocido',
+        tecnico: ot.tecnico?.nombre || 'Sin Técnico'
+      }))
+    ).filter(s => s.estado === 'PENDIENTE' || s.estado === 'APROBADA' || s.estado === 'RECHAZADA' || s.estado === 'ENTREGADA');
+    
+    // Sort logic
+    solicitudesOt.sort((a, b) => new Date(b.fecha_solicitud).getTime() - new Date(a.fecha_solicitud).getTime());
+
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center p-6 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-xl">
+                <Boxes className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+              </div>
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Solicitudes de Taller (O.T.)</h1>
+            </div>
+            <div className="mt-2 flex items-center gap-2 text-sm text-slate-500 uppercase font-medium">
+              Repuestos solicitados directamente desde las Órdenes de Trabajo por los mecánicos
+            </div>
+          </div>
+
+          <Button variant="secondary" className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-sm" onClick={() => setActiveView('inventario')}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            VOLVER AL INVENTARIO
+          </Button>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-[10px] uppercase text-slate-500 border-b border-slate-200 dark:border-slate-800 font-bold bg-slate-50 dark:bg-slate-800/50">
+                <tr>
+                  <th className="px-6 py-4">FECHA</th>
+                  <th className="px-6 py-4">O.T. / VEHÍCULO</th>
+                  <th className="px-6 py-4">TÉCNICO</th>
+                  <th className="px-6 py-4">REPUESTO SOLICITADO</th>
+                  <th className="px-6 py-4 text-center">CANTIDAD</th>
+                  <th className="px-6 py-4 text-center">ESTADO</th>
+                  <th className="px-6 py-4 text-right">ACCIÓN</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {solicitudesOt.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center">
+                      <div className="flex flex-col items-center justify-center text-slate-500">
+                        <Package className="w-10 h-10 mb-3 text-slate-300 dark:text-slate-600" />
+                        <p className="text-base font-medium text-slate-600 dark:text-slate-400">No hay solicitudes de taller registradas.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  solicitudesOt.map((s) => (
+                    <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                      <td className="px-6 py-4 font-medium">{new Date(s.fecha_solicitud).toLocaleString()}</td>
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-slate-800 dark:text-slate-200">{s.ot_folio}</div>
+                        <div className="text-xs text-slate-500">{s.vehiculo}</div>
+                      </td>
+                      <td className="px-6 py-4">{s.tecnico}</td>
+                      <td className="px-6 py-4 font-semibold text-slate-700 dark:text-slate-300">{s.repuesto_nombre}</td>
+                      <td className="px-6 py-4 text-center font-bold text-lg">{s.cantidad}</td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase
+                          ${s.estado === 'PENDIENTE' ? 'bg-yellow-100 text-yellow-700' :
+                            s.estado === 'APROBADA' ? 'bg-indigo-100 text-indigo-700' :
+                            s.estado === 'RECHAZADA' ? 'bg-red-100 text-red-700' :
+                            s.estado === 'ENTREGADA' ? 'bg-emerald-100 text-emerald-700' :
+                            'bg-slate-100 text-slate-700'}`}>
+                          {s.estado}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        {s.estado === 'APROBADA' && (
+                          <Button 
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-all"
+                            onClick={() => entregarSolicitudOt(s.ot_id, s.id)}
+                          >
+                            MARCAR ENTREGADO
+                          </Button>
+                        )}
+                        {s.estado === 'PENDIENTE' && (
+                          <span className="text-xs text-slate-400 italic">Esperando aprobación de supervisor</span>
+                        )}
+                        {s.estado === 'RECHAZADA' && (
+                          <span className="text-xs text-red-500 italic">Rechazado ({s.motivo_rechazo})</span>
+                        )}
+                        {s.estado === 'ENTREGADA' && (
+                          <span className="text-xs text-emerald-600 italic font-medium">Entregada a Taller</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header section with metrics and actions */}
@@ -944,6 +1084,10 @@ export default function GestionSuministros() {
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          <Button className="bg-orange-500 hover:bg-orange-600 text-white shadow-sm" onClick={() => setActiveView('solicitudesOT')}>
+            <Boxes className="w-4 h-4 mr-2" />
+            Solicitudes de Taller
+          </Button>
           <Button className="bg-[#4285f4] hover:bg-[#3367d6] text-white" onClick={() => setActiveView('auditoria')}>
             <History className="w-4 h-4 mr-2" />
             Historial Bodega
