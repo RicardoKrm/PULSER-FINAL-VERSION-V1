@@ -548,14 +548,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const eliminarOrdenTrabajo = async (id: string) => {
-    setOrdenesTrabajo(prev => prev.filter(ot => ot.id !== id));
-    try {
-      const { error } = await supabase.from('orden_de_trabajo').delete().eq('id', id);
-      if (error) {
-        console.error("Error deleting work order from database:", error);
+    const result = await Swal.fire({
+      title: '¿Estás seguro?',
+      text: "Eliminar una Orden de Trabajo es una acción irreversible.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#3b82f6',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      setOrdenesTrabajo(prev => prev.filter(ot => ot.id !== id));
+      try {
+        const { error } = await supabase.from('orden_de_trabajo').delete().eq('id', id);
+        if (error) {
+          console.error("Error deleting work order from database:", error);
+          Swal.fire('Error', 'No se pudo eliminar la OT en la base de datos.', 'error');
+        } else {
+          Swal.fire('¡Eliminada!', 'La Orden de Trabajo ha sido eliminada.', 'success');
+        }
+      } catch (err) {
+        console.error(err);
+        Swal.fire('Error', 'Ocurrió un error inesperado al eliminar.', 'error');
       }
-    } catch (err) {
-      console.error(err);
     }
   };
 
