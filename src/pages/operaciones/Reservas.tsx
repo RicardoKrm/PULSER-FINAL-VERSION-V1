@@ -349,6 +349,53 @@ export default function ReservasTurismo() {
     }
   };
 
+  const handleCopiarReserva = (reserva: ReservaTurismo, tipo: 'chofer' | 'pasajero') => {
+    const c = conductores.find(cond => cond.id === reserva.conductorId);
+    
+    let texto = `https://www.fastour.cl/\n`;
+    texto += `OP: ${reserva.op}   Tipo: ${reserva.categoria}\n`;
+    texto += `Fecha: ${reserva.fecha}\n`;
+    texto += `Hora🛑⏰: ${reserva.horaInicio}\n`;
+    
+    if (reserva.lugares.numeroVuelo) {
+       texto += `🛑 Vuelo: ${reserva.lugares.numeroVuelo}\n`;
+    }
+
+    texto += `(Vehículo: ${reserva.tipoVehiculo} + ${reserva.pasajeros.cantidad} Pax + ${reserva.logistica.maletasGrandes || 0} MG 23K + ${reserva.logistica.maletasChicas || 0} Mch)\n`;
+    texto += `📞 ${reserva.cliente.telefono}\n`;
+    texto += `Empresa: *${reserva.cliente.nombre} ${reserva.cliente.rut_empresa ? reserva.cliente.rut_empresa : ''}*\n`;
+    texto += `Pax: *${reserva.pasajeros.nombre}*\n`;
+    texto += `A Origen: *${reserva.lugares.origen}*\n`;
+    
+    if (reserva.pasajerosList && reserva.pasajerosList.length > 0) {
+       texto += `B Destino: *PASAJERO 1: ${reserva.lugares.destino}*\n`;
+       reserva.pasajerosList.forEach((p, idx) => {
+          texto += `PASAJERO ${idx + 2}: ${p.nombre} ${p.telefono ? p.telefono : ''} ${p.destino}\n`;
+       });
+    } else {
+       texto += `B Destino: *${reserva.lugares.destino}*\n`;
+    }
+
+    if (tipo === 'chofer') {
+       texto += `Monto: $${reserva.finanzas.montoBruto} ${reserva.finanzas.tipoDocumento}\n`;
+       texto += `Conductor: ${c ? c.nombre : 'Sin Asignar'}\n`;
+       texto += `Pago: ${reserva.finanzas.formaPago}\n`;
+       texto += `Comentarios: 🛑👁️ ${reserva.comentarios.conductor || ''} ${reserva.comentarios.interno || ''} ${reserva.enlaceMapa || ''}\n`;
+    } else {
+       texto += `Conductor: ${c ? c.nombre : 'Sin Asignar'}\n`;
+       if (reserva.comentarios.conductor || reserva.enlaceMapa) {
+          texto += `Comentarios: ${reserva.comentarios.conductor || ''} ${reserva.enlaceMapa || ''}\n`;
+       }
+    }
+
+    navigator.clipboard.writeText(texto).then(() => {
+       alert(`Copiado formato para ${tipo}`);
+    }).catch(err => {
+       console.error(err);
+       alert('Error al copiar al portapapeles');
+    });
+  };
+
   const handleCrearReserva = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalCompanyId = activeCompanyId === 'GLOBAL' ? newEmpresaId : activeCompanyId;
@@ -844,20 +891,27 @@ export default function ReservasTurismo() {
                 </div>
               </div>
             </CardContent>
-            <div className="p-4 border-t bg-white dark:bg-slate-800/50 flex justify-between items-center">
-               <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800/50" onClick={() => {
+            <div className="p-4 border-t bg-white dark:bg-slate-800/50 flex flex-col md:flex-row justify-between items-center gap-3">
+               <div className="flex flex-wrap gap-2">
+                  <Button className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 shadow-md" size="sm" onClick={() => handleCopiarReserva(reservaSeleccionada, 'pasajero')}>
+                     <Copy className="h-4 w-4 mr-1.5" /> Pasajero
+                  </Button>
+                  <Button className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 shadow-md" size="sm" onClick={() => handleCopiarReserva(reservaSeleccionada, 'chofer')}>
+                     <Copy className="h-4 w-4 mr-1.5" /> Chofer
+                  </Button>
+               </div>
+               <div className="flex gap-2 w-full md:w-auto">
+                  <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800/50 flex-1 md:flex-none" onClick={() => {
                       setFormReserva(reservaSeleccionada as any);
                       setMostrarDetalle(false);
                       setMostrarFormulario(true);
                   }}>Editar</Button>
-                  <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800/50 border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30" onClick={() => {
+                  <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800/50 border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 flex-1 md:flex-none" onClick={() => {
                       if (window.confirm('¿Estás seguro de anular esta Reserva (OP)?')) {
                           handleActualizarEstado('cancelado');
                       }
                   }}>Anular OP</Button>
-               </div>
-               <Button onClick={() => {
+                  <Button onClick={() => {
                     if (reservaSeleccionada?.estado === 'pendiente' || reservaSeleccionada?.estado === 'confirmado' || reservaSeleccionada?.estado === 'en curso') {
                         if (window.confirm('¿Desea marcar esta OP como Finalizada?')) {
                             handleActualizarEstado('finalizado');
@@ -867,7 +921,8 @@ export default function ReservasTurismo() {
                     } else {
                         setMostrarDetalle(false);
                     }
-               }} className="bg-slate-900 text-white hover:bg-black dark:hover:bg-slate-800">Finalizar Revisión</Button>
+               }} className="bg-slate-900 text-white hover:bg-black dark:hover:bg-slate-800 flex-1 md:flex-none">Finalizar Revisión</Button>
+               </div>
             </div>
           </Card>
         </div>
