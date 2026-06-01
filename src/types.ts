@@ -222,6 +222,11 @@ export interface OrdenDeTrabajo {
   presupuestoAprobado?: number;
   observaciones?: string;
 
+  tecnico_tipo?: 'INTERNO' | 'EXTERNO';
+  externo_nombre?: string;
+  externo_especialidad?: string;
+  externo_intervencion?: string;
+
   costoInsumos: number;
   costoManoObraTareas: number;
   costoManoObraHH: number;

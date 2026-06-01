@@ -321,20 +321,64 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
         
         {renderSection("ASIGNACIÓN Y TIEMPO", (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium">Responsable Principal</label>
-              <select name="tecnicoResponsable" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} value={formData.tecnicoResponsable || ''} required>
-                  <option value="">---------</option>
-                  {personalOperativoList.map(m => <option key={m.id} value={m.name}>{m.name} ({m.roleBadgeText || m.rol?.nombre})</option>)}
-              </select>
+            <div className="md:col-span-2 mb-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-700">
+              <label className="block text-sm font-bold mb-2">Tipo de Trabajador Asignado</label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="tecnico_tipo" value="INTERNO" checked={!formData.tecnico_tipo || formData.tecnico_tipo === 'INTERNO'} onChange={(e) => setFormData({...formData, tecnico_tipo: 'INTERNO'})} className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm">Personal Interno</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="tecnico_tipo" value="EXTERNO" checked={formData.tecnico_tipo === 'EXTERNO'} onChange={(e) => setFormData({...formData, tecnico_tipo: 'EXTERNO'})} className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm">Personal/Empresa Externa</span>
+                </label>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium">Personal de Apoyo / Ayudante (Opcional)</label>
-              <select name="personalOperativo" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} value={formData.personalOperativo || ''}>
-                  <option value="">Ninguno</option>
-                  {personalOperativoList.map(m => <option key={m.id} value={m.name}>{m.name} ({m.roleBadgeText || m.rol?.nombre})</option>)}
-              </select>
-            </div>
+
+            {(!formData.tecnico_tipo || formData.tecnico_tipo === 'INTERNO') && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium">Responsable Principal</label>
+                  <select name="tecnicoResponsable" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} value={formData.tecnicoResponsable || ''} required>
+                      <option value="">---------</option>
+                      {personalOperativoList.map(m => <option key={m.id} value={m.name}>{m.name} ({m.roleBadgeText || m.rol?.nombre})</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium">Personal de Apoyo (Opcional)</label>
+                  <select name="personalOperativo" className="w-full p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} value={formData.personalOperativo || ''}>
+                      <option value="">Ninguno</option>
+                      {personalOperativoList.map(m => <option key={m.id} value={m.name}>{m.name} ({m.roleBadgeText || m.rol?.nombre})</option>)}
+                  </select>
+                </div>
+              </>
+            )}
+
+            {formData.tecnico_tipo === 'EXTERNO' && (
+              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 bg-orange-50/50 dark:bg-orange-900/10 p-4 rounded-lg border border-orange-100 dark:border-orange-900/30">
+                <div>
+                  <label className="block text-sm font-medium text-orange-900 dark:text-orange-200">Nombre (Persona o Empresa)</label>
+                  <input type="text" name="externo_nombre" className="w-full p-2 border border-orange-200 dark:border-orange-800/50 rounded-md dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} value={formData.externo_nombre || ''} required placeholder="Ej: Taller Juanito / Juan Pérez" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-orange-900 dark:text-orange-200">Tipo de Especialista</label>
+                  <input type="text" name="externo_especialidad" className="w-full p-2 border border-orange-200 dark:border-orange-800/50 rounded-md dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} value={formData.externo_especialidad || ''} required placeholder="Ej: Electromecánico, Tornero..." />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-orange-900 dark:text-orange-200">Tipo de Intervención</label>
+                  <select name="externo_intervencion" className="w-full p-2 border border-orange-200 dark:border-orange-800/50 rounded-md dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} value={formData.externo_intervencion || ''} required>
+                    <option value="">Seleccione...</option>
+                    <option value="DIAGNOSTICO">Diagnóstico</option>
+                    <option value="DIAGNOSTICO_REPARACION_REPUESTOS">Diagnóstico + Reparación + Repuestos</option>
+                    <option value="TODO">Todo (Servicio integral)</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-orange-900 dark:text-orange-200">Observaciones del Servicio Externo</label>
+                  <textarea name="observaciones" rows={2} className="w-full p-2 border border-orange-200 dark:border-orange-800/50 rounded-md dark:bg-slate-800 dark:text-slate-100" onChange={handleChange} value={formData.observaciones || ''} placeholder="Detalles de lo que se va a realizar..."></textarea>
+                </div>
+              </div>
+            )}
             <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                   <label className="block text-sm font-medium">Fecha de Creación (OT)</label>

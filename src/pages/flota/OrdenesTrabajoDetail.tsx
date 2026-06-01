@@ -77,6 +77,12 @@ export default function OrdenesTrabajoDetail() {
 
     const [isPautaModalOpen, setIsPautaModalOpen] = useState(false);
     const [infoView, setInfoView] = useState<'info' | 'costos'>('info');
+    
+    // External worker state
+    const [selectedTipoTecnico, setSelectedTipoTecnico] = useState<'INTERNO' | 'EXTERNO'>(ot?.tecnico_tipo || 'INTERNO');
+    const [externoNombre, setExternoNombre] = useState(ot?.externo_nombre || '');
+    const [externoEspecialidad, setExternoEspecialidad] = useState(ot?.externo_especialidad || '');
+    const [externoIntervencion, setExternoIntervencion] = useState(ot?.externo_intervencion || '');
 
     const [isPausaModalOpen, setIsPausaModalOpen] = useState(false);
     const [tiposPausa, setTiposPausa] = useState<any[]>([]);
@@ -322,18 +328,26 @@ export default function OrdenesTrabajoDetail() {
     if (!ot) return;
     setIsUpdatingDb(true);
     let comentarios = [];
-    if (selectedTecnico) {
-       comentarios.push(`Responsable: ${selectedTecnico}`);
-    }
-    if (personalTemporal && personalTemporal !== ot.personalOperativo) {
-       comentarios.push(`Apoyos: ${personalTemporal}`);
+    if (selectedTipoTecnico === 'INTERNO') {
+        if (selectedTecnico) {
+           comentarios.push(`Responsable: ${selectedTecnico}`);
+        }
+        if (personalTemporal && personalTemporal !== ot.personalOperativo) {
+           comentarios.push(`Apoyos: ${personalTemporal}`);
+        }
+    } else {
+        comentarios.push(`Responsable Externo: ${externoNombre || 'No especificado'}`);
     }
 
     try {
       await actualizarOrdenTrabajo({
         ...ot,
-        tecnicoResponsable: selectedTecnico || ot.tecnicoResponsable,
-        personalOperativo: personalTemporal,
+        tecnico_tipo: selectedTipoTecnico,
+        externo_nombre: externoNombre,
+        externo_especialidad: externoEspecialidad,
+        externo_intervencion: externoIntervencion,
+        tecnicoResponsable: selectedTipoTecnico === 'INTERNO' ? (selectedTecnico || ot.tecnicoResponsable) : undefined,
+        personalOperativo: selectedTipoTecnico === 'INTERNO' ? personalTemporal : undefined,
         historial: [
           ...ot.historial,
           ...(comentarios.length > 0 ? [{
@@ -1506,52 +1520,108 @@ export default function OrdenesTrabajoDetail() {
             {canAssignPersonal && (
             <AccordionPanel title="Asignar Personal" active={activePanels.personal} onToggle={() => togglePanel('personal')}>
                 <div className="space-y-4">
-                    <div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold">Responsable Principal</p>
-                        <p className="text-sm font-semibold p-2 bg-slate-50 dark:bg-slate-900/50 rounded mt-1">{ot.tecnicoResponsable || 'Ninguno'}</p>
+                    <div className="mb-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-700">
+                        <label className="block text-sm font-bold mb-2">Tipo de Trabajador Asignado</label>
+                        <div className="flex gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="detail_tecnico_tipo" value="INTERNO" checked={selectedTipoTecnico === 'INTERNO'} onChange={() => setSelectedTipoTecnico('INTERNO')} className="w-4 h-4 text-blue-600" />
+                                <span className="text-sm">Personal Interno</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="detail_tecnico_tipo" value="EXTERNO" checked={selectedTipoTecnico === 'EXTERNO'} onChange={() => setSelectedTipoTecnico('EXTERNO')} className="w-4 h-4 text-blue-600" />
+                                <span className="text-sm">Personal/Empresa Externa</span>
+                            </label>
+                        </div>
                     </div>
 
-                    <div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold">Cambiar Responsable</p>
-                        <select 
-                            value={selectedTecnico} 
-                            onChange={(e) => setSelectedTecnico(e.target.value)}
-                            className="w-full p-2 mt-1 border rounded dark:border-slate-800 text-sm dark:bg-slate-800 dark:text-slate-100"
-                        >
-                            <option value="">Seleccionar técnico...</option>
-                            {personal
-                              .filter(p => p.isMecanico || p.roleBadgeText?.toLowerCase().includes('mecanic') || p.role?.toLowerCase().includes('mecanic') || p.roleBadgeText?.toLowerCase().includes('taller') || p.role?.toLowerCase().includes('taller'))
-                              .map(p => (
-                                <option key={p.id} value={p.name}>{p.name} ({p.roleBadgeText || p.role || 'Mecánico'})</option>
-                              ))
-                            }
-                            {/* Fallback to list anyone in personal if no filtered mechanics are found */}
-                            {personal.length > 0 && personal.filter(p => p.isMecanico || p.roleBadgeText?.toLowerCase().includes('mecanic') || p.role?.toLowerCase().includes('mecanic') || p.roleBadgeText?.toLowerCase().includes('taller') || p.role?.toLowerCase().includes('taller')).length === 0 &&
-                              personal.map(p => (
-                                <option key={p.id} value={p.name}>{p.name} ({p.roleBadgeText || p.role || 'Personal'})</option>
-                              ))
-                            }
-                        </select>
-                    </div>
+                    {selectedTipoTecnico === 'INTERNO' && (
+                        <>
+                            <div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold">Responsable Principal</p>
+                                <p className="text-sm font-semibold p-2 bg-slate-50 dark:bg-slate-900/50 rounded mt-1">{ot.tecnicoResponsable || 'Ninguno'}</p>
+                            </div>
 
-                    <div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold">Personal de Apoyo (Ayudantes)</p>
-                        <input 
-                            type="text" 
-                            list="ayudantes-list"
-                            className="w-full p-2 mt-1 border rounded dark:border-slate-800 text-sm dark:bg-slate-800 dark:text-slate-100" 
-                            placeholder="Buscar ayudantes..." 
-                            onChange={(e) => {
-                                setPersonalTemporal(e.target.value);
-                            }}
-                            defaultValue={ot.personalOperativo || ''}
-                        />
-                        <datalist id="ayudantes-list">
-                            {personal.map(p => (
-                                <option key={p.id} value={p.name}>{p.roleBadgeText || p.role}</option>
-                            ))}
-                        </datalist>
-                    </div>
+                            <div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold">Cambiar Responsable</p>
+                                <select 
+                                    value={selectedTecnico} 
+                                    onChange={(e) => setSelectedTecnico(e.target.value)}
+                                    className="w-full p-2 mt-1 border rounded dark:border-slate-800 text-sm dark:bg-slate-800 dark:text-slate-100"
+                                >
+                                    <option value="">Seleccionar técnico...</option>
+                                    {personal
+                                      .filter(p => p.isMecanico || p.roleBadgeText?.toLowerCase().includes('mecanic') || p.role?.toLowerCase().includes('mecanic') || p.roleBadgeText?.toLowerCase().includes('taller') || p.role?.toLowerCase().includes('taller'))
+                                      .map(p => (
+                                        <option key={p.id} value={p.name}>{p.name} ({p.roleBadgeText || p.role || 'Mecánico'})</option>
+                                      ))
+                                    }
+                                    {/* Fallback to list anyone in personal if no filtered mechanics are found */}
+                                    {personal.length > 0 && personal.filter(p => p.isMecanico || p.roleBadgeText?.toLowerCase().includes('mecanic') || p.role?.toLowerCase().includes('mecanic') || p.roleBadgeText?.toLowerCase().includes('taller') || p.role?.toLowerCase().includes('taller')).length === 0 &&
+                                      personal.map(p => (
+                                        <option key={p.id} value={p.name}>{p.name} ({p.roleBadgeText || p.role || 'Personal'})</option>
+                                      ))
+                                    }
+                                </select>
+                            </div>
+
+                            <div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold">Personal de Apoyo (Ayudantes)</p>
+                                <input 
+                                    type="text" 
+                                    list="ayudantes-list"
+                                    className="w-full p-2 mt-1 border rounded dark:border-slate-800 text-sm dark:bg-slate-800 dark:text-slate-100" 
+                                    placeholder="Buscar ayudantes..." 
+                                    onChange={(e) => {
+                                        setPersonalTemporal(e.target.value);
+                                    }}
+                                    defaultValue={ot.personalOperativo || ''}
+                                />
+                                <datalist id="ayudantes-list">
+                                    {personal.map(p => (
+                                        <option key={p.id} value={p.name}>{p.roleBadgeText || p.role}</option>
+                                    ))}
+                                </datalist>
+                            </div>
+                        </>
+                    )}
+
+                    {selectedTipoTecnico === 'EXTERNO' && (
+                        <div className="space-y-4 bg-orange-50/50 dark:bg-orange-900/10 p-4 rounded-lg border border-orange-100 dark:border-orange-900/30">
+                            <div>
+                                <p className="text-xs text-orange-900 dark:text-orange-200 uppercase font-bold">Nombre (Persona o Empresa)</p>
+                                <input 
+                                    type="text" 
+                                    className="w-full p-2 mt-1 border border-orange-200 dark:border-orange-800/50 rounded dark:bg-slate-800 text-sm dark:text-slate-100" 
+                                    placeholder="Ej: Taller Juanito / Juan Pérez" 
+                                    value={externoNombre}
+                                    onChange={(e) => setExternoNombre(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <p className="text-xs text-orange-900 dark:text-orange-200 uppercase font-bold">Tipo de Especialista</p>
+                                <input 
+                                    type="text" 
+                                    className="w-full p-2 mt-1 border border-orange-200 dark:border-orange-800/50 rounded dark:bg-slate-800 text-sm dark:text-slate-100" 
+                                    placeholder="Ej: Electromecánico, Tornero..." 
+                                    value={externoEspecialidad}
+                                    onChange={(e) => setExternoEspecialidad(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <p className="text-xs text-orange-900 dark:text-orange-200 uppercase font-bold">Tipo de Intervención</p>
+                                <select 
+                                    value={externoIntervencion} 
+                                    onChange={(e) => setExternoIntervencion(e.target.value)}
+                                    className="w-full p-2 mt-1 border border-orange-200 dark:border-orange-800/50 rounded dark:bg-slate-800 text-sm dark:text-slate-100"
+                                >
+                                    <option value="">Seleccione...</option>
+                                    <option value="DIAGNOSTICO">Diagnóstico</option>
+                                    <option value="DIAGNOSTICO_REPARACION_REPUESTOS">Diagnóstico + Reparación + Repuestos</option>
+                                    <option value="TODO">Todo (Servicio integral)</option>
+                                </select>
+                            </div>
+                        </div>
+                    )}
 
                     <Button onClick={handleGuardarAsignacion} disabled={isUpdatingDb} className="w-full bg-cyan-600 hover:bg-cyan-700">
                         {isUpdatingDb ? 'Guardando...' : 'Guardar Asignación'}

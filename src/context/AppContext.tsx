@@ -300,6 +300,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             vehiculoId: row.vehiculo_id,
             tecnicoResponsable: row.tecnico_responsable || undefined,
             responsable_id: row.responsable_id || undefined,
+            tecnico_tipo: row.tecnico_tipo || undefined,
+            externo_nombre: row.externo_nombre || undefined,
+            externo_especialidad: row.externo_especialidad || undefined,
+            externo_intervencion: row.externo_intervencion || undefined,
             tipo: row.tipo as any,
             estado: row.estado as any,
             prioridad: row.prioridad as any,
@@ -376,6 +380,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setOrdenesTrabajo(prev => [...prev, finalOT]);
 
     try {
+      const clampNum = (val: string | number | undefined | null, maxVal = 99999999.99): number | null => {
+        if (val === undefined || val === null || val === '') return null;
+        const num = Number(val);
+        if (isNaN(num)) return null;
+        return Math.min(Math.max(num, -maxVal), maxVal);
+      };
+
       const dbPayload = {
         id: finalOT.id,
         folio: finalOT.folio,
@@ -386,8 +397,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         estado: finalOT.estado,
         prioridad: finalOT.prioridad,
         inicio_proceso: finalOT.inicio_proceso || null,
-        kilometraje_apertura: finalOT.kilometrajeApertura ? Number(finalOT.kilometrajeApertura) : 0,
-        kilometraje_cierre: finalOT.kilometrajeCierre ? Number(finalOT.kilometrajeCierre) : null,
+        kilometraje_apertura: clampNum(finalOT.kilometrajeApertura) || 0,
+        kilometraje_cierre: clampNum(finalOT.kilometrajeCierre),
         fecha_creacion: finalOT.fechaCreacion,
         fecha_programada: finalOT.fechaProgramada || null,
         hora_inicio_programada: finalOT.horaInicioProgramada || null,
@@ -401,18 +412,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         sintomas: finalOT.sintomas || null,
         inspeccion_tren_motriz: finalOT.inspeccionTrenMotriz || null,
         eje: finalOT.eje || null,
-        presion_neumatico: finalOT.presionNeumatico ? Number(finalOT.presionNeumatico) : null,
+        presion_neumatico: clampNum(finalOT.presionNeumatico, 999.99),
         personal_operativo: finalOT.personalOperativo || null,
         proveedor: finalOT.proveedor || null,
         empresa_externa: finalOT.empresaExterna || null,
         rut_empresa: finalOT.rutEmpresa || null,
-        valor_hh: finalOT.valorHH ? Number(finalOT.valorHH) : null,
-        presupuesto_aprobado: finalOT.presupuestoAprobado ? Number(finalOT.presupuestoAprobado) : null,
+        valor_hh: clampNum(finalOT.valorHH),
+        presupuesto_aprobado: clampNum(finalOT.presupuestoAprobado),
         observaciones: finalOT.observaciones || null,
-        costo_insumos: finalOT.costoInsumos ? Number(finalOT.costoInsumos) : 0,
-        costo_mano_obra_tareas: finalOT.costoManoObraTareas ? Number(finalOT.costoManoObraTareas) : 0,
-        costo_mano_obra_hh: finalOT.costoManoObraHH ? Number(finalOT.costoManoObraHH) : 0,
-        tiempo_trabajado_segundos: finalOT.tiempoTrabajadoSegundos ? Number(finalOT.tiempoTrabajadoSegundos) : 0
+        tecnico_tipo: finalOT.tecnico_tipo || 'INTERNO',
+        externo_nombre: finalOT.externo_nombre || null,
+        externo_especialidad: finalOT.externo_especialidad || null,
+        externo_intervencion: finalOT.externo_intervencion || null,
+        costo_insumos: clampNum(finalOT.costoInsumos) || 0,
+        costo_mano_obra_tareas: clampNum(finalOT.costoManoObraTareas) || 0,
+        costo_mano_obra_hh: clampNum(finalOT.costoManoObraHH) || 0,
+        tiempo_trabajado_segundos: clampNum(finalOT.tiempoTrabajadoSegundos, 2000000000) || 0
       };
 
       const { error } = await supabase.from('orden_de_trabajo').insert([dbPayload]);
@@ -548,6 +563,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const originalOts = [...ordenesTrabajo];
     setOrdenesTrabajo(prev => prev.map(ot => ot.id === otActualizada.id ? otActualizada : ot));
     try {
+      const clampNum = (val: string | number | undefined | null, maxVal = 99999999.99): number | null => {
+        if (val === undefined || val === null || val === '') return null;
+        const num = Number(val);
+        if (isNaN(num)) return null;
+        return Math.min(Math.max(num, -maxVal), maxVal);
+      };
+
       const dbPayload = {
         folio: otActualizada.folio,
         vehiculo_id: otActualizada.vehiculoId,
@@ -557,8 +579,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         estado: otActualizada.estado,
         prioridad: otActualizada.prioridad,
         inicio_proceso: otActualizada.inicio_proceso || null,
-        kilometraje_apertura: otActualizada.kilometrajeApertura ? Number(otActualizada.kilometrajeApertura) : 0,
-        kilometraje_cierre: otActualizada.kilometrajeCierre ? Number(otActualizada.kilometrajeCierre) : null,
+        kilometraje_apertura: clampNum(otActualizada.kilometrajeApertura) || 0,
+        kilometraje_cierre: clampNum(otActualizada.kilometrajeCierre),
         fecha_creacion: otActualizada.fechaCreacion,
         fecha_programada: otActualizada.fechaProgramada || null,
         hora_inicio_programada: otActualizada.horaInicioProgramada || null,
@@ -572,18 +594,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         sintomas: otActualizada.sintomas || null,
         inspeccion_tren_motriz: otActualizada.inspeccionTrenMotriz || null,
         eje: otActualizada.eje || null,
-        presion_neumatico: otActualizada.presionNeumatico ? Number(otActualizada.presionNeumatico) : null,
+        presion_neumatico: clampNum(otActualizada.presionNeumatico, 999.99),
         personal_operativo: otActualizada.personalOperativo || null,
         proveedor: otActualizada.proveedor || null,
         empresa_externa: otActualizada.empresaExterna || null,
         rut_empresa: otActualizada.rutEmpresa || null,
-        valor_hh: otActualizada.valorHH ? Number(otActualizada.valorHH) : null,
-        presupuesto_aprobado: otActualizada.presupuestoAprobado ? Number(otActualizada.presupuestoAprobado) : null,
+        valor_hh: clampNum(otActualizada.valorHH),
+        presupuesto_aprobado: clampNum(otActualizada.presupuestoAprobado),
         observaciones: otActualizada.observaciones || null,
-        costo_insumos: otActualizada.costoInsumos ? Number(otActualizada.costoInsumos) : 0,
-        costo_mano_obra_tareas: otActualizada.costoManoObraTareas ? Number(otActualizada.costoManoObraTareas) : 0,
-        costo_mano_obra_hh: otActualizada.costoManoObraHH ? Number(otActualizada.costoManoObraHH) : 0,
-        tiempo_trabajado_segundos: otActualizada.tiempoTrabajadoSegundos ? Number(otActualizada.tiempoTrabajadoSegundos) : 0
+        tecnico_tipo: otActualizada.tecnico_tipo || 'INTERNO',
+        externo_nombre: otActualizada.externo_nombre || null,
+        externo_especialidad: otActualizada.externo_especialidad || null,
+        externo_intervencion: otActualizada.externo_intervencion || null,
+        costo_insumos: clampNum(otActualizada.costoInsumos) || 0,
+        costo_mano_obra_tareas: clampNum(otActualizada.costoManoObraTareas) || 0,
+        costo_mano_obra_hh: clampNum(otActualizada.costoManoObraHH) || 0,
+        tiempo_trabajado_segundos: clampNum(otActualizada.tiempoTrabajadoSegundos, 2000000000) || 0
       };
 
       const { error } = await supabase.from('orden_de_trabajo').update(dbPayload).eq('id', otActualizada.id);
