@@ -470,21 +470,32 @@ export default function ReservasTurismo() {
               value={filtroVehiculo}
               onChange={(e) => setFiltroVehiculo(e.target.value)}
             >
-              <option value="">Vehículo (SUV/Van/Sedán)</option>
-              <option value="SUV">SUV</option>
-              <option value="Van">Van</option>
-              <option value="Sedán">Sedán</option>
+              <option value="">Todos los Vehículos</option>
+              {vehiculos.map(v => (
+                 <option key={v.id} value={v.id}>{v.patente} - {v.modelo || v.marca || ''}</option>
+              ))}
+            </select>
+            <select 
+              className="px-3 py-2 border rounded rounded-md dark:border-slate-800 text-sm focus:ring-2 focus:ring-blue-500"
+              value={filtroConductor}
+              onChange={(e) => setFiltroConductor(e.target.value)}
+            >
+              <option value="">Todos los Conductores</option>
+              {conductores.map(c => (
+                 <option key={c.id} value={c.id}>{c.nombre}</option>
+              ))}
             </select>
             <select 
               className="px-3 py-2 border rounded rounded-md dark:border-slate-800 text-sm focus:ring-2 focus:ring-blue-500"
               value={filtroEstado}
               onChange={(e) => setFiltroEstado(e.target.value)}
             >
-              <option value="">Estado de Gestión</option>
+              <option value="">Todos los Estados</option>
               <option value="pendiente">Pendiente</option>
-              <option value="confirmada">Confirmada</option>
-              <option value="finalizada">Finalizada</option>
-              <option value="cancelada">Cancelada</option>
+              <option value="confirmado">Confirmado</option>
+              <option value="en curso">En Curso</option>
+              <option value="finalizado">Finalizado</option>
+              <option value="cancelado">Cancelado</option>
             </select>
             <div className="flex gap-2">
                <input 
