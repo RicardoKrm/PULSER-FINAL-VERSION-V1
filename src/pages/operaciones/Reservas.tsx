@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabase';
 import { 
   Plus, Search, Filter, MapPin, Clock, User, Users, Car, FileText, 
   FileSpreadsheet, ChevronRight, CheckCircle, XCircle, Calendar as CalendarIcon, 
-  Copy, Briefcase, Hash, Luggage, Baby, Phone, Mail, DollarSign, Info
+  Copy, Briefcase, Hash, Luggage, Baby, Phone, Mail, DollarSign, Info, Settings, Trash2
 } from 'lucide-react';
 import { exportToExcel } from '../../lib/excelExport';
 import { Pagination } from '../../components/ui/Pagination';
@@ -20,7 +20,8 @@ export default function ReservasTurismo() {
   const [reservasTurismo, setReservasTurismo] = useState<ReservaTurismo[]>([]);
   const [conductores, setConductores] = useState<any[]>([]);
   const [vehiculos, setVehiculos] = useState<any[]>([]);
-  const [categoriasDisponibles, setCategoriasDisponibles] = useState<string[]>(['Web', 'Whatsapp', 'Correo', 'Minera', 'Extranjero', 'Operador']);
+  const [contratos, setContratos] = useState<{id: string, razonSocial: string}[]>([]);
+  const [categoriasDisponibles, setCategoriasDisponibles] = useState<string[]>([]);
 
   const loadData = async () => {
     if (!activeCompanyId) return;
@@ -49,7 +50,8 @@ export default function ReservasTurismo() {
           telefono: dbR.cliente_telefono || '',
           dni_pasaporte: dbR.detalles?.cliente?.dni_pasaporte || '',
           rut_empresa: dbR.cliente_rut || '',
-          tipoCliente: dbR.detalles?.cliente?.tipoCliente || 'Particular'
+          tipoCliente: dbR.detalles?.cliente?.tipoCliente || 'Particular',
+          contratoId: dbR.detalles?.cliente?.contratoId || ''
         },
         pasajeros: dbR.detalles?.pasajeros || { nombre: '', telefono: '', cantidad: dbR.pasajeros_cantidad || 1 },
         pasajerosList: dbR.detalles?.pasajerosList || [],
@@ -85,19 +87,20 @@ export default function ReservasTurismo() {
 
       setReservasTurismo(formattedReservas);
 
-      const defaultCategorias = ['Web', 'Whatsapp', 'Correo', 'Minera', 'Extranjero', 'Operador'];
       const dbCategories = (reservasData || []).map((dbR: any) => dbR.categoria).filter(Boolean);
-      const uniqueCats = Array.from(new Set([...defaultCategorias, ...dbCategories])) as string[];
+      const uniqueCats = Array.from(new Set([...categoriasMaestras, ...dbCategories])) as string[];
       setCategoriasDisponibles(uniqueCats);
 
       let condQuery = supabase.from('colaborador').select('id, nombre, estado').in('rol', ['Conductor', 'Chofer', 'Conductor Interprovincial', 'Conductor Interno Mina']);
       let vehQuery = supabase.from('vehiculo').select('id, patente, marca, estado');
       let rutasQuery = supabase.from('operacion_ruta').select('*').order('created_at', { ascending: false });
-      
+      let contratosQ = supabase.from('operacion_contrato').select('id, cliente_razon_social').eq('activo', true);
+
       if (activeCompanyId !== 'GLOBAL') {
         condQuery = condQuery.eq('empresa_id', activeCompanyId);
         vehQuery = vehQuery.eq('empresa_id', activeCompanyId);
         rutasQuery = rutasQuery.eq('empresa_id', activeCompanyId);
+        contratosQ = contratosQ.eq('empresa_id', activeCompanyId);
       }
 
       const { data: condData } = await condQuery;
@@ -108,6 +111,9 @@ export default function ReservasTurismo() {
 
       const { data: rutasData } = await rutasQuery;
       if (rutasData) setRutasGuardadas(rutasData);
+
+      const { data: contratosData } = await contratosQ;
+      if (contratosData) setContratos(contratosData.map(c => ({ id: c.id, razonSocial: c.cliente_razon_social })));
 
       if (activeCompanyId === 'GLOBAL') {
         const { data: userData } = await supabase.auth.getUser();
@@ -164,13 +170,28 @@ export default function ReservasTurismo() {
   });
   const [rutasGuardadas, setRutasGuardadas] = useState<any[]>([]);
   const [mostrarCrearRuta, setMostrarCrearRuta] = useState(false);
+  const [mostrarPanelCategorias, setMostrarPanelCategorias] = useState(false);
+  const [nuevaCategoriaForm, setNuevaCategoriaForm] = useState('');
+  const [categoriasMaestras, setCategoriasMaestras] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('categoriasMaestras') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  const guardarCategorias = (nuevas: string[]) => {
+    setCategoriasMaestras(nuevas);
+    localStorage.setItem('categoriasMaestras', JSON.stringify(nuevas));
+  };
+  
   const [isCustomCategoria, setIsCustomCategoria] = useState(false);
   const [nuevaRutaForm, setNuevaRutaForm] = useState({ nombre: '', origen: '', destino: '', enlaceMapa: '' });
 
   // New Reservation Form State
-  const initialFormState = {
+  const initialFormState: any = {
     categoria: 'Web' as ReservaTurismo['categoria'],
-    cliente: { nombre: '', email: '', telefono: '', dni_pasaporte: '', rut_empresa: '', tipoCliente: 'Particular' },
+    cliente: { nombre: '', email: '', telefono: '', dni_pasaporte: '', rut_empresa: '', tipoCliente: 'Particular', contratoId: '' },
     pasajeros: { nombre: '', telefono: '', cantidad: 1 },
     pasajerosList: [],
     lugares: { origen: '', destino: '', numeroVuelo: '' },
@@ -315,6 +336,19 @@ export default function ReservasTurismo() {
     return (bruto - adicional) * (1 - comision / 100);
   };
 
+  const handleActualizarEstado = async (nuevoEstado: string) => {
+    if (!reservaSeleccionada) return;
+    try {
+        const { error } = await supabase.from('operacion_reserva').update({ estado_viaje: nuevoEstado }).eq('id', reservaSeleccionada.id);
+        if (error) throw error;
+        setMostrarDetalle(false);
+        loadData();
+    } catch (e) {
+        console.error(e);
+        alert('Error al actualizar: ' + (e as Error).message);
+    }
+  };
+
   const handleCrearReserva = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalCompanyId = activeCompanyId === 'GLOBAL' ? newEmpresaId : activeCompanyId;
@@ -326,10 +360,11 @@ export default function ReservasTurismo() {
 
     const neto = calcularNeto(formReserva.finanzas.montoBruto, formReserva.finanzas.gastosAdicionales, formReserva.finanzas.porcentajeComision);
     
-    // Default structure for details JSONB
-    const reservationData = {
+    const isEdit = !!(formReserva as any).id;
+    const auditLogs = (formReserva as any).auditLogs || [];
+
+    const reservationData: any = {
       empresa_id: finalCompanyId,
-      codigo: `OP-${Math.floor(1000 + Math.random() * 9000)}-${new Date().getFullYear()}`,
       categoria: formReserva.categoria,
       cliente_nombre: formReserva.cliente.nombre,
       cliente_email: formReserva.cliente.email,
@@ -341,7 +376,6 @@ export default function ReservasTurismo() {
       pasajeros_cantidad: formReserva.pasajeros.cantidad,
       monto_total: formReserva.finanzas.montoBruto,
       estado_pago: formReserva.finanzas.cobrado ? 'Pagado' : 'Pendiente',
-      estado_viaje: 'Confirmado',
       conductor_id: formReserva.conductorId || null,
       vehiculo_id: formReserva.vehiculoId || null,
       detalles: {
@@ -360,13 +394,25 @@ export default function ReservasTurismo() {
           montoNeto: neto
         },
         comentarios: formReserva.comentarios,
-        auditLogs: [{ accion: 'Reserva Creada', quien: 'Actual Usuario', cuando: new Date().toISOString() }]
+        auditLogs: isEdit 
+            ? [...auditLogs, { accion: 'Reserva Actualizada', quien: 'Actual Usuario', cuando: new Date().toISOString() }]
+            : [{ accion: 'Reserva Creada', quien: 'Actual Usuario', cuando: new Date().toISOString() }]
       }
     };
 
+    if (!isEdit) {
+       reservationData.codigo = `OP-${Math.floor(1000 + Math.random() * 9000)}-${new Date().getFullYear()}`;
+       reservationData.estado_viaje = 'Confirmado';
+    }
+
     try {
-      const { error } = await supabase.from('operacion_reserva').insert([reservationData]);
-      if (error) throw error;
+      if (isEdit) {
+         const { error } = await supabase.from('operacion_reserva').update(reservationData).eq('id', (formReserva as any).id);
+         if (error) throw error;
+      } else {
+         const { error } = await supabase.from('operacion_reserva').insert([reservationData]);
+         if (error) throw error;
+      }
       
       setMostrarFormulario(false);
       setFormReserva(initialFormState);
@@ -800,10 +846,89 @@ export default function ReservasTurismo() {
             </CardContent>
             <div className="p-4 border-t bg-white dark:bg-slate-800/50 flex justify-between items-center">
                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800/50">Editar</Button>
-                  <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800/50 border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30">Anular OP</Button>
+                  <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800/50" onClick={() => {
+                      setFormReserva(reservaSeleccionada as any);
+                      setMostrarDetalle(false);
+                      setMostrarFormulario(true);
+                  }}>Editar</Button>
+                  <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800/50 border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30" onClick={() => {
+                      if (window.confirm('¿Estás seguro de anular esta Reserva (OP)?')) {
+                          handleActualizarEstado('cancelado');
+                      }
+                  }}>Anular OP</Button>
                </div>
-               <Button onClick={() => setMostrarDetalle(false)} className="bg-slate-900 text-white hover:bg-black">Finalizar Revisión</Button>
+               <Button onClick={() => {
+                    if (reservaSeleccionada?.estado === 'pendiente' || reservaSeleccionada?.estado === 'confirmado' || reservaSeleccionada?.estado === 'en curso') {
+                        if (window.confirm('¿Desea marcar esta OP como Finalizada?')) {
+                            handleActualizarEstado('finalizado');
+                        } else {
+                            setMostrarDetalle(false);
+                        }
+                    } else {
+                        setMostrarDetalle(false);
+                    }
+               }} className="bg-slate-900 text-white hover:bg-black dark:hover:bg-slate-800">Finalizar Revisión</Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {mostrarPanelCategorias && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 dark:bg-slate-800/80 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-sm bg-white dark:bg-slate-900 shadow-2xl overflow-hidden rounded-xl animate-in fade-in zoom-in-95 duration-200">
+            <CardHeader className="flex flex-row items-center justify-between border-b dark:border-slate-800 bg-indigo-600 text-white px-5 py-4">
+              <CardTitle className="text-sm font-bold flex items-center gap-2">
+                <Settings className="h-4 w-4" /> Gestionar Categorías
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setMostrarPanelCategorias(false)} className="text-white hover:bg-indigo-700/50 rounded-full h-8 w-8 p-0">
+                <XCircle className="h-5 w-5" />
+              </Button>
+            </CardHeader>
+            <CardContent className="p-5 space-y-4">
+              <div className="flex gap-2">
+                 <input 
+                   type="text" 
+                   required 
+                   className="flex-1 px-3 py-2 border rounded-lg text-sm bg-slate-50 dark:bg-slate-800/50 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-indigo-500" 
+                   placeholder="Nueva Categoría" 
+                   value={nuevaCategoriaForm}
+                   onChange={e => setNuevaCategoriaForm(e.target.value)}
+                 />
+                 <Button type="button" onClick={() => {
+                   if (nuevaCategoriaForm.trim() && !categoriasMaestras.includes(nuevaCategoriaForm.trim())) {
+                     guardarCategorias([...categoriasMaestras, nuevaCategoriaForm.trim()]);
+                     setNuevaCategoriaForm('');
+                   }
+                 }} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md">
+                   Agregar
+                 </Button>
+              </div>
+
+              <div className="space-y-2 max-h-[30vh] overflow-y-auto mt-4 pr-1">
+                {categoriasMaestras.length === 0 ? (
+                  <div className="text-center text-xs text-slate-500 py-4">No hay categorías. Agrega una nueva arriba.</div>
+                ) : (
+                  categoriasMaestras.map(cat => (
+                    <div key={cat} className="flex justify-between items-center p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg text-sm font-medium border border-slate-100 dark:border-slate-700">
+                      <span className="text-slate-800 dark:text-slate-200">{cat}</span>
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          guardarCategorias(categoriasMaestras.filter(c => c !== cat));
+                        }}
+                        className="text-slate-400 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+            <div className="p-4 border-t dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex justify-end">
+              <Button onClick={() => setMostrarPanelCategorias(false)} variant="outline" className="w-full">
+                Cerrar Panel
+              </Button>
             </div>
           </Card>
         </div>
@@ -916,44 +1041,50 @@ export default function ReservasTurismo() {
                       <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Categoría de Reserva</label>
                       <button 
                         type="button" 
-                        onClick={() => setIsCustomCategoria(!isCustomCategoria)} 
-                        className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                        onClick={() => setMostrarPanelCategorias(true)} 
+                        className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
                       >
-                        {isCustomCategoria ? 'Usar Lista' : '+ Nueva Categoría'}
+                        <Settings className="w-3 h-3" />
+                        Gestionar Categorías
                       </button>
                     </div>
-                    {isCustomCategoria ? (
-                      <input 
-                        type="text" 
-                        className="w-full mt-2 px-3 py-2 border rounded-lg dark:border-slate-800 text-sm font-bold bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                        value={formReserva.categoria}
-                        onChange={(e) => setFormReserva({ ...formReserva, categoria: e.target.value as any })}
-                        placeholder="Ej. VIP, Especial..."
-                      />
-                    ) : (
-                      <select 
-                        className="w-full mt-2 px-3 py-2 border rounded-lg dark:border-slate-800 text-sm font-bold bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                        value={formReserva.categoria}
-                        onChange={(e) => setFormReserva({ ...formReserva, categoria: e.target.value as any })}
-                      >
-                        {categoriasDisponibles.map((cat) => (
-                          <option key={cat} value={cat}>{cat}</option>
-                        ))}
-                      </select>
-                    )}
+                    <select 
+                      className="w-full mt-2 px-3 py-2 border rounded-lg dark:border-slate-800 text-sm font-bold bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                      value={formReserva.categoria}
+                      onChange={(e) => setFormReserva({ ...formReserva, categoria: e.target.value as any })}
+                    >
+                      <option value="">Seleccione Categoría...</option>
+                      {categoriasMaestras.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="space-y-2 col-span-2">
                     <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Datos del Cliente Reservante</label>
                     <div className="flex flex-col gap-3">
-                      <select 
-                        className="w-full px-3 py-2 border rounded-lg dark:border-slate-800 text-sm font-bold bg-white dark:bg-slate-800/50 dark:text-slate-100"
-                        value={(formReserva.cliente as any).tipoCliente || 'Particular'}
-                        onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, tipoCliente: e.target.value}})}
-                      >
-                         <option value="Particular">Particular</option>
-                         <option value="Empresa / Convenio">Empresa / Convenio</option>
-                         <option value="Agencia">Agencia</option>
-                      </select>
+                      <div className="flex gap-3">
+                        <select 
+                          className="flex-1 px-3 py-2 border rounded-lg dark:border-slate-800 text-sm font-bold bg-white dark:bg-slate-800/50 dark:text-slate-100"
+                          value={(formReserva.cliente as any).tipoCliente || 'Particular'}
+                          onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, tipoCliente: e.target.value}})}
+                        >
+                           <option value="Particular">Particular</option>
+                           <option value="Empresa / Convenio">Empresa / Convenio</option>
+                           <option value="Agencia">Agencia</option>
+                        </select>
+                        {((formReserva.cliente as any).tipoCliente === 'Empresa / Convenio' || (formReserva.cliente as any).tipoCliente === 'Agencia') && (
+                          <select
+                            className="flex-1 px-3 py-2 border rounded-lg dark:border-slate-800 text-sm font-bold bg-white dark:bg-slate-800/50 dark:text-slate-100 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/50"
+                            value={(formReserva.cliente as any).contratoId || ''}
+                            onChange={(e) => setFormReserva({...formReserva, cliente: {...formReserva.cliente, contratoId: e.target.value}})}
+                          >
+                            <option value="">Seleccione Contrato Maestro...</option>
+                            {contratos.map(c => (
+                              <option key={c.id} value={c.id}>{c.razonSocial}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div className="relative group">
                           <Users className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500 group-focus-within:text-blue-500" />
@@ -1236,7 +1367,7 @@ export default function ReservasTurismo() {
                                  />
                                </div>
                                <div className="flex justify-between items-center px-1 bg-white dark:bg-slate-900/50 rounded">
-                                 <span className="text-[10px] text-slate-500 font-bold">Alzas:</span>
+                                 <span className="text-[10px] text-slate-500 font-bold">Alzador:</span>
                                  <input 
                                    type="number" min="0" className="w-10 px-1 py-0.5 border rounded dark:border-slate-800 text-xs text-center dark:bg-slate-800/50 dark:text-slate-100"
                                    value={(formReserva.logistica as any).cantidadAlzadores || ''}
