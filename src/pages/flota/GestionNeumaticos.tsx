@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Plus, Search, Activity, CircleDashed, BarChart3, Truck, Trash, ChevronDown, AlertCircle, ChevronUp, DollarSign, X, Info, TrendingUp, AlertTriangle, ChevronRight, Box } from 'lucide-react';
+import { Plus, Search, Activity, CircleDashed, BarChart3, Truck, Trash, ChevronDown, AlertCircle, ChevronUp, DollarSign, X, Info, TrendingUp, AlertTriangle, ChevronRight, Box, Printer } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Modal } from '../../components/ui/Modal';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
@@ -1049,7 +1049,10 @@ export function FormularioInspeccion({
       </div>
 
       {/* Button Actions */}
-      <div className="flex justify-end gap-3 pt-4">
+      <div className="flex justify-end gap-3 pt-4 print:hidden">
+        <Button variant="outline" className="dark:border-slate-700 dark:text-slate-300" onClick={() => window.print()}>
+          <Printer className="w-4 h-4 mr-2" /> Imprimir Pauta
+        </Button>
         <Button variant="outline" className="dark:border-slate-700 dark:text-slate-300" onClick={onClose}>Descartar</Button>
         <Button className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold border-none shadow-md">
           <Activity className="w-4 h-4 mr-2" /> Guardar Inspección
