@@ -507,7 +507,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         
         if (finalOT.historial && finalOT.historial.length > 0) {
           const insertPayload = finalOT.historial.map(h => ({
-            id: h.id && h.id.length > 20 ? h.id : generateUUID(),
             orden_id: finalOT.id,
             usuario_nombre: h.usuario_nombre || 'Sistema',
             comentario: h.comentario || '',
@@ -702,7 +701,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
           if (otActualizada.tareasRealizadas.length > 0) {
             const insertPayload = otActualizada.tareasRealizadas.map(t => ({
-              id: t.id && t.id.length > 20 ? t.id : generateUUID(), // ensure UUID
               orden_id: otActualizada.id,
               tarea_estandar_id: t.tarea_estandar_id || null,
               tiempo_real_minutos: t.tiempo_real_minutos || 0,
@@ -760,7 +758,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             }
 
             const insertPayload = otActualizada.insumos.map(i => ({
-              id: i.id && i.id.length > 20 ? i.id : generateUUID(),
               orden_id: otActualizada.id,
               repuesto_id: i.repuesto?.id || i.repuesto_id || null,
               cantidad: i.cantidad || 0,
@@ -847,14 +844,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         
         // Historial de la OT
         if (otActualizada.historial) {
-          const { error: delHistErr } = await supabase.from('historial_ot').delete().eq('orden_id', otActualizada.id);
-          if (delHistErr) {
-            console.error("Error deleting old historial_ot:", delHistErr);
-            throw new Error(`No se pudo limpiar el historial anterior: ${delHistErr.message}`);
-          }
-          if (otActualizada.historial.length > 0) {
-            const insertPayload = otActualizada.historial.map(h => ({
-              id: h.id && h.id.length > 20 ? h.id : generateUUID(),
+          const nuevosHistorial = otActualizada.historial.filter(h => !h.id || h.id.length < 20);
+          if (nuevosHistorial.length > 0) {
+            const insertPayload = nuevosHistorial.map(h => ({
               orden_id: otActualizada.id,
               usuario_nombre: h.usuario_nombre || 'Sistema',
               comentario: h.comentario || '',
@@ -877,7 +869,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             }
             if (otActualizada.solicitudes.length > 0) {
               const insertPayload = otActualizada.solicitudes.map(s => ({
-                id: s.id && s.id.length > 20 ? s.id : generateUUID(),
                 orden_id: otActualizada.id,
                 repuesto_id: s.repuesto_id || null,
                 repuesto_nombre: s.repuesto_nombre || 'Insumo',
