@@ -646,9 +646,223 @@ function InventarioNeumaticos() {
   );
 }
 
-function FormularioInspeccion() {
-  const [numPositions, setNumPositions] = useState(6); // Default 6 wheels
-  const positions = Array.from({length: numPositions}, (_, i) => i + 1);
+const CONFIGURACIONES: Record<string, any> = {
+  "1": {
+    nombre: "Configuración 1 (4x2 - 4 Neum.)",
+    label: "CONFIGURACIÓN 1",
+    ejes: [
+      { tipo: "simple", neumaticos: [1, 2] },
+      { tipo: "simple", neumaticos: [3, 4] }
+    ],
+    tablaPosiciones: [1, 2, 3, 4]
+  },
+  "2": {
+    nombre: "Configuración 2 (4x2 - 6 Neum.)",
+    label: "CONFIGURACIÓN 2",
+    ejes: [
+      { tipo: "simple", neumaticos: [1, 2] },
+      { tipo: "dual", neumaticos: [3, 4, 5, 6] }
+    ],
+    tablaPosiciones: [1, 2, 3, 4, 5, 6]
+  },
+  "3": {
+    nombre: "Configuración 3 (6x2 - 8 Neum. E3 Simple)",
+    label: "CONFIGURACIÓN 3",
+    ejes: [
+      { tipo: "simple", neumaticos: [1, 2] },
+      { tipo: "dual", neumaticos: [3, 4, 5, 6] },
+      { tipo: "simple", neumaticos: [7, 8] }
+    ],
+    tablaPosiciones: [1, 2, 3, 4, 5, 6, 7, 8]
+  },
+  "4": {
+    nombre: "Configuración 4 (10 Neumáticos)",
+    label: "CONFIGURACIÓN 4",
+    ejes: [
+      { tipo: "simple", neumaticos: [1, 2] },
+      { tipo: "dual", neumaticos: [3, 4, 5, 6] },
+      { tipo: "dual", neumaticos: [7, 8, 9, 10] }
+    ],
+    tablaPosiciones: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  },
+  "5": {
+    nombre: "Configuración 5 (14 Neumáticos - 10x6)",
+    label: "CONFIGURACIÓN 5",
+    ejes: [
+      { tipo: "simple", neumaticos: [1, 2] },
+      { tipo: "simple", neumaticos: [3, 4] },
+      { tipo: "simple", neumaticos: [5, 6] },
+      { tipo: "dual", neumaticos: [7, 8, 9, 10] },
+      { tipo: "dual", neumaticos: [11, 12, 13, 14] }
+    ],
+    tablaPosiciones: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+  },
+  "6": {
+    nombre: "Configuración 6 (16 Neumáticos)",
+    label: "CONFIGURACIÓN 6",
+    ejes: [
+      { tipo: "simple", neumaticos: [1, 2] },
+      { tipo: "simple", neumaticos: [3, 4] },
+      { tipo: "dual", neumaticos: [5, 6, 7, 8] },
+      { tipo: "dual", neumaticos: [9, 10, 11, 12] },
+      { tipo: "dual", neumaticos: [13, 14, 15, 16] }
+    ],
+    tablaPosiciones: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+  },
+  "7": {
+    nombre: "Semi-remolque 2 Ejes (8 Neumáticos)",
+    label: "SEMI-REMOLQUE 2 EJES",
+    isTrailer: true,
+    ejes: [
+      { tipo: "dual", neumaticos: [1, 2, 3, 4] },
+      { tipo: "dual", neumaticos: [5, 6, 7, 8] }
+    ],
+    tablaPosiciones: [1, 2, 3, 4, 5, 6, 7, 8]
+  },
+  "8": {
+    nombre: "Semi-remolque 3 Ejes (12 Neumáticos)",
+    label: "SEMI-REMOLQUE 3 EJES",
+    isTrailer: true,
+    ejes: [
+      { tipo: "dual", neumaticos: [1, 2, 3, 4] },
+      { tipo: "dual", neumaticos: [5, 6, 7, 8] },
+      { tipo: "dual", neumaticos: [9, 10, 11, 12] }
+    ],
+    tablaPosiciones: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  },
+  "9": {
+    nombre: "Semi-remolque 4 Ejes (16 Neumáticos)",
+    label: "SEMI-REMOLQUE 4 EJES",
+    isTrailer: true,
+    ejes: [
+      { tipo: "dual", neumaticos: [1, 2, 3, 4] },
+      { tipo: "dual", neumaticos: [5, 6, 7, 8] },
+      { tipo: "dual", neumaticos: [9, 10, 11, 12] },
+      { tipo: "dual", neumaticos: [13, 14, 15, 16] }
+    ],
+    tablaPosiciones: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+  }
+};
+
+function SvgNeumaticos({ configId }: { configId: string }) {
+  const config = CONFIGURACIONES[configId];
+  if (!config) return null;
+
+  const svgHeight = 400;
+  const totalEjes = config.ejes.length;
+
+  const renderNeumatico = (x: number, y: number, id: number) => {
+    const w = 30;
+    const h = 50;
+    return (
+      <g key={id}>
+        <rect x={x} y={y} width={w} height={h} rx={6} fill="#000000" />
+        {/* Bandas de rodadura realistas */}
+        <line x1={x+6} y1={y} x2={x+6} y2={y+h} stroke="#1e293b" strokeWidth={1.2} strokeDasharray="3,3" />
+        <line x1={x+w-6} y1={y} x2={x+w-6} y2={y+h} stroke="#1e293b" strokeWidth={1.2} strokeDasharray="3,3" />
+        {/* Identificación numérica destacada */}
+        <text x={x + w/2} y={y + h/2 + 4} fill="#ffffff" fontSize={12} fontWeight={900} textAnchor="middle" fontFamily="sans-serif">{id}</text>
+      </g>
+    );
+  };
+
+  const elements = [];
+
+  if (config.isTrailer) {
+    elements.push(
+      <g transform="translate(150, 40)" key="acople">
+        <path d="M-15,10 L15,10 L0,-15 Z" fill="#475569" stroke="#1e293b" strokeWidth={2} />
+        <circle cx={0} cy={5} r={4.5} fill="#f59e0b" />
+      </g>
+    );
+    elements.push(
+      <line x1={150} y1={40} x2={150} y2={340} stroke="#64748b" strokeWidth={4} strokeDasharray="5,5" key="chasis-line" />
+    );
+    elements.push(
+      <rect x={135} y={65} width={30} height={20} rx={3} fill="#334155" key="chasis-rect" />
+    );
+
+    const startY = 340 - ((totalEjes - 1) * 55);
+    const ejeSpacing = 55;
+
+    config.ejes.forEach((eje: any, index: number) => {
+      const y = startY + (index * ejeSpacing);
+      const etiquetaEje = `EJE ${index + 1}`;
+
+      elements.push(
+        <g key={`eje-${index}`}>
+          <line x1={60} y1={y} x2={240} y2={y} stroke="black" strokeWidth={6} strokeLinecap="round" />
+          <text x={265} y={y + 3.5} fontSize={10} fontWeight={900} fill="#475569" fontFamily="sans-serif">{etiquetaEje}</text>
+          
+          {eje.tipo === "simple" && (
+            <>
+              {renderNeumatico(45, y - 25, eje.neumaticos[0])}
+              {renderNeumatico(225, y - 25, eje.neumaticos[1])}
+            </>
+          )}
+          {eje.tipo === "dual" && (
+            <>
+              {renderNeumatico(45, y - 25, eje.neumaticos[0])}
+              {renderNeumatico(80, y - 25, eje.neumaticos[1])}
+              {renderNeumatico(190, y - 25, eje.neumaticos[2])}
+              {renderNeumatico(225, y - 25, eje.neumaticos[3])}
+            </>
+          )}
+        </g>
+      );
+    });
+  } else {
+    const ejeSpacing = totalEjes > 1 ? (svgHeight - 60) / (totalEjes - 1) : 0;
+    const startY = 30;
+
+    config.ejes.forEach((eje: any, index: number) => {
+      const y = startY + (index * ejeSpacing);
+      const etiquetaEje = `EJE ${index + 1}`;
+
+      elements.push(
+        <g key={`eje-${index}`}>
+          <line x1={60} y1={y} x2={240} y2={y} stroke="black" strokeWidth={6} strokeLinecap="round" />
+          <text x={265} y={y + 3.5} fontSize={10} fontWeight={900} fill="#475569" fontFamily="sans-serif">{etiquetaEje}</text>
+          
+          {eje.tipo === "simple" && (
+            <>
+              {renderNeumatico(45, y - 25, eje.neumaticos[0])}
+              {renderNeumatico(225, y - 25, eje.neumaticos[1])}
+            </>
+          )}
+          {eje.tipo === "dual" && (
+            <>
+              <circle cx={150} cy={y} r={10} fill="#1e293b" />
+              <circle cx={150} cy={y} r={4} fill="#f59e0b" />
+              {renderNeumatico(45, y - 25, eje.neumaticos[0])}
+              {renderNeumatico(80, y - 25, eje.neumaticos[1])}
+              {renderNeumatico(190, y - 25, eje.neumaticos[2])}
+              {renderNeumatico(225, y - 25, eje.neumaticos[3])}
+            </>
+          )}
+        </g>
+      );
+    });
+  }
+
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400" className="w-full h-full font-sans">
+      <rect width="100%" height="100%" fill="none" />
+      {elements}
+    </svg>
+  );
+}
+
+export function FormularioInspeccion({ 
+  prefilledVehiculoId,
+  prefilledCliente,
+  onClose
+}: {
+  prefilledVehiculoId?: string;
+  prefilledCliente?: string;
+  onClose?: () => void;
+} = {}) {
+  const [configId, setConfigId] = useState("5");
   const [vehiculos, setVehiculos] = useState<any[]>([]);
   const { currentCompany } = useCompany();
 
@@ -661,139 +875,187 @@ function FormularioInspeccion() {
     fetchVehicles();
   }, [currentCompany]);
 
+  const activeConfig = CONFIGURACIONES[configId];
+  const allPositions = Array.from({length: 16}, (_, i) => i + 1);
+
   return (
-    <Card className="border shadow-lg">
-      <CardHeader className="bg-slate-900 text-white rounded-t-xl pb-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <CardTitle className="text-xl">Formulario de Inspección Técnica Ocular</CardTitle>
-            <p className="text-slate-300 text-sm mt-1">Captura de presiones, desgaste de surcos y observaciones</p>
+    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 flex flex-col p-6 w-full">
+      {/* Header and Controls */}
+      <div className="flex flex-col sm:flex-row justify-between gap-4 mb-6 pt-2 pb-5 border-b border-slate-200 dark:border-slate-800">
+        <div>
+          <h2 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight uppercase flex items-center gap-2 relative">
+            <Truck className="w-6 h-6 text-amber-500" />
+            Pauta de Inspección Técnica de Neumáticos
+          </h2>
+          <p className="text-xs text-slate-500 font-semibold mt-0.5 ml-8">Control de flota y desgaste operativo</p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-[9px] uppercase text-slate-400 font-extrabold tracking-wider">Configuración Activa</label>
+          <select 
+            value={configId}
+            onChange={(e) => setConfigId(e.target.value)}
+            className="bg-slate-800 text-white border border-slate-700 rounded px-3 py-2 text-xs focus:outline-none focus:border-amber-500 cursor-pointer font-bold w-full sm:w-[260px]"
+          >
+            {Object.entries(CONFIGURACIONES).map(([key, config]) => (
+              <option key={key} value={key}>{config.nombre}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Datos Generales Formulario */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6 text-xs border-b border-slate-100 dark:border-slate-800 pb-6 print-header-grid">
+        <div className="border-b border-slate-200 dark:border-slate-700 py-1">
+          <span className="block text-[9px] text-slate-400 uppercase font-bold mb-1">Cliente / Operación:</span>
+          <input type="text" placeholder="-" defaultValue={prefilledCliente || ""} className="w-full font-bold focus:outline-none border-0 p-0 text-slate-800 dark:text-slate-100 bg-transparent" />
+        </div>
+        <div className="border-b border-slate-200 dark:border-slate-700 py-1">
+          <span className="block text-[9px] text-slate-400 uppercase font-bold mb-1">Patente / ID Equipo:</span>
+          <select defaultValue={prefilledVehiculoId || ""} className="w-full font-bold focus:outline-none border-0 p-0 text-slate-800 dark:text-slate-100 bg-transparent appearance-none">
+            <option value="">Seleccione Equipo</option>
+            {vehiculos.map(v => (
+              <option key={v.id} value={v.id}>{v.patente} {v.modelo ? `- ${v.modelo}` : ''}</option>
+            ))}
+          </select>
+        </div>
+        <div className="border-b border-slate-200 dark:border-slate-700 py-1">
+          <span className="block text-[9px] text-slate-400 uppercase font-bold mb-1">Kilometraje Actual:</span>
+          <input type="text" placeholder="Ej: 124,530" className="w-full font-bold focus:outline-none border-0 p-0 text-slate-800 dark:text-slate-100 bg-transparent" />
+        </div>
+        <div className="border-b border-slate-200 dark:border-slate-700 py-1">
+          <span className="block text-[9px] text-slate-400 uppercase font-bold mb-1">Fecha Inspección:</span>
+          <input type="date" defaultValue={new Date().toISOString().substring(0, 10)} className="w-full font-bold focus:outline-none border-0 p-0 text-slate-800 dark:text-slate-100 bg-transparent" />
+        </div>
+        <div className="border-b border-slate-200 dark:border-slate-700 py-1">
+          <span className="block text-[9px] text-slate-400 uppercase font-bold mb-1">Inspector / Supervisor:</span>
+          <input type="text" placeholder="Nombre completo" className="w-full font-bold focus:outline-none border-0 p-0 text-slate-800 dark:text-slate-100 bg-transparent" />
+        </div>
+      </div>
+
+      {/* Workspace Dos Columnas */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start mb-6">
+        {/* Columna Izquierda: Esquema Vectorial */}
+        <div className="lg:col-span-5 flex flex-col items-center bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+          <div className="flex justify-between w-full mb-2">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Esquema Vectorial</span>
+            <span className="bg-slate-900 text-white text-[9px] font-black px-2 py-0.5 rounded tracking-wider uppercase">
+              {activeConfig?.label}
+            </span>
+          </div>
+          <div className="w-full max-w-[280px] aspect-[3/4] flex items-center justify-center">
+            <SvgNeumaticos configId={configId} />
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="p-6 bg-slate-50 dark:bg-slate-900/50 border-b dark:border-slate-800 grid grid-cols-2 md:grid-cols-4 gap-4">
-           <div>
-             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Vehículo / Placa</label>
-             <select className="w-full p-2 border rounded-md dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-slate-100 text-sm">
-               <option value="">Seleccione equipo</option>
-               {vehiculos.map(v => (
-                 <option key={v.id} value={v.id}>{v.patente} {v.modelo ? `- ${v.modelo}` : ''}</option>
-               ))}
-             </select>
-           </div>
-           <div>
-             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fecha Inspección</label>
-             <input type="date" className="w-full p-2 border rounded-md dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-slate-100 text-sm" />
-           </div>
-           <div>
-             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Odómetro (Km)</label>
-             <input type="number" placeholder="Ej: 125000" className="w-full p-2 border rounded-md dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-slate-100 text-sm" />
-           </div>
-           <div>
-             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Configuración Ejes</label>
-             <select 
-               className="w-full p-2 border rounded-md dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-slate-100 text-sm"
-               onChange={(e) => setNumPositions(parseInt(e.target.value))}
-               value={numPositions}
-             >
-               <option value="4">2 Ejes / Config. 2x2 (4 Neumáticos)</option>
-               <option value="6">2 Ejes (6 Neumáticos)</option>
-               <option value="10">3 Ejes (10 Neumáticos)</option>
-               <option value="14">4 Ejes (14 Neumáticos)</option>
-               <option value="18">5 Ejes (18 Neumáticos)</option>
-             </select>
-           </div>
+
+        {/* Columna Derecha: Glosario de Parámetros y Notas */}
+        <div className="lg:col-span-7 space-y-4 flex flex-col justify-between h-full">
+          {/* Glosario */}
+          <div className="bg-amber-50/70 dark:bg-amber-900/10 border-l-4 border-amber-500 p-4 rounded-lg text-[11px] text-amber-900 dark:text-amber-200">
+            <h4 className="font-extrabold uppercase mb-1.5 flex items-center gap-1.5"><Info className="w-3.5 h-3.5" /> Glosario de Medición y Control</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-1.5 mt-2 font-semibold">
+              <div><strong>Presión (PSI):</strong> Caliente / Frío</div>
+              <div><strong>Prof. Remanente:</strong> Cocada en mm</div>
+              <div><strong>Ext/Int:</strong> Cocada Exterior/Interior</div>
+              <div><strong>Nº R:</strong> Número de Reencauches</div>
+              <div><strong>Reens:</strong> Neumático Reencauchado</div>
+              <div><strong>TV:</strong> Tapa Válvula (SÍ/NO)</div>
+              <div className="col-span-2"><strong>Exten:</strong> Extensión de Válvula</div>
+            </div>
+          </div>
+
+          {/* Notas de Campo */}
+          <div className="border border-slate-200 dark:border-slate-800 rounded-xl p-4 bg-slate-50 dark:bg-slate-900/30 flex-grow">
+            <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-2 flex items-center gap-1.5">
+              <Box className="w-3.5 h-3.5" /> Notas de Campo
+            </h3>
+            <textarea className="w-full h-32 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-amber-500 resize-none" placeholder="Escriba aquí observaciones críticas encontradas durante la medición (ej: cortes en flancos, desalineación excesiva, neumáticos listos para reencauche)..."></textarea>
+          </div>
         </div>
-        
-        <div className="p-6 overflow-x-auto">
-           <table className="w-full min-w-max border-collapse">
-             <thead>
-               <tr>
-                 <th colSpan={3} className="border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-2 text-xs text-center text-slate-600 dark:text-slate-300">Identificación</th>
-                 <th colSpan={2} className="border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-2 text-xs text-center text-slate-600 dark:text-slate-300">Condición Operativa</th>
-                 <th colSpan={4} className="border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-2 text-xs text-center text-slate-600 dark:text-slate-300">Profundidad del Surco (mm)</th>
-                 <th colSpan={4} className="border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-2 text-xs text-center text-slate-600 dark:text-slate-300">Detalles Adicionales</th>
-                 <th colSpan={1} className="border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-2 text-xs text-center text-slate-600 dark:text-slate-300">Obs</th>
-               </tr>
-               <tr className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 uppercase">
-                 <th className="p-2 border-r dark:border-slate-700 w-12 text-center">Pos</th>
-                 <th className="p-2 border-r dark:border-slate-700 w-32">Serie/DOT</th>
-                 <th className="p-2 border-r dark:border-slate-700 w-40">Marca / Diseño</th>
-                 <th className="p-2 border-r dark:border-slate-700 w-24">Presión (PSI)</th>
-                 <th className="p-2 border-r dark:border-slate-700 w-20">Estado (C/F)</th>
-                 <th className="p-2 border-r dark:border-slate-700 w-16 text-center">Ext-1</th>
-                 <th className="p-2 border-r dark:border-slate-700 w-16 text-center">Ext-2</th>
-                 <th className="p-2 border-r dark:border-slate-700 w-16 text-center">Int-1</th>
-                 <th className="p-2 border-r dark:border-slate-700 w-16 text-center">Int-2</th>
-                 <th className="p-2 border-r dark:border-slate-700 w-14 text-center">N° R</th>
-                 <th className="p-2 border-r dark:border-slate-700 w-16 text-center">Reenc</th>
-                 <th className="p-2 border-r dark:border-slate-700 w-12 text-center" title="Tapa Válvula">TV</th>
-                 <th className="p-2 border-r dark:border-slate-700 w-12 text-center" title="Extensión Válvula">Ext</th>
-                 <th className="p-2 w-48">Observaciones</th>
-               </tr>
-             </thead>
-             <tbody>
-                {positions.map(pos => (
-                  <tr key={pos} className="border-b border-x border-slate-200 dark:border-slate-700 dark:bg-slate-900/30">
-                    <td className="p-2 border-r dark:border-slate-700 text-center font-bold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50">{pos}</td>
-                    <td className="p-1.5 border-r dark:border-slate-700">
-                      <input type="text" className="w-full px-2 py-1.5 border dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-xs font-mono dark:text-slate-100" placeholder="Ej: DOT-123" />
-                    </td>
-                    <td className="p-1.5 border-r dark:border-slate-700">
-                      <select className="w-full px-2 py-1.5 border dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-xs dark:text-slate-100">
-                        <option>Michelin XZE2</option>
-                        <option>Bridgestone M729</option>
-                        <option>Goodyear KMAX</option>
-                        <option>Otro...</option>
-                      </select>
-                    </td>
-                    <td className="p-1.5 border-r dark:border-slate-700">
-                      <input type="number" className="w-full px-2 py-1.5 border dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-xs text-center dark:text-slate-100" placeholder="110" />
-                    </td>
-                    <td className="p-1.5 border-r dark:border-slate-700">
-                      <select className="w-full px-2 py-1.5 border dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-xs dark:text-slate-100 text-center">
-                        <option title="Frio">F</option>
-                        <option title="Caliente">C</option>
-                      </select>
-                    </td>
-                    <td className="p-1.5 border-r dark:border-slate-700">
-                      <input type="number" step="0.1" className="w-full px-1 py-1.5 border dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-xs text-center dark:text-slate-100" placeholder="12.5" />
-                    </td>
-                    <td className="p-1.5 border-r dark:border-slate-700">
-                      <input type="number" step="0.1" className="w-full px-1 py-1.5 border dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-xs text-center dark:text-slate-100" placeholder="12.5" />
-                    </td>
-                    <td className="p-1.5 border-r dark:border-slate-700">
-                      <input type="number" step="0.1" className="w-full px-1 py-1.5 border dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-xs text-center dark:text-slate-100" placeholder="12.8" />
-                    </td>
-                    <td className="p-1.5 border-r dark:border-slate-700">
-                      <input type="number" step="0.1" className="w-full px-1 py-1.5 border dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-xs text-center dark:text-slate-100" placeholder="12.8" />
-                    </td>
-                    <td className="p-1.5 border-r dark:border-slate-700">
-                      <input type="number" className="w-full px-1 py-1.5 border dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-xs text-center dark:text-slate-100" placeholder="0" />
-                    </td>
-                    <td className="p-1.5 border-r dark:border-slate-700">
-                      <input type="text" className="w-full px-1 py-1.5 border dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-xs text-center dark:text-slate-100" placeholder="-" />
-                    </td>
-                    <td className="p-1.5 border-r dark:border-slate-700 text-center">
-                      <input type="checkbox" className="w-4 h-4 cursor-pointer dark:text-slate-100" />
-                    </td>
-                    <td className="p-1.5 border-r dark:border-slate-700 text-center">
-                      <input type="checkbox" className="w-4 h-4 cursor-pointer dark:text-slate-100" />
-                    </td>
-                    <td className="p-1.5">
-                      <input type="text" className="w-full px-2 py-1.5 border dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-xs dark:text-slate-100" placeholder="Cortes, desgaste irregular..." />
-                    </td>
-                  </tr>
-                ))}
-             </tbody>
-           </table>
-        </div>
-        <div className="p-6 bg-slate-50 dark:bg-slate-900 border-t dark:border-slate-800 flex justify-end gap-3 rounded-b-xl">
-           <Button variant="outline" className="dark:border-slate-700 dark:text-slate-300">Descartar</Button>
-           <Button className="bg-blue-600 hover:bg-blue-700 text-white">Guardar Inspección</Button>
-        </div>
-      </CardContent>
-    </Card>
-  )
+      </div>
+
+      {/* Tabla de Inspección */}
+      <div className="overflow-x-auto border border-slate-300 dark:border-slate-700 rounded-lg shadow-sm mb-4">
+        <table className="w-full text-xs text-left text-slate-700 dark:text-slate-300">
+          <thead className="bg-slate-900 text-white uppercase text-[9px] tracking-wider text-center">
+            <tr>
+              <th className="py-2 px-1 border-r border-slate-700 w-10">Pos</th>
+              <th className="py-2 px-2 border-r border-slate-700 w-24">Código/DOT</th>
+              <th className="py-2 px-2 border-r border-slate-700 w-24">Marca</th>
+              <th className="py-2 px-2 border-r border-slate-700 w-24">Medida</th>
+              <th className="py-2 px-2 border-r border-slate-700 w-24">Diseño</th>
+              <th className="py-2 px-2 border-r border-slate-700 w-16">Presión</th>
+              <th className="py-2 px-2 border-r border-slate-700 w-14">C/F</th>
+              <th className="py-2 px-2 border-r border-slate-700 w-12">Ext-1</th>
+              <th className="py-2 px-2 border-r border-slate-700 w-12">Ext-2</th>
+              <th className="py-2 px-2 border-r border-slate-700 w-12">Int-1</th>
+              <th className="py-2 px-2 border-r border-slate-700 w-12">Int-2</th>
+              <th className="py-2 px-1 border-r border-slate-700 w-10">NR</th>
+              <th className="py-2 px-1 border-r border-slate-700 w-14">Reens</th>
+              <th className="py-2 px-1 border-r border-slate-700 w-12">TV</th>
+              <th className="py-2 px-1 border-r border-slate-700 w-14">Exten</th>
+              <th className="py-2 px-3 text-left">Observaciones</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800">
+            {allPositions.map((pos) => {
+              const isVisible = activeConfig?.tablaPosiciones.includes(pos);
+              if (!isVisible) return null;
+
+              return (
+                <tr key={pos} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                  <td className="py-1 px-1 text-center font-black bg-slate-100 dark:bg-slate-800 border-r border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100">{pos}</td>
+                  <td className="py-0.5 px-0.5 border-r border-slate-200 dark:border-slate-800"><input type="text" className="w-full text-center focus:ring-1 focus:ring-amber-500 rounded p-1 text-xs uppercase font-mono bg-transparent placeholder:text-slate-300 dark:placeholder:text-slate-600 outline-none" placeholder="---" /></td>
+                  <td className="py-0.5 px-0.5 border-r border-slate-200 dark:border-slate-800"><input type="text" className="w-full text-center focus:ring-1 focus:ring-amber-500 rounded p-1 text-xs bg-transparent placeholder:text-slate-300 dark:placeholder:text-slate-600 outline-none" placeholder="---" /></td>
+                  <td className="py-0.5 px-0.5 border-r border-slate-200 dark:border-slate-800"><input type="text" className="w-full text-center focus:ring-1 focus:ring-amber-500 rounded p-1 text-xs bg-transparent placeholder:text-slate-300 dark:placeholder:text-slate-600 outline-none" placeholder="---" /></td>
+                  <td className="py-0.5 px-0.5 border-r border-slate-200 dark:border-slate-800"><input type="text" className="w-full text-center focus:ring-1 focus:ring-amber-500 rounded p-1 text-xs bg-transparent placeholder:text-slate-300 dark:placeholder:text-slate-600 outline-none" placeholder="---" /></td>
+                  <td className="py-0.5 px-0.5 border-r border-slate-200 dark:border-slate-800"><input type="number" className="w-full text-center focus:ring-1 focus:ring-amber-500 rounded p-1 text-xs font-semibold bg-transparent placeholder:text-slate-300 dark:placeholder:text-slate-600 outline-none" placeholder="110" /></td>
+                  <td className="py-0.5 px-0.5 border-r border-slate-200 dark:border-slate-800">
+                    <select className="w-full text-center focus:ring-1 focus:ring-amber-500 rounded p-1 text-xs bg-transparent cursor-pointer font-bold outline-none">
+                      <option value="F">F</option>
+                      <option value="C">C</option>
+                    </select>
+                  </td>
+                  <td className="py-0.5 px-0.5 border-r border-slate-200 dark:border-slate-800"><input type="number" step="0.1" className="w-full text-center focus:ring-1 focus:ring-amber-500 rounded p-1 text-xs bg-transparent placeholder:text-slate-300 dark:placeholder:text-slate-600 outline-none" placeholder="0.0" /></td>
+                  <td className="py-0.5 px-0.5 border-r border-slate-200 dark:border-slate-800"><input type="number" step="0.1" className="w-full text-center focus:ring-1 focus:ring-amber-500 rounded p-1 text-xs bg-transparent placeholder:text-slate-300 dark:placeholder:text-slate-600 outline-none" placeholder="0.0" /></td>
+                  <td className="py-0.5 px-0.5 border-r border-slate-200 dark:border-slate-800"><input type="number" step="0.1" className="w-full text-center focus:ring-1 focus:ring-amber-500 rounded p-1 text-xs bg-transparent placeholder:text-slate-300 dark:placeholder:text-slate-600 outline-none" placeholder="0.0" /></td>
+                  <td className="py-0.5 px-0.5 border-r border-slate-200 dark:border-slate-800"><input type="number" step="0.1" className="w-full text-center focus:ring-1 focus:ring-amber-500 rounded p-1 text-xs bg-transparent placeholder:text-slate-300 dark:placeholder:text-slate-600 outline-none" placeholder="0.0" /></td>
+                  <td className="py-0.5 px-0.5 border-r border-slate-200 dark:border-slate-800"><input type="number" className="w-full text-center focus:ring-1 focus:ring-amber-500 rounded p-1 text-xs bg-transparent placeholder:text-slate-300 dark:placeholder:text-slate-600 outline-none" placeholder="0" /></td>
+                  <td className="py-0.5 px-0.5 border-r border-slate-200 dark:border-slate-800">
+                    <select className="w-full text-center focus:ring-1 focus:ring-amber-500 rounded p-1 text-xs bg-transparent font-bold cursor-pointer outline-none">
+                      <option value="NO">NO</option>
+                      <option value="SI">SÍ</option>
+                    </select>
+                  </td>
+                  <td className="py-0.5 px-0.5 border-r border-slate-200 dark:border-slate-800">
+                    <select className="w-full text-center focus:ring-1 focus:ring-amber-500 rounded p-1 text-xs bg-transparent font-bold cursor-pointer outline-none">
+                      <option value="SI">SÍ</option>
+                      <option value="NO">NO</option>
+                    </select>
+                  </td>
+                  <td className="py-0.5 px-0.5 border-r border-slate-200 dark:border-slate-800">
+                    <select className="w-full text-center focus:ring-1 focus:ring-amber-500 rounded p-1 text-xs bg-transparent font-bold cursor-pointer outline-none">
+                      <option value="SI">SÍ</option>
+                      <option value="NO">NO</option>
+                    </select>
+                  </td>
+                  <td className="py-0.5 px-2">
+                    <input type="text" className="w-full focus:ring-1 focus:ring-amber-500 rounded p-1 text-xs bg-transparent outline-none" placeholder="..." />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Button Actions */}
+      <div className="flex justify-end gap-3 pt-4">
+        <Button variant="outline" className="dark:border-slate-700 dark:text-slate-300" onClick={onClose}>Descartar</Button>
+        <Button className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold border-none shadow-md">
+          <Activity className="w-4 h-4 mr-2" /> Guardar Inspección
+        </Button>
+      </div>
+
+    </div>
+  );
 }

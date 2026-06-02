@@ -13,6 +13,7 @@ import Swal from 'sweetalert2';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { usePermissions } from '../../hooks/usePermissions';
+import { FormularioInspeccion } from './GestionNeumaticos';
 
 export default function OrdenesTrabajoDetail() {
   const { id } = useParams();
@@ -35,6 +36,7 @@ export default function OrdenesTrabajoDetail() {
   const [activePanels, setActivePanels] = useState<Record<string, boolean>>({ diagnostico: false, pauta: false, personal: false, estado: false });
   const [selectedKitToAdd, setSelectedKitToAdd] = useState('');
   const [selectedTecnico, setSelectedTecnico] = useState('');
+  const [isInspeccionModalOpen, setIsInspeccionModalOpen] = useState(false);
 
   const [isTareaModalOpen, setIsTareaModalOpen] = useState(false);
   const [isCrearTareaModalOpen, setIsCrearTareaModalOpen] = useState(false);
@@ -1295,6 +1297,11 @@ export default function OrdenesTrabajoDetail() {
                 <Button variant={activeTab === 'insumos' ? 'default' : 'outline'} onClick={() => setActiveTab('insumos')}>Insumos y Repuestos</Button>
                 <Button variant={activeTab === 'solicitudes' ? 'default' : 'outline'} onClick={() => setActiveTab('solicitudes')}>Solicitudes Bodega</Button>
                 <Button variant={activeTab === 'historial' ? 'default' : 'outline'} onClick={() => setActiveTab('historial')}>Historial de la OT</Button>
+                {ot.tipo?.includes('NEUMATICOS') && (
+                    <Button variant="outline" onClick={() => setIsInspeccionModalOpen(true)} className="bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 dark:hover:bg-purple-900/50 border-purple-200 dark:border-purple-800">
+                        <FileText className="w-4 h-4 mr-2" /> Pauta Inspección
+                    </Button>
+                )}
             </div>
 
             <Card>
@@ -1800,6 +1807,10 @@ export default function OrdenesTrabajoDetail() {
              <Button variant="ghost" onClick={() => setIsInsumoModalOpen(false)}>Cerrar</Button>
           </div>
         </div>
+      </Modal>
+
+      <Modal isOpen={isInspeccionModalOpen} onClose={() => setIsInspeccionModalOpen(false)} title="Pauta Inspección Técnica de Neumáticos" size="7xl">
+        <FormularioInspeccion prefilledVehiculoId={ot.vehiculoId} onClose={() => setIsInspeccionModalOpen(false)} />
       </Modal>
     </div>
   );
