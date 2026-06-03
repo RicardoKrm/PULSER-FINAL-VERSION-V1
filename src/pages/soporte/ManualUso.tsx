@@ -38,28 +38,7 @@ const MODULES = [
       { subtitle: 'Pizarra de Mantenimiento', text: 'Controla los estados de los vehículos (En taller, operativo, en ruta) mediante un panel tipo Kanban de fácil acceso visual.' },
       { subtitle: 'Programación de Recursos', text: 'Asigna a través del calendario los recursos mecánicos, la disponibilidad de los fosos de taller y tiempos de reparación.' },
       { subtitle: 'Órdenes de Trabajo (OT)', text: 'Crea y administra OTs, registrando actividades, calculando tiempos de respuesta, ingresando costos de repuestos y validando garantías de los proveedores.' },
-    ]
-  },
-  {
-    id: 'integracion_monitoreo',
-    title: 'Monitoreo GPS y Alertas',
-    description: 'Control de telemetría, monitoreo en tiempo real y gestión de alarmas automáticas.',
-    duration: '10:05',
-    videoUrl: 'https://images.unsplash.com/photo-1508215885820-4585e5610928?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80',
-    content: [
-      { subtitle: 'Monitoreo en Mapa', text: 'Visualiza la posición real de cada vehículo de la flota. El panel muestra indicadores de velocidad, el rumbo y si se encuentra con la ignición encendida.' },
-      { subtitle: 'Malla de Alertas', text: 'Recibe notificaciones críticas en tiempo real sobre excesos de velocidad, eventos de fatiga y somnolencia, desvíos de ruta o aperturas de puertas.' },
-    ]
-  },
-  {
-    id: 'soporte_integraciones',
-    title: 'Soporte e Integraciones',
-    description: 'Mesa de ayuda (Tickets) y conectores con sistemas de terceros.',
-    duration: '06:30',
-    videoUrl: 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80',
-    content: [
-      { subtitle: 'Mesa de Ayuda', text: 'El sistema permite crear tickets de soporte técnico aislados de manera segura por empresa. Mantenga comunicación continua con el agente de soporte técnico a través del flujo de chat.' },
-      { subtitle: 'Integradores API', text: 'En el menú Integraciones, agregue conectores externos ingresando un nombre y tipo (ej. FLEETSAT GPS, SAP, CRM). Una vez creado el registro, utilice el panel de configuración para ingresar la URL del API y la clave de acceso.' },
+      { subtitle: 'Neumáticos y Combustible', text: 'Gestiona la vida útil de los neumáticos, su ubicación actual, y visualiza la carga y rendimiento de combustible por vehículo.' }
     ]
   },
   {
@@ -72,6 +51,7 @@ const MODULES = [
       { subtitle: 'Inventario de Repuestos', text: 'Controla el stock de repuestos y elementos de mantenimiento disponibles en bodega. Ajusta el stock mínimo para recibir alertas automatizadas de reposición.' },
       { subtitle: 'Recepción de Suministros', text: 'Registra el ingreso de nuevos materiales a través de órdenes de compra, validando las cantidades recibidas.' },
       { subtitle: 'Despacho y Asignación', text: 'Registra los movimientos de salida de repuestos y consumibles, asociándolos a órdenes de trabajo (OT) o vehículos específicos para mantener trazabilidad.' },
+      { subtitle: 'Auditorías', text: 'Realiza auditorías de inventario de forma periódica y genera reportes de descuadres.' }
     ]
   },
   {
@@ -84,6 +64,53 @@ const MODULES = [
       { subtitle: 'Gestión de Proveedores', text: 'Mantén un registro actualizado con los datos de contacto y la evaluación de desempeño de los proveedores de repuestos o servicios externos.' },
       { subtitle: 'Órdenes de Compra', text: 'Genera solicitudes formales de cotización o compra. Realiza seguimiento desde la emisión hasta la facturación y cierre, validando el presupuesto departamental.' },
       { subtitle: 'Control de Facturas', text: 'Audita y lleva registro de las facturas que los proveedores emiten para facilitar su posterior pago u homologación con tu sistema contable.' },
+    ]
+  },
+  {
+    id: 'finanzas',
+    title: 'Finanzas y Costos',
+    description: 'Gestión de presupuestos, estados de pago y trazabilidad financiera.',
+    duration: '14:30',
+    videoUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80',
+    content: [
+      { subtitle: 'Costos Operacionales', text: 'Visualiza de manera consolidada los gastos por repuestos, reparaciones e insumos por periodo de tiempo.' },
+      { subtitle: 'Estados de Pago', text: 'Controla y aprueba los pagos pendientes de facturas recibidas y los costos operacionales del periodo.' },
+      { subtitle: 'Gestión de Presupuestos', text: 'Administre el presupuesto total asignado a su empresa, validando el consumo según los gastos ejecutados en OTs y Bodegas.' }
+    ]
+  },
+  {
+    id: 'biblioteca',
+    title: 'Biblioteca de Archivos',
+    description: 'Navegación y gestión de documentos almacenados en la nube.',
+    duration: '05:40',
+    videoUrl: 'https://images.unsplash.com/photo-1544396821-4ea4ce7049b1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80',
+    content: [
+      { subtitle: 'Explorador de Archivos', text: 'Navegue a través de la interfaz para visualizar los archivos y fotografías de evidencias adjuntas en los distintos módulos del sistema.' },
+      { subtitle: 'Subir Archivos', text: 'Sube manuales de fabricante, diagramas o cualquier documento relevante para mantenerlo disponible online.' }
+    ]
+  },
+  {
+    id: 'configuracion',
+    title: 'Configuraciones Generales',
+    description: 'Ajuste de parámetros, permisos de usuarios y pautas del sistema.',
+    duration: '18:15',
+    videoUrl: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80',
+    content: [
+      { subtitle: 'Permisos de Usuarios', text: 'Administre a sus empleados, cree cuentas de usuario para el sistema y asigne perfiles y permisos a distintos módulos.' },
+      { subtitle: 'Pautas y Tareas', text: 'Defina pautas maestras (p. ej. "Mantención 10.000 KM") y configure sus checklist de tareas obligatorias.' },
+      { subtitle: 'Flota y Personal', text: 'Mantenga al día su maestro de vehículos, así como también los perfiles completos de sus operarios y conductores.' }
+    ]
+  },
+  {
+    id: 'soporte_integraciones',
+    title: 'Soporte e Integraciones',
+    description: 'Mesa de ayuda (Tickets) y conectores con sistemas de terceros.',
+    duration: '06:30',
+    videoUrl: 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80',
+    content: [
+      { subtitle: 'Mesa de Ayuda', text: 'El sistema permite crear tickets de soporte técnico aislados de manera segura por empresa. Mantenga comunicación continua con el agente de soporte técnico a través del flujo de chat.' },
+      { subtitle: 'Integradores API', text: 'En el menú Integraciones, agregue conectores externos ingresando un nombre y tipo (ej. FLEETSAT GPS, SAP, CRM). Una vez creado el registro, utilice el panel de configuración para ingresar la URL del API y la clave de acceso.' },
+      { subtitle: 'Manual de Uso', text: 'Acceda a este apartado interactivo para visualizar el contenido o buscar rápidamente mediante el filtro superior la ayuda que requiere.' }
     ]
   }
 ];

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Building2, 
   MapPin, 
@@ -10,34 +10,106 @@ import {
   User,
   Shield,
   CreditCard,
-  Bell
+  Bell,
+  Link as LinkIcon
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import Swal from 'sweetalert2';
+import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
 
 export default function ConfiguracionEmpresa() {
+  const { activeCompanyId } = useCompany();
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
-    nombre: 'Transportes del Norte S.A.',
-    rut: '76.123.456-K',
-    direccion: 'Av. Industrial 450, Antofagasta',
-    comuna: 'Antofagasta',
-    ciudad: 'Antofagasta',
+    nombre: '',
+    rut: '',
+    direccion: '',
+    comuna: '',
+    ciudad: '',
     pais: 'Chile',
-    telefono: '+56 55 2234 5678',
-    email: 'contacto@transnorte.cl',
-    website: 'www.transnorte.cl',
+    telefono: '',
+    email: '',
+    website: '',
     moneda: 'CLP',
     zonaHoraria: 'UTC-3',
+    logo_url: ''
   });
 
-  const handleSave = () => {
-    Swal.fire({
-      title: '¡Configuración Guardada!',
-      text: 'Los datos de la empresa han sido actualizados correctamente.',
-      icon: 'success',
-      confirmButtonColor: '#0891b2'
-    });
+  useEffect(() => {
+    if (activeCompanyId) {
+      loadData();
+    }
+  }, [activeCompanyId]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from('empresa').select('nombre, rut, detalles').eq('id', activeCompanyId).single();
+      if (error) throw error;
+      
+      const det = data.detalles || {};
+      
+      setFormData({
+        nombre: data.nombre || '',
+        rut: data.rut || '',
+        direccion: det.direccion || '',
+        comuna: det.comuna || '',
+        ciudad: det.ciudad || '',
+        pais: det.pais || 'Chile',
+        telefono: det.telefono || '',
+        email: det.email || '',
+        website: det.website || '',
+        moneda: det.moneda || 'CLP',
+        zonaHoraria: det.zonaHoraria || 'UTC-3',
+        logo_url: det.logo_url || ''
+      });
+    } catch (err: any) {
+      console.error(err);
+      Swal.fire('Error', 'No se pudo cargar la configuración de la empresa', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handleSave = async () => {
+    try {
+      const dbDetalles = {
+        direccion: formData.direccion,
+        comuna: formData.comuna,
+        ciudad: formData.ciudad,
+        pais: formData.pais,
+        telefono: formData.telefono,
+        email: formData.email,
+        website: formData.website,
+        moneda: formData.moneda,
+        zonaHoraria: formData.zonaHoraria,
+        logo_url: formData.logo_url
+      };
+
+      const { error } = await supabase.from('empresa').update({
+        nombre: formData.nombre,
+        rut: formData.rut,
+        detalles: dbDetalles
+      }).eq('id', activeCompanyId);
+
+      if (error) throw error;
+
+      Swal.fire({
+        title: '¡Configuración Guardada!',
+        text: 'Los datos de la empresa han sido actualizados correctamente.',
+        icon: 'success',
+        confirmButtonColor: '#0891b2'
+      });
+    } catch (error: any) {
+      console.error(error);
+      Swal.fire('Error', error.message, 'error');
+    }
+  };
+
+  if (loading) {
+     return <div className="p-8 text-center text-slate-500 font-bold">Cargando configuración...</div>
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -57,26 +129,37 @@ export default function ConfiguracionEmpresa() {
         {/* Profile Card */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center text-center">
-             <div className="relative group cursor-pointer mb-6">
+             <div className="mb-6 flex flex-col items-center gap-3 w-full">
                 <div className="w-32 h-32 rounded-[2.5rem] bg-slate-100 dark:bg-slate-800 border-4 border-white dark:border-slate-900 shadow-xl flex items-center justify-center overflow-hidden">
-                   <Building2 className="w-16 h-16 text-slate-300 group-hover:scale-110 transition-transform" />
+                   {formData.logo_url ? (
+                     <img src={formData.logo_url} alt="Logo" className="w-full h-full object-contain" />
+                   ) : (
+                     <Building2 className="w-16 h-16 text-slate-300" />
+                   )}
                 </div>
-                <div className="absolute inset-0 bg-black/40 rounded-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                   <Upload className="w-8 h-8 text-white" />
+                <div className="w-full space-y-2 mt-4 text-left">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1 block text-center">URL DEL LOGO (OPCIONAL)</label>
+                  <input 
+                    type="text" 
+                    value={formData.logo_url}
+                    onChange={(e) => setFormData({...formData, logo_url: e.target.value})}
+                    placeholder="https://ejemplo.com/logo.png"
+                    className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl font-medium border border-transparent focus:border-cyan-500 outline-none transition-all text-xs text-center" 
+                  />
                 </div>
              </div>
-             <h2 className="text-xl font-black text-slate-800 dark:text-slate-100">{formData.nombre}</h2>
-             <p className="text-slate-400 font-bold text-sm tracking-widest uppercase mb-6">ID Tributario: {formData.rut}</p>
+             <h2 className="text-xl font-black text-slate-800 dark:text-slate-100">{formData.nombre || 'Nombre de Empresa'}</h2>
+             <p className="text-slate-400 font-bold text-sm tracking-widest uppercase mb-6">ID Tributario: {formData.rut || 'N/A'}</p>
              
              <div className="w-full space-y-3 pt-6 border-t border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-3 text-sm font-medium text-slate-500">
-                   <Phone className="w-4 h-4 text-cyan-600" /> {formData.telefono}
+                   <Phone className="w-4 h-4 text-cyan-600" /> {formData.telefono || 'Sin teléfono'}
                 </div>
                 <div className="flex items-center gap-3 text-sm font-medium text-slate-500">
-                   <Mail className="w-4 h-4 text-cyan-600" /> {formData.email}
+                   <Mail className="w-4 h-4 text-cyan-600" /> {formData.email || 'Sin email'}
                 </div>
                 <div className="flex items-center gap-3 text-sm font-medium text-slate-500">
-                   <Globe className="w-4 h-4 text-cyan-600" /> {formData.website}
+                   <Globe className="w-4 h-4 text-cyan-600" /> {formData.website || 'Sin sitio web'}
                 </div>
              </div>
           </div>

@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+import { useCompany } from '../../contexts/CompanyContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -20,6 +21,18 @@ export default function OrdenesTrabajoDetail() {
   const navigate = useNavigate();
   const { ordenesTrabajo, vehiculos, kitsRepuesto, tareasEstandar, repuestos, personal, pautas, actualizarOrdenTrabajo, agregarTareaEstandar } = useAppContext();
   const { profile } = useAuth();
+  const { activeCompanyId } = useCompany();
+  const [empresaLogo, setEmpresaLogo] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeCompanyId) {
+      supabase.from('empresa').select('detalles').eq('id', activeCompanyId).single().then(({ data }) => {
+        if (data?.detalles?.logo_url) {
+          setEmpresaLogo(data.detalles.logo_url);
+        }
+      });
+    }
+  }, [activeCompanyId]);
   
   const { hasPermission } = usePermissions();
   // Solo el dueño del sistema tiene acceso total por defecto. Los demás se rigen por los permisos configurables.
@@ -766,7 +779,7 @@ export default function OrdenesTrabajoDetail() {
     };
   };
 
-  const handleExportarPDF = (imprimir: boolean = false) => {
+  const handleExportarPDF = async (imprimir: boolean = false) => {
     if (!ot) return;
 
     // Create a new jsPDF instance
@@ -782,26 +795,37 @@ export default function OrdenesTrabajoDetail() {
 
     // Helper: title banner / header
     doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.rect(0, 0, 210, 25, 'F');
+    doc.rect(0, 0, 210, 30, 'F');
 
     // Title text
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(14);
     doc.setTextColor(255, 255, 255);
-    doc.text('SISTEMA DE GESTIÓN DE FLOTA Y MANTENIMIENTO', 10, 10);
+    doc.text('CERTIFICADO DE ORDEN DE TRABAJO', 10, 12);
     doc.setFontSize(11);
     doc.setFont('Helvetica', 'normal');
-    doc.text('HOJA DE ORDEN DE TRABAJO - CONTROL DE PROCESO', 10, 16);
+    doc.text('HOJA DE CONTROL DE PROCESO', 10, 18);
     doc.setFont('Helvetica', 'bold');
-    doc.text(`OT NO: #${ot.folio}`, 200, 10, { align: 'right' });
+    doc.text(`OT NO: #${ot.folio}`, 200, 12, { align: 'right' });
     doc.setFont('Helvetica', 'normal');
     doc.setFontSize(9);
-    doc.text(`Impreso: ${new Date().toLocaleString()}`, 200, 16, { align: 'right' });
+    doc.text(`Impreso: ${new Date().toLocaleString()}`, 200, 18, { align: 'right' });
+
+    if (empresaLogo) {
+      try {
+        const ext = empresaLogo.split('.').pop()?.toUpperCase() || 'PNG';
+        const imgExt = ['PNG', 'JPG', 'JPEG'].includes(ext) ? (ext === 'JPG' ? 'JPEG' : ext) : 'PNG';
+        doc.addImage(empresaLogo, imgExt, 160, 2, 25, 25);
+      } catch (err) {
+        console.error("Error drawing company logo", err);
+      }
+    }
 
     // Add white margin decoration line
     doc.setDrawColor(255, 255, 255);
     doc.setLineWidth(0.5);
-    doc.line(10, 19, 200, 19);
+    doc.line(10, 26, 200, 26);
+
 
     // 1. General information section in a nice grid table (2 columns)
     const generalInfo: any[] = [

@@ -1,26 +1,56 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Plus, MessageSquare, Clock, CheckCircle2, Ticket, Filter, Building2, User, Send, X, AlertTriangle } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import Swal from 'sweetalert2';
-
-const MOCK_TICKETS: any[] = [];
-
-const EMPRESAS_MOCK = ['Todas', 'Minera Norte S.A.', 'Constructora Beta', 'Transportes Gamma'];
+import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
+import { useAuth } from '../../context/AuthContext';
 
 export default function CentroAyuda() {
-  const [tickets, setTickets] = useState(MOCK_TICKETS);
+  const { currentCompany } = useCompany();
+  const { profile } = useAuth();
+  
+  const [tickets, setTickets] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('TODOS');
   const [selectedEmpresa, setSelectedEmpresa] = useState('Todas');
+  const [empresasList, setEmpresasList] = useState<string[]>(['Todas']);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Modal states
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [selectedTicket, setSelectedTicket] = useState<typeof MOCK_TICKETS[0] | null>(null);
+  const [selectedTicket, setSelectedTicket] = useState<any | null>(null);
   const [replyMessage, setReplyMessage] = useState('');
 
   const [isNewTicketModalOpen, setIsNewTicketModalOpen] = useState(false);
   const [newTicket, setNewTicket] = useState({ title: '', description: '', priority: 'MEDIA', category: 'FALLA TÉCNICA' });
+
+  useEffect(() => {
+    loadTickets();
+  }, []);
+
+  const loadTickets = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('tickets_ayuda')
+        .select('*')
+        .order('fecha_creacion', { ascending: false });
+        
+      if (error) throw error;
+      
+      setTickets(data || []);
+      
+      // Extraer empresas unicas para el filtro
+      const uniqueEmpresas = Array.from(new Set((data || []).map(t => t.empresa).filter(Boolean)));
+      setEmpresasList(['Todas', ...uniqueEmpresas]);
+    } catch (error) {
+      console.error('Error loading tickets:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -42,73 +72,119 @@ export default function CentroAyuda() {
   };
 
   const filteredTickets = tickets.filter(t => {
-    const matchSearch = t.title.toLowerCase().includes(searchTerm.toLowerCase()) || t.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchStatus = selectedStatus === 'TODOS' || t.status === selectedStatus;
+    const matchSearch = (t.titulo || '').toLowerCase().includes(searchTerm.toLowerCase()) || (t.ticket_id || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchStatus = selectedStatus === 'TODOS' || t.estado === selectedStatus;
     const matchEmpresa = selectedEmpresa === 'Todas' || t.empresa === selectedEmpresa;
     return matchSearch && matchStatus && matchEmpresa;
   });
 
-  const handleOpenTicket = (ticket: typeof MOCK_TICKETS[0]) => {
+  const handleOpenTicket = (ticket: any) => {
     setSelectedTicket(ticket);
     setIsDetailModalOpen(true);
   };
 
-  const handleSendReply = () => {
+  const handleSendReply = async () => {
     if (!replyMessage.trim() || !selectedTicket) return;
     
-    const updatedTicket = {
-      ...selectedTicket,
-      messages: [
-        ...selectedTicket.messages,
-        { sender: 'Soporte Admin', type: 'agent', text: replyMessage, date: new Date().toISOString() }
-      ],
-      status: selectedTicket.status === 'ABIERTO' ? 'EN PROCESO' : selectedTicket.status
-    };
-
-    setTickets(prev => prev.map(t => t.id === updatedTicket.id ? updatedTicket : t));
-    setSelectedTicket(updatedTicket);
-    setReplyMessage('');
+    const newMessages = [
+      ...(selectedTicket.mensajes || []),
+      { sender: profile?.nombre || 'Soporte Admin', type: 'agent', text: replyMessage, date: new Date().toISOString() }
+    ];
     
-    Swal.fire({
-      toast: true, position: 'top-end', icon: 'success', title: 'Respuesta enviada', showConfirmButton: false, timer: 1500
-    });
+    const newStatus = selectedTicket.estado === 'ABIERTO' ? 'EN PROCESO' : selectedTicket.estado;
+
+    try {
+      const { error } = await supabase.from('tickets_ayuda').update({
+        mensajes: newMessages,
+        estado: newStatus
+      }).eq('id', selectedTicket.id);
+
+      if (error) throw error;
+
+      const updatedTicket = {
+        ...selectedTicket,
+        mensajes: newMessages,
+        estado: newStatus
+      };
+
+      setTickets(prev => prev.map(t => t.id === updatedTicket.id ? updatedTicket : t));
+      setSelectedTicket(updatedTicket);
+      setReplyMessage('');
+      
+      Swal.fire({
+        toast: true, position: 'top-end', icon: 'success', title: 'Respuesta enviada', showConfirmButton: false, timer: 1500
+      });
+    } catch (e: any) {
+      console.error(e);
+      Swal.fire('Error', 'No se pudo enviar la respuesta', 'error');
+    }
   };
 
-  const handleResolveTicket = () => {
+  const handleResolveTicket = async () => {
     if (!selectedTicket) return;
-    const updatedTicket = { ...selectedTicket, status: 'RESUELTO' };
-    setTickets(prev => prev.map(t => t.id === updatedTicket.id ? updatedTicket : t));
-    setSelectedTicket(updatedTicket);
-    Swal.fire('Ticket Resuelto', 'El ticket ha sido marcado como resuelto.', 'success');
+    
+    try {
+      const { error } = await supabase.from('tickets_ayuda').update({
+        estado: 'RESUELTO'
+      }).eq('id', selectedTicket.id);
+
+      if (error) throw error;
+
+      const updatedTicket = { ...selectedTicket, estado: 'RESUELTO' };
+      setTickets(prev => prev.map(t => t.id === updatedTicket.id ? updatedTicket : t));
+      setSelectedTicket(updatedTicket);
+      Swal.fire('Ticket Resuelto', 'El ticket ha sido marcado como resuelto.', 'success');
+    } catch (e) {
+      console.error(e);
+      Swal.fire('Error', 'No se pudo resolver el ticket', 'error');
+    }
   };
 
-  const handleCreateTicket = () => {
+  const handleCreateTicket = async () => {
     if (!newTicket.title || !newTicket.description) {
       Swal.fire('Error', 'Debe completar el título y la descripción.', 'error');
       return;
     }
-    const created: typeof MOCK_TICKETS[0] = {
-      id: `#TKT-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-      title: newTicket.title,
-      description: newTicket.description,
-      status: 'ABIERTO',
-      priority: newTicket.priority,
-      category: newTicket.category,
-      user: 'Usuario Interno',
-      empresa: selectedEmpresa !== 'Todas' ? selectedEmpresa : 'Empresa Interna',
-      date: new Date().toISOString(),
-      messages: [
-        { sender: 'Usuario Interno', type: 'client', text: newTicket.description, date: new Date().toISOString() }
+
+    const { data: empresaData } = await supabase.from('empresa').select('nombre').eq('id', currentCompany?.id).single();
+    const empresaNombre = currentCompany?.id ? (empresaData?.nombre || 'Mi Empresa') : (selectedEmpresa !== 'Todas' ? selectedEmpresa : 'Soporte Interno');
+
+    const created = {
+      ticket_id: `#TKT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      titulo: newTicket.title,
+      descripcion: newTicket.description,
+      estado: 'ABIERTO',
+      prioridad: newTicket.priority,
+      categoria: newTicket.category,
+      usuario: profile?.nombre || 'Usuario Interno',
+      email_contacto: profile?.email || '',
+      empresa: empresaNombre,
+      mensajes: [
+        { sender: profile?.nombre || 'Usuario', type: 'client', text: newTicket.description, date: new Date().toISOString() }
       ]
     };
-    setTickets([created, ...tickets]);
-    setIsNewTicketModalOpen(false);
-    setNewTicket({ title: '', description: '', priority: 'MEDIA', category: 'FALLA TÉCNICA' });
-    Swal.fire('Creado', 'El ticket ha sido ingresado al sistema.', 'success');
+
+    try {
+      const { data, error } = await supabase.from('tickets_ayuda').insert([created]).select().single();
+      if (error) throw error;
+
+      setTickets([data, ...tickets]);
+      // Update filters just in case we created a new distinct company
+      if (!empresasList.includes(empresaNombre)) {
+         setEmpresasList([...empresasList, empresaNombre]);
+      }
+
+      setIsNewTicketModalOpen(false);
+      setNewTicket({ title: '', description: '', priority: 'MEDIA', category: 'FALLA TÉCNICA' });
+      Swal.fire('Creado', 'El ticket ha sido ingresado al sistema.', 'success');
+    } catch (e) {
+       console.error(e);
+       Swal.fire('Error', 'No se pudo crear el ticket', 'error');
+    }
   };
 
-  const openTicketsCount = tickets.filter(t => t.status === 'ABIERTO').length;
-  const inProgressCount = tickets.filter(t => t.status === 'EN PROCESO').length;
+  const openTicketsCount = tickets.filter(t => t.estado === 'ABIERTO').length;
+  const inProgressCount = tickets.filter(t => t.estado === 'EN PROCESO').length;
 
   return (
     <div className="space-y-6">
@@ -199,7 +275,7 @@ export default function CentroAyuda() {
                onChange={(e) => setSelectedEmpresa(e.target.value)} 
                className="bg-transparent font-bold outline-none text-indigo-700 dark:text-indigo-400 max-w-[200px] truncate block"
             >
-              {EMPRESAS_MOCK.map(emp => <option key={emp} value={emp}>{emp === 'Todas' ? 'Todas las Empresas (Vista Admin)' : emp}</option>)}
+              {empresasList.map(emp => <option key={emp} value={emp}>{emp === 'Todas' ? 'Todas las Empresas (Vista Admin)' : emp}</option>)}
             </select>
           </div>
         </div>
@@ -212,12 +288,12 @@ export default function CentroAyuda() {
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-3 mb-1.5">
-                    <span className="font-mono text-sm font-bold text-indigo-600 dark:text-indigo-400">{ticket.id}</span>
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${getStatusColor(ticket.status)}`}>{ticket.status}</span>
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${getPriorityColor(ticket.priority)}`}>{ticket.priority}</span>
+                    <span className="font-mono text-sm font-bold text-indigo-600 dark:text-indigo-400">{ticket.ticket_id}</span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${getStatusColor(ticket.estado)}`}>{ticket.estado}</span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${getPriorityColor(ticket.prioridad)}`}>{ticket.prioridad}</span>
                   </div>
                   <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">
-                    {ticket.title}
+                    {ticket.titulo}
                   </h3>
                   <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-slate-500 dark:text-slate-400">
                     <div className="flex items-center gap-1.5">
@@ -226,14 +302,14 @@ export default function CentroAyuda() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       <User className="w-4 h-4 text-slate-400" />
-                      <span className="font-medium">{ticket.user}</span>
+                      <span className="font-medium">{ticket.usuario}</span>
                     </div>
                   </div>
                 </div>
                 <div className="flex sm:flex-col items-center sm:items-end justify-between shrink-0 text-sm">
                   <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 font-medium">
                     <Clock className="w-4 h-4" />
-                    {new Date(ticket.date).toLocaleDateString('es-CL')}
+                    {new Date(ticket.fecha_creacion).toLocaleDateString('es-CL')}
                   </span>
                   <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mt-2 sm:mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Ver detalle &rarr;</span>
                 </div>
@@ -250,13 +326,13 @@ export default function CentroAyuda() {
         </ul>
       </div>
 
-      <Modal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} title={`Detalle: ${selectedTicket?.id}`} size="lg">
+      <Modal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} title={`Detalle: ${selectedTicket?.ticket_id}`} size="lg">
         {selectedTicket && (
           <div className="flex flex-col h-[70vh] max-h-[700px]">
             <div className="shrink-0 bg-slate-50 dark:bg-slate-800/80 rounded-xl p-5 mb-4 border border-slate-200 dark:border-slate-700">
                <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
                   <h3 className="text-lg sm:text-xl font-bold text-slate-800 dark:text-slate-100 leading-tight">
-                    {selectedTicket.title}
+                    {selectedTicket.titulo}
                   </h3>
                </div>
                <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
@@ -266,17 +342,17 @@ export default function CentroAyuda() {
                   </div>
                   <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                     <User className="w-4 h-4 text-slate-400" />
-                    <span className="font-medium">{selectedTicket.user}</span>
+                    <span className="font-medium">{selectedTicket.usuario}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${getStatusColor(selectedTicket.status)}`}>{selectedTicket.status}</span>
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${getPriorityColor(selectedTicket.priority)}`}>{selectedTicket.priority}</span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${getStatusColor(selectedTicket.estado)}`}>{selectedTicket.estado}</span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${getPriorityColor(selectedTicket.prioridad)}`}>{selectedTicket.prioridad}</span>
                   </div>
                </div>
             </div>
 
             <div className="flex-1 overflow-y-auto pr-2 space-y-4 mb-4 custom-scrollbar">
-               {selectedTicket.messages.map((msg, i) => (
+               {selectedTicket.mensajes?.map((msg: any, i: number) => (
                   <div key={i} className={`flex ${msg.type === 'agent' ? 'justify-end' : 'justify-start'}`}>
                      <div className={`max-w-[85%] rounded-2xl p-4 ${
                          msg.type === 'agent' 
@@ -296,7 +372,7 @@ export default function CentroAyuda() {
                ))}
             </div>
 
-            {selectedTicket.status !== 'RESUELTO' ? (
+            {selectedTicket.estado !== 'RESUELTO' ? (
               <div className="shrink-0 pt-4 border-t border-slate-200 dark:border-slate-800">
                 <div className="flex gap-3">
                   <textarea 

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { NavLink, Link, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Menu, 
   Bell, 
@@ -31,27 +31,114 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
   const location = useLocation();
+  const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const { companies, activeCompanyId, setActiveCompanyId } = useCompany();
-  const { currentUser, usuarios, setCurrentUser } = useAppContext();
+  const { currentUser, usuarios, setCurrentUser, ordenesTrabajo, repuestos } = useAppContext();
   const { signOut, user, profile } = useAuth();
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notificationsRef = useRef<HTMLDivElement>(null);
-  const [allNotifications, setAllNotifications] = useState([
-    { id: 1, type: 'ALERTA_FLOTA', title: 'Vehículo Mantenido Vencido', description: 'El vehículo F-05 ha superado su kilometraje de mantenimiento programado.', time: 'Hace 30 min', read: false, roles: ['Admin', 'Súper Administrador'] },
-    { id: 2, type: 'ALERTA_FLOTA', title: 'Revisión de Neumáticos', description: '2 vehículos necesitan inspección urgente de neumáticos (límite < 3.0mm).', time: 'Hace 2 horas', read: false, roles: ['Admin', 'Súper Administrador'] },
-    { id: 3, type: 'STOCK_CRITICO', title: 'Stock Crítico en Bodega', description: 'Filtro de Aceite X1 (Stock Actual: 2, Mínimo Requerido: 5)', time: 'Hace 5 horas', read: true, roles: ['Admin', 'Súper Administrador', 'Mecánico'] },
-    { id: 4, type: 'INFO', title: 'OT Pendiente', description: 'Tienes 1 Orden de Trabajo asignada (OT-2345).', time: 'Ayer', read: true, roles: ['Mecánico', 'Súper Administrador'] },
-    { id: 5, type: 'ALERTA_SUMINISTRO', title: 'Pedido Recibido', description: '✅ ¡Buenas noticias! Llegó el repuesto "Filtro de Aceite X1" que pediste.', time: 'Hace 1 hora', read: false, roles: ['Mecánico'] },
-  ]);
+  
+  const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(new Set());
 
-  const notifications = allNotifications.filter(n => n.roles.includes(currentUser.cargo));
+  const notifications = React.useMemo(() => {
+    const list: any[] = [];
+    const now = new Date();
+
+    const otList = ordenesTrabajo || [];
+    const repList = repuestos || [];
+
+    // 1. Trabajos en proceso
+    const enProceso = otList.filter(o => o?.estado === 'EN_PROCESO');
+    if (enProceso.length > 0) {
+      list.push({
+        id: 'ot-en-proceso',
+        type: 'INFO',
+        title: 'Trabajos en Proceso',
+        description: `Hay ${enProceso.length} órdenes de trabajo ejecutándose actualmente.`,
+        time: 'Actual',
+        roles: ['Admin', 'Súper Administrador', 'Mecánico']
+      });
+    }
+
+    // 2. Trabajos atrasados de programación
+    const atrasadasProg = otList.filter(ot => {
+      if (!ot) return false;
+      if ((ot.estado === 'PROGRAMADA' || ot.estado === 'ABIERTA') && ot.fechaProgramada && ot.horaInicioProgramada) {
+        const progDateStr = `${ot.fechaProgramada}T${ot.horaInicioProgramada.length === 5 ? ot.horaInicioProgramada + ':00' : ot.horaInicioProgramada}`;
+        const progDate = new Date(progDateStr);
+        return now > progDate;
+      }
+      return false;
+    });
+
+    if (atrasadasProg.length > 0) {
+      list.push({
+        id: 'ot-prog-atrasado',
+        type: 'ALERTA_FLOTA',
+        title: 'Programación Atrasada',
+        description: `${atrasadasProg.length} OT(s) programadas ya deberían haber comenzado.`,
+        time: 'Urgente',
+        roles: ['Admin', 'Súper Administrador']
+      });
+    }
+
+    // 3. Trabajos pasados de tiempo (En proceso but past tfs_minutos)
+    const pasadosDeTiempo = otList.filter(ot => {
+      if (!ot) return false;
+      if (ot.estado === 'EN_PROCESO' && ot.inicio_proceso && ot.tfs_minutos) {
+        const start = new Date(ot.inicio_proceso);
+        const end = new Date(start.getTime() + (ot.tfs_minutos * 60000));
+        return now > end;
+      }
+      return false;
+    });
+
+    if (pasadosDeTiempo.length > 0) {
+      list.push({
+        id: 'ot-pasado-tiempo',
+        type: 'ALERTA_FLOTA',
+        title: 'OT Fuera de Tiempo',
+        description: `${pasadosDeTiempo.length} OT(s) han superado su Tiempo Fuera de Servicio (TFS) estimado.`,
+        time: 'Urgente',
+        roles: ['Admin', 'Súper Administrador', 'Mecánico']
+      });
+    }
+
+    // 4. Stock crítico
+    const stockCritico = repList.filter(r => {
+        if (!r) return false;
+        const stockActual = typeof r.stock === 'number' ? r.stock : (Number(r.stock) || 0);
+        const minimo = typeof (r as any).stockMinimo === 'number' ? (r as any).stockMinimo : 5;
+        return stockActual <= minimo;
+    });
+    
+    if (stockCritico.length > 0) {
+      list.push({
+        id: 'stock-critico',
+        type: 'STOCK_CRITICO',
+        title: 'Stock Crítico en Bodega',
+        description: `${stockCritico.length} repuesto(s) se encuentran en nivel crítico o por debajo del mínimo.`,
+        time: 'Aviso',
+        roles: ['Admin', 'Súper Administrador']
+      });
+    }
+    
+    const userRole = currentUser?.cargo || profile?.rol?.nombre || 'Súper Administrador';
+    
+    return list
+      .filter(n => (n.roles || []).includes(userRole) || (n.roles || []).includes('Súper Administrador'))
+      .map(n => ({...n, read: readNotificationIds?.has(n.id) || false}));
+
+  }, [ordenesTrabajo, repuestos, currentUser, profile, readNotificationIds]);
 
   const markAllAsRead = () => {
-    setAllNotifications(allNotifications.map(n => ({ ...n, read: true })));
+    const newRead = new Set(readNotificationIds);
+    notifications.forEach(n => newRead.add(n.id));
+    setReadNotificationIds(newRead);
   };
 
   const [newPassword, setNewPassword] = useState('');
@@ -211,7 +298,7 @@ export default function Layout() {
         )}
       >
         <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800 shrink-0">
-          <Link to="/operaciones/alertas" className="flex items-center gap-3 text-white overflow-hidden whitespace-nowrap outline-none">
+          <Link to="/dashboard" className="flex items-center gap-3 text-white overflow-hidden whitespace-nowrap outline-none">
             <div className="bg-blue-600 p-1.5 rounded-lg shrink-0">
               <Activity className="h-6 w-6 text-white" />
             </div>
@@ -440,7 +527,17 @@ export default function Layout() {
                             !notification.read ? "bg-blue-50/50 dark:bg-blue-900/10" : ""
                           )}
                           onClick={() => {
-                            setAllNotifications(allNotifications.map(n => n.id === notification.id ? { ...n, read: true } : n));
+                            const newRead = new Set(readNotificationIds);
+                            newRead.add(notification.id);
+                            setReadNotificationIds(newRead);
+                            
+                            if (notification.id === 'ot-en-proceso') navigate('/flota/mantenimiento');
+                            else if (notification.id === 'ot-prog-atrasado') navigate('/flota/programacion');
+                            else if (notification.id === 'ot-pasado-tiempo') navigate('/flota/mantenimiento');
+                            else if (notification.id === 'stock-critico') navigate('/logistica/suministros');
+                            else if (notification.type === 'ALERTA_FLOTA') navigate('/flota/alertas');
+                            
+                            setNotificationsOpen(false);
                           }}
                         >
                           <div className="flex items-start gap-3">
@@ -476,7 +573,7 @@ export default function Layout() {
                   
                   <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-800/80 text-center">
                     <Link 
-                      to="/operaciones/alertas" 
+                      to="/flota/alertas" 
                       onClick={() => setNotificationsOpen(false)}
                       className="text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors block w-full"
                     >
