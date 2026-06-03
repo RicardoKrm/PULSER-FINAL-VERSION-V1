@@ -151,6 +151,10 @@ export default function IngresoFacturas() {
         const { error } = await supabase.from('compras_facturas').insert(payload);
         if (error) throw error;
 
+        if (ocObj) {
+           await supabase.from('compras_ordenes').update({ estado: 'RECIBIDA' }).eq('id', ocObj.id);
+        }
+
         Swal.fire({
           title: '¡Factura Registrada!',
           text: 'El documento ha sido ingresado al sistema.',
