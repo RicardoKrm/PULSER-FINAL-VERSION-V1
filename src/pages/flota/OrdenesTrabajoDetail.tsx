@@ -1809,7 +1809,7 @@ export default function OrdenesTrabajoDetail() {
         </div>
       </Modal>
 
-      <Modal isOpen={isInspeccionModalOpen} onClose={() => setIsInspeccionModalOpen(false)} title="Pauta Inspección Técnica de Neumáticos" size="7xl">
+      <Modal isOpen={isInspeccionModalOpen} onClose={() => setIsInspeccionModalOpen(false)} title="Pauta Inspección Técnica de Neumáticos" size="5xl">
         <FormularioInspeccion prefilledVehiculoId={ot.vehiculoId} onClose={() => setIsInspeccionModalOpen(false)} />
       </Modal>
     </div>

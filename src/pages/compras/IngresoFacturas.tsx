@@ -22,9 +22,12 @@ import {
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import Swal from 'sweetalert2';
+import { useCompany } from '../../contexts/CompanyContext';
+import { supabase } from '../../lib/supabase';
 
 interface Invoice {
   id: string;
+  uuid?: string;
   emisor: string;
   rut: string;
   fecha: string;
@@ -33,13 +36,10 @@ interface Invoice {
   oc: string;
 }
 
-const INITIAL_INVOICES: Invoice[] = [
-  { id: 'FE-10293', emisor: 'Lubricantes y Filtros S.A.', rut: '76.123.456-K', fecha: '2026-05-15', monto: 1540000, estado: 'PENDIENTE', oc: 'OC-2501' },
-  { id: 'FE-10294', emisor: 'Neumáticos del Sur', rut: '77.987.654-2', fecha: '2026-05-12', monto: 3200000, estado: 'APROBADA', oc: 'OC-2498' },
-];
-
 export default function IngresoFacturas() {
-  const [invoices, setInvoices] = useState<Invoice[]>(INITIAL_INVOICES);
+  const { currentCompany } = useCompany();
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [comprasOrdenes, setComprasOrdenes] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'lista' | 'nuevo'>('lista');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -51,6 +51,46 @@ export default function IngresoFacturas() {
   const [nOc, setNOc] = useState('');
   const [fechaEmision, setFechaEmision] = useState(new Date().toISOString().split('T')[0]);
   const [montoTotal, setMontoTotal] = useState<number>(0);
+
+  useEffect(() => {
+     if(currentCompany) {
+        fetchFacturas();
+        fetchOrdenes();
+     }
+  }, [currentCompany]);
+
+  const fetchFacturas = async () => {
+      if (!currentCompany) return;
+      const { data, error } = await supabase.from('compras_facturas')
+        .select('*')
+        .eq('empresa_id', currentCompany.id)
+        .order('created_at', { ascending: false });
+      
+      if (data) {
+          const parsed = data.map(f => ({
+             id: f.folio_factura,
+             uuid: f.id,
+             emisor: f.proveedor_nombre || 'Desconocido',
+             rut: f.proveedor_rut || '',
+             fecha: new Date(f.fecha_emision).toISOString().split('T')[0],
+             monto: Number(f.monto_total),
+             estado: f.estado || 'PENDIENTE',
+             oc: f.orden_folio || ''
+          }));
+          setInvoices(parsed);
+      }
+  };
+
+  const fetchOrdenes = async () => {
+      if (!currentCompany) return;
+      const { data } = await supabase.from('compras_ordenes')
+        .select('id, folio')
+        .eq('empresa_id', currentCompany.id)
+        .eq('estado', 'PENDIENTE'); // Facturas para OC pendientes
+      if (data) {
+          setComprasOrdenes(data);
+      }
+  };
 
   const filteredInvoices = invoices.filter(inv => 
     inv.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -86,39 +126,45 @@ export default function IngresoFacturas() {
     }, 1500);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rut || !nDoc || montoTotal <= 0) {
+    if (!currentCompany || !rut || !nDoc || montoTotal <= 0) {
       Swal.fire('Campos requeridos', 'Por favor complete RUT, N° Documento y Monto', 'warning');
       return;
     }
 
-    const newInvoice: Invoice = {
-      id: `FE-${nDoc}`,
-      emisor: razonSocial || 'Proveedor sin nombre',
-      rut,
-      fecha: fechaEmision,
-      monto: montoTotal,
-      estado: 'PENDIENTE',
-      oc: nOc || 'Directa'
-    };
+    const ocObj = comprasOrdenes.find(o => o.folio === nOc);
 
-    setInvoices([newInvoice, ...invoices]);
-    Swal.fire({
-      title: '¡Factura Registrada!',
-      text: 'El documento ha sido ingresado al sistema.',
-      icon: 'success',
-      confirmButtonColor: '#4f46e5'
-    });
-    
-    // Reset form
-    setRut('');
-    setRazonSocial('');
-    setNDoc('');
-    setNOc('');
-    setFechaEmision(new Date().toISOString().split('T')[0]);
-    setMontoTotal(0);
-    setActiveTab('lista');
+    try {
+        const payload = {
+           empresa_id: currentCompany.id,
+           proveedor_rut: rut,
+           proveedor_nombre: razonSocial || 'Proveedor sin nombre',
+           folio_factura: `FE-${nDoc}`,
+           orden_id: ocObj ? ocObj.id : null,
+           orden_folio: nOc || 'Directa',
+           fecha_emision: fechaEmision,
+           monto_total: montoTotal,
+           estado: 'PENDIENTE'
+        };
+
+        const { error } = await supabase.from('compras_facturas').insert(payload);
+        if (error) throw error;
+
+        Swal.fire({
+          title: '¡Factura Registrada!',
+          text: 'El documento ha sido ingresado al sistema.',
+          icon: 'success',
+          confirmButtonColor: '#4f46e5'
+        });
+        
+        // Reset form
+        setRut(''); setRazonSocial(''); setNDoc(''); setNOc(''); setMontoTotal(0); setFechaEmision(new Date().toISOString().split('T')[0]);
+        setActiveTab('lista');
+        fetchFacturas();
+    } catch(err: any) {
+        Swal.fire('Error', err.message, 'error');
+    }
   };
 
   const getStatusBadge = (estado: string) => {
@@ -217,13 +263,16 @@ export default function IngresoFacturas() {
                    </div>
                    <div>
                       <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Orden de Compra (OC)</label>
-                      <input 
-                        type="text" 
+                      <select 
                         value={nOc}
                         onChange={(e) => setNOc(e.target.value)}
-                        placeholder="Opcional" 
-                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-white transition-all" 
-                      />
+                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-white transition-all cursor-pointer" 
+                      >
+                         <option value="">(Sin Orden - Compra Directa)</option>
+                         {comprasOrdenes.map(oc => (
+                           <option key={oc.id} value={oc.folio}>{oc.folio}</option>
+                         ))}
+                      </select>
                    </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">

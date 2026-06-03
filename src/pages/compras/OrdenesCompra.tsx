@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ShoppingCart, 
@@ -27,8 +27,10 @@ import {
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Modal } from '../../components/ui/Modal';
+import Swal from 'sweetalert2';
 
-import { useAppContext } from '../../context/AppContext';
+import { useCompany } from '../../contexts/CompanyContext';
+import { supabase } from '../../lib/supabase';
 
 interface PedidoTaller {
   id: string;
@@ -70,30 +72,76 @@ interface LineaOC {
 
 export default function OrdenesCompra() {
   const navigate = useNavigate();
-  const { ordenesTrabajo, vehiculos } = useAppContext();
+  const { currentCompany } = useCompany();
   const [view, setView] = useState<'panel' | 'historial' | 'detalle'>('panel');
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [showNuevaOCModal, setShowNuevaOCModal] = useState(false);
-  const [proveedorSeleccionadoTaller, setProveedorSeleccionadoTaller] = useState('KAUFMANN');
+  const [proveedorSeleccionadoTaller, setProveedorSeleccionadoTaller] = useState('');
   
   const [selectedPedidos, setSelectedPedidos] = useState<string[]>([]);
+  const [ordenesTrabajo, setOrdenesTrabajo] = useState<any[]>([]);
+  const [vehiculos, setVehiculos] = useState<any[]>([]);
+  const [proveedores, setProveedores] = useState<any[]>([]);
+  const [searchHistory, setSearchHistory] = useState('');
+
+  useEffect(() => {
+    if (currentCompany) {
+       fetchDatosBase();
+       fetchOrdenes();
+    }
+  }, [currentCompany]);
+
+  const fetchDatosBase = async () => {
+     if (!currentCompany) return;
+     const [otsRes, vehRes, provRes] = await Promise.all([
+        supabase.from('orden_de_trabajo').select('*, solicitudes:solicitud_repuesto_ot(*)').eq('empresa_id', currentCompany.id),
+        supabase.from('vehiculo').select('*').eq('empresa_id', currentCompany.id),
+        supabase.from('proveedores_directorio').select('*').eq('empresa_id', currentCompany.id)
+     ]);
+     if (otsRes.data) setOrdenesTrabajo(otsRes.data);
+     if (vehRes.data) setVehiculos(vehRes.data);
+     if (provRes.data) setProveedores(provRes.data);
+  };
+
+  const fetchOrdenes = async () => {
+     if (!currentCompany) return;
+     const { data } = await supabase.from('compras_ordenes')
+       .select('*, lineas:compras_ordenes_lineas(*)')
+       .eq('empresa_id', currentCompany.id)
+       .order('fecha_emision', { ascending: false });
+
+     if (data) {
+        const parsed = data.map(o => ({
+           id: o.id,
+           folio: o.folio,
+           fecha: new Date(o.fecha_emision).toLocaleString('es-CL'),
+           proveedor: o.proveedor_nombre || 'Desconocido',
+           monto: o.monto_estimado,
+           estado: o.estado,
+           resumen: o.notas || 'Compra general',
+           lineas: o.lineas || []
+        }));
+        setOrdenesPendientes(parsed.filter(p => p.estado === 'PENDIENTE'));
+        setHistorialOrdenes(parsed);
+     }
+  };
 
   const pedidosTaller = React.useMemo(() => {
      let pedidos: PedidoTaller[] = [];
      ordenesTrabajo.forEach(ot => {
-         const vehiculo = vehiculos.find(v => v.id === ot.vehiculoId)?.patente || 'Desconocido';
+         const vehiculo = vehiculos.find(v => v.id === ot.vehiculo_id)?.patente || 'Desconocido';
          if (ot.solicitudes) {
-             ot.solicitudes.forEach(sol => {
+             ot.solicitudes.forEach((sol: any) => {
                  if (sol.estado === 'PENDIENTE') {
                      pedidos.push({
                          id: sol.id,
-                         fecha: new Date(sol.fecha_solicitud).toLocaleString(),
-                         prioridad: ot.prioridad,
+                         fecha: new Date(sol.created_at || new Date()).toLocaleString(),
+                         prioridad: ot.prioridad || 'MEDIA',
                          vehiculo: vehiculo + ' (OT: ' + ot.folio + ')',
-                         repuesto: sol.repuesto_nombre,
+                         repuesto: sol.repuesto_nombre || sol.descripcion || 'Sin nombre',
                          sugerencia: 'Sin sugerencia',
                          cantidad: sol.cantidad,
-                         motivo: ot.observacionInicial || ot.diagnosticoEvaluacion || 'Repuesto para OT',
+                         motivo: ot.observacion || ot.diagnostico || 'Repuesto para OT',
                          selected: selectedPedidos.includes(sol.id)
                      });
                  }
@@ -103,18 +151,8 @@ export default function OrdenesCompra() {
      return pedidos;
   }, [ordenesTrabajo, vehiculos, selectedPedidos]);
 
-  const [ordenesPendientes, setOrdenesPendientes] = useState<OrdenCompra[]>([
-    { folio: "#5", fecha: "20/04/2026", proveedor: "KAUFMANN", monto: 0, estado: "PENDIENTE" },
-    { folio: "#4", fecha: "20/04/2026", proveedor: "KAUFMANN", monto: 0, estado: "PENDIENTE" }
-  ]);
-
-  const [historialOrdenes, setHistorialOrdenes] = useState<HistorialOrden[]>([
-    { folio: "#5", fecha: "20/04/2026", proveedor: "KAUFMANN", resumen: "", estado: "PENDIENTE", monto: 0 },
-    { folio: "#4", fecha: "20/04/2026", proveedor: "KAUFMANN", resumen: "", estado: "PENDIENTE", monto: 0 },
-    { folio: "#3", fecha: "15/04/2026", proveedor: "KAUFMANN", resumen: "", estado: "RECIBIDA", monto: 0 },
-    { folio: "#2", fecha: "15/04/2026", proveedor: "KAUFMANN", resumen: "", estado: "RECIBIDA", monto: 0 },
-    { folio: "#1", fecha: "15/04/2026", proveedor: "KAUFMANN", resumen: "", estado: "RECIBIDA", monto: 0 },
-  ]);
+  const [ordenesPendientes, setOrdenesPendientes] = useState<OrdenCompra[]>([]);
+  const [historialOrdenes, setHistorialOrdenes] = useState<HistorialOrden[]>([]);
 
   const [nuevaOCLineas, setNuevaOCLineas] = useState<LineaOC[]>([
     { id: Date.now(), repuesto: '', descripcion: '', centroCosto: '', cantidad: 1, precioUnitario: 0 }
@@ -136,53 +174,90 @@ export default function OrdenesCompra() {
     setNuevaOCLineas(nuevaOCLineas.map(l => l.id === id ? { ...l, [field]: value } : l));
   };
 
-  const handleGuardarNuevaOC = () => {
-    if (!nuevaOCProveedor) {
+  const handleGuardarNuevaOC = async () => {
+    if (!currentCompany || !nuevaOCProveedor) {
       alert("Por favor, seleccione un proveedor.");
       return;
     }
     const montoTotal = nuevaOCLineas.reduce((acc, l) => acc + (l.cantidad * l.precioUnitario), 0);
     const folioStr = `#${Date.now().toString().slice(-4)}`;
-    const nuevoHistorialOC: HistorialOrden = {
-      folio: folioStr,
-      fecha: new Date().toLocaleDateString('es-CL'),
-      proveedor: nuevaOCProveedor,
-      resumen: "Compra General",
-      estado: "PENDIENTE",
-      monto: montoTotal
-    };
-
-    setOrdenesPendientes([{ folio: nuevoHistorialOC.folio, fecha: nuevoHistorialOC.fecha, proveedor: nuevoHistorialOC.proveedor, monto: nuevoHistorialOC.monto, estado: nuevoHistorialOC.estado }, ...ordenesPendientes]);
-    setHistorialOrdenes([nuevoHistorialOC, ...historialOrdenes]);
-    setShowNuevaOCModal(false);
-    setNuevaOCLineas([{ id: Date.now(), repuesto: '', descripcion: '', centroCosto: '', cantidad: 1, precioUnitario: 0 }]);
-    setNuevaOCProveedor('');
-    setNuevaOCNotas('');
-    alert(`Órden de compra ${folioStr} generada exitosamente.`);
+    
+    try {
+        const { data, error } = await supabase.from('compras_ordenes').insert({
+           empresa_id: currentCompany.id,
+           folio: folioStr,
+           proveedor_nombre: nuevaOCProveedor,
+           monto_estimado: montoTotal,
+           estado: 'PENDIENTE',
+           notas: nuevaOCNotas
+        }).select().single();
+        if (error) throw error;
+        
+        if (data) {
+           const lineas = nuevaOCLineas.map(l => ({
+              orden_id: data.id,
+              repuesto_nombre: l.repuesto || l.descripcion,
+              descripcion: l.descripcion,
+              centro_costo: l.centroCosto,
+              cantidad: l.cantidad,
+              precio_unitario: l.precioUnitario
+           }));
+           await supabase.from('compras_ordenes_lineas').insert(lineas);
+        }
+        
+        Swal.fire({ title: '¡Éxito!', text: `Órden de compra ${folioStr} generada exitosamente.`, icon: 'success' });
+        setShowNuevaOCModal(false);
+        setNuevaOCLineas([{ id: Date.now(), repuesto: '', descripcion: '', centroCosto: '', cantidad: 1, precioUnitario: 0 }]);
+        setNuevaOCProveedor('');
+        setNuevaOCNotas('');
+        fetchOrdenes();
+    } catch(e: any) {
+       Swal.fire({ title: 'Error', text: e.message, icon: 'error' });
+    }
   };
 
-  const handleGenerarOCTaller = () => {
+  const handleGenerarOCTaller = async () => {
     const pedidosSeleccionados = pedidosTaller.filter(p => p.selected);
-    if (pedidosSeleccionados.length === 0) {
+    if (!currentCompany || pedidosSeleccionados.length === 0) {
       alert("Por favor, seleccione al menos un pedido de taller para generar la OC.");
       return;
     }
     
-    // Simulate generation
     const folioStr = `#${Date.now().toString().slice(-4)}`;
-    const nuevoHistorialOC: HistorialOrden = {
-      folio: folioStr,
-      fecha: new Date().toLocaleDateString('es-CL'),
-      proveedor: proveedorSeleccionadoTaller,
-      resumen: `OC generada desde ${pedidosSeleccionados.length} pedidos de taller`,
-      estado: "PENDIENTE",
-      monto: 0
-    };
-
-    setOrdenesPendientes([{ folio: nuevoHistorialOC.folio, fecha: nuevoHistorialOC.fecha, proveedor: nuevoHistorialOC.proveedor, monto: nuevoHistorialOC.monto, estado: nuevoHistorialOC.estado }, ...ordenesPendientes]);
-    setHistorialOrdenes([nuevoHistorialOC, ...historialOrdenes]);
-    setSelectedPedidos([]); // Clear selection instead of filtering out
-    alert(`Órden de compra de taller ${folioStr} generada exitosamente. Recuerda ir a la OT para actualizar el estado de las solicitudes.`);
+    const resumen = `OC generada desde ${pedidosSeleccionados.length} pedidos de taller`;
+    
+    try {
+        const { data, error } = await supabase.from('compras_ordenes').insert({
+            empresa_id: currentCompany.id,
+            folio: folioStr,
+            proveedor_nombre: proveedorSeleccionadoTaller || 'Desconocido',
+            monto_estimado: 0,
+            estado: 'PENDIENTE',
+            notas: resumen
+        }).select().single();
+        if (error) throw error;
+        
+        if (data) {
+           const lineas = pedidosSeleccionados.map(p => ({
+              orden_id: data.id,
+              repuesto_nombre: p.repuesto,
+              descripcion: `Para vehículo ${p.vehiculo} - Motivo: ${p.motivo}`,
+              centro_costo: 'Taller',
+              cantidad: p.cantidad,
+              precio_unitario: 0
+           }));
+           await supabase.from('compras_ordenes_lineas').insert(lineas);
+           
+           // Actualizar estado de las solicitudes de repuesto asociadas si es necesario (esperan OC, etc)
+           const repIds = pedidosSeleccionados.map(p => p.id);
+           // Not doing full DB update of requests to avoid schema conflicts if standard is not ready, just generating OC
+        }
+        Swal.fire('¡Éxito!', `Órden de compra de taller ${folioStr} generada exitosamente.`, 'success');
+        setSelectedPedidos([]);
+        fetchOrdenes();
+    } catch (e: any) {
+        Swal.fire('Error', e.message, 'error');
+    }
   };
 
   const togglePedidoTallerSelection = (id: string) => {
@@ -196,22 +271,30 @@ export default function OrdenesCompra() {
     setView('detalle');
   };
 
-  const handleRecibirMercaderia = () => {
+  const handleRecibirMercaderia = async () => {
     if (!selectedOrder) return;
-    
-    // Update state in pending orders
-    setOrdenesPendientes(prev => 
-      prev.map(oc => oc.folio === selectedOrder ? { ...oc, estado: 'RECIBIDA' } : oc)
-    );
-    
-    // Update state in history
-    setHistorialOrdenes(prev => 
-      prev.map(oc => oc.folio === selectedOrder ? { ...oc, estado: 'RECIBIDA' } : oc)
-    );
-    
-    alert(`✅ ¡Éxito!\n\nLa mercadería para la Orden ${selectedOrder} ha sido recibida correctamente.\nLos insumos han sido cargados al inventario de la bodega y el stock ha sido actualizado.`);
+    try {
+        const { error } = await supabase.from('compras_ordenes').update({
+           estado: 'RECIBIDA'
+        }).eq('folio', selectedOrder);
+        
+        if (error) throw error;
+        Swal.fire({
+            title: '¡Éxito!', 
+            text: `La mercadería para la Orden ${selectedOrder} ha sido recibida correctamente.`, 
+            icon: 'success'
+        });
+        fetchOrdenes();
+    } catch (e: any) {
+        Swal.fire('Error', e.message, 'error');
+    }
   };
 
+  const filteredHistory = historialOrdenes.filter(h => 
+     h.folio.toLowerCase().includes(searchHistory.toLowerCase()) || 
+     h.proveedor.toLowerCase().includes(searchHistory.toLowerCase())
+  );
+  
   if (view === 'detalle') {
     const ordenObj = 
       ordenesPendientes.find(o => o.folio === selectedOrder) || 
@@ -219,12 +302,14 @@ export default function OrdenesCompra() {
     
     const isReceived = ordenObj?.estado === 'RECIBIDA';
 
-    const mockItems = [
-      { repuesto: "Filtro de Aceite - Hyundai (Original)", cantidad: 2, precioU: 15000, total: 30000 },
-      { repuesto: "Correa 8 PK - Alternador", cantidad: 1, precioU: 45000, total: 45000 },
-      { repuesto: "Pastillas de Freno - Eje Delantero", cantidad: 1, precioU: 32000, total: 32000 }
-    ];
-    const totalMonto = mockItems.reduce((acc, curr) => acc + curr.total, 0);
+    const renderItems = ordenObj?.lineas?.map((l: any) => ({
+      repuesto: l.repuesto_nombre || l.descripcion,
+      cantidad: l.cantidad,
+      precioU: l.precio_unitario || 0,
+      total: (l.cantidad * (l.precio_unitario || 0)) || 0
+    })) || [];
+    
+    const totalMonto = renderItems.reduce((acc, curr) => acc + curr.total, 0);
 
     return (
       <div className="p-6 max-w-[1600px] mx-auto space-y-6">
@@ -315,7 +400,7 @@ export default function OrdenesCompra() {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-slate-800">
-                {mockItems.map((item, idx) => (
+                {renderItems.map((item: any, idx: number) => (
                   <tr key={idx} className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                     <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200 text-xs">{item.repuesto}</td>
                     <td className="px-6 py-4">
@@ -341,30 +426,8 @@ export default function OrdenesCompra() {
         </Card>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-          {/* Pedidos asociados */}
-          <Card className="rounded-2xl border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden bg-white dark:bg-slate-800">
-            <CardHeader className="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 py-4 px-6">
-              <div className="flex items-center gap-2">
-                <Wrench className="w-5 h-5 text-orange-500" />
-                <CardTitle className="text-sm font-black text-slate-700 dark:text-slate-200 tracking-wider uppercase">Pedidos de Taller Asociados</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 bg-slate-50 dark:bg-slate-900">
-              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                <div>
-                  <h4 className="font-black text-slate-800 dark:text-white text-sm">NONE</h4>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Solicitado Por: DEMO</span>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className="bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 px-3 py-1 rounded text-xs font-black">1</span>
-                  <span className="text-[10px] font-bold text-slate-400">#OT-0344</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Observaciones y Notas */}
-          <Card className="rounded-2xl border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden bg-white dark:bg-slate-800">
+          <Card className="rounded-2xl border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden bg-white dark:bg-slate-800 md:col-span-2">
             <CardHeader className="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 py-4 px-6">
               <div className="flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-cyan-500" />
@@ -373,7 +436,7 @@ export default function OrdenesCompra() {
             </CardHeader>
             <CardContent className="p-6">
               <p className="text-sm text-slate-600 dark:text-slate-400 italic font-medium">
-                O.C. generada automáticamente desde 1 solicitudes de taller.
+                {ordenObj?.resumen || ordenObj?.notas || 'Sin notas ni observaciones adjuntas a esta orden de compra.'}
               </p>
             </CardContent>
           </Card>
@@ -392,7 +455,7 @@ export default function OrdenesCompra() {
               <History className="w-8 h-8 text-blue-500" /> Historial de Órdenes
             </h1>
             <p className="text-emerald-600 dark:text-emerald-400 font-bold text-sm tracking-wide mt-2 flex items-center gap-2">
-              <span className="text-xl">💰</span> Total en Filtro: $ 0
+              <span className="text-xl">💰</span> Total en Filtro: $ {filteredHistory.reduce((acc, curr) => acc + (curr.monto || 0), 0).toLocaleString('es-CL')}
             </p>
           </div>
           <div>
@@ -413,6 +476,8 @@ export default function OrdenesCompra() {
               <div className="relative">
                 <input 
                   type="text" 
+                  value={searchHistory}
+                  onChange={(e) => setSearchHistory(e.target.value)}
                   placeholder="Folio, Proveedor o Ítem..." 
                   className="w-full h-11 px-4 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-200 bg-transparent outline-none focus:border-blue-500 transition-colors placeholder:text-slate-400"
                 />
@@ -464,7 +529,7 @@ export default function OrdenesCompra() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700 bg-white dark:bg-slate-800">
-                {historialOrdenes.map((orden, idx) => (
+                {filteredHistory.map((orden, idx) => (
                   <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                     <td className="px-6 py-4 font-black text-slate-800 dark:text-white text-sm">{orden.folio}</td>
                     <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-300 text-xs">{orden.fecha}</td>
@@ -490,7 +555,7 @@ export default function OrdenesCompra() {
             </table>
           </div>
           <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mostrando 5 órdenes registradas</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mostrando {filteredHistory.length} órdenes registradas</span>
             <div className="flex items-center gap-1">
               <Button variant="outline" className="h-8 px-3 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700">Anterior</Button>
               <Button className="h-8 w-8 p-0 rounded-lg text-xs font-bold bg-blue-500 hover:bg-blue-600 text-white">1</Button>
@@ -543,8 +608,9 @@ export default function OrdenesCompra() {
               onChange={(e) => setProveedorSeleccionadoTaller(e.target.value)}
             >
               <option value="">SELECCIONAR PROVEEDOR PARA O.C...</option>
-              <option value="KAUFMANN">KAUFMANN</option>
-              <option value="SALFA">SALFA</option>
+              {proveedores.map(p => (
+                <option key={p.id} value={p.nombre}>{p.nombre} {p.rut ? `(${p.rut})` : ''}</option>
+              ))}
             </select>
             <Button 
               onClick={handleGenerarOCTaller}
@@ -717,9 +783,9 @@ export default function OrdenesCompra() {
                 onChange={(e) => setNuevaOCProveedor(e.target.value)}
               >
                 <option value="">Seleccione un proveedor...</option>
-                <option value="KAUFMANN">KAUFMANN</option>
-                <option value="SALFA">SALFA</option>
-                <option value="LIBRERIA NACIONAL">LIBRERÍA NACIONAL</option>
+                {proveedores.map(p => (
+                  <option key={p.id} value={p.nombre}>{p.nombre} {p.rut ? `(${p.rut})` : ''}</option>
+                ))}
               </select>
             </div>
             <div className="space-y-2">
