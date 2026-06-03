@@ -1,36 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FileText, Plus, Search, CheckCircle2, XCircle, Clock, Calendar, Hash, DollarSign, Building2, Paperclip, UploadCloud } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import Swal from 'sweetalert2';
+import { useCompany } from '../../contexts/CompanyContext';
+import { supabase } from '../../lib/supabase';
 
 interface Cotizacion {
   id: string;
+  uuid?: string;
   folio: string;
   proveedor: string;
+  rut?: string;
   fecha: string;
   fechaVencimiento: string;
   monto: number;
   moneda: string;
-  estado: 'Pendiente' | 'Aprobada' | 'Rechazada';
+  estado: 'EVALUACION' | 'APROBADA' | 'RECHAZADA';
   articulos: number;
   condicionPago: string;
+  observaciones?: string;
 }
 
-const INITIAL_DATA: Cotizacion[] = [
-  { id: '1', folio: 'COT-001', proveedor: 'Filtros y Lubricantes S.A.', fecha: '2026-05-10', fechaVencimiento: '2026-05-25', monto: 450000, moneda: 'CLP', estado: 'Aprobada', articulos: 15, condicionPago: '30 días' },
-  { id: '2', folio: 'COT-002', proveedor: 'Repuestos del Norte', fecha: '2026-05-12', fechaVencimiento: '2026-05-27', monto: 1250000, moneda: 'CLP', estado: 'Pendiente', articulos: 5, condicionPago: '15 días' },
-  { id: '3', folio: 'COT-003', proveedor: 'Neumáticos del Sur', fecha: '2026-05-14', fechaVencimiento: '2026-05-29', monto: 3200, moneda: 'USD', estado: 'Pendiente', articulos: 8, condicionPago: 'Al contado' },
-  { id: '4', folio: 'COT-004', proveedor: 'Electro Auto SPA', fecha: '2026-05-05', fechaVencimiento: '2026-05-20', monto: 120000, moneda: 'CLP', estado: 'Rechazada', articulos: 2, condicionPago: '60 días' },
-];
-
 export default function Cotizaciones() {
-  const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>(INITIAL_DATA);
+  const { currentCompany } = useCompany();
+  const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [proveedoresDist, setProveedoresDist] = useState<any[]>([]);
   
-  // New Form State
-  const [proveedor, setProveedor] = useState('');
+  // Form State
+  const [proveedorSeleccionado, setProveedorSeleccionado] = useState('');
+  const [rut, setRut] = useState('');
   const [fechaEmision, setFechaEmision] = useState(new Date().toISOString().split('T')[0]);
   const [fechaVencimiento, setFechaVencimiento] = useState('');
   const [moneda, setMoneda] = useState('CLP');
@@ -39,43 +40,99 @@ export default function Cotizaciones() {
   const [condicionPago, setCondicionPago] = useState('30 días');
   const [observaciones, setObservaciones] = useState('');
 
+  useEffect(() => {
+     if(currentCompany) {
+         fetchCotizaciones();
+         fetchProveedores();
+     }
+  }, [currentCompany]);
+
+  const fetchCotizaciones = async () => {
+      if (!currentCompany) return;
+      const { data, error } = await supabase.from('compras_cotizaciones')
+        .select('*')
+        .eq('empresa_id', currentCompany.id)
+        .order('created_at', { ascending: false });
+        
+      if (data) {
+          const parsed = data.map(c => ({
+             id: c.folio,
+             uuid: c.id,
+             folio: c.folio,
+             proveedor: c.proveedor_nombre,
+             rut: c.proveedor_rut,
+             fecha: new Date(c.fecha_emision).toISOString().split('T')[0],
+             fechaVencimiento: c.fecha_vencimiento ? new Date(c.fecha_vencimiento).toISOString().split('T')[0] : '',
+             monto: Number(c.monto_total),
+             moneda: c.moneda,
+             estado: c.estado,
+             articulos: c.articulos,
+             condicionPago: c.condicion_pago,
+             observaciones: c.observaciones
+          }));
+          setCotizaciones(parsed as any);
+      }
+  };
+
+  const fetchProveedores = async () => {
+      if (!currentCompany) return;
+      const { data } = await supabase.from('proveedores_directorio').select('*').eq('empresa_id', currentCompany.id);
+      if (data) {
+          setProveedoresDist(data);
+      }
+  };
+
   const filteredCotizaciones = cotizaciones.filter(c => 
     c.folio.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.proveedor.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!proveedor) return;
+    if (!currentCompany || (!rut && !proveedorSeleccionado)) {
+      Swal.fire('Campos requeridos', 'Por favor indique un proveedor o RUT.', 'warning');
+      return;
+    }
 
-    const newCotizacion: Cotizacion = {
-      id: Date.now().toString(),
-      folio: `COT-${(cotizaciones.length + 1).toString().padStart(3, '0')}`,
-      proveedor,
-      fecha: fechaEmision,
-      fechaVencimiento: fechaVencimiento || new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      monto,
-      moneda,
-      estado: 'Pendiente',
-      articulos,
-      condicionPago
-    };
+    const folioStr = `COT-${Date.now().toString().slice(-4)}`;
 
-    setCotizaciones([newCotizacion, ...cotizaciones]);
-    
-    Swal.fire({
-      title: '¡Guardada!', 
-      text: 'La cotización ha sido registrada exitosamente.', 
-      icon: 'success',
-      confirmButtonColor: '#4f46e5'
-    });
-    
-    setIsModalOpen(false);
-    resetForm();
+    try {
+        const payload = {
+           empresa_id: currentCompany.id,
+           folio: folioStr,
+           proveedor_rut: rut,
+           proveedor_nombre: proveedorSeleccionado || 'Desconocido',
+           fecha_emision: fechaEmision,
+           fecha_vencimiento: fechaVencimiento || null,
+           moneda,
+           monto_total: monto,
+           articulos,
+           condicion_pago: condicionPago,
+           observaciones,
+           estado: 'EVALUACION'
+        };
+
+        const { error } = await supabase.from('compras_cotizaciones').insert(payload);
+        if (error) throw error;
+        
+        Swal.fire({
+          title: '¡Guardada!', 
+          text: 'La cotización ha sido registrada exitosamente.', 
+          icon: 'success',
+          confirmButtonColor: '#4f46e5'
+        });
+        
+        setIsModalOpen(false);
+        resetForm();
+        fetchCotizaciones();
+    } catch(err: any) {
+        Swal.fire('Error', err.message, 'error');
+    }
   };
 
   const resetForm = () => {
-     setProveedor('');
+     setProveedorSeleccionado('');
+     setRut('');
      setFechaEmision(new Date().toISOString().split('T')[0]);
      setFechaVencimiento('');
      setMoneda('CLP');
@@ -87,9 +144,9 @@ export default function Cotizaciones() {
 
   const getStatusBadge = (estado: string) => {
     switch (estado) {
-      case 'Aprobada': return <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-black uppercase tracking-wider"><CheckCircle2 className="w-3.5 h-3.5" /> Aprobada</span>;
-      case 'Pendiente': return <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-black uppercase tracking-wider"><Clock className="w-3.5 h-3.5" /> Pendiente</span>;
-      case 'Rechazada': return <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400 text-xs font-black uppercase tracking-wider"><XCircle className="w-3.5 h-3.5" /> Rechazada</span>;
+      case 'APROBADA': return <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-black uppercase tracking-wider"><CheckCircle2 className="w-3.5 h-3.5" /> Aprobada</span>;
+      case 'EVALUACION': return <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-black uppercase tracking-wider"><Clock className="w-3.5 h-3.5" /> En Evaluación</span>;
+      case 'RECHAZADA': return <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400 text-xs font-black uppercase tracking-wider"><XCircle className="w-3.5 h-3.5" /> Rechazada</span>;
       default: return null;
     }
   };
@@ -204,16 +261,32 @@ export default function Cotizaciones() {
                 <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest border-b border-slate-200 dark:border-slate-700 pb-2 flex items-center gap-2">
                   <Building2 className="w-4 h-4 text-indigo-500" /> Información del Proveedor
                 </h4>
-                <div>
-                  <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Nombre del Proveedor *</label>
-                  <input 
-                    type="text" 
-                    required
-                    value={proveedor}
-                    onChange={(e) => setProveedor(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-white transition-all" 
-                    placeholder="Empresa o proveedor de los servicios/productos" 
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Nombre del Proveedor *</label>
+                    <select 
+                      required
+                      value={proveedorSeleccionado}
+                      onChange={(e) => setProveedorSeleccionado(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-white transition-all cursor-pointer" 
+                    >
+                       <option value="">Seleccione un Proveedor...</option>
+                       {proveedoresDist.map(p => (
+                         <option key={p.id} value={p.nombre}>{p.nombre}</option>
+                       ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">RUT Emisor *</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={rut}
+                      onChange={(e) => setRut(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-white transition-all" 
+                      placeholder="Ej. 76.888.999-5" 
+                    />
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

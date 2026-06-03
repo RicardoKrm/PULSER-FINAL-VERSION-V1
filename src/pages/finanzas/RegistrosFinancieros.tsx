@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '../../components/ui/Card';
 import { DollarSign, Search, Plus, Trash2, ArrowLeft, Download, Filter, Hourglass, TrendingUp, TrendingDown, Edit } from 'lucide-react';
+import { Modal } from '../../components/ui/Modal';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
 import Swal from 'sweetalert2';
@@ -12,10 +13,20 @@ export default function RegistrosFinancieros() {
   const [loading, setLoading] = useState(true);
   const [selectedEntityId, setSelectedEntityId] = useState<string>('global');
 
+  // Contratos
+  const [contratosProveedores, setContratosProveedores] = useState<any[]>([]);
+  const [contratosClientes, setContratosClientes] = useState<any[]>([]);
+
+  // Filtros
+  const [fechaInicioFiltro, setFechaInicioFiltro] = useState('');
+  const [fechaFinFiltro, setFechaFinFiltro] = useState('');
+
   // Form State para Nuevo Registro
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [fechaRegistro, setFechaRegistro] = useState(new Date().toISOString().split('T')[0]);
   const [tipoRegistro, setTipoRegistro] = useState('Costo/Egreso');
   const [categoria, setCategoria] = useState('');
+  const [otrosDetalle, setOtrosDetalle] = useState('');
   const [contrato, setContrato] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [monto, setMonto] = useState('');
@@ -24,8 +35,22 @@ export default function RegistrosFinancieros() {
   useEffect(() => {
     if (activeCompanyId) {
       fetchData();
+      fetchContratos();
     }
   }, [activeCompanyId]);
+
+  const fetchContratos = async () => {
+     try {
+         const [{ data: pData }, { data: cData }] = await Promise.all([
+             supabase.from('compras_contratos').select('*').eq('empresa_id', activeCompanyId),
+             supabase.from('operacion_contrato').select('*').eq('empresa_id', activeCompanyId)
+         ]);
+         if(pData) setContratosProveedores(pData);
+         if(cData) setContratosClientes(cData);
+     } catch (err) {
+         console.error('Error fetching contracts', err);
+     }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -63,7 +88,15 @@ export default function RegistrosFinancieros() {
      setEditingRegistroId(reg.id);
      setFechaRegistro(reg.fecha);
      setTipoRegistro(reg.tipo);
-     setCategoria(reg.categoria);
+     
+     if (reg.categoria.startsWith('Otros - ')) {
+         setCategoria('Otros');
+         setOtrosDetalle(reg.categoria.replace('Otros - ', ''));
+     } else {
+         setCategoria(reg.categoria);
+         setOtrosDetalle('');
+     }
+     
      setContrato(reg.contrato || '');
      setDescripcion(reg.descripcion);
      setMonto(reg.monto.toString());
@@ -75,6 +108,7 @@ export default function RegistrosFinancieros() {
      setDescripcion('');
      setMonto('');
      setContrato('');
+     setOtrosDetalle('');
      setFechaRegistro(new Date().toISOString().split('T')[0]);
   };
 
@@ -89,10 +123,12 @@ export default function RegistrosFinancieros() {
     const currentDetalles = activeEntity.detalles || {};
     let newRegistros = [...registros];
 
+    const categoryToSave = categoria === 'Otros' && otrosDetalle ? `Otros - ${otrosDetalle}` : categoria;
+
     if (editingRegistroId) {
        newRegistros = newRegistros.map((r: any) => 
          r.id === editingRegistroId 
-           ? { ...r, fecha: fechaRegistro, tipo: tipoRegistro, categoria, contrato, descripcion, monto: parseFloat(monto) }
+           ? { ...r, fecha: fechaRegistro, tipo: tipoRegistro, categoria: categoryToSave, contrato, descripcion, monto: parseFloat(monto) }
            : r
        );
     } else {
@@ -100,7 +136,7 @@ export default function RegistrosFinancieros() {
           id: crypto.randomUUID(),
           fecha: fechaRegistro,
           tipo: tipoRegistro,
-          categoria,
+          categoria: categoryToSave,
           contrato,
           descripcion,
           monto: parseFloat(monto)
@@ -131,6 +167,7 @@ export default function RegistrosFinancieros() {
         
         // Form Reset
         cancelEdit();
+        setIsModalOpen(false);
       } else {
         throw error;
       }
@@ -186,41 +223,41 @@ export default function RegistrosFinancieros() {
     });
   };
 
-  const categoriasOptions = isGlobal ? [
-    'Operaciones y Servicios',
-    'Gestión de Flota',
-    'Logística y Suministros',
-    'Compras y Proveedores',
-    'Finanzas',
-    'Administración / Otros'
-  ] : tipoRegistro === 'Ingreso' ? [
-    'Ingreso por Contrato',
-    'Ingreso Variable (Viaje, KM)',
-    'Otros Ingresos'
-  ] : [
-    'Costo Fijo (Seguros, Salarios)',
-    'Combustible',
-    'Mantenimiento y Reparaciones',
-    'Neumáticos',
-    'Peajes y Estacionamiento',
-    'Lubricantes y Fluidos',
-    'Costo Extraordinario (Multas)',
-    'Otros Gastos'
+  const CATEGORIES = [
+    { 
+      group: 'Ingresos Operacionales', 
+      type: 'Ingreso',
+      options: ['Facturación por Servicio', 'Ingreso por Kilometraje', 'Bono Producción', 'Arriendo de Equipo', 'Otros'] 
+    },
+    { 
+      group: 'Costos Directos', 
+      type: 'Costo/Egreso',
+      options: ['Peajes y TAG', 'Estacionamiento', 'Lavado y Aseo', 'Insumos Ruta', 'Viáticos', 'Otros'] 
+    },
+    { 
+      group: 'Costos Administrativos', 
+      type: 'Costo/Egreso',
+      options: ['Seguro Obligatorio (SOAP)', 'Seguro Automotriz', 'Permiso de Circulación', 'Revisión Técnica', 'Multas y Partes', 'Otros'] 
+    }
   ];
 
-  // Auto-select first category when type or entity changes
+  const getCategoriasToRender = () => CATEGORIES.filter(c => c.type === tipoRegistro);
+
   useEffect(() => {
-     if (isGlobal) {
-        setCategoria('Operaciones y Servicios');
-     } else if (tipoRegistro === 'Ingreso') {
-        setCategoria('Ingreso por Contrato');
-     } else {
-        setCategoria('Combustible');
-     }
+     setCategoria('');
   }, [tipoRegistro, isGlobal]);
 
-  const totalIngresos = registros.filter((r:any) => r.tipo === 'Ingreso').reduce((acc: number, r:any) => acc + r.monto, 0);
-  const totalCostos = registros.filter((r:any) => r.tipo === 'Costo/Egreso').reduce((acc: number, r:any) => acc + r.monto, 0);
+  const getFilteredRegistros = () => {
+     return registros.filter((reg: any) => {
+         if (fechaInicioFiltro && new Date(reg.fecha) < new Date(fechaInicioFiltro)) return false;
+         if (fechaFinFiltro && new Date(reg.fecha) > new Date(fechaFinFiltro)) return false;
+         return true;
+     }).sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+  };
+
+  const filteredRegistros = getFilteredRegistros();
+  const totalIngresos = filteredRegistros.filter((r:any) => r.tipo === 'Ingreso').reduce((acc: number, r:any) => acc + r.monto, 0);
+  const totalCostos = filteredRegistros.filter((r:any) => r.tipo === 'Costo/Egreso').reduce((acc: number, r:any) => acc + r.monto, 0);
   const balance = totalIngresos - totalCostos;
 
   return (
@@ -253,99 +290,10 @@ export default function RegistrosFinancieros() {
             Seleccione una entidad para gestionar sus registros.
          </div>
       ) : (
-         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+         <div className="space-y-6">
             
-            {/* Formulario */}
-            <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 h-fit xl:col-span-1">
-               <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
-                  <h3 className="font-bold text-slate-800 dark:text-slate-200">{editingRegistroId ? 'Editar Registro' : 'Añadir Nuevo Registro'}</h3>
-               </div>
-               <CardContent className="p-6">
-                  <form onSubmit={handleSaveRegistro} className="space-y-5">
-                     <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Fecha del Registro</label>
-                        <input 
-                           type="date" 
-                           required
-                           value={fechaRegistro}
-                           onChange={(e) => setFechaRegistro(e.target.value)}
-                           className="w-full border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 bg-white dark:bg-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
-                        />
-                        <p className="text-[11px] text-slate-500 mt-1">Fecha en que se registró el ingreso o costo.</p>
-                     </div>
-                     <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tipo de Registro</label>
-                        <select 
-                           value={tipoRegistro}
-                           onChange={(e) => setTipoRegistro(e.target.value)}
-                           className="w-full border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 bg-white dark:bg-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                           <option value="Ingreso">Ingreso</option>
-                           <option value="Costo/Egreso">Costo/Egreso</option>
-                        </select>
-                     </div>
-                     <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoría</label>
-                        <select 
-                           value={categoria}
-                           onChange={(e) => setCategoria(e.target.value)}
-                           className="w-full border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 bg-white dark:bg-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                           {categoriasOptions.map(cat => (
-                              <option key={cat} value={cat}>{cat}</option>
-                           ))}
-                        </select>
-                     </div>
-                     <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Contrato Asociado (Opcional)</label>
-                        <select 
-                           value={contrato}
-                           onChange={(e) => setContrato(e.target.value)}
-                           className="w-full border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 bg-white dark:bg-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                           <option value="">Sin contrato específico</option>
-                           <option value="Contrato A">Contrato A (Ejemplo)</option>
-                           <option value="Contrato Minero">Contrato Minero (Ejemplo)</option>
-                        </select>
-                     </div>
-                     <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descripción</label>
-                        <textarea 
-                           required
-                           value={descripcion}
-                           onChange={(e) => setDescripcion(e.target.value)}
-                           placeholder="Ej: Factura de peajes, Contrato mensual..."
-                           className="w-full border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 bg-white dark:bg-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 min-h-[80px]" 
-                        />
-                        <p className="text-[11px] text-slate-500 mt-1">Descripción detallada (Ej: 'Factura de peajes A-5', 'Cambio de aceite').</p>
-                     </div>
-                     <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Monto ($)</label>
-                        <input 
-                           type="number"
-                           required 
-                           value={monto}
-                           min="0"
-                           step="0.01"
-                           onChange={(e) => setMonto(e.target.value)}
-                           placeholder="Ingrese solo el número, ej: 150000.50"
-                           className="w-full border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 bg-white dark:bg-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-mono" 
-                        />
-                        <p className="text-[11px] text-slate-500 mt-1">Monto del registro. Ingresar siempre como número positivo.</p>
-                     </div>
-                     <div className="flex gap-2">
-                        <button type="submit" className="flex-1 bg-[#14b8a6] hover:bg-[#0d9488] text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors">
-                           <Plus className="w-5 h-5" /> {editingRegistroId ? 'Actualizar Registro' : 'Guardar Registro'}
-                        </button>
-                        {editingRegistroId && (
-                           <button type="button" onClick={cancelEdit} className="px-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg transition-colors">
-                              Cancelar
-                           </button>
-                        )}
-                     </div>
-                  </form>
-               </CardContent>
-            </Card>
-
             {/* Listado y KPIs */}
-            <div className="xl:col-span-2 space-y-6">
+            <div className="space-y-6">
                
                {/* KPIs */}
                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -366,10 +314,39 @@ export default function RegistrosFinancieros() {
                </div>
 
                <Card className="shadow-sm border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-                  <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+                  <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50 dark:bg-slate-900/50">
                      <h3 className="font-bold text-slate-800 dark:text-slate-200">
                         Historial de Transacciones ({isGlobal ? 'Global / Software' : 'Unidad'})
                      </h3>
+                     <div className="flex items-center gap-3 w-full md:w-auto">
+                        <div className="flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                           <Filter className="w-4 h-4 text-slate-400" />
+                           <input 
+                              type="date" 
+                              value={fechaInicioFiltro}
+                              onChange={(e) => setFechaInicioFiltro(e.target.value)}
+                              className="bg-transparent border-none outline-none text-xs text-slate-600 dark:text-slate-300"
+                           />
+                           <span className="text-slate-400 text-xs">-</span>
+                           <input 
+                              type="date" 
+                              value={fechaFinFiltro}
+                              onChange={(e) => setFechaFinFiltro(e.target.value)}
+                              className="bg-transparent border-none outline-none text-xs text-slate-600 dark:text-slate-300"
+                           />
+                           {(fechaInicioFiltro || fechaFinFiltro) && (
+                              <button onClick={() => { setFechaInicioFiltro(''); setFechaFinFiltro(''); }} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full">
+                                 <Trash2 className="w-3 h-3 text-rose-500" />
+                              </button>
+                           )}
+                        </div>
+                        <button
+                          onClick={() => { cancelEdit(); setIsModalOpen(true); }}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors whitespace-nowrap text-sm"
+                        >
+                           <Plus className="w-4 h-4" /> Añadir Registro
+                        </button>
+                     </div>
                   </div>
                   <div className="overflow-x-auto">
                      <table className="w-full text-sm text-left">
@@ -383,12 +360,12 @@ export default function RegistrosFinancieros() {
                            </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                           {registros.length === 0 ? (
+                           {filteredRegistros.length === 0 ? (
                              <tr>
-                                <td colSpan={5} className="text-center py-12 text-slate-500 italic">No hay registros financieros.</td>
+                                <td colSpan={5} className="text-center py-12 text-slate-500 italic">No hay registros financieros que coincidan.</td>
                              </tr>
                            ) : (
-                              registros.map((reg: any) => (
+                              filteredRegistros.map((reg: any) => (
                                 <tr key={reg.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
                                    <td className="px-5 py-4 text-slate-600 dark:text-slate-400 font-medium">{new Date(reg.fecha).toLocaleDateString('es-CL')}</td>
                                    <td className="px-5 py-4">
@@ -403,7 +380,7 @@ export default function RegistrosFinancieros() {
                                    </td>
                                    <td className="px-5 py-4 text-center">
                                       <button 
-                                        onClick={() => handleEditClick(reg)}
+                                        onClick={() => { handleEditClick(reg); setIsModalOpen(true); }}
                                         className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-md transition-colors mr-1">
                                          <Edit className="w-4 h-4" />
                                       </button>
@@ -423,6 +400,107 @@ export default function RegistrosFinancieros() {
             </div>
          </div>
       )}
+
+      {/* Modal para Registro Financiero */}
+      <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); cancelEdit(); }} title={editingRegistroId ? 'Editar Registro' : 'Añadir Nuevo Registro'}>
+         <div className="p-4">
+            <form onSubmit={handleSaveRegistro} className="space-y-4">
+               <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Fecha del Registro</label>
+                  <input 
+                     type="date" 
+                     required
+                     value={fechaRegistro}
+                     onChange={(e) => setFechaRegistro(e.target.value)}
+                     className="w-full border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 bg-white dark:bg-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
+                  />
+               </div>
+               <div className="grid grid-cols-2 gap-4">
+                  <div>
+                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tipo de Registro</label>
+                     <select 
+                        value={tipoRegistro}
+                        onChange={(e) => setTipoRegistro(e.target.value)}
+                        className="w-full border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 bg-white dark:bg-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        <option value="Ingreso">Ingreso</option>
+                        <option value="Costo/Egreso">Costo/Egreso</option>
+                     </select>
+                  </div>
+                  <div>
+                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoría</label>
+                     <select 
+                        required
+                        value={categoria}
+                        onChange={(e) => setCategoria(e.target.value)}
+                        className="w-full border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 bg-white dark:bg-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        <option value="">-- Seleccionar --</option>
+                        {getCategoriasToRender().map(group => (
+                            <optgroup key={group.group} label={group.group}>
+                                {group.options.map(opt => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                            </optgroup>
+                        ))}
+                     </select>
+                  </div>
+               </div>
+               {categoria === 'Otros' && (
+                  <div>
+                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Especificar Otro *</label>
+                     <input 
+                        type="text" 
+                        required
+                        value={otrosDetalle}
+                        onChange={(e) => setOtrosDetalle(e.target.value)}
+                        placeholder="Especifique el motivo de la categoría"
+                        className="w-full border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 bg-white dark:bg-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
+                     />
+                  </div>
+               )}
+               <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Contrato Asociado (Opcional)</label>
+                  <select 
+                     value={contrato}
+                     onChange={(e) => setContrato(e.target.value)}
+                     className="w-full border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 bg-white dark:bg-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                     <option value="">Sin contrato específico</option>
+                     {tipoRegistro === 'Costo/Egreso' ? 
+                       contratosProveedores.map(c => <option key={c.id} value={`PRV-${c.folio}`}>Proveedor: {c.folio} - {c.proveedor_nombre}</option>) :
+                       contratosClientes.map(c => <option key={c.id} value={`CLI-${c.folio}`}>Cliente: {c.folio}</option>)
+                     }
+                  </select>
+               </div>
+               <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descripción</label>
+                  <textarea 
+                     required
+                     value={descripcion}
+                     onChange={(e) => setDescripcion(e.target.value)}
+                     placeholder="Ej: Factura de peajes, Contrato mensual..."
+                     className="w-full border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 bg-white dark:bg-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 min-h-[80px]" 
+                  />
+               </div>
+               <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Monto ($)</label>
+                  <input 
+                     type="number"
+                     required 
+                     value={monto}
+                     min="0"
+                     step="0.01"
+                     onChange={(e) => setMonto(e.target.value)}
+                     className="w-full border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 bg-white dark:bg-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-mono" 
+                  />
+               </div>
+               <div className="flex gap-2 pt-4">
+                  <button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors">
+                     <Plus className="w-5 h-5" /> {editingRegistroId ? 'Actualizar' : 'Guardar'}
+                  </button>
+               </div>
+            </form>
+         </div>
+      </Modal>
+
     </div>
   );
 }

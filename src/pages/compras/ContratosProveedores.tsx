@@ -1,35 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Briefcase, Plus, Search, Calendar, Tag, ShieldAlert, CheckCircle2, AlertTriangle, AlertCircle, FileText, Paperclip, UploadCloud, Users, DollarSign } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import Swal from 'sweetalert2';
+import { useCompany } from '../../contexts/CompanyContext';
+import { supabase } from '../../lib/supabase';
 
 interface Contrato {
   id: string;
+  uuid?: string;
   folio: string;
   proveedor: string;
+  rut?: string;
   fechaInicio: string;
   fechaTermino: string;
   tipo: string;
-  estado: 'Activo' | 'Por Vencer' | 'Vencido' | 'Inactivo';
+  estado: string;
   montoTotal?: number;
   responsable?: string;
   condicionPago?: string;
 }
 
-const INITIAL_DATA: Contrato[] = [
-  { id: '1', folio: 'CTR-001', proveedor: 'Lubricantes y Filtros S.A.', fechaInicio: '2025-01-01', fechaTermino: '2026-12-31', tipo: 'Suministro Insumos', estado: 'Activo', montoTotal: 15000000, responsable: 'Juan Pérez', condicionPago: '30 días' },
-  { id: '2', folio: 'CTR-002', proveedor: 'Neumáticos del Norte', fechaInicio: '2024-05-01', fechaTermino: '2026-05-30', tipo: 'Mantención Neumáticos', estado: 'Por Vencer', montoTotal: 45000000, responsable: 'María González', condicionPago: '30 días' },
-  { id: '3', folio: 'CTR-003', proveedor: 'Limpieza Industrial SPA', fechaInicio: '2023-01-01', fechaTermino: '2024-01-01', tipo: 'Servicios Generales', estado: 'Vencido', montoTotal: 5000000, responsable: 'Carlos Rojas', condicionPago: '15 días' },
-];
-
 export default function ContratosProveedores() {
-  const [contratos, setContratos] = useState<Contrato[]>(INITIAL_DATA);
+  const { currentCompany } = useCompany();
+  const [contratos, setContratos] = useState<Contrato[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [proveedoresDist, setProveedoresDist] = useState<any[]>([]);
   
   // Form State
-  const [proveedor, setProveedor] = useState('');
+  const [proveedorSeleccionado, setProveedorSeleccionado] = useState('');
+  const [rut, setRut] = useState('');
   const [tipo, setTipo] = useState('');
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaTermino, setFechaTermino] = useState('');
@@ -39,44 +40,100 @@ export default function ContratosProveedores() {
   const [alertasActivadas, setAlertasActivadas] = useState(true);
   const [observaciones, setObservaciones] = useState('');
 
+  useEffect(() => {
+     if(currentCompany) {
+        fetchContratos();
+        fetchProveedores();
+     }
+  }, [currentCompany]);
+
+  const fetchContratos = async () => {
+      if (!currentCompany) return;
+      const { data, error } = await supabase.from('compras_contratos')
+        .select('*')
+        .eq('empresa_id', currentCompany.id)
+        .order('created_at', { ascending: false });
+        
+      if (data) {
+          const parsed = data.map(c => ({
+             id: c.folio,
+             uuid: c.id,
+             folio: c.folio,
+             proveedor: c.proveedor_nombre,
+             rut: c.proveedor_rut || '',
+             fechaInicio: new Date(c.fecha_inicio).toISOString().split('T')[0],
+             fechaTermino: new Date(c.fecha_termino).toISOString().split('T')[0],
+             tipo: c.tipo,
+             estado: c.estado,
+             montoTotal: Number(c.monto_total),
+             responsable: c.responsable,
+             condicionPago: c.condicion_pago
+          }));
+          setContratos(parsed);
+      }
+  };
+
+  const fetchProveedores = async () => {
+      if (!currentCompany) return;
+      const { data } = await supabase.from('proveedores_directorio').select('*').eq('empresa_id', currentCompany.id);
+      if (data) {
+          setProveedoresDist(data);
+      }
+  };
+
   const filteredContratos = contratos.filter(c => 
     c.folio.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.proveedor.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.tipo.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!proveedor || !tipo || !fechaInicio || !fechaTermino) return;
+    if (!currentCompany || (!rut && !proveedorSeleccionado) || !tipo || !fechaInicio || !fechaTermino) {
+      Swal.fire('Campos requeridos', 'Verifique que ingresó un proveedor, y las fechas de inicio/término', 'warning');
+      return;
+    }
 
-    const newContrato: Contrato = {
-      id: Date.now().toString(),
-      folio: `CTR-${(contratos.length + 1).toString().padStart(3, '0')}`,
-      proveedor,
-      tipo,
-      fechaInicio,
-      fechaTermino,
-      estado: 'Activo',
-      montoTotal,
-      responsable,
-      condicionPago
-    };
+    const folioStr = `CTR-${Date.now().toString().slice(-4)}`;
 
-    setContratos([newContrato, ...contratos]);
-    
-    Swal.fire({
-      title: '¡Guardado!', 
-      text: 'El contrato ha sido registrado exitosamente.', 
-      icon: 'success',
-      confirmButtonColor: '#4f46e5'
-    });
-    
-    setIsModalOpen(false);
-    resetForm();
+    try {
+        const payload = {
+           empresa_id: currentCompany.id,
+           folio: folioStr,
+           proveedor_nombre: proveedorSeleccionado || 'Desconocido',
+           proveedor_rut: rut,
+           fecha_inicio: fechaInicio,
+           fecha_termino: fechaTermino,
+           tipo,
+           estado: 'Activo',
+           monto_total: montoTotal,
+           responsable,
+           condicion_pago: condicionPago,
+           alertas_activadas: alertasActivadas,
+           observaciones
+        };
+
+        const { error } = await supabase.from('compras_contratos').insert(payload);
+        if (error) throw error;
+        
+        Swal.fire({
+          title: '¡Guardado!', 
+          text: 'El contrato ha sido registrado exitosamente.', 
+          icon: 'success',
+          confirmButtonColor: '#4f46e5'
+        });
+        
+        setIsModalOpen(false);
+        resetForm();
+        fetchContratos();
+    } catch(err: any) {
+        Swal.fire('Error', err.message, 'error');
+    }
   };
 
   const resetForm = () => {
-    setProveedor('');
+    setProveedorSeleccionado('');
+    setRut('');
     setTipo('');
     setFechaInicio('');
     setFechaTermino('');
@@ -196,16 +253,32 @@ export default function ContratosProveedores() {
                 <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-widest border-b border-slate-200 dark:border-slate-700 pb-2 flex items-center gap-2">
                   <Briefcase className="w-4 h-4 text-indigo-500" /> Información Principal
                 </h4>
-                <div>
-                  <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Proveedor *</label>
-                  <input 
-                    type="text" 
-                    required
-                    value={proveedor}
-                    onChange={(e) => setProveedor(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-white transition-all" 
-                    placeholder="Nombre de la empresa proveedora" 
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Proveedor *</label>
+                    <select 
+                      required
+                      value={proveedorSeleccionado}
+                      onChange={(e) => setProveedorSeleccionado(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-white transition-all cursor-pointer" 
+                    >
+                       <option value="">Seleccione un Proveedor...</option>
+                       {proveedoresDist.map(p => (
+                         <option key={p.id} value={p.nombre}>{p.nombre}</option>
+                       ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">RUT Emisor *</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={rut}
+                      onChange={(e) => setRut(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none dark:text-white transition-all" 
+                      placeholder="Ej. 76.888.999-5" 
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
