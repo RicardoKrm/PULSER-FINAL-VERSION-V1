@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { DollarSign, Search, Plus, Calendar, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { DollarSign, Search, Plus, Calendar, TrendingUp, TrendingDown, ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
 import Swal from 'sweetalert2';
 
 interface HistorialPrecio {
@@ -13,57 +15,109 @@ interface HistorialPrecio {
   variacion: number;
 }
 
-const INITIAL_DATA: HistorialPrecio[] = [
-  { id: '1', fecha: '2026-05-15', tipo: 'Diésel', precio: 1050, usuario: 'Admin', variacion: 30 },
-  { id: '2', fecha: '2026-05-01', tipo: 'Diésel', precio: 1020, usuario: 'Admin', variacion: 30 },
-  { id: '3', fecha: '2026-04-15', tipo: 'Diésel', precio: 990, usuario: 'Admin', variacion: -10 },
-  { id: '4', fecha: '2026-04-01', tipo: 'Diésel', precio: 1000, usuario: 'Admin', variacion: 0 },
-];
-
 export default function PrecioCombustible() {
-  const [precios, setPrecios] = useState<HistorialPrecio[]>(INITIAL_DATA);
+  const [precios, setPrecios] = useState<HistorialPrecio[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Form State
-  const [fechaVigencia, setFechaVigencia] = useState('');
+  const [fechaVigencia, setFechaVigencia] = useState(new Date().toISOString().split('T')[0]);
   const [tipoCombustible, setTipoCombustible] = useState('Diésel');
-  const [precioLitro, setPrecioLitro] = useState<number>(0);
+  const [precioLitro, setPrecioLitro] = useState<number | ''>('');
+
+  const { currentCompany, currentUser } = useCompany();
+
+  useEffect(() => {
+    fetchPrecios();
+  }, [currentCompany]);
+
+  const fetchPrecios = async () => {
+    if (!currentCompany) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('log_actividad')
+        .select('*')
+        .eq('empresa_id', currentCompany.id)
+        .eq('accion', 'PRECIO_COMBUSTIBLE')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        const parsedPrecios = data.map(log => {
+          try {
+            const detalles = JSON.parse(log.detalles || '{}');
+            return {
+              id: log.id,
+              fecha: detalles.vigencia || log.created_at.split('T')[0],
+              tipo: detalles.tipo || 'Desconocido',
+              precio: Number(detalles.precio) || 0,
+              usuario: detalles.usuario || 'Sistema',
+              variacion: Number(detalles.variacion) || 0
+            };
+          } catch (e) {
+             return null;
+          }
+        }).filter(Boolean) as HistorialPrecio[];
+
+        setPrecios(parsedPrecios.sort((a,b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()));
+      }
+    } catch (error) {
+      console.error('Error fetching precios:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredPrecios = precios.filter(p => 
     p.fecha.includes(searchTerm) ||
     p.tipo.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fechaVigencia || !tipoCombustible || !precioLitro) return;
+    if (!currentCompany || !fechaVigencia || !tipoCombustible || !precioLitro) return;
 
-    // Calculate simulated variation
-    const lastPrice = precios.find(p => p.tipo === tipoCombustible)?.precio || precioLitro;
-    const variacion = precioLitro - lastPrice;
+    try {
+      // Calculate variation based on previous price of SAME type
+      const lastPriceOfType = precios.find(p => p.tipo === tipoCombustible)?.precio || Number(precioLitro);
+      const variacion = Number(precioLitro) - lastPriceOfType;
 
-    const newPrecio: HistorialPrecio = {
-      id: Date.now().toString(),
-      fecha: fechaVigencia,
-      tipo: tipoCombustible,
-      precio: precioLitro,
-      usuario: 'Administrador Actual',
-      variacion
-    };
+      const userName = currentUser?.email?.split('@')[0] || 'Administrador';
 
-    setPrecios([newPrecio, ...precios].sort((a,b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()));
+      const logData = {
+        empresa_id: currentCompany.id,
+        usuario_id: currentUser?.id, // Note: might be null if using full custom users, but fallback will ignore it if so
+        accion: 'PRECIO_COMBUSTIBLE',
+        modulo: 'configuracion',
+        detalles: JSON.stringify({
+          precio: Number(precioLitro),
+          tipo: tipoCombustible,
+          vigencia: fechaVigencia,
+          variacion: variacion,
+          usuario: userName
+        })
+      };
 
-    Swal.fire({
-      title: '¡Guardado!', 
-      text: 'El precio del combustible ha sido actualizado exitosamente.', 
-      icon: 'success',
-      confirmButtonColor: '#4f46e5'
-    });
-    
-    setIsModalOpen(false);
-    setFechaVigencia('');
-    setPrecioLitro(0);
+      const { error } = await supabase.from('log_actividad').insert([logData]);
+      if (error) throw error;
+
+      Swal.fire({
+        title: '¡Guardado!', 
+        text: 'El precio del combustible ha sido actualizado exitosamente.', 
+        icon: 'success',
+        confirmButtonColor: '#4f46e5'
+      });
+      
+      setIsModalOpen(false);
+      setFechaVigencia(new Date().toISOString().split('T')[0]);
+      setPrecioLitro('');
+      fetchPrecios();
+    } catch (err: any) {
+      Swal.fire('Error', err.message || 'No se pudo guardar el precio.', 'error');
+    }
   };
 
   return (

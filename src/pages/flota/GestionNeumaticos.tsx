@@ -410,7 +410,21 @@ function InventarioNeumaticos() {
   const [inventory, setInventory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCrearModalOpen, setIsCrearModalOpen] = useState(false);
+  const [bodegas, setBodegas] = useState<any[]>([]);
+  const [filtroBodega, setFiltroBodega] = useState('Todas las bodegas');
+  const [filtroUbicacion, setFiltroUbicacion] = useState('Todas las ubicaciones');
+  const [filtroEstado, setFiltroEstado] = useState('Todos los estados');
+  const [searchTerm, setSearchTerm] = useState('');
   const { currentCompany } = useCompany();
+
+  useEffect(() => {
+    const fetchBodegas = async () => {
+      if (!currentCompany) return;
+      const { data } = await supabase.from('logistica_bodegas').select('*').eq('empresa_id', currentCompany.id);
+      if (data) setBodegas(data);
+    };
+    fetchBodegas();
+  }, [currentCompany]);
 
   useEffect(() => {
     const fetchInventory = async () => {
@@ -447,7 +461,8 @@ function InventarioNeumaticos() {
             profNueva: item.profundidad_nueva || 18,
             km: item.km_acumulados || 0,
             costo: item.costo || 0,
-            instalacion: item.fecha_instalacion || '-'
+            instalacion: item.fecha_instalacion || '-',
+            bodega_id: item.bodega_id || null
           };
         });
 
@@ -469,27 +484,57 @@ function InventarioNeumaticos() {
     return "bg-red-600";
   };
 
+  const filteredInventory = inventory.filter(inv => {
+    const matchesSearch = inv.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          inv.marca.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          inv.vehiculo.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesUbicacion = filtroUbicacion === 'Todas las ubicaciones' || inv.ubicacion.toLowerCase() === filtroUbicacion.toLowerCase();
+    const matchesEstado = filtroEstado === 'Todos los estados' || inv.estado.toLowerCase() === filtroEstado.toLowerCase();
+    const matchesBodega = filtroBodega === 'Todas las bodegas' || inv.bodega_id === filtroBodega;
+    return matchesSearch && matchesUbicacion && matchesEstado && matchesBodega;
+  });
+
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden lg:h-[calc(100vh-140px)] min-h-[500px] w-full">
       <div className="flex-1 flex flex-col w-full h-full">
         
         {/* Filters Header */}
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex gap-4 bg-slate-50 dark:bg-slate-900/50">
-          <div className="relative flex-1 max-w-sm">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap gap-4 bg-slate-50 dark:bg-slate-900/50">
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
             <input 
               type="text" 
               placeholder="Buscar por código, marca o patente..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-400"
             />
           </div>
-          <select className="px-4 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer w-48">
+          <select 
+            value={filtroBodega}
+            onChange={(e) => setFiltroBodega(e.target.value)}
+            className="px-4 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+          >
+            <option value="Todas las bodegas">Todas las bodegas</option>
+            {bodegas.map(b => (
+              <option key={b.id} value={b.id}>{b.nombre}</option>
+            ))}
+          </select>
+          <select 
+            value={filtroUbicacion}
+            onChange={(e) => setFiltroUbicacion(e.target.value)}
+            className="px-4 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer w-48"
+          >
             <option>Todas las ubicaciones</option>
             <option>Montado</option>
             <option>Bodega</option>
             <option>Desecho</option>
           </select>
-          <select className="px-4 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer w-48">
+          <select 
+            value={filtroEstado}
+            onChange={(e) => setFiltroEstado(e.target.value)}
+            className="px-4 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer w-48"
+          >
             <option>Todos los estados</option>
             <option>Nuevo</option>
             <option>Bueno</option>
@@ -520,7 +565,7 @@ function InventarioNeumaticos() {
                </tr>
              </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {inventory.map((inv) => (
+                {filteredInventory.map((inv) => (
                   <tr 
                     key={inv.id} 
                     className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group"
@@ -545,6 +590,9 @@ function InventarioNeumaticos() {
                           {inv.ubicacion === 'BODEGA' && <Box className="w-3.5 h-3.5 mr-1.5" />}
                           {inv.ubicacion === 'DESECHO' && <Trash className="w-3.5 h-3.5 mr-1.5" />}
                           {inv.ubicacion}
+                          {inv.bodega_id && bodegas.find(b => b.id === inv.bodega_id) && (
+                            <span className="ml-1 opacity-70">({bodegas.find(b => b.id === inv.bodega_id)?.nombre})</span>
+                          )}
                         </div>
                         {inv.ubicacion === 'MONTADO' && (
                           <span className="text-xs text-slate-500">{inv.vehiculo} &bull; {inv.pos}</span>
@@ -1197,6 +1245,8 @@ export function CrearNeumaticoModal({ isOpen, onClose, onCreated }: { isOpen: bo
   const { currentCompany } = useCompany();
   const [models, setModels] = useState<any[]>([]);
   const [selectedModelId, setSelectedModelId] = useState('');
+  const [bodegas, setBodegas] = useState<any[]>([]);
+  const [selectedBodegaId, setSelectedBodegaId] = useState('');
 
   useEffect(() => {
     if (isOpen && currentCompany) {
@@ -1205,6 +1255,11 @@ export function CrearNeumaticoModal({ isOpen, onClose, onCreated }: { isOpen: bo
         .eq('empresa_id', currentCompany.id)
         .eq('categoria', 'Neumáticos')
         .then(({ data }) => setModels(data || []));
+
+      supabase.from('logistica_bodegas')
+        .select('*')
+        .eq('empresa_id', currentCompany.id)
+        .then(({ data }) => setBodegas(data || []));
     }
   }, [isOpen, currentCompany]);
 
@@ -1256,7 +1311,8 @@ export function CrearNeumaticoModal({ isOpen, onClose, onCreated }: { isOpen: bo
         profundidad_actual: Number(profNueva) || 18,
         estado,
         ubicacion: 'BODEGA',
-        km_acumulados: 0
+        km_acumulados: 0,
+        bodega_id: selectedBodegaId || null
       });
 
       if (error) throw error;
@@ -1318,6 +1374,19 @@ export function CrearNeumaticoModal({ isOpen, onClose, onCreated }: { isOpen: bo
                <option value="REGULAR">Regular (Usado)</option>
             </select>
           </div>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Bodega de Destino (Opcional)</label>
+          <select 
+            value={selectedBodegaId} 
+            onChange={e => setSelectedBodegaId(e.target.value)} 
+            className="w-full px-3 py-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700"
+          >
+            <option value="">Seleccionar Bodega...</option>
+            {bodegas.map(b => (
+              <option key={b.id} value={b.id}>{b.nombre}</option>
+            ))}
+          </select>
         </div>
         <div className="pt-4 flex justify-end gap-3">
           <Button variant="outline" onClick={onClose}>Cancelar</Button>

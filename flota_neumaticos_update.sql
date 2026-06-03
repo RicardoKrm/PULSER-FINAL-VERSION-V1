@@ -5,6 +5,7 @@ ALTER TABLE public.neumatico ADD COLUMN IF NOT EXISTS profundidad_nueva NUMERIC(
 ALTER TABLE public.neumatico ADD COLUMN IF NOT EXISTS km_acumulados NUMERIC(10,2) DEFAULT 0;
 ALTER TABLE public.neumatico ADD COLUMN IF NOT EXISTS ubicacion TEXT DEFAULT 'BODEGA'; -- 'MONTADO', 'BODEGA', 'DESECHO'
 ALTER TABLE public.neumatico ADD COLUMN IF NOT EXISTS fecha_instalacion DATE;
+ALTER TABLE public.neumatico ADD COLUMN IF NOT EXISTS bodega_id UUID REFERENCES public.logistica_bodegas(id) ON DELETE SET NULL;
 
 ALTER TABLE public.neumatico ENABLE ROW LEVEL SECURITY;
 

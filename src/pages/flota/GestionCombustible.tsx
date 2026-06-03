@@ -58,13 +58,16 @@ export default function GestionCombustible() {
     odometro: '',
     litros: '',
     ruta: '',
-    costo_total: ''
+    costo_total: '',
+    tipo_combustible: 'Diésel'
   });
   
   const [formMeta, setFormMeta] = useState({
     vehiculo_id: '',
     rendimiento_objetivo: ''
   });
+
+  const [preciosActuales, setPreciosActuales] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetchData();
@@ -74,11 +77,26 @@ export default function GestionCombustible() {
     if (!currentCompany) return;
     try {
       setLoading(true);
-      const [vehiculoRes, cargasRes] = await Promise.all([
+      const [vehiculoRes, cargasRes, preciosRes] = await Promise.all([
         supabase.from('vehiculo').select('*').eq('empresa_id', currentCompany.id),
-        supabase.from('registro_combustible').select('*, vehiculo:vehiculo_id(patente, detalles)').eq('empresa_id', currentCompany.id).order('fecha', { ascending: false })
+        supabase.from('registro_combustible').select('*, vehiculo:vehiculo_id(patente, detalles)').eq('empresa_id', currentCompany.id).order('fecha', { ascending: false }),
+        supabase.from('log_actividad').select('detalles').eq('empresa_id', currentCompany.id).eq('accion', 'PRECIO_COMBUSTIBLE').order('created_at', { ascending: false })
       ]);
       
+      const newPrecios: Record<string, number> = {};
+      if (preciosRes.data) {
+         // Because it's ordered by latest first, we only take the first occurrence of each type
+         preciosRes.data.forEach(log => {
+            try {
+               const det = JSON.parse(log.detalles || '{}');
+               if (det.tipo && det.precio && !newPrecios[det.tipo]) {
+                  newPrecios[det.tipo] = Number(det.precio);
+               }
+            } catch (e) {}
+         });
+      }
+      setPreciosActuales(newPrecios);
+
       if (vehiculoRes.data) {
         const dataSorted = [...vehiculoRes.data].sort((a, b) => {
           const valA = a.numero_interno || (a.detalles ? a.detalles.numero_interno : '');
@@ -123,7 +141,7 @@ export default function GestionCombustible() {
       }
       
       setIsRegistrarCargaOpen(false);
-      setFormCarga({fecha: new Date().toISOString().split('T')[0], vehiculo_id: '', conductor: '', odometro: '', litros: '', ruta: '', costo_total: ''});
+      setFormCarga({fecha: new Date().toISOString().split('T')[0], vehiculo_id: '', conductor: '', odometro: '', litros: '', ruta: '', costo_total: '', tipo_combustible: 'Diésel'});
       fetchData();
     } catch (err: any) {
       alert("Error al registrar carga: " + err.message);
@@ -873,9 +891,43 @@ export default function GestionCombustible() {
             <input 
               type="number" step="0.1" placeholder="Ej: 150" 
               value={formCarga.litros}
-              onChange={(e) => setFormCarga({...formCarga, litros: e.target.value})}
+              onChange={(e) => {
+                 const newLitros = e.target.value;
+                 const px = preciosActuales[formCarga.tipo_combustible] || 0;
+                 const newCost = newLitros ? Math.round(Number(newLitros) * px).toString() : '';
+                 setFormCarga({...formCarga, litros: newLitros, costo_total: newCost});
+              }}
               className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm" 
             />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium flex items-center gap-2">
+              Tipo de Combustible
+              {preciosActuales[formCarga.tipo_combustible] ? (
+                 <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                    ${preciosActuales[formCarga.tipo_combustible]}/L
+                 </span>
+              ) : (
+                 <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-200">
+                    Precio no conf.
+                 </span>
+              )}
+            </label>
+            <select 
+              value={formCarga.tipo_combustible}
+              onChange={(e) => {
+                 const newType = e.target.value;
+                 const px = preciosActuales[newType] || 0;
+                 const newCost = formCarga.litros ? Math.round(Number(formCarga.litros) * px).toString() : formCarga.costo_total;
+                 setFormCarga({...formCarga, tipo_combustible: newType, costo_total: newCost});
+              }}
+              className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm bg-white"
+            >
+               <option>Diésel</option>
+               <option>Gasolina 93</option>
+               <option>Gasolina 95</option>
+               <option>Gasolina 97</option>
+            </select>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Costo Total ($)</label>
