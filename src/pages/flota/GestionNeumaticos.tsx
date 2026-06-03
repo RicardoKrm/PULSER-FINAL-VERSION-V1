@@ -67,10 +67,18 @@ export default function GestionNeumaticos() {
 function DashboardNeumaticos() {
   const [selectedKpi, setSelectedKpi] = useState<'cpk' | 'activos' | 'alertas' | 'ahorro' | null>(null);
   const [stats, setStats] = useState({
+    totalCosto: 0,
+    totalKm: 0,
     cpkPromedio: 0,
     neumaticosActivos: 0,
+    neumaticosMontados: 0,
+    neumaticosBodega: 0,
     alertasCriticas: 0,
-    ahorroEstimado: 0
+    alertasCriticasList: [] as any[],
+    ahorroEstimado: 0,
+    ahorroRenuevo: 0,
+    ahorroCombustible: 0,
+    chartData: [] as any[]
   });
   const { currentCompany } = useCompany();
 
@@ -83,11 +91,68 @@ function DashboardNeumaticos() {
         .eq('empresa_id', currentCompany.id);
 
       if (!error && data) {
+        let totalCost = 0;
+        let totalKm = 0;
+        let neumaticosMontados = 0;
+        let neumaticosBodega = 0;
+        let alertasCriticasList: any[] = [];
+        
+        const marcaStats: Record<string, { totalCosto: number; totalKm: number; count: number, maxKm: number }> = {};
+
+        data.forEach(d => {
+          if (d.ubicacion !== 'DESECHO') {
+            if (d.ubicacion === 'MONTADO') neumaticosMontados++;
+            if (d.ubicacion === 'BODEGA') neumaticosBodega++;
+            totalCost += Number(d.costo || 0);
+            totalKm += Number(d.km_acumulados || 0);
+          }
+
+          if (d.profundidad_actual && d.profundidad_actual <= 3) {
+            alertasCriticasList.push({
+              pos: `${d.patente_asignada || 'N/A'} - ${d.posicion || 'N/A'}`,
+              desc: `Surco crítico (${d.profundidad_actual}mm)`
+            });
+          }
+          
+          const marca = d.marca || 'GENERICO';
+          if (!marcaStats[marca]) {
+            marcaStats[marca] = { totalCosto: 0, totalKm: 0, count: 0, maxKm: 0 };
+          }
+          marcaStats[marca].totalCosto += Number(d.costo || 0);
+          marcaStats[marca].totalKm += Number(d.km_acumulados || 0);
+          marcaStats[marca].count++;
+          if (Number(d.km_acumulados || 0) > marcaStats[marca].maxKm) {
+             marcaStats[marca].maxKm = Number(d.km_acumulados || 0);
+          }
+        });
+
+        const activeTires = neumaticosMontados + neumaticosBodega;
+        const cpkAverage = totalKm > 0 ? (totalCost / totalKm) : 0;
+        
+        const chartData = Object.keys(marcaStats).map(marca => {
+           const sc = marcaStats[marca];
+           const cpk = sc.totalKm > 0 ? (sc.totalCosto / sc.totalKm) : 0;
+           return {
+             name: marca,
+             cpk: Number(cpk.toFixed(2)),
+             maxKm: sc.maxKm,
+             count: sc.count
+           }
+        }).filter(d => d.count > 0).sort((a,b) => b.count - a.count).slice(0, 5);
+
         setStats({
-          cpkPromedio: 0,
-          neumaticosActivos: data.filter(d => d.ubicacion !== 'DESECHO').length,
-          alertasCriticas: data.filter(d => d.profundidad_actual && d.profundidad_actual <= 3).length,
-          ahorroEstimado: 0
+          totalCosto: totalCost,
+          totalKm: totalKm,
+          cpkPromedio: cpkAverage,
+          neumaticosActivos: activeTires,
+          neumaticosMontados,
+          neumaticosBodega,
+          alertasCriticas: alertasCriticasList.length,
+          alertasCriticasList,
+          ahorroEstimado: totalCost * 0.12, // 12% total
+          ahorroRenuevo: totalCost * 0.08,
+          ahorroCombustible: totalCost * 0.04,
+          chartData
         });
       }
     };
@@ -151,8 +216,8 @@ function DashboardNeumaticos() {
           <CardContent className="p-6">
             <div className="flex justify-between items-start">
               <div className="space-y-2">
-                <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Ahorro Proyectado</p>
-                <h3 className="text-3xl font-black text-emerald-600 dark:text-emerald-500">${stats.ahorroEstimado}</h3>
+                <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Potencial Ahorro Anual</p>
+                <h3 className="text-3xl font-black text-emerald-600 dark:text-emerald-500">${stats.ahorroEstimado.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</h3>
               </div>
               <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg"><DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /></div>
             </div>
@@ -164,15 +229,38 @@ function DashboardNeumaticos() {
       <div className="grid lg:grid-cols-3 gap-6">
         <Card className="col-span-full lg:col-span-2 shadow-sm">
           <CardHeader>
-            <CardTitle>Rentabilidad y Vida Útil (Sin Datos)</CardTitle>
+            <CardTitle>Rentabilidad y Vida Útil por Marca</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-80 w-full mt-4 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900/50">
-              <div className="text-center">
-                <BarChart3 className="h-10 w-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                <p className="text-slate-500 font-medium">No hay suficientes datos de neumáticos<br/> para generar el gráfico de rentabilidad.</p>
+            {stats.chartData.length > 0 ? (
+              <div className="h-80 w-full mt-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={stats.chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
+                    <YAxis yAxisId="left" orientation="left" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(value) => `${value}`} />
+                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(value) => `${value/1000}k`} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      formatter={(value: any, name: string) => [
+                         name === 'CPK' ? `${value}` : `${value.toLocaleString()} km`,
+                         name
+                      ]}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                    <Bar yAxisId="left" dataKey="cpk" name="CPK ($/km)" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                    <Line yAxisId="right" type="monotone" dataKey="maxKm" name="Vida Útil Max (km)" stroke="#10b981" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} />
+                  </ComposedChart>
+                </ResponsiveContainer>
               </div>
-            </div>
+            ) : (
+               <div className="h-80 w-full mt-4 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                 <div className="text-center">
+                   <BarChart3 className="h-10 w-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+                   <p className="text-slate-500 font-medium">No hay suficientes datos de neumáticos<br/> para generar el gráfico de rentabilidad.</p>
+                 </div>
+               </div>
+            )}
           </CardContent>
         </Card>
         <div className="space-y-6">
@@ -184,6 +272,17 @@ function DashboardNeumaticos() {
                {stats.alertasCriticas === 0 && (
                  <div className="text-center py-6 text-emerald-600 dark:text-emerald-500 font-medium bg-emerald-50 dark:bg-emerald-900/10 rounded-xl border border-emerald-100 dark:border-emerald-900/30">
                     Sin alertas críticas recientes
+                 </div>
+               )}
+               {stats.alertasCriticasList.slice(0, 5).map((a, i) => (
+                  <div key={i} className="flex justify-between text-sm p-3 border-l-4 border-red-500 bg-red-50 dark:bg-red-900/10 rounded-r">
+                     <span className="font-medium text-slate-900 dark:text-white">{a.pos}</span>
+                     <span className="text-red-600 font-semibold">{a.desc}</span>
+                  </div>
+               ))}
+               {stats.alertasCriticasList.length > 5 && (
+                 <div className="text-center text-sm text-slate-500">
+                    + {stats.alertasCriticasList.length - 5} alertas más.
                  </div>
                )}
             </CardContent>
@@ -232,15 +331,15 @@ function DashboardNeumaticos() {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                       <span className="text-slate-600 dark:text-slate-400">Total Inversión Activa</span>
-                      <span className="font-bold text-slate-900 dark:text-white">$75,500,000</span>
+                      <span className="font-bold text-slate-900 dark:text-white">${stats.totalCosto.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                       <span className="text-slate-600 dark:text-slate-400">Total Kilómetros Producidos</span>
-                      <span className="font-bold text-slate-900 dark:text-white">23,230,769 km</span>
+                      <span className="font-bold text-slate-900 dark:text-white">{stats.totalKm.toLocaleString()} km</span>
                     </div>
                     <div className="flex justify-between items-center p-4 bg-blue-600 text-white rounded-lg shadow-inner">
                       <span className="font-medium">CPK Promedio Ponderado</span>
-                      <span className="font-black text-xl">$3.25/km</span>
+                      <span className="font-black text-xl">${stats.cpkPromedio.toFixed(2)}/km</span>
                     </div>
                   </div>
                 )}
@@ -248,15 +347,15 @@ function DashboardNeumaticos() {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                       <span className="text-slate-600 dark:text-slate-400">Montados en Vehículos</span>
-                      <span className="font-bold text-slate-900 dark:text-white">135 Unidades</span>
+                      <span className="font-bold text-slate-900 dark:text-white">{stats.neumaticosMontados} Unidades</span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                       <span className="text-slate-600 dark:text-slate-400">Stock Bodega (Repuestos)</span>
-                      <span className="font-bold text-slate-900 dark:text-white">7 Unidades</span>
+                      <span className="font-bold text-slate-900 dark:text-white">{stats.neumaticosBodega} Unidades</span>
                     </div>
                     <div className="flex justify-between items-center p-4 bg-slate-800 dark:bg-slate-950 text-white rounded-lg shadow-inner">
                       <span className="font-medium">Total Unidades Activas</span>
-                      <span className="font-black text-xl">142</span>
+                      <span className="font-black text-xl">{stats.neumaticosActivos}</span>
                     </div>
                   </div>
                 )}
@@ -264,44 +363,34 @@ function DashboardNeumaticos() {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                       <span className="text-slate-600 dark:text-slate-400">Surco Crítico (&lt; 3mm)</span>
-                      <span className="font-bold text-slate-900 dark:text-white">2 Unidades</span>
+                      <span className="font-bold text-slate-900 dark:text-white">{stats.alertasCriticas} Unidades</span>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                      <span className="text-slate-600 dark:text-slate-400 text-red-600">Presión Baja Peligrosa</span>
-                      <span className="font-bold text-slate-900 dark:text-white">2 Unidades</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                      <span className="text-slate-600 dark:text-slate-400">Desgaste Irregular Grave</span>
-                      <span className="font-bold text-slate-900 dark:text-white">1 Unidad</span>
-                    </div>
-                    <div className="space-y-2 mt-4 border-t dark:border-slate-800 pt-4">
-                      <p className="text-sm font-semibold text-red-600 flex items-center"><AlertTriangle className="w-4 h-4 mr-2" /> Necesidad de Retiro</p>
-                      {[
-                        { pos: 'LDPJ-99 - Pos 8', desc: 'Surco crítico (3mm)' },
-                        { pos: 'LDPJ-99 - Pos 9', desc: 'Surco crítico (3mm)' },
-                        { pos: 'FRTY-12 - Pos 2', desc: 'Desgaste irregular' },
-                      ].map((v, idx) => (
-                         <div key={idx} className="flex justify-between text-sm p-2 border-l-4 border-red-500 bg-red-50 dark:bg-red-900/10 rounded-r">
-                           <span className="font-medium">{v.pos}</span>
-                           <span className="text-red-600">{v.desc}</span>
-                         </div>
-                      ))}
-                    </div>
+                    {stats.alertasCriticasList.length > 0 && (
+                      <div className="space-y-2 mt-4 border-t dark:border-slate-800 pt-4">
+                        <p className="text-sm font-semibold text-red-600 flex items-center"><AlertTriangle className="w-4 h-4 mr-2" /> Necesidad de Retiro</p>
+                        {stats.alertasCriticasList.map((v, idx) => (
+                           <div key={idx} className="flex justify-between text-sm p-2 border-l-4 border-red-500 bg-red-50 dark:bg-red-900/10 rounded-r">
+                             <span className="font-medium">{v.pos}</span>
+                             <span className="text-red-600">{v.desc}</span>
+                           </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
                 {selectedKpi === 'ahorro' && (
                   <div className="space-y-4">
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                       <span className="text-slate-600 dark:text-slate-400">Ahorro en Renuevos Esperado</span>
-                      <span className="font-bold text-slate-900 dark:text-white">$800,000</span>
+                      <span className="font-bold text-slate-900 dark:text-white">${stats.ahorroRenuevo.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                       <span className="text-slate-600 dark:text-slate-400">Menor Combustible por Presión</span>
-                      <span className="font-bold text-slate-900 dark:text-white">$400,000</span>
+                      <span className="font-bold text-slate-900 dark:text-white">${stats.ahorroCombustible.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</span>
                     </div>
                     <div className="flex justify-between items-center p-4 bg-emerald-600 text-white rounded-lg shadow-inner">
                       <span className="font-medium">Total Potencial Anual</span>
-                      <span className="font-black text-xl">$1.2M</span>
+                      <span className="font-black text-xl">${stats.ahorroEstimado.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</span>
                     </div>
                   </div>
                 )}
@@ -320,6 +409,7 @@ function InventarioNeumaticos() {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [inventory, setInventory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isCrearModalOpen, setIsCrearModalOpen] = useState(false);
   const { currentCompany } = useCompany();
 
   useEffect(() => {
@@ -406,6 +496,12 @@ function InventarioNeumaticos() {
             <option>Regular</option>
             <option>Crítico</option>
           </select>
+          <Button 
+            onClick={() => setIsCrearModalOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" /> Nuevo Neumático
+          </Button>
         </div>
 
         {/* Table Content */}
@@ -642,6 +738,16 @@ function InventarioNeumaticos() {
           </div>
         </div>
       </Modal>
+
+      <CrearNeumaticoModal 
+        isOpen={isCrearModalOpen} 
+        onClose={() => setIsCrearModalOpen(false)} 
+        onCreated={() => {
+           // We need to re-fetch, but fetchInventory is inside useEffect. 
+           // We will just do a quick window location reload for now, or the user can click tabs.
+           window.location.reload();
+        }} 
+      />
     </div>
   );
 }
@@ -708,6 +814,17 @@ const CONFIGURACIONES: Record<string, any> = {
       { tipo: "dual", neumaticos: [13, 14, 15, 16] }
     ],
     tablaPosiciones: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+  },
+  "10": {
+    nombre: "Configuración 8x4 (12 Neumáticos)",
+    label: "CONFIGURACIÓN 8x4",
+    ejes: [
+      { tipo: "simple", neumaticos: [1, 2] },
+      { tipo: "simple", neumaticos: [3, 4] },
+      { tipo: "dual", neumaticos: [5, 6, 7, 8] },
+      { tipo: "dual", neumaticos: [9, 10, 11, 12] }
+    ],
+    tablaPosiciones: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
   },
   "7": {
     nombre: "Semi-remolque 2 Ejes (8 Neumáticos)",
@@ -896,9 +1013,11 @@ export function FormularioInspeccion({
             onChange={(e) => setConfigId(e.target.value)}
             className="bg-slate-800 text-white border border-slate-700 rounded px-3 py-2 text-xs focus:outline-none focus:border-amber-500 cursor-pointer font-bold w-full sm:w-[260px]"
           >
-            {Object.entries(CONFIGURACIONES).map(([key, config]) => (
-              <option key={key} value={key}>{config.nombre}</option>
-            ))}
+            {Object.entries(CONFIGURACIONES)
+              .sort(([, a], [, b]) => a.nombre.localeCompare(b.nombre, undefined, { numeric: true }))
+              .map(([key, config]) => (
+                <option key={key} value={key}>{config.nombre}</option>
+              ))}
           </select>
         </div>
       </div>
@@ -987,6 +1106,7 @@ export function FormularioInspeccion({
               <th className="py-2 px-2 border-r border-slate-700 w-14">C/F</th>
               <th className="py-2 px-2 border-r border-slate-700 w-12">Ext-1</th>
               <th className="py-2 px-2 border-r border-slate-700 w-12">Ext-2</th>
+              <th className="py-2 px-2 border-r border-slate-700 w-12 text-center" title="Centro">Cen</th>
               <th className="py-2 px-2 border-r border-slate-700 w-12">Int-1</th>
               <th className="py-2 px-2 border-r border-slate-700 w-12">Int-2</th>
               <th className="py-2 px-1 border-r border-slate-700 w-10">NR</th>
@@ -1015,6 +1135,7 @@ export function FormularioInspeccion({
                       <option value="C">C</option>
                     </select>
                   </td>
+                  <td className="py-0.5 px-0.5 border-r border-slate-200 dark:border-slate-800"><input type="number" step="0.1" className="w-full text-center focus:ring-1 focus:ring-amber-500 rounded p-1 text-xs bg-transparent placeholder:text-slate-300 dark:placeholder:text-slate-600 outline-none" placeholder="0.0" /></td>
                   <td className="py-0.5 px-0.5 border-r border-slate-200 dark:border-slate-800"><input type="number" step="0.1" className="w-full text-center focus:ring-1 focus:ring-amber-500 rounded p-1 text-xs bg-transparent placeholder:text-slate-300 dark:placeholder:text-slate-600 outline-none" placeholder="0.0" /></td>
                   <td className="py-0.5 px-0.5 border-r border-slate-200 dark:border-slate-800"><input type="number" step="0.1" className="w-full text-center focus:ring-1 focus:ring-amber-500 rounded p-1 text-xs bg-transparent placeholder:text-slate-300 dark:placeholder:text-slate-600 outline-none" placeholder="0.0" /></td>
                   <td className="py-0.5 px-0.5 border-r border-slate-200 dark:border-slate-800"><input type="number" step="0.1" className="w-full text-center focus:ring-1 focus:ring-amber-500 rounded p-1 text-xs bg-transparent placeholder:text-slate-300 dark:placeholder:text-slate-600 outline-none" placeholder="0.0" /></td>
@@ -1060,5 +1181,151 @@ export function FormularioInspeccion({
       </div>
 
     </div>
+  );
+}
+
+
+export function CrearNeumaticoModal({ isOpen, onClose, onCreated }: { isOpen: boolean, onClose: () => void, onCreated: () => void }) {
+  const [codigo, setCodigo] = useState('');
+  const [marca, setMarca] = useState('');
+  const [modelo, setModelo] = useState('');
+  const [medida, setMedida] = useState('');
+  const [costo, setCosto] = useState('');
+  const [profNueva, setProfNueva] = useState('18');
+  const [estado, setEstado] = useState('NUEVO');
+  const [loading, setLoading] = useState(false);
+  const { currentCompany } = useCompany();
+  const [models, setModels] = useState<any[]>([]);
+  const [selectedModelId, setSelectedModelId] = useState('');
+
+  useEffect(() => {
+    if (isOpen && currentCompany) {
+      supabase.from('logistica_repuestos')
+        .select('*')
+        .eq('empresa_id', currentCompany.id)
+        .eq('categoria', 'Neumáticos')
+        .then(({ data }) => setModels(data || []));
+    }
+  }, [isOpen, currentCompany]);
+
+  const handleModelChange = (id: string) => {
+    setSelectedModelId(id);
+    const mod = models.find(m => m.id === id);
+    if (mod) {
+       setMarca(mod.proveedor || ''); // Often used for brand
+       setModelo(mod.nombre || '');
+       setMedida(mod.sku || '');
+       setCosto(mod.precio ? String(mod.precio) : '0');
+    } else {
+       setMarca(''); setModelo(''); setMedida(''); setCosto('');
+    }
+  };
+
+  const handleCreate = async () => {
+    if (!currentCompany || !codigo) return;
+    setLoading(true);
+    
+    try {
+      if (selectedModelId) {
+         const mod = models.find(m => m.id === selectedModelId);
+         if (mod && mod.stock > 0) {
+            await supabase.from('logistica_repuestos').update({ 
+               stock: mod.stock - 1, 
+               valor_total: mod.precio * (mod.stock - 1)
+            }).eq('id', mod.id);
+            // Optionally register movement
+            await supabase.from('logistica_movimientos').insert({
+               empresa_id: currentCompany.id,
+               repuesto_id: mod.id,
+               tipo: 'SALIDA',
+               cantidad: 1,
+               notas: 'Alta como Activo (Neumático) Serial: ' + codigo,
+               estado: 'COMPLETADO'
+            });
+         }
+      }
+
+      const { error } = await supabase.from('neumatico').insert({
+        empresa_id: currentCompany.id,
+        codigo_interno: codigo,
+        marca,
+        modelo,
+        medida,
+        costo: Number(costo) || 0,
+        profundidad_nueva: Number(profNueva) || 18,
+        profundidad_actual: Number(profNueva) || 18,
+        estado,
+        ubicacion: 'BODEGA',
+        km_acumulados: 0
+      });
+
+      if (error) throw error;
+      onCreated();
+      onClose();
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Ingreso Nuevo Neumático">
+      <div className="space-y-4">
+        <div>
+          <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Modelo desde Suministros (Opcional)</label>
+          <select value={selectedModelId} onChange={(e) => handleModelChange(e.target.value)} className="w-full px-3 py-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700 mb-4">
+             <option value="">-- Ingresar Manualmente --</option>
+             {models.map(m => (
+               <option key={m.id} value={m.id}>{m.nombre} (Stock: {m.stock}) - {m.sku}</option>
+             ))}
+          </select>
+        </div>
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Código Interno / N° Serie *</label>
+          <input type="text" value={codigo} onChange={e => setCodigo(e.target.value)} className="w-full px-3 py-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700" placeholder="Ej: NEU-1001" />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Marca</label>
+            <input type="text" value={marca} onChange={e => setMarca(e.target.value)} className="w-full px-3 py-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700" placeholder="Ej: Michelin" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Modelo</label>
+            <input type="text" value={modelo} onChange={e => setModelo(e.target.value)} className="w-full px-3 py-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700" placeholder="Ej: X Multi Z" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Medida</label>
+            <input type="text" value={medida} onChange={e => setMedida(e.target.value)} className="w-full px-3 py-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700" placeholder="Ej: 295/80 R22.5" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Costo ($)</label>
+            <input type="number" value={costo} onChange={e => setCosto(e.target.value)} className="w-full px-3 py-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700" placeholder="Ej: 350000" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Profundidad Original (mm)</label>
+            <input type="number" value={profNueva} onChange={e => setProfNueva(e.target.value)} className="w-full px-3 py-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Estado</label>
+            <select value={estado} onChange={e => setEstado(e.target.value)} className="w-full px-3 py-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700">
+               <option value="NUEVO">Nuevo</option>
+               <option value="BUENO">Bueno (Usado)</option>
+               <option value="REGULAR">Regular (Usado)</option>
+            </select>
+          </div>
+        </div>
+        <div className="pt-4 flex justify-end gap-3">
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleCreate} disabled={loading || !codigo} className="bg-blue-600 hover:bg-blue-700 text-white">
+            {loading ? 'Guardando...' : 'Guardar Neumático'}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }

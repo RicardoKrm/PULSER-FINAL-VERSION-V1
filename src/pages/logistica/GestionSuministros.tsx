@@ -26,6 +26,7 @@ interface Insumo {
   precio: number;
   valorTotal: number;
   isCritico: boolean;
+  categoria?: string;
 }
 
 interface HistorialMovimiento {
@@ -108,7 +109,8 @@ export default function GestionSuministros() {
             min: r.min_stock || 0,
             valorTotal: parsedPrecio * parsedStock,
             ultMov: r.ult_mov ? new Date(r.ult_mov).toLocaleDateString() : '--',
-            bodegaNombre: r.logistica_bodegas?.nombre || null
+            bodegaNombre: r.logistica_bodegas?.nombre || null,
+            categoria: r.categoria || 'General'
           };
         }));
       } else {
@@ -225,6 +227,7 @@ export default function GestionSuministros() {
   const [selectedBodega, setSelectedBodega] = useState('Todas las bodegas');
   const [selectedUbicacion, setSelectedUbicacion] = useState('Todas las ubicaciones');
   const [selectedCalidad, setSelectedCalidad] = useState('Todas las calidades');
+  const [selectedCategoria, setSelectedCategoria] = useState('Todas las categorías');
   const [selectedProveedor, setSelectedProveedor] = useState('Todos los proveedores');
   const [filterBajoStock, setFilterBajoStock] = useState(false);
   const [filterSinMov, setFilterSinMov] = useState(false);
@@ -1959,6 +1962,7 @@ export default function GestionSuministros() {
                   precio: newRepuestoForm.precioUnitario,
                   valor_total: newRepuestoForm.precioUnitario * newRepuestoForm.stockActual,
                   is_critico: newRepuestoForm.nivelCriticidad === "CRÍTICO",
+                  categoria: newRepuestoForm.categoria,
                   bodega_id: newRepuestoForm.bodegaId,
                   estado: 'ACTIVO'
                 };
@@ -1985,7 +1989,7 @@ export default function GestionSuministros() {
                   
                   setNewRepuestoForm({
                     nombre: '', numeroParte: '', calidad: 'ORIGINAL', origen: 'OEM', 
-                    nivelCriticidad: 'INSUMO', stockActual: 0, stockMinimo: 0, 
+                    nivelCriticidad: 'INSUMO', categoria: 'General', stockActual: 0, stockMinimo: 0, 
                     diasStockObjetivo: 30, ubicacion: '', precioUnitario: 0, bodegaId: '1', proveedorId: ''
                   });
                 } catch (e) {
