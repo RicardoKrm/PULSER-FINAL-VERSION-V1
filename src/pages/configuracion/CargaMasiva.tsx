@@ -383,51 +383,6 @@ const MODULES: UploadModule[] = [
     ]
   },
   {
-    id: 'rutas',
-    title: 'Gestión de Rutas',
-    description: 'Carga masiva de trayectos, distancias, tiempos estimados y tarifas base.',
-    icon: Route,
-    template: [
-      { CodigoRuta: 'R-001', Origen: 'Santiago', Destino: 'Antofagasta', DistanciaKM: 1350, TiempoEstimadoHoras: 18, TarifaBase: 850000 }
-    ]
-  },
-  {
-    id: 'neumaticos',
-    title: 'Inventario de Neumáticos',
-    description: 'Ingreso inicial de neumáticos, medidas, marcas, estado y asignación actual.',
-    icon: Disc,
-    template: [
-      { CodigoInterno: 'N-101', Marca: 'Michelin', Modelo: 'X Multi D', Medida: '295/80 R22.5', Estado: 'Nuevo', PatenteAsignada: 'AB-CD-12', Posicion: 'Eje 1 Izq Exterior' }
-    ]
-  },
-  {
-    id: 'combustible',
-    title: 'Registros de Combustible',
-    description: 'Carga histórica de repostajes, odómetro, litros, costos y proveedores vinculados.',
-    icon: Fuel,
-    template: [
-      { Fecha: '2023-10-25 14:30', Patente: 'AB-CD-12', Odometro: 12500, Litros: 450, CostoTotal: 495000, Proveedor: 'Copec', Conductor: 'Juan Pérez' }
-    ]
-  },
-  {
-    id: 'contratos',
-    title: 'Contratos Comerciales',
-    description: 'Sincronización de acuerdos, fechas de vigencia, renovaciones y tarifas.',
-    icon: FileSignature,
-    template: [
-      { CodigoContrato: 'CONT-2023-01', Cliente: 'Minera XYZ', FechaInicio: '2023-01-01', FechaFin: '2025-12-31', MontoMensual: 15000000 }
-    ]
-  },
-  {
-    id: 'documental',
-    title: 'Control Documental',
-    description: 'Migración inicial de registros documentales y sus estados de vencimiento.',
-    icon: FolderOpen,
-    template: [
-      { Entidad: 'Vehículo', Referencia: 'AB-CD-12', TipoDocumento: 'Revisión Técnica', FechaEmision: '2023-05-10', FechaVencimiento: '2024-05-10' }
-    ]
-  },
-  {
     id: 'bodegas',
     title: 'Directorio de Bodegas',
     description: 'Creación de múltiples sucursales, almacenes y sus datos de ubicación.',
@@ -452,15 +407,6 @@ const MODULES: UploadModule[] = [
     icon: ClipboardList,
     template: [
       { NumeroOT: 'OT-1005', Patente: 'AB-CD-12', FechaCreacion: '2023-10-20', Estado: 'Cerrada', TipoMantenimiento: 'Preventivo', CostoTotal: 150000 }
-    ]
-  },
-  {
-    id: 'reservas',
-    title: 'Historial de Reservas',
-    description: 'Carga de servicios, pasajes, encomiendas y planificaciones previas.',
-    icon: CalendarCheck,
-    template: [
-      { CodigoReserva: 'RES-9001', Cliente: 'Empresa ABC', FechaServicio: '2023-11-05', Origen: 'Santiago', Destino: 'Valparaíso', Pasajeros: 4 }
     ]
   }
 ];
