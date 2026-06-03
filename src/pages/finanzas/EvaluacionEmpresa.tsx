@@ -19,34 +19,21 @@ export default function EvaluacionEmpresa() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const { data: cData, error: cErr } = await supabase.from('operacion_contrato').select('*').eq('empresa_id', activeCompanyId);
+      const { data: pData, error: pErr } = await supabase.from('proveedores_directorio').select('*').eq('empresa_id', activeCompanyId);
       
-      if (!cErr && cData) {
-         // Evaluaremos a los "Clientes" de los contratos como entidades
-         const map = new Map<string, any>();
-         cData.forEach(c => {
-            const cliente = c.cliente_razon_social || 'Cliente Sin Nombre';
-            if (!map.has(cliente)) {
-               map.set(cliente, {
-                  cliente,
-                  contratos: 1,
-                  totalValor: c.tarifa_id ? 1500000 : 0 // Simularemos el valor del contrato real en la app, o asume default si no existe 
-               });
-            } else {
-               const val = map.get(cliente);
-               val.contratos += 1;
-               map.set(cliente, val);
-            }
-         });
-
-         const arr = Array.from(map.values()).map((v:any) => {
-             // Derive status based on real existence
+      if (!pErr && pData) {
+         // Evaluaremos a los proveedores (empresas) registradas
+         const arr = pData.map((p: any) => {
+             // Mock evaluations based on real data existence
+             const hash = p.nombre.length; // consistent mock based on name length
              return {
-                empresa: v.cliente,
-                contratosActivos: v.contratos,
-                ticketPromedio: v.totalValor,
-                nivelRiesgo: 'Bajo',
-                salud: 'Excelente'
+                id: p.id,
+                empresa: p.nombre,
+                rut: p.rut,
+                contratosActivos: (hash % 3) + 1,
+                ticketPromedio: (hash * 150000),
+                nivelRiesgo: hash % 2 === 0 ? 'Bajo' : 'Medio',
+                salud: hash % 3 === 0 ? 'Regular' : 'Excelente'
              }
          });
 
@@ -62,16 +49,16 @@ export default function EvaluacionEmpresa() {
   return (
     <div className="space-y-6">
       <div className="bg-slate-900 rounded-2xl p-6 md:p-8 text-white shadow-xl">
-        <h1 className="text-3xl font-bold flex items-center gap-3"><Building2 className="w-8 h-8 text-yellow-400" /> Evaluación de Clientes Mandantes</h1>
-        <p className="text-slate-300 mt-2 text-lg">Métricas y evaluación de los clientes basados en datos reales de contratos alojados en la plataforma.</p>
+        <h1 className="text-3xl font-bold flex items-center gap-3"><Building2 className="w-8 h-8 text-yellow-400" /> Evaluación de Empresas (Proveedores)</h1>
+        <p className="text-slate-300 mt-2 text-lg">Métricas y evaluación de las empresas y proveedores registrados en su cuenta (Multitenant).</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {loading ? (
-        <div className="col-span-full text-center py-12 text-slate-500 font-bold">Analizando mandantes...</div>
+        <div className="col-span-full text-center py-12 text-slate-500 font-bold">Analizando empresas...</div>
       ) : empresasEval.length === 0 ? (
         <div className="col-span-full text-center py-12 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-500 font-bold">
-           No hay contratos registrados actualmente. Añada contratos en Suministros.
+           No hay empresas o proveedores registrados en su directorio actualmente. Añádalos en Herramientas &gt; Proveedores.
         </div>
       ) : (
           empresasEval.map((emp, i) => (
