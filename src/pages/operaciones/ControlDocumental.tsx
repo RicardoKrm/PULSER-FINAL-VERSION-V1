@@ -48,7 +48,7 @@ export default function ControlDocumental() {
     nombre: "",
     rut: "",
     cargo: "Conductor Interprovincial",
-    tipoLicencia: "A4",
+    tipoLicencia: ["A4"] as string[],
     vencimientoLicencia: "",
     vencimientoSalud: "",
   });
@@ -510,7 +510,9 @@ export default function ControlDocumental() {
                       <p className="text-slate-600 dark:text-slate-400">
                         Licencia:{" "}
                         <span className="font-bold text-slate-800 dark:text-slate-200">
-                          {d.tipoLicencia}
+                          {Array.isArray(d.tipoLicencia)
+                            ? d.tipoLicencia.join(", ")
+                            : d.tipoLicencia}
                         </span>
                       </p>
                       <p className="text-slate-600 dark:text-slate-400">
@@ -702,28 +704,52 @@ export default function ControlDocumental() {
                       </option>
                     </select>
                   </div>
-                  <div>
+                  <div className="col-span-2 md:col-span-1">
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">
                       Tipo de Licencia
                     </label>
-                    <select
-                      value={newDriverForm.tipoLicencia}
-                      onChange={(e) =>
-                        setNewDriverForm({
-                          ...newDriverForm,
-                          tipoLicencia: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 transition-all text-slate-900 dark:text-white"
-                    >
-                      <option>B</option>
-                      <option>C</option>
-                      <option>A1</option>
-                      <option>A2</option>
-                      <option>A3</option>
-                      <option>A4</option>
-                      <option>A5</option>
-                    </select>
+                    <div className="flex flex-wrap gap-2">
+                      {["B", "C", "A1", "A2", "A3", "A4", "A5"].map((tipo) => (
+                        <button
+                          key={tipo}
+                          type="button"
+                          onClick={() => {
+                            const current: string[] = Array.isArray(
+                              newDriverForm.tipoLicencia,
+                            )
+                              ? newDriverForm.tipoLicencia
+                              : [
+                                  newDriverForm.tipoLicencia as unknown as string,
+                                ];
+                            if (current.includes(tipo)) {
+                              setNewDriverForm({
+                                ...newDriverForm,
+                                tipoLicencia: current.filter(
+                                  (t) => t !== tipo,
+                                ) as any,
+                              });
+                            } else {
+                              setNewDriverForm({
+                                ...newDriverForm,
+                                tipoLicencia: [...current, tipo] as any,
+                              });
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border ${
+                            (Array.isArray(newDriverForm.tipoLicencia)
+                              ? newDriverForm.tipoLicencia
+                              : [
+                                  newDriverForm.tipoLicencia as unknown as string,
+                                ]
+                            ).includes(tipo)
+                              ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                              : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-indigo-400"
+                          }`}
+                        >
+                          {tipo}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div className="col-span-2">
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">
