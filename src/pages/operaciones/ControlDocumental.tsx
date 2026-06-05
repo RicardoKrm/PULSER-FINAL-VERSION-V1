@@ -22,11 +22,13 @@ import {
   User,
   Hash,
   Search,
+  Trash2,
 } from "lucide-react";
 import { exportToExcel } from "../../lib/excelExport";
 import { supabase } from "../../lib/supabase";
 import { useCompany } from "../../contexts/CompanyContext";
 import { useAuth } from "../../context/AuthContext";
+import Swal from "sweetalert2";
 
 export default function ControlDocumental() {
   const { activeCompanyId } = useCompany();
@@ -42,6 +44,7 @@ export default function ControlDocumental() {
   const [isAddingEntity, setIsAddingEntity] = useState<
     "driver" | "vehicle" | null
   >(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const [newDriverForm, setNewDriverForm] = useState({
@@ -280,13 +283,29 @@ export default function ControlDocumental() {
 
   const handleSaveDriver = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     const saveCompanyId = activeCompanyId;
-    if (!saveCompanyId)
-      return alert(
-        "No perteneces a una empresa asignada. Por favor contacta al administrador.",
-      );
+    if (!saveCompanyId) {
+      Swal.fire('Error', 'No perteneces a una empresa asignada. Por favor contacta al administrador.', 'error');
+      return;
+    }
 
     try {
+      setIsSubmitting(true);
+      // Ensure no duplicates by RUT and Empresa
+      const { data: existing, error: checkError } = await supabase
+        .from("colaborador")
+        .select("id")
+        .eq("rut", newDriverForm.rut)
+        .eq("empresa_id", saveCompanyId);
+
+      if (checkError) throw checkError;
+      if (existing && existing.length > 0) {
+        Swal.fire('Error', 'Ya existe un conductor con ese RUT.', 'error');
+        return;
+      }
+
       const { data, error } = await supabase
         .from("colaborador")
         .insert([
@@ -304,24 +323,42 @@ export default function ControlDocumental() {
         ])
         .select();
       if (error) throw error;
-      alert("Conductor guardado correctamente");
+      Swal.fire('Éxito', 'Conductor guardado correctamente', 'success');
       setIsAddingEntity(null);
       fetchData(); // reload
     } catch (error) {
       console.error(error);
-      alert("Error al guardar conductor");
+      Swal.fire('Error', 'Error al guardar conductor', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleSaveVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     const saveCompanyId = activeCompanyId;
-    if (!saveCompanyId)
-      return alert(
-        "No perteneces a una empresa asignada. Por favor contacta al administrador.",
-      );
+    if (!saveCompanyId) {
+       Swal.fire('Error', 'No perteneces a una empresa asignada. Por favor contacta al administrador.', 'error');
+       return;
+    }
 
     try {
+      setIsSubmitting(true);
+      // Ensure no duplicates by patente and Empresa
+      const { data: existing, error: checkError } = await supabase
+        .from("vehiculo")
+        .select("id")
+        .ilike("patente", newVehicleForm.patente)
+        .eq("empresa_id", saveCompanyId);
+
+      if (checkError) throw checkError;
+      if (existing && existing.length > 0) {
+        Swal.fire('Error', 'Ya existe una unidad con esa patente.', 'error');
+        return;
+      }
+
       const { data, error } = await supabase
         .from("vehiculo")
         .insert([
@@ -339,12 +376,14 @@ export default function ControlDocumental() {
         ])
         .select();
       if (error) throw error;
-      alert("Unidad guardada correctamente");
+      Swal.fire('Éxito', 'Unidad guardada correctamente', 'success');
       setIsAddingEntity(null);
       fetchData(); // reload
     } catch (error) {
       console.error(error);
-      alert("Error al guardar unidad");
+      Swal.fire('Error', 'Error al guardar unidad', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -363,6 +402,36 @@ export default function ControlDocumental() {
   const closeModals = () => {
     setSelectedEntity(null);
     setModalType(null);
+  };
+
+  const handleDeleteEntity = async (id: string, type: "driver" | "vehicle") => {
+    const table = type === "driver" ? "colaborador" : "vehiculo";
+    const entityName = type === "driver" ? "conductor" : "vehículo";
+    
+    const result = await Swal.fire({
+      title: `¿Eliminar ${entityName}?`,
+      text: "Esta acción no se puede deshacer.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#64748b",
+      confirmButtonText: "Sí, eliminar",
+      cancelButtonText: "Cancelar"
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const { error } = await supabase.from(table).delete().eq("id", id);
+        if (error) throw error;
+        
+        Swal.fire("Eliminado", `El ${entityName} ha sido eliminado.`, "success");
+        fetchData();
+        closeModals();
+      } catch (err: any) {
+        console.error("Error al eliminar entidad:", err);
+        Swal.fire("Error", `No se pudo eliminar el ${entityName}. Es posible que tenga registros asociados.`, "error");
+      }
+    }
   };
 
   const handleExportDrivers = () =>
@@ -962,12 +1031,21 @@ export default function ControlDocumental() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={closeModals}
-                className="p-1.5 rounded-lg hover:bg-black/5 text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleDeleteEntity(selectedEntity.id, modalType)}
+                  className="p-1.5 rounded-lg hover:bg-red-100 text-slate-400 hover:text-red-600 transition-colors"
+                  title={`Eliminar ${modalType === "driver" ? "conductor" : "vehículo"}`}
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={closeModals}
+                  className="p-1.5 rounded-lg hover:bg-black/5 text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             <div className="p-6 overflow-y-auto flex-1 space-y-6">
