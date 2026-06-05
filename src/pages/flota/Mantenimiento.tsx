@@ -11,6 +11,7 @@ import {
   MoreVertical, Edit3, History, TrendingUp, Archive, Trash2,
   Table as TableIcon, List, Eye, ArrowLeft
 } from 'lucide-react';
+import Swal from 'sweetalert2';
 import { CrearOTModal } from '../../components/flota/CrearOTModal';
 import { CrearVehiculoModal } from '../../components/flota/CrearVehiculoModal';
 import { Modal } from '../../components/ui/Modal';
@@ -370,6 +371,34 @@ export default function PizarraMantenimiento() {
   const handleArchive = (id: string | number) => {
     setDataFlota(dataFlota.filter(v => v.id !== id));
     setActionMenuOpen(null);
+  };
+
+  const handleDeletePermanent = async (id: string | number) => {
+    const result = await Swal.fire({
+      title: '¿Eliminar vehículo definitivamente?',
+      text: "Esta acción no se puede deshacer y podría fallar si el vehículo tiene historial asociado.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const { error } = await supabase.from('vehiculo').delete().eq('id', id);
+        if (error) throw error;
+        
+        setDataFlota(dataFlota.filter(v => v.id !== id));
+        setActionMenuOpen(null);
+        
+        Swal.fire('Eliminado', 'El vehículo ha sido eliminado.', 'success');
+      } catch (err: any) {
+        console.error("Error al eliminar vehículo:", err);
+        Swal.fire('Error', 'No se pudo eliminar el vehículo. Es posible que tenga registros asociados.', 'error');
+      }
+    }
   };
 
   const getStatusBadge = (estado: string) => {
@@ -1022,7 +1051,10 @@ export default function PizarraMantenimiento() {
                           >
                             <Archive className="w-4 h-4 mr-2" /> Archivar Vehículo
                           </button>
-                          <button className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center">
+                          <button 
+                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center"
+                            onClick={() => handleDeletePermanent(vehiculo.id)}
+                          >
                             <Trash2 className="w-4 h-4 mr-2" /> Eliminar Definitivamente
                           </button>
                         </div>
