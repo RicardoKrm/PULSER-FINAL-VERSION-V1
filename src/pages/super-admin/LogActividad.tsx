@@ -21,6 +21,7 @@ export default function LogActividad() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCompany, setSelectedCompany] = useState('all');
+  const [selectedDate, setSelectedDate] = useState<string>('');
   const [activeCompaniesList, setActiveCompaniesList] = useState<{id: string, name: string}[]>([]);
   const [stats, setStats] = useState({
     totalActions: 0,
@@ -46,6 +47,12 @@ export default function LogActividad() {
 
       if (currentCompany) {
         logQuery = logQuery.eq('empresa_id', currentCompany.id);
+      }
+
+      if (selectedDate) {
+        const start = new Date(`${selectedDate}T00:00:00`);
+        const end = new Date(`${selectedDate}T23:59:59.999`);
+        logQuery = logQuery.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
       }
 
       // Fetch stats natively instead of from logs
@@ -101,7 +108,9 @@ export default function LogActividad() {
 
   useEffect(() => {
     fetchLogs();
+  }, [selectedDate, currentCompany]);
 
+  useEffect(() => {
     // Subscribe to realtime inserts
     const channel = supabase
       .channel('log_actividad_changes')
@@ -193,7 +202,14 @@ export default function LogActividad() {
             <Clock className="w-5 h-5 text-slate-500" />
             Registro Global
           </h2>
-          <div className="flex items-center gap-4 w-full sm:w-auto">
+          <div className="flex items-center flex-wrap gap-4 w-full sm:w-auto">
+            <input
+              type="date"
+              title="Filtrar por fecha"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+            />
             <select
               title="Filtrar por empresa"
               className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
