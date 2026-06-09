@@ -45,14 +45,23 @@ export default function ConfiguracionEmpresa() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('empresa').select('nombre, rut, detalles').eq('id', activeCompanyId).single();
-      if (error) throw error;
+      let queryData;
+      let { data, error } = await supabase.from('empresa').select('nombre, rut, detalles').eq('id', activeCompanyId).single();
       
-      const det = data.detalles || {};
+      if (error) {
+        // Fallback: If 'detalles' column is missing, just fetch 'nombre' and 'rut'
+        const fallback = await supabase.from('empresa').select('nombre, rut').eq('id', activeCompanyId).single();
+        if (fallback.error) throw fallback.error;
+        queryData = fallback.data;
+      } else {
+        queryData = data;
+      }
+      
+      const det = queryData.detalles || {};
       
       setFormData({
-        nombre: data.nombre || '',
-        rut: data.rut || '',
+        nombre: queryData.nombre || '',
+        rut: queryData.rut || '',
         direccion: det.direccion || '',
         comuna: det.comuna || '',
         ciudad: det.ciudad || '',
@@ -66,7 +75,7 @@ export default function ConfiguracionEmpresa() {
       });
     } catch (err: any) {
       console.error(err);
-      Swal.fire('Error', 'No se pudo cargar la configuración de la empresa', 'error');
+      Swal.fire('Error', `No se pudo cargar la configuración de la empresa: ${err.message || JSON.stringify(err)}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -87,13 +96,28 @@ export default function ConfiguracionEmpresa() {
         logo_url: formData.logo_url
       };
 
-      const { error } = await supabase.from('empresa').update({
+      let dataToUpdate: any = {
         nombre: formData.nombre,
         rut: formData.rut,
+      };
+
+      const { error } = await supabase.from('empresa').update({
+        ...dataToUpdate,
         detalles: dbDetalles
       }).eq('id', activeCompanyId);
 
-      if (error) throw error;
+      if (error) {
+         // Attempt fallback update
+         const fallbackParams = await supabase.from('empresa').update(dataToUpdate).eq('id', activeCompanyId);
+         if (fallbackParams.error) throw fallbackParams.error;
+         
+         Swal.fire({
+           icon: 'warning',
+           title: 'Atención',
+           text: 'Los datos básicos se guardaron, pero falta la columna "detalles" (JSONB) en la tabla "empresa" para guardar toda la configuración. Contacte a soporte o ejecute ALTER TABLE empresa ADD COLUMN detalles JSONB;'
+         });
+         return;
+      }
 
       Swal.fire({
         title: '¡Configuración Guardada!',

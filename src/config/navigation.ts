@@ -35,7 +35,10 @@ import {
   MessageSquare,
   Link,
   BookOpen,
-  Map as MapIcon
+  Map as MapIcon,
+  Factory,
+  PenTool,
+  History
 } from 'lucide-react';
 
 export const navigation = [
@@ -77,6 +80,18 @@ export const navigation = [
       { title: 'Historial', icon: Activity, href: '/operaciones/historial' },
       { title: 'GPS FleetSat', icon: MapPin, href: '/operaciones/gps' },
       { title: 'Portal Conductor', icon: UserCircle, href: '/operaciones/portal-conductor' },
+    ],
+  },
+  {
+    title: 'Producción',
+    icon: Factory,
+    href: '/produccion',
+    submodules: [
+      { title: 'Dashboard de Producción', icon: BarChart3, href: '/produccion/dashboard' },
+      { title: 'Procesos Internos', icon: Settings, href: '/produccion/procesos' },
+      { title: 'Logística en Ruta', icon: Truck, href: '/produccion/logistica' },
+      { title: 'Reportes Diarios', icon: PenTool, href: '/produccion/reportes' },
+      { title: 'Trazabilidad', icon: History, href: '/produccion/trazabilidad' },
     ],
   },
   {
