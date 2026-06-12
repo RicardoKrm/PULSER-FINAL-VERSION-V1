@@ -466,8 +466,6 @@ Responde de forma concisa.`;
           const data = await response.json();
           return res.json(calculateOdometer(data));
       } catch (e: any) {
-          console.warn('Real API failed (likely missing actual URL). Using mock data.');
-          
           let lat1 = -20.25;
           let lng1 = -69.80;
           
