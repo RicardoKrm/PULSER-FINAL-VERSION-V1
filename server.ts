@@ -434,6 +434,87 @@ Responde de forma concisa.`;
     }
   });
 
+  // API Route for GPS Dominio Client
+  app.post("/api/gps/dominio", async (req, res) => {
+    try {
+      const { patente, desde, hasta, token } = req.body;
+      if (!patente || !desde || !hasta || !token) {
+        return res.status(400).json({ error: "Missing required parameters (patente, desde, hasta, token)" });
+      }
+
+      const url = `https://api.dominio.cl/${patente}?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`;
+      
+      const response = await fetch(url, {
+        headers: {
+           'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        // Fallback to try without Bearer just in case it fails, as IT guy mentioned it could be just TOKEN
+        const responseWithoutBearer = await fetch(url, {
+          headers: {
+            'Authorization': token
+          }
+        });
+        
+        if (!responseWithoutBearer.ok) {
+           throw new Error(`GPS API Error: ${response.statusText} / ${responseWithoutBearer.statusText}`);
+        }
+        
+        const data = await responseWithoutBearer.json();
+        return res.json(calculateOdometer(data));
+      }
+      
+      const data = await response.json();
+      res.json(calculateOdometer(data));
+      
+    } catch (e: any) {
+      console.error('Error fetching GPS Dominio:', e);
+      res.status(500).json({ error: "Failed to fetch GPS Dominio data" });
+    }
+  });
+
+  function calculateOdometer(data: any) {
+      let kmRecorridos = 0;
+      
+      if (data && data.elements && Array.isArray(data.elements) && data.elements.length > 0) {
+         const points = data.elements.slice().sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+         
+         for (let i = 1; i < points.length; i++) {
+            const p1 = points[i-1];
+            const p2 = points[i];
+            
+            if (p1.lat && p1.lng && p2.lat && p2.lng) {
+                const dist = getDistanceFromLatLonInKm(p1.lat, p1.lng, p2.lat, p2.lng);
+                // Simple outlier check to avoid GPS jumps (e.g., > 150km in consecutive points without very long time gap)
+                // Assuming points are not super spread, but we can just sum them
+                if (dist < 100) { // arbitrary threshold for a single segment just in case of anomaly
+                    kmRecorridos += dist;
+                }
+            }
+         }
+      }
+      return { totalKm: kmRecorridos, rawData: data };
+  }
+
+  function deg2rad(deg: number) {
+    return deg * (Math.PI/180)
+  }
+
+  function getDistanceFromLatLonInKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const R = 6371; // Radius of the earth in km
+    const dLat = deg2rad(lat2-lat1);  
+    const dLon = deg2rad(lon2-lon1); 
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2)
+      ; 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    return R * c; 
+  }
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
