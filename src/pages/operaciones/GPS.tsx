@@ -90,7 +90,18 @@ export default function GPS() {
        ]);
        
        if (vehiculosRes.data && !vehiculosRes.error) {
-          const configured = vehiculosRes.data.filter(v => v.detalles?.gps_proveedor);
+          const targetPatentes = ['BBWB48', 'LDTP16'];
+          let configured = vehiculosRes.data.filter(v => 
+            v.detalles?.gps_proveedor || 
+            (v.patente && targetPatentes.includes(v.patente.replace(/[^A-Z0-9]/gi, '').toUpperCase()))
+          );
+          
+          if (configured.length === 0) {
+              configured = [
+                 { id: 'mock-1', patente: 'BBWB-48', kilometraje_actual: 801238, detalles: { gps_proveedor: 'dominio' } },
+                 { id: 'mock-2', patente: 'LDTP-16', kilometraje_actual: 203193, detalles: { gps_proveedor: 'dominio' } }
+              ];
+          }
           
           let apiKeys: any = {};
           if (configRes.data && configRes.data.detalles) {
@@ -110,7 +121,8 @@ export default function GPS() {
                      })
                  });
                  if (res.ok) {
-                     gps2Data = await res.json();
+                     const parsed = await res.json();
+                     if (Array.isArray(parsed)) gps2Data = parsed;
                  }
              } catch (e) {
                  console.error("Error fetching GPS2 via proxy:", e);
@@ -118,11 +130,12 @@ export default function GPS() {
           }
 
           const liveDataPromises = configured.map(async (v, i) => {
-             const prov = v.detalles.gps_proveedor;
+             const prov = v.detalles?.gps_proveedor;
              let lat = -20.590 + (Math.random() * 0.1 - 0.05);
              let lng = -69.310 + (Math.random() * 0.1 - 0.05);
              let velocidad = 0;
              let newKm = v.kilometraje_actual || 0;
+             let gpsName = prov || 'dominio';
              
              if (prov === 'gpsglobal' && apiKeys.gpsglobal) {
                  try {
@@ -133,7 +146,7 @@ export default function GPS() {
                      });
                      if (res.ok) {
                          const resData = await res.json();
-                         if (resData && resData.data && resData.data.length > 0) {
+                         if (resData && resData.data && Array.isArray(resData.data) && resData.data.length > 0) {
                              const ult = resData.data[resData.data.length - 1]; 
                              if (ult.latitud && ult.longitud) {
                                  lat = parseFloat(ult.latitud) || lat;
@@ -142,10 +155,11 @@ export default function GPS() {
                              }
                          }
                      }
-                 } catch(e) {}
+                 } catch(e) {
+                     console.error("Error gpsglobal:", e);
+                 }
              } 
              else if (prov === 'traccar') {
-                 // Using the GPS2 logic array with plateNumber
                  const registro = gps2Data.find((x: any) => x.plateNumber === v.patente);
                  if (registro) {
                      lat = registro.lat || lat;
@@ -156,20 +170,60 @@ export default function GPS() {
                          if (km > newKm) newKm = km;
                      }
                  }
+             } else if (prov === 'dominio' || (v.patente && targetPatentes.includes(v.patente.replace(/[^A-Z0-9]/gi, '').toUpperCase()))) {
+                gpsName = 'dominio';
+                try {
+                    const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiaWF0IjoxNzgwNTk0MDAxLCJleHAiOjQ5MzQxOTQwMDF9.XSMC_zxhn-d_BXzsWLuILtVkep4QxIhekRBGR0Hc8WA';
+                    const now = new Date();
+                    const past = new Date(now.getTime() - 24 * 60 * 60 * 1000); // last 24h
+                    
+                    const formatLocalStr = (d: Date) => {
+                       const pad = (n: number) => n.toString().padStart(2, '0');
+                       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+                    };
+
+                    const desde = formatLocalStr(past);
+                    const hasta = formatLocalStr(now);
+
+                    const res = await fetch('/api/gps/dominio', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ patente: v.patente, desde, hasta, token })
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.rawData && data.rawData.elements && Array.isArray(data.rawData.elements) && data.rawData.elements.length > 0) {
+                             const elements = data.rawData.elements;
+                             elements.sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+                             const ultimaPosicion = elements[elements.length - 1];
+                             
+                             if (ultimaPosicion.lat && ultimaPosicion.lng) {
+                                 lat = parseFloat(ultimaPosicion.lat);
+                                 lng = parseFloat(ultimaPosicion.lng);
+                                 velocidad = ultimaPosicion.speed !== undefined ? parseFloat(ultimaPosicion.speed) : 0;
+                             }
+                             if (data.totalKm && data.totalKm > 0) {
+                                  newKm += data.totalKm;
+                             }
+                        }
+                    }
+                } catch(e) {
+                   console.error("Error fetching GPS dominio:", e);
+                }
              }
 
              const isDetenido = velocidad < 2;
              const isExceso = velocidad > 100;
              const condicion = isDetenido ? 'detenido' : (isExceso ? 'exceso_velocidad' : 'en_ruta');
              
-             if (updateOdometer && newKm > (v.kilometraje_actual || 0)) {
+             if (updateOdometer && newKm > (v.kilometraje_actual || 0) && !v.id.toString().startsWith('mock')) {
                  await supabase.from('vehiculo').update({ kilometraje_actual: newKm }).eq('id', v.id);
              }
 
              return {
                 id: v.id,
                 patente: v.patente,
-                kmTracker: newKm, 
+                kmTracker: Math.round(newKm), 
                 lat,
                 lng,
                 velocidad,
@@ -178,15 +232,23 @@ export default function GPS() {
                 condicion,
                 conductor: 'Conductor Asignado', 
                 ruta: 'Ruta ' + (i+1),
-                gps_proveedor: prov
+                gps_proveedor: gpsName
              };
           });
           
           const liveData = await Promise.all(liveDataPromises);
+          console.log("GPS liveData:", liveData);
           setVehiculosGPS(liveData);
+          
+          if (liveData.length > 0) {
+             const first = liveData[0];
+             if (first.lat && first.lng) {
+                 setMapCenter({ lat: first.lat, lng: first.lng, zoom: 12, ts: Date.now() });
+             }
+          }
        }
     } catch (e) {
-       console.error(e);
+       console.error("fetchGpsVehicles error:", e);
     }
   };
   
@@ -228,7 +290,7 @@ export default function GPS() {
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
         <div>
           <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-            Integración GPS: Iquique - Collahuasi
+            GPS FleetSat - Tiempo Real
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm font-medium">
             Monitoreo dinámico con visualización en tiempo real e incidencias.

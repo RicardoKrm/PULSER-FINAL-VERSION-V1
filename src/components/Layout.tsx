@@ -295,9 +295,11 @@ export default function Layout() {
           if (perms.includes(item.title)) {
             let filteredSubmodules = item.submodules;
             if (item.submodules) {
-              filteredSubmodules = item.submodules.filter((sub) =>
-                perms.includes(`${item.title}:${sub.title}`),
-              );
+              filteredSubmodules = item.submodules.filter((sub) => {
+                const key = `${item.title}:${sub.title}`;
+                const legacyKey = sub.title === 'GPS FleetSat' ? `${item.title}:GPS` : key;
+                return perms.includes(key) || perms.includes(legacyKey);
+              });
             }
             acc.push({
               ...item,

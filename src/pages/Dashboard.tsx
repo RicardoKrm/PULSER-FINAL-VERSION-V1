@@ -38,7 +38,6 @@ export default function Dashboard() {
     const fetchVehs = async () => {
       const { data } = await supabase.from('vehiculo').select('*').eq('empresa_id', currentCompany.id);
       if (data) {
-        // Map fields to what calcularDatosPizarra expects
         const { data: pautasData } = await supabase.from('mantenimiento_pauta').select('*, modelo:mantenimiento_modelo_vehiculo(nombre)').eq('empresa_id', currentCompany.id);
 
         const mapped = data.map(v => {
