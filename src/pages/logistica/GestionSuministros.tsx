@@ -494,6 +494,29 @@ export default function GestionSuministros() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    const res = await Swal.fire({
+      title: '¿Eliminar repuestos seleccionados?',
+      text: `Se eliminarán ${selectedItems.length} repuesto(s). Esta acción no se puede deshacer.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar masivamente',
+      cancelButtonText: 'Cancelar'
+    });
+    if (res.isConfirmed) {
+      const { error } = await supabase.from('logistica_repuestos').delete().in('id', selectedItems);
+      if (!error) {
+        Swal.fire("Eliminados", "Repuestos eliminados correctamente", "success");
+        setSelectedItems([]);
+        loadData();
+      } else {
+        Swal.fire("Error", "No se pudieron eliminar los repuestos", "error");
+      }
+    }
+  };
+
   if (activeView === 'auditoria') {
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -1097,13 +1120,22 @@ export default function GestionSuministros() {
           </Button>
           
           {selectedItems.length > 0 && (
-            <Button 
-              className="bg-[#8b5cf6] hover:bg-[#7c3aed] text-white"
-              onClick={() => setIsMoveModalOpen(true)}
-            >
-              <Boxes className="w-4 h-4 mr-2" />
-              Movimiento Masivo ( {selectedItems.length} )
-            </Button>
+            <>
+              <Button 
+                className="bg-[#8b5cf6] hover:bg-[#7c3aed] text-white"
+                onClick={() => setIsMoveModalOpen(true)}
+              >
+                <Boxes className="w-4 h-4 mr-2" />
+                Movimiento Masivo ( {selectedItems.length} )
+              </Button>
+              <Button 
+                className="bg-red-600 hover:bg-red-700 text-white shadow-sm"
+                onClick={handleBulkDelete}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Eliminar Masivo ( {selectedItems.length} )
+              </Button>
+            </>
           )}
           
           <Button className="bg-[#6366f1] hover:bg-[#4f46e5] text-white" onClick={() => navigate('/logistica/validaciones')}>
