@@ -442,71 +442,33 @@ Responde de forma concisa.`;
         return res.status(400).json({ error: "Missing required parameters (patente, desde, hasta, token)" });
       }
 
-      const url = `https://api.dominio.cl/${patente}?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`;
+      const url = `https://wiatool-back.kuvesoft.com/api/v1/vehiculos/datos/${patente}?desde=${desde}&hasta=${hasta}`;
       
       try {
-          const response = await fetch(url, {
-            headers: {
-               'Authorization': `Bearer ${token}`
-            },
-            // fast timeout since it will fail
-            signal: AbortSignal.timeout(3000)
+          let response = await fetch(url, {
+            headers: { 'Authorization': token },
+            signal: AbortSignal.timeout(10000)
           });
           
+          if (!response.ok && response.status === 401) {
+             // Fallback to Bearer format just in case
+             response = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` },
+                signal: AbortSignal.timeout(10000)
+             });
+          }
+          
           if (!response.ok) {
-            const responseWithoutBearer = await fetch(url, {
-              headers: { 'Authorization': token },
-              signal: AbortSignal.timeout(3000)
-            });
-            if (!responseWithoutBearer.ok) throw new Error();
-            const data = await responseWithoutBearer.json();
-            return res.json(calculateOdometer(data));
+             const errText = await response.text();
+             console.error(`GPS Dominio API Error: ${response.status} ${response.statusText}`, errText);
+             throw new Error(`GPS Dominio API Error: ${response.statusText} ${errText}`);
           }
           
           const data = await response.json();
           return res.json(calculateOdometer(data));
       } catch (e: any) {
-          let lat1 = -20.25;
-          let lng1 = -69.80;
-          
-          if (patente.includes('BBWB')) {
-              lat1 = -20.21;
-              lng1 = -70.15;
-          } else if (patente.includes('LDTP')) {
-              lat1 = -20.28;
-              lng1 = -70.12;
-          }
-          
-          const mockData = {
-              "from": 1,
-              "to": 1,
-              "count": 1,
-              "page": 1,
-              "pageSize": 100,
-              "elements": [
-                {
-                  "id": 1,
-                  "imei": "869066061815628",
-                  "heading": 112,
-                  "ignition": 1,
-                  "speed": 0,
-                  "lat": lat1,
-                  "lng": lng1,
-                  "timestamp": new Date(Date.now() - 3600000).toISOString()
-                },
-                {
-                  "id": 2,
-                  "imei": "869066061815628",
-                  "heading": 112,
-                  "ignition": 1,
-                  "speed": 60,
-                  "lat": lat1 + (Math.random() * 0.05),
-                  "lng": lng1 + (Math.random() * 0.05),
-                  "timestamp": new Date().toISOString()
-                }
-              ]
-          };
-          return res.json(calculateOdometer(mockData));
+          console.error("fetch gps failed:", e);
+          return res.status(500).json({ error: "Failed to fetch GPS data from real API", details: e.message });
       }
       
     } catch (e: any) {
