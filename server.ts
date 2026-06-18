@@ -442,33 +442,62 @@ Responde de forma concisa.`;
         return res.status(400).json({ error: "Missing required parameters (patente, desde, hasta, token)" });
       }
 
-      const url = `https://wiatool-back.kuvesoft.com/api/v1/vehiculos/datos/${patente}?desde=${desde}&hasta=${hasta}`;
-      
       try {
-          let response = await fetch(url, {
-            headers: { 'Authorization': token },
-            signal: AbortSignal.timeout(10000)
-          });
-          
-          if (!response.ok && response.status === 401) {
-             // Fallback to Bearer format just in case
-             response = await fetch(url, {
-                headers: { 'Authorization': `Bearer ${token}` },
+          const fetchPage = async (page: number) => {
+              const url = `https://wiatool-back.kuvesoft.com/api/v1/vehiculos/datos/${patente}?desde=${desde}&hasta=${hasta}&pageSize=1000&page=${page}`;
+              let response = await fetch(url, {
+                headers: { 'Authorization': token },
                 signal: AbortSignal.timeout(10000)
-             });
+              });
+              
+              if (!response.ok && response.status === 401) {
+                 response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    signal: AbortSignal.timeout(10000)
+                 });
+              }
+              
+              if (!response.ok) {
+                 const errText = await response.text();
+                 if (response.status === 403) {
+                     throw new Error("403 Forbidden - No tiene acceso a esta patente");
+                 }
+                 console.error(`GPS Dominio API Error: ${response.status} ${response.statusText}`, errText);
+                 throw new Error(`GPS Dominio API Error: ${response.statusText} ${errText}`);
+              }
+              
+              return await response.json();
+          };
+
+          let data = await fetchPage(1);
+          let allElements = data.elements || [];
+          
+          if (data.count && data.count > allElements.length) {
+              const totalPages = Math.ceil(data.count / (data.pageSize || 100)); // provider might cap pageSize randomly
+              const maxPages = Math.min(totalPages, 500); // allow up to 500 pages = ~50k points (~17 days)
+              for (let p = 2; p <= maxPages; p++) {
+                  try {
+                      const pageData = await fetchPage(p);
+                      if (pageData.elements) {
+                          allElements = allElements.concat(pageData.elements);
+                      }
+                  } catch (err) {
+                      console.error(`Pagination failed at page ${p}:`, err);
+                      break;
+                  }
+              }
+              data.elements = allElements;
           }
           
-          if (!response.ok) {
-             const errText = await response.text();
-             if (response.status === 403) {
-                 return res.status(403).json({ error: "Forbidden", details: "No tiene acceso a esta patente" });
-             }
-             console.error(`GPS Dominio API Error: ${response.status} ${response.statusText}`, errText);
-             throw new Error(`GPS Dominio API Error: ${response.statusText} ${errText}`);
+          const resultData = calculateOdometer(data);
+          
+          // attach the last timestamp so client knows exactly up to when data was synced
+          if (data.elements && data.elements.length > 0) {
+             const sorted = data.elements.slice().sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+             resultData.lastTimestamp = sorted[sorted.length - 1].timestamp;
           }
           
-          const data = await response.json();
-          return res.json(calculateOdometer(data));
+          return res.json(resultData);
       } catch (e: any) {
           console.error("fetch gps failed:", e);
           return res.status(500).json({ error: "Failed to fetch GPS data from real API", details: e.message });

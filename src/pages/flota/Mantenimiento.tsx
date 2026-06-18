@@ -218,12 +218,14 @@ export default function PizarraMantenimiento() {
       // In production, we'd normally check if a vehicle or company has this integration enabled.
       // For this specific urgent request, we will check the two mentioned patentes, or we can check any that have a valid response.
       // We will attempt sync for BBWB-48 and LDTP-16 or perhaps others as requested: "tengo 2 vehiculos en 1 empresa que ya me contrataron!!"
-      const targetPatentes = ['BBWB-48', 'LDTP-16'];
+      const targetPatentes = ['BBWB48', 'LDTP16'];
       
       let wasUpdated = false;
 
       for (const v of vehiculosRaw) {
-          if (!v.patente || !targetPatentes.includes(v.patente.toUpperCase())) continue;
+          if (!v.patente) continue;
+          const patenteClean = v.patente.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+          if (!targetPatentes.includes(patenteClean)) continue;
 
           let desdeDate = v.fecha_actualizacion_km ? new Date(v.fecha_actualizacion_km) : null;
           if (!desdeDate || isNaN(desdeDate.getTime())) {
@@ -263,7 +265,7 @@ export default function PizarraMantenimiento() {
 
                      const { error } = await supabase.from('vehiculo').update({
                          kilometraje_actual: Math.round(nuevoKm), // typically odometers are ints or round manually
-                         fecha_actualizacion_km: now.toISOString(),
+                         fecha_actualizacion_km: data.lastTimestamp && !isNaN(new Date(data.lastTimestamp).getTime()) ? new Date(data.lastTimestamp).toISOString() : now.toISOString(),
                          updated_at: now.toISOString(),
                          km_promedio_dia: baseKmPromedio
                      }).eq('id', v.id);

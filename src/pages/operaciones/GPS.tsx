@@ -91,10 +91,12 @@ export default function GPS() {
        
        if (vehiculosRes.data && !vehiculosRes.error) {
           const targetPatentes = ['BBWB48', 'LDTP16'];
-          let configured = vehiculosRes.data.filter(v => 
-            v.detalles?.gps_proveedor || 
-            (v.patente && targetPatentes.includes(v.patente.replace(/[^A-Z0-9]/gi, '').toUpperCase()))
-          );
+          let configured = vehiculosRes.data.filter(v => {
+            if (v.detalles?.gps_proveedor) return true;
+            if (!v.patente) return false;
+            const patenteClean = v.patente.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+            return targetPatentes.includes(patenteClean);
+          });
           
           if (configured.length === 0) {
               configured = [
