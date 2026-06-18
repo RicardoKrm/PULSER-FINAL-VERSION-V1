@@ -512,8 +512,8 @@ export default function GestionSuministros() {
       cancelButtonText: 'Cancelar'
     });
     if (res.isConfirmed) {
-      // Supabase URI limit avoidance
-      const CHUNK_SIZE = 100;
+      // Supabase URI limit avoidance: 20 is safe for UUID lists
+      const CHUNK_SIZE = 20;
       let hasError = false;
       let lastErrorMessage = '';
       
@@ -522,7 +522,8 @@ export default function GestionSuministros() {
         const { error } = await supabase.from('logistica_repuestos').delete().in('id', chunk);
         if (error) {
           hasError = true;
-          lastErrorMessage = error.message;
+          // If the error message is empty or missing, provide a generic fallback
+          lastErrorMessage = error.message || 'Error desconocido (posibles limitantes de URI o RLS).';
           console.error("Bulk Delete Error:", error);
           break;
         }
@@ -533,7 +534,7 @@ export default function GestionSuministros() {
         setSelectedItems([]);
         loadData();
       } else {
-        Swal.fire("Error", `Problema al eliminar repuestos: ${lastErrorMessage}`, "error");
+        Swal.fire("Error", "No se pudieron eliminar los repuestos\n" + lastErrorMessage, "error");
         loadData(); // reload anyway to show what was deleted
       }
     }
@@ -1570,7 +1571,7 @@ export default function GestionSuministros() {
                 if (destinationBodega) {
                   try {
                     const destBodega = bodegasList.find(b => b.id === destinationBodega);
-                    const CHUNK_SIZE = 100;
+                    const CHUNK_SIZE = 20;
                     let hasError = false;
 
                     for (let i = 0; i < selectedItems.length; i += CHUNK_SIZE) {
