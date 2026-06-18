@@ -177,7 +177,11 @@ export default function GPS() {
                 try {
                     const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiaWF0IjoxNzgwNTk0MDAxLCJleHAiOjQ5MzQxOTQwMDF9.XSMC_zxhn-d_BXzsWLuILtVkep4QxIhekRBGR0Hc8WA';
                     const now = new Date();
-                    const past = new Date(now.getTime() - 24 * 60 * 60 * 1000); // last 24h
+                    
+                    let past = v.detalles?.fecha_actualizacion_km ? new Date(v.detalles.fecha_actualizacion_km) : null;
+                    if (!past || isNaN(past.getTime())) {
+                        past = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                    }
                     
                     const formatLocalStr = (d: Date) => {
                        const pad = (n: number) => n.toString().padStart(2, '0');
@@ -187,6 +191,8 @@ export default function GPS() {
                     const desde = formatLocalStr(past);
                     const hasta = formatLocalStr(now);
 
+                    let updatedTimestamp: string | null = null;
+
                     const res = await fetch('/api/gps/dominio', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -194,6 +200,7 @@ export default function GPS() {
                     });
                     if (res.ok) {
                         const data = await res.json();
+                        updatedTimestamp = data.lastTimestamp;
                         if (data && data.rawData && data.rawData.elements && Array.isArray(data.rawData.elements) && data.rawData.elements.length > 0) {
                              const elements = data.rawData.elements;
                              elements.sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
@@ -219,7 +226,13 @@ export default function GPS() {
              const condicion = isDetenido ? 'detenido' : (isExceso ? 'exceso_velocidad' : 'en_ruta');
              
              if (updateOdometer && newKm > (v.kilometraje_actual || 0) && !v.id.toString().startsWith('mock')) {
-                 await supabase.from('vehiculo').update({ kilometraje_actual: newKm }).eq('id', v.id);
+                 const detalles = v.detalles || {};
+                 if (updatedTimestamp && !isNaN(new Date(updatedTimestamp).getTime())) {
+                     detalles.fecha_actualizacion_km = new Date(updatedTimestamp).toISOString();
+                 } else {
+                     detalles.fecha_actualizacion_km = new Date().toISOString();
+                 }
+                 await supabase.from('vehiculo').update({ kilometraje_actual: newKm, detalles }).eq('id', v.id);
              }
 
              return {
