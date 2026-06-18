@@ -138,6 +138,7 @@ export default function GPS() {
              let velocidad = 0;
              let newKm = v.kilometraje_actual || 0;
              let gpsName = prov || 'dominio';
+             let updatedTimestamp: string | null = null;
              
              if (prov === 'gpsglobal' && apiKeys.gpsglobal) {
                  try {
@@ -190,8 +191,6 @@ export default function GPS() {
 
                     const desde = formatLocalStr(past);
                     const hasta = formatLocalStr(now);
-
-                    let updatedTimestamp: string | null = null;
 
                     const res = await fetch('/api/gps/dominio', {
                         method: 'POST',
