@@ -77,9 +77,10 @@ const parseExcelDate = (excelDate: any) => {
   return undefined;
 };
 
-const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any }> = {
+const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[], mapConfig: (r: any) => any }> = {
   empleados: { 
     table: 'colaborador', 
+    matchKey: 'rut',
     mapConfig: (r: any) => ({
       rut: r.Rut || r.RUT || '',
       nombre: (`${r.Nombre || r.Nombres || ''} ${r.Ap_Paterno || r.Apellidos || ''} ${r.Ap_Materno || ''}`).trim(),
@@ -100,6 +101,7 @@ const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any
   },
   vehiculos: { 
     table: 'vehiculo', 
+    matchKey: 'patente',
     mapConfig: (r: any) => ({
       numero_interno: r.numero_interno?.toString() || '',
       patente: r.patente,
@@ -130,6 +132,7 @@ const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any
   },
   inventario: { 
     table: 'logistica_repuestos', 
+    matchKey: 'sku',
     mapConfig: (r: any) => ({
       sku: r.numero_parte || r.Codigo || r.SKU,
       nombre: r.nombre || r.Nombre || r.Repuesto,
@@ -143,10 +146,12 @@ const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any
   },
   bodegas: { 
     table: 'logistica_bodegas', 
+    matchKey: 'nombre',
     mapConfig: (r: any) => ({ nombre: r.Nombre, descripcion: r.Descripcion, tipo: r.Tipo, identificador: r.Identificador, proveedor: r.Proveedor, responsable: r.Responsable, ubicacion: r.Ubicacion, estado: r.Estado || 'Activo' }) 
   },
   pautas: { 
     table: 'mantenimiento_pauta', 
+    matchKey: 'nombre',
     mapConfig: (r: any) => ({ 
       nombre: r.nombre_pauta || r.NombrePauta || r.Nombre, 
       kilometraje_inicial: r.cronograma_en_km || r.KilometrajeInicial || 0,
@@ -159,6 +164,7 @@ const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any
   },
   tareas: { 
     table: 'mantenimiento_tarea', 
+    matchKey: 'descripcion',
     mapConfig: (r: any) => ({ 
       descripcion: r.descripcion || r.Descripcion || r.DescripcionTarea, 
       tiempo_estandar_minutos: r.tiempo_minutos || r.TiempoEstimadoMinutos || 60, 
@@ -167,6 +173,7 @@ const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any
   },
   fallas: { 
     table: 'tipo_falla', 
+    matchKey: 'descripcion',
     mapConfig: (r: any) => {
       const tfsVal = r.tfs_predeterminado_min !== undefined ? r.tfs_predeterminado_min : (r.tfs_predeterminado_horas !== undefined ? r.tfs_predeterminado_horas : r.tfs_predeterminado_n);
       return {
@@ -181,6 +188,7 @@ const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any
   },
   pausas: { 
     table: 'tipo_pausa', 
+    matchKey: 'nombre',
     mapConfig: (r: any) => ({
       nombre: r['Nombre del Motivo'] || r.nombre_del_motivo || r.nombre || r.NombreDelMotivo,
       descripcion: r.Descripción || r.descripcion || '',
@@ -191,22 +199,27 @@ const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any
   },
   proveedores: { 
     table: 'proveedor', 
+    matchKey: 'rut',
     mapConfig: (r: any) => ({ rut: r.Rut, razon_social: r.RazonSocial, contacto: r.Contacto, telefono: r.Telefono, email: r.Email, tipo_servicio: r.TipoServicio }) 
   },
   kits: { 
     table: 'kit_repuesto', 
+    matchKey: 'codigo_kit',
     mapConfig: (r: any) => ({ codigo_kit: r.CodigoKit, nombre: r.Nombre }) 
   },
   rutas: { 
     table: 'ruta', 
+    matchKey: 'codigo_ruta',
     mapConfig: (r: any) => ({ codigo_ruta: r.CodigoRuta, origen: r.Origen, destino: r.Destino, distancia_km: r.DistanciaKM, tiempo_estimado_horas: r.TiempoEstimadoHoras, tarifa_base: r.TarifaBase }) 
   },
   neumaticos: { 
     table: 'neumatico', 
+    matchKey: 'codigo_interno',
     mapConfig: (r: any) => ({ codigo_interno: r.CodigoInterno, marca: r.Marca, modelo: r.Modelo, medida: r.Medida, estado: r.Estado, patente_asignada: r.PatenteAsignada, posicion: r.Posicion }) 
   },
   combustible: { 
     table: 'registro_combustible', 
+    matchKey: 'NONE', // Special case, no matching key
     mapConfig: (r: any) => ({ 
       fecha: r.Fecha ? new Date(r.Fecha).toISOString() : new Date().toISOString(), 
       patente: r.Patente, odometro: r.Odometro, litros: r.Litros, costo_total: r.CostoTotal, proveedor: r.Proveedor, conductor: r.Conductor 
@@ -214,18 +227,22 @@ const UPLOAD_MAPPING: Record<string, { table: string, mapConfig: (r: any) => any
   },
   contratos: { 
     table: 'operacion_contrato', 
+    matchKey: 'codigo_contrato',
     mapConfig: (r: any) => ({ codigo_contrato: r.CodigoContrato, cliente: r.Cliente, fecha_inicio: r.FechaInicio, fecha_fin: r.FechaFin, monto_mensual: r.MontoMensual }) 
   },
   documental: { 
     table: 'operacion_documento', 
+    matchKey: 'referencia',
     mapConfig: (r: any) => ({ entidad: r.Entidad, referencia: r.Referencia, tipo_documento: r.TipoDocumento, fecha_emision: r.FechaEmision, fecha_vencimiento: r.FechaVencimiento }) 
   },
   suministros: { 
-    table: 'sumuministro', // actually let's check schema: table name is suministro
+    table: 'suministro', 
+    matchKey: 'codigo_suministro',
     mapConfig: (r: any) => ({ codigo_suministro: r.CodigoSuministro, nombres: r.Nombres, tipo: r.Tipo, stock: r.Stock, precio_unitario: r.PrecioUnitario }) 
   },
   ots: { 
     table: 'orden_de_trabajo', 
+    matchKey: 'folio',
     mapConfig: (r: any) => {
       const getVal = (keywords: string[]) => {
         const key = Object.keys(r).find(k => keywords.some(kw => k.toUpperCase().includes(kw)));
@@ -575,18 +592,80 @@ export default function CargaMasiva() {
            }
       }
 
-      const { error } = await supabase.from(config.table).insert(cleanData);
+      let insertCount = 0;
+      let updateCount = 0;
 
-      if (error) {
-        console.error("Supabase insert error:", error);
-        throw new Error(error.message);
+      if (config.matchKey && config.matchKey !== 'NONE') {
+        const matchKeyStr = config.matchKey as string;
+        const { data: existingRecords } = await supabase
+          .from(config.table)
+          .select(`id, "${matchKeyStr}"`)
+          .eq('empresa_id', currentCompany?.id);
+        
+        const existingMap = new Map();
+        if (existingRecords) {
+           existingRecords.forEach(r => {
+              if (r[matchKeyStr] !== undefined && r[matchKeyStr] !== null) {
+                 existingMap.set(String(r[matchKeyStr]).toUpperCase().trim(), r.id);
+              }
+           });
+        }
+
+        const toInsert = [];
+        const toUpdate = [];
+
+        for (const row of cleanData) {
+           const matchVal = row[matchKeyStr];
+           if (matchVal !== undefined && matchVal !== null) {
+              const key = String(matchVal).toUpperCase().trim();
+              if (existingMap.has(key)) {
+                 toUpdate.push({ ...row, id: existingMap.get(key) });
+              } else {
+                 toInsert.push(row);
+              }
+           } else {
+              toInsert.push(row);
+           }
+        }
+
+        if (toInsert.length > 0) {
+           const { error: insError } = await supabase.from(config.table).insert(toInsert);
+           if (insError) throw new Error("Error insertando registros nuevos: " + insError.message);
+           insertCount += toInsert.length;
+        }
+
+        if (toUpdate.length > 0) {
+           const { error: updError } = await supabase.from(config.table).upsert(toUpdate, { onConflict: 'id' });
+           if (updError) {
+              console.warn("Bulk upsert failed, falling back to sequential update", updError);
+              for (const uRow of toUpdate) {
+                 const { id, ...updateData } = uRow;
+                 const { error } = await supabase.from(config.table).update(updateData).eq('id', id);
+                 if (error) console.error(`Error updating record ${id}:`, error);
+              }
+           }
+           updateCount += toUpdate.length;
+        }
+
+      } else {
+        const { error } = await supabase.from(config.table).insert(cleanData);
+        if (error) {
+          console.error("Supabase insert error:", error);
+          throw new Error(error.message);
+        }
+        insertCount += cleanData.length;
       }
+
+      const msgParts = [];
+      if (insertCount > 0) msgParts.push(`${insertCount} nuevos creados`);
+      if (updateCount > 0) msgParts.push(`${updateCount} existentes actualizados`);
+      if (msgParts.length === 0) msgParts.push("No se modificaron datos");
 
       setResults(prev => ({ 
         ...prev, 
         [moduleId]: { 
           success: true, 
-          message: `Carga completada exitosamente: ${jsonData.length} registros insertados.` 
+          message: `Carga completada: ${msgParts.join(' y ')}.` 
         } 
       }));
       

@@ -460,6 +460,9 @@ Responde de forma concisa.`;
           
           if (!response.ok) {
              const errText = await response.text();
+             if (response.status === 403) {
+                 return res.status(403).json({ error: "Forbidden", details: "No tiene acceso a esta patente" });
+             }
              console.error(`GPS Dominio API Error: ${response.status} ${response.statusText}`, errText);
              throw new Error(`GPS Dominio API Error: ${response.statusText} ${errText}`);
           }
