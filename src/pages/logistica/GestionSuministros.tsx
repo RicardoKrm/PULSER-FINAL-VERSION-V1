@@ -337,9 +337,15 @@ export default function GestionSuministros() {
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelectedItems(filteredData.map(item => item.id));
+      const paginatedIds = paginatedData.map(item => item.id);
+      const newSelected = [...selectedItems];
+      paginatedIds.forEach(id => {
+         if (!newSelected.includes(id)) newSelected.push(id);
+      });
+      setSelectedItems(newSelected);
     } else {
-      setSelectedItems([]);
+      const paginatedIds = paginatedData.map(item => item.id);
+      setSelectedItems(selectedItems.filter(id => !paginatedIds.includes(id)));
     }
   };
 
@@ -506,13 +512,29 @@ export default function GestionSuministros() {
       cancelButtonText: 'Cancelar'
     });
     if (res.isConfirmed) {
-      const { error } = await supabase.from('logistica_repuestos').delete().in('id', selectedItems);
-      if (!error) {
+      // Supabase URI limit avoidance
+      const CHUNK_SIZE = 100;
+      let hasError = false;
+      let lastErrorMessage = '';
+      
+      for (let i = 0; i < selectedItems.length; i += CHUNK_SIZE) {
+        const chunk = selectedItems.slice(i, i + CHUNK_SIZE);
+        const { error } = await supabase.from('logistica_repuestos').delete().in('id', chunk);
+        if (error) {
+          hasError = true;
+          lastErrorMessage = error.message;
+          console.error("Bulk Delete Error:", error);
+          break;
+        }
+      }
+
+      if (!hasError) {
         Swal.fire("Eliminados", "Repuestos eliminados correctamente", "success");
         setSelectedItems([]);
         loadData();
       } else {
-        Swal.fire("Error", "No se pudieron eliminar los repuestos", "error");
+        Swal.fire("Error", `Problema al eliminar repuestos: ${lastErrorMessage}`, "error");
+        loadData(); // reload anyway to show what was deleted
       }
     }
   };
@@ -1286,7 +1308,12 @@ export default function GestionSuministros() {
             <thead className="text-xs uppercase text-slate-500 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 font-medium whitespace-nowrap">
               <tr>
                 <th className="px-4 py-3 text-center w-10">
-                  <input type="checkbox" onChange={handleSelectAll} className="rounded border-slate-300" />
+                  <input 
+                    type="checkbox" 
+                    onChange={handleSelectAll} 
+                    checked={paginatedData.length > 0 && paginatedData.every(item => selectedItems.includes(item.id))}
+                    className="rounded border-slate-300" 
+                  />
                 </th>
                 <th className="px-4 py-3">NOMBRE REPUESTO <span className="font-light text-[10px]">▼</span></th>
                 <th className="px-4 py-3">SKU / N° PARTE <span className="font-light text-[10px]">▼</span></th>
@@ -1542,13 +1569,23 @@ export default function GestionSuministros() {
               onClick={async () => {
                 if (destinationBodega) {
                   try {
-                    const { error } = await supabase.from('logistica_repuestos')
-                      .update({ bodega_id: destinationBodega })
-                      .in('id', selectedItems);
-                      
-                    if (!error) {
-                      const destBodega = bodegasList.find(b => b.id === destinationBodega);
-                      const movs = selectedItems.map(itemId => {
+                    const destBodega = bodegasList.find(b => b.id === destinationBodega);
+                    const CHUNK_SIZE = 100;
+                    let hasError = false;
+
+                    for (let i = 0; i < selectedItems.length; i += CHUNK_SIZE) {
+                      const chunk = selectedItems.slice(i, i + CHUNK_SIZE);
+                      const { error } = await supabase.from('logistica_repuestos')
+                        .update({ bodega_id: destinationBodega })
+                        .in('id', chunk);
+
+                      if (error) {
+                        hasError = true;
+                        console.error('Update chunk error:', error);
+                        break;
+                      }
+
+                      const movs = chunk.map(itemId => {
                         const repItem = sumInsumosData.find(r => r.id === itemId);
                         return {
                           empresa_id: currentCompany.id,
@@ -1559,13 +1596,21 @@ export default function GestionSuministros() {
                           estado: 'COMPLETADO'
                         };
                       });
-                      await supabase.from('logistica_movimientos').insert(movs);
                       
+                      const { error: errorIns } = await supabase.from('logistica_movimientos').insert(movs);
+                      if (errorIns) {
+                        hasError = true;
+                        console.error('Insert chunk error:', errorIns);
+                        break;
+                      }
+                    }
+                      
+                    if (!hasError) {
                       setIsMoveModalOpen(false);
                       setIsSuccessModalOpen(true);
                       await loadData();
                     } else {
-                      Swal.fire("Error", "No se pudo realizar el movimiento", "error");
+                      Swal.fire("Error", "No se pudo realizar el movimiento completo", "error");
                     }
                   } catch (e) {
                      console.error(e);
