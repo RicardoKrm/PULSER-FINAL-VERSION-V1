@@ -664,19 +664,19 @@ export default function CargaMasiva() {
                   {selectedFile ? (
                     <div className="text-center">
                       <p className="font-bold text-slate-700 dark:text-slate-200 text-sm">
-                        {selectedFile.name}
+                        <span>{selectedFile.name}</span>
                       </p>
                       <p className="text-xs text-slate-400 mt-1">
-                        {(selectedFile.size / 1024).toFixed(1)} KB
+                        <span>{(selectedFile.size / 1024).toFixed(1)} KB</span>
                       </p>
                     </div>
                   ) : (
                     <div className="text-center pointer-events-none">
                       <p className="font-bold text-slate-600 dark:text-slate-300 text-sm">
-                        Arrastra tu archivo aquí
+                        <span>Arrastra tu archivo aquí</span>
                       </p>
                       <p className="text-xs text-slate-400 mt-1">
-                        o haz click para buscar (.xlsx, .csv)
+                        <span>o haz click para buscar (.xlsx, .csv)</span>
                       </p>
                     </div>
                   )}
@@ -686,7 +686,7 @@ export default function CargaMasiva() {
                 {result && (
                   <div className={`flex items-start gap-3 p-3 rounded-xl text-sm font-bold ${result.success ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100'}`}>
                     {result.success ? <CheckCircle2 className="w-5 h-5 flex-shrink-0" /> : <XCircle className="w-5 h-5 flex-shrink-0" />}
-                    {result.message}
+                    <span>{result.message}</span>
                   </div>
                 )}
 
@@ -708,14 +708,9 @@ export default function CargaMasiva() {
                     onClick={() => handleUpload(mod.id)}
                     className="bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl px-6 py-2 h-auto flex items-center gap-2 disabled:opacity-50"
                   >
-                    {isUploading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Procesando...
-                      </>
-                    ) : (
-                      'Cargar Datos'
-                    )}
+                    {isUploading && <Loader2 className="w-4 h-4 animate-spin" />}
+                    <span className={isUploading ? 'hidden' : ''}>Cargar Datos</span>
+                    <span className={!isUploading ? 'hidden' : ''}>Procesando...</span>
                   </Button>
                 </div>
               </div>
