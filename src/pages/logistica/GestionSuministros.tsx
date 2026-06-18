@@ -644,21 +644,23 @@ export default function GestionSuministros() {
                 {paginatedAuditoria.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
                     <td className="px-4 py-3 align-top whitespace-nowrap">
-                      <div className="font-bold text-slate-800 dark:text-slate-200 text-xs">{new Date(item.created_at).toLocaleDateString()}</div>
-                      <div className="text-[10px] text-slate-500">{new Date(item.created_at).toLocaleTimeString()}</div>
+                      <div className="font-bold text-slate-800 dark:text-slate-200 text-xs"><span>{new Date(item.created_at).toLocaleDateString()}</span></div>
+                      <div className="text-[10px] text-slate-500"><span>{new Date(item.created_at).toLocaleTimeString()}</span></div>
                     </td>
                     <td className="px-4 py-3 align-top">
                       <div className="font-bold text-blue-600 dark:text-blue-400 text-xs hover:underline cursor-pointer">
-                        {item.logistica_repuestos?.nombre || 'Repuesto Eliminado'}
+                        <span>{item.logistica_repuestos?.nombre || 'Repuesto Eliminado'}</span>
                       </div>
                       <div className="text-[10px] text-slate-400 mt-0.5">
-                        SKU: {item.logistica_repuestos?.sku || '--'}
+                        <span>SKU: {item.logistica_repuestos?.sku || '--'}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 align-top text-xs text-slate-600 dark:text-slate-400">{item.logistica_repuestos?.proveedor || '--'}</td>
+                    <td className="px-4 py-3 align-top text-xs text-slate-600 dark:text-slate-400"><span>{item.logistica_repuestos?.proveedor || '--'}</span></td>
                     <td className="px-4 py-3 align-top text-xs font-bold text-slate-700 dark:text-slate-300">
+                      <span>
                       {item.logistica_repuestos?.logistica_bodegas?.nombre ? `${item.logistica_repuestos?.logistica_bodegas?.nombre} - ` : ''}
                       {item.logistica_repuestos?.ubicacion || '--'}
+                      </span>
                     </td>
                     <td className="px-4 py-3 align-top text-center">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase
@@ -670,15 +672,15 @@ export default function GestionSuministros() {
                       </span>
                     </td>
                     <td className={`px-4 py-3 align-top text-center font-bold text-sm ${item.tipo === 'SALIDA' ? 'text-orange-500' : item.tipo === 'ENTRADA' ? 'text-emerald-500' : item.tipo === 'CORRECCIÓN_MANUAL' ? 'text-purple-500' : 'text-blue-500'}`}>
-                      {item.cantidad > 0 ? '+' : ''}{item.cantidad}
+                      <span>{item.cantidad > 0 ? '+' : ''}{item.cantidad}</span>
                     </td>
                     <td className="px-4 py-3 align-top">
                       <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-medium leading-tight">
-                        {item.notas || item.referencia}
+                        <span>{item.notas || item.referencia}</span>
                       </p>
                     </td>
                     <td className="px-4 py-3 align-top text-xs font-bold text-slate-600 dark:text-slate-400">
-                      {item.usuario_nombre || 'Sistema'}
+                      <span>{item.usuario_nombre || 'Sistema'}</span>
                     </td>
                   </tr>
                 ))}
@@ -1319,21 +1321,21 @@ export default function GestionSuministros() {
                     className="px-4 py-3 font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
                     onClick={() => setSelectedRepuestoDetalle(item)}
                   >
-                    {item.nombre}
+                    <span>{item.nombre}</span>
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs">{item.sku}</td>
-                  <td className="px-4 py-3">{item.proveedor}</td>
-                  <td className="px-4 py-3">{item.bodegaNombre ? `${item.bodegaNombre} - ${item.ubicacion}` : item.ubicacion}</td>
-                  <td className="px-4 py-3">{item.calidad?.toUpperCase() || '-'}</td>
+                  <td className="px-4 py-3 font-mono text-xs"><span>{item.sku}</span></td>
+                  <td className="px-4 py-3"><span>{item.proveedor}</span></td>
+                  <td className="px-4 py-3"><span>{item.bodegaNombre ? `${item.bodegaNombre} - ${item.ubicacion}` : item.ubicacion}</span></td>
+                  <td className="px-4 py-3"><span>{item.calidad?.toUpperCase() || '-'}</span></td>
                   <td className="px-4 py-3 text-center">
                     <span className={`font-bold ${item.isCritico ? 'bg-red-500 text-white px-2 py-0.5 rounded-md' : ''}`}>
                       {item.stock}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-center text-slate-500">{item.min}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{item.ultMov}</td>
-                  <td className="px-4 py-3 text-right">{formatCurrency(item.precio)}</td>
-                  <td className="px-4 py-3 text-right font-medium">{formatCurrency(item.valorTotal)}</td>
+                  <td className="px-4 py-3 text-center text-slate-500"><span>{item.min}</span></td>
+                  <td className="px-4 py-3 whitespace-nowrap"><span>{item.ultMov}</span></td>
+                  <td className="px-4 py-3 text-right"><span>{formatCurrency(item.precio)}</span></td>
+                  <td className="px-4 py-3 text-right font-medium"><span>{formatCurrency(item.valorTotal)}</span></td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center gap-1">
                       <button 
