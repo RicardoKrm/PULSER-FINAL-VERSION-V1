@@ -451,8 +451,9 @@ Responde de forma concisa.`;
       }
 
       try {
+          const cleanPatente = patente.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
           const fetchPage = async (page: number) => {
-              const url = `https://wiatool-back.kuvesoft.com/api/v1/vehiculos/datos/${patente}?desde=${desde}&hasta=${hasta}&pageSize=1000&page=${page}`;
+              const url = `https://wiatool-back.kuvesoft.com/api/v1/vehiculos/datos/${cleanPatente}?desde=${desde}&hasta=${hasta}&pageSize=1000&page=${page}`;
               let response = await fetch(url, {
                 headers: { 'Authorization': token },
                 signal: AbortSignal.timeout(10000)
@@ -468,7 +469,7 @@ Responde de forma concisa.`;
               if (!response.ok) {
                  const errText = await response.text();
                  if (response.status === 403) {
-                     throw new Error("403 Forbidden - No tiene acceso a esta patente");
+                     return { __is403: true, message: "403 Forbidden - No tiene acceso a esta patente" };
                  }
                  console.error(`GPS Dominio API Error: ${response.status} ${response.statusText}`, errText);
                  throw new Error(`GPS Dominio API Error: ${response.statusText} ${errText}`);
@@ -478,6 +479,12 @@ Responde de forma concisa.`;
           };
 
           let data = await fetchPage(1);
+
+          if (data.__is403) {
+             console.log(`[GPS API] Skipping vehicle ${patente} due to 403 Forbidden`);
+             return res.status(403).json({ error: "Forbidden", details: data.message });
+          }
+
           let allElements = data.elements || [];
           
           if (data.count && data.count > allElements.length) {
@@ -676,17 +683,26 @@ Responde de forma concisa.`;
                    const hasta = formatLocalStr(now);
                    
                    // Fetch actual points from Dominio provider
+                   const cleanPatente = v.patente ? v.patente.replace(/[^A-Za-z0-9]/g, '').toUpperCase() : '';
                    const fetchPage = async (page: number) => {
-                       const url = `https://wiatool-back.kuvesoft.com/api/v1/vehiculos/datos/${v.patente}?desde=${desde}&hasta=${hasta}&pageSize=1000&page=${page}`;
+                       const url = `https://wiatool-back.kuvesoft.com/api/v1/vehiculos/datos/${cleanPatente}?desde=${desde}&hasta=${hasta}&pageSize=1000&page=${page}`;
                        let response = await fetch(url, { headers: { 'Authorization': token }, signal: AbortSignal.timeout(10000) });
                        if (!response.ok && response.status === 401) {
                           response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` }, signal: AbortSignal.timeout(10000) });
                        }
-                       if (!response.ok) throw new Error("GPS API Error");
+                       if (!response.ok) {
+                           if (response.status === 403) {
+                               return { __is403: true };
+                           }
+                           throw new Error("GPS API Error");
+                       }
                        return await response.json();
                    };
 
                    let data = await fetchPage(1);
+                   if (data.__is403) {
+                       throw new Error("403 Forbidden"); // will be caught by the silent catch block below
+                   }
                    let allElements = data.elements || [];
                    if (data.count && data.count > allElements.length) {
                        const totalPages = Math.ceil(data.count / (data.pageSize || 100));
