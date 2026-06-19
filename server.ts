@@ -663,6 +663,17 @@ Responde de forma concisa.`;
                        newKm = km;
                        hasUpdate = true;
                    }
+                   if (registro.latitude !== undefined && registro.longitude !== undefined) {
+                       v.detalles = v.detalles || {};
+                       v.detalles.ultima_ubicacion = {
+                           lat: registro.latitude,
+                           lng: registro.longitude,
+                           velocidad: registro.speed || 0,
+                           heading: registro.course || 0,
+                           timestamp: registro.deviceTime || registro.fixTime || new Date().toISOString()
+                       };
+                       hasUpdate = true;
+                   }
                }
            } else if (prov === 'dominio') {
                try {
@@ -720,6 +731,19 @@ Responde de forma concisa.`;
                    if (data.elements && data.elements.length > 0) {
                       const sorted = data.elements.slice().sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
                       resultData.lastTimestamp = sorted[sorted.length - 1].timestamp;
+
+                      const lastPoint = sorted[sorted.length - 1];
+                      if (lastPoint && lastPoint.lat !== undefined && lastPoint.lng !== undefined) {
+                          v.detalles = v.detalles || {};
+                          v.detalles.ultima_ubicacion = {
+                              lat: lastPoint.lat,
+                              lng: lastPoint.lng,
+                              velocidad: lastPoint.speed || 0,
+                              heading: lastPoint.course || lastPoint.heading || 0,
+                              timestamp: lastPoint.timestamp || new Date().toISOString()
+                          };
+                          hasUpdate = true;
+                      }
                    }
 
                    updatedTimestamp = resultData.lastTimestamp;
@@ -732,19 +756,24 @@ Responde de forma concisa.`;
                }
            }
            
-           if (hasUpdate && newKm > (v.kilometraje_actual || 0) && !v.id.toString().startsWith('mock')) {
+           if (hasUpdate && !v.id.toString().startsWith('mock')) {
                const detalles = v.detalles || {};
-               newKm = Math.round(newKm * 100) / 100;
+               const updates: any = { detalles };
                
-               if (updatedTimestamp && !isNaN(new Date(updatedTimestamp).getTime())) {
-                   detalles.fecha_actualizacion_km = new Date(updatedTimestamp).toISOString();
-               } else {
-                   detalles.fecha_actualizacion_km = new Date().toISOString();
+               if (newKm > (v.kilometraje_actual || 0)) {
+                   newKm = Math.round(newKm * 100) / 100;
+                   updates.kilometraje_actual = newKm;
+                   
+                   if (updatedTimestamp && !isNaN(new Date(updatedTimestamp).getTime())) {
+                       detalles.fecha_actualizacion_km = new Date(updatedTimestamp).toISOString();
+                   } else {
+                       detalles.fecha_actualizacion_km = new Date().toISOString();
+                   }
                }
                
-               const { error } = await supabase.from('vehiculo').update({ kilometraje_actual: newKm, detalles }).eq('id', v.id);
+               const { error } = await supabase.from('vehiculo').update(updates).eq('id', v.id);
                if (!error) {
-                   console.log(`[GPS Cron] Successfully updated vehicle ${v.patente} to ${newKm} km`);
+                   console.log(`[GPS Cron] Successfully updated vehicle ${v.patente}`);
                } else {
                    console.error(`[GPS Cron] Failed to update vehicle ${v.patente}:`, error);
                }

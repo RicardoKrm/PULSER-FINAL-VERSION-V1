@@ -133,9 +133,10 @@ export default function GPS() {
 
           const liveDataPromises = configured.map(async (v, i) => {
              const prov = v.detalles?.gps_proveedor;
-             let lat = -20.590 + (Math.random() * 0.1 - 0.05);
-             let lng = -69.310 + (Math.random() * 0.1 - 0.05);
-             let velocidad = 0;
+             
+             let lat = v.detalles?.ultima_ubicacion?.lat !== undefined ? v.detalles.ultima_ubicacion.lat : -20.590 + (Math.random() * 0.1 - 0.05);
+             let lng = v.detalles?.ultima_ubicacion?.lng !== undefined ? v.detalles.ultima_ubicacion.lng : -69.310 + (Math.random() * 0.1 - 0.05);
+             let velocidad = v.detalles?.ultima_ubicacion?.velocidad || 0;
              let newKm = v.kilometraje_actual || 0;
              let gpsName = prov || 'dominio';
              let updatedTimestamp: string | null = null;

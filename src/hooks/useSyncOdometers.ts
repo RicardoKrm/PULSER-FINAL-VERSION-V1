@@ -107,22 +107,29 @@ export function useSyncOdometers(activeCompanyId: string | null, setVehiculos?: 
                  // Keep it as is
             }
 
-            if (hasUpdate && newKm > (v.kilometraje_actual || 0) && !v.id.toString().startsWith('mock')) {
+            if (hasUpdate && !v.id.toString().startsWith('mock')) {
                 const detalles = v.detalles || {};
+                const updates: any = { detalles };
                 
-                // Asegurarse de mantener precision de Km
-                newKm = Math.round(newKm * 100) / 100;
-                
-                if (updatedTimestamp && !isNaN(new Date(updatedTimestamp).getTime())) {
-                    detalles.fecha_actualizacion_km = new Date(updatedTimestamp).toISOString();
-                } else {
-                    detalles.fecha_actualizacion_km = new Date().toISOString();
+                if (newKm > (v.kilometraje_actual || 0)) {
+                    // Asegurarse de mantener precision de Km
+                    newKm = Math.round(newKm * 100) / 100;
+                    updates.kilometraje_actual = newKm;
+                    
+                    if (updatedTimestamp && !isNaN(new Date(updatedTimestamp).getTime())) {
+                        detalles.fecha_actualizacion_km = new Date(updatedTimestamp).toISOString();
+                    } else {
+                        detalles.fecha_actualizacion_km = new Date().toISOString();
+                    }
                 }
-                const { error } = await supabase.from('vehiculo').update({ kilometraje_actual: newKm, detalles }).eq('id', v.id);
+                
+                const { error } = await supabase.from('vehiculo').update(updates).eq('id', v.id);
                 if (!error) {
-                    console.log(`BG Sync updated Vehiculo ${v.patente} to newKm: ${newKm}`);
-                    if (setVehiculos) {
-                        setVehiculos(prev => prev.map(veh => veh.id === v.id ? { ...veh, kilometraje_actual: newKm } : veh));
+                    console.log(`BG Sync updated Vehiculo ${v.patente}`);
+                    if (setVehiculos && updates.kilometraje_actual) {
+                        setVehiculos(prev => prev.map(veh => veh.id === v.id ? { ...veh, kilometraje_actual: newKm, detalles: { ...veh.detalles, ...detalles } } : veh));
+                    } else if (setVehiculos) {
+                        setVehiculos(prev => prev.map(veh => veh.id === v.id ? { ...veh, detalles: { ...veh.detalles, ...detalles } } : veh));
                     }
                 }
             }
