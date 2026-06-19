@@ -142,27 +142,45 @@ export default function GestionSuministros() {
   }, [loadData]);
 
   const handleTerminalSubmit = async () => {
-    if (!currentCompany?.id || !terminalForm.bodegaId) {
-       Swal.fire("Error", "Seleccione una bodega", "error");
+    if (!currentCompany?.id) {
        return;
     }
     
     try {
-       // Check if SKU exists
-       const { data: rep, error: rErr } = await supabase.from('logistica_repuestos')
+       // Find SKU in all bodegas
+       const { data: reps, error: rErr } = await supabase.from('logistica_repuestos')
          .select('*')
          .eq('empresa_id', currentCompany.id)
-         .eq('bodega_id', terminalForm.bodegaId)
-         .eq('sku', terminalForm.sku).single();
+         .eq('sku', terminalForm.sku);
+
+       let rep = null;
+       if (reps && reps.length > 0) {
+           rep = reps.find(r => r.bodega_id === terminalForm.bodegaId);
+           if (!rep) {
+               // Auto-detect other bodega if not found in selected
+               if (terminalForm.tipoMovimiento === 'SALIDA') {
+                   rep = reps.find(r => r.stock >= terminalForm.cantidad) || reps[0];
+               } else if (!terminalForm.bodegaId) {
+                   // If ENTRADA and no bodega selected, auto-detect the existing one
+                   rep = reps[0];
+               }
+               // If ENTRADA and a SPECIFIC bodega was selected but not found, 
+               // we deliberately leave rep = null so it goes to validation as a new product in that bodega.
+           }
+       }
 
        let repId = rep?.id;
        let requiresValidation = false;
          
        if (!rep) {
           if (terminalForm.tipoMovimiento === 'ENTRADA') {
+             if (!terminalForm.bodegaId) {
+                Swal.fire("Error", "Seleccione una bodega destino para este nuevo SKU", "error");
+                return;
+             }
              requiresValidation = true;
           } else {
-             Swal.fire("Error", "SKU no encontrado en esta bodega, no puede extraer stock", "error");
+             Swal.fire("Error", "SKU no encontrado en ninguna bodega, no puede extraer stock", "error");
              return;
           }
        }
@@ -196,7 +214,7 @@ export default function GestionSuministros() {
              estado: 'COMPLETADO'
           });
           
-          Swal.fire("Éxito", "Movimiento procesado", "success");
+          Swal.fire("Éxito", `Movimiento procesado correctamente.`, "success");
           
           // Refetch
           await loadData();
@@ -1703,7 +1721,7 @@ export default function GestionSuministros() {
               value={terminalForm.bodegaId}
               onChange={(e) => setTerminalForm({...terminalForm, bodegaId: e.target.value})}
             >
-              <option value="">Seleccione una bodega...</option>
+              <option value="">{terminalForm.tipoMovimiento === 'SALIDA' ? 'Auto-detectar bodega...' : 'Seleccione una bodega...'}</option>
               {bodegasList.map((b) => (
                 <option key={b.id} value={b.id}>{b.nombre}</option>
               ))}
