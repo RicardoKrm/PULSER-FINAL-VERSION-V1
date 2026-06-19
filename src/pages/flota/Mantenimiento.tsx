@@ -205,99 +205,15 @@ export default function PizarraMantenimiento() {
   };
 
   useEffect(() => {
-    fetchVehiculos().then(async (vehiculosRaw) => {
-       if (vehiculosRaw && vehiculosRaw.length > 0) {
-           await syncAllGPS(vehiculosRaw);
-       }
-    });
+    fetchVehiculos();
+    
+    // Auto-refresh the Pizarra every 1 minute to reflect background GPS updates
+    const intervalId = setInterval(() => {
+      fetchVehiculos();
+    }, 60000);
+    
+    return () => clearInterval(intervalId);
   }, [currentCompany?.id]);
-
-  const syncAllGPS = async (vehiculosRaw: any[]) => {
-      // The fixed API token for this company as requested
-      const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiaWF0IjoxNzgwNTk0MDAxLCJleHAiOjQ5MzQxOTQwMDF9.XSMC_zxhn-d_BXzsWLuILtVkep4QxIhekRBGR0Hc8WA';
-      // In production, we'd normally check if a vehicle or company has this integration enabled.
-      // For this specific urgent request, we will check the two mentioned patentes, or we can check any that have a valid response.
-      // We will attempt sync for BBWB-48 and LDTP-16 or perhaps others as requested: "tengo 2 vehiculos en 1 empresa que ya me contrataron!!"
-      const targetPatentes = ['BBWB48', 'LDTP16'];
-      
-      let wasUpdated = false;
-
-      for (const v of vehiculosRaw) {
-          if (!v.patente) continue;
-          const patenteClean = v.patente.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-          if (!targetPatentes.includes(patenteClean)) continue;
-
-          let desdeDate = v.detalles?.fecha_actualizacion_km ? new Date(v.detalles.fecha_actualizacion_km) : null;
-          if (!desdeDate || isNaN(desdeDate.getTime())) {
-             desdeDate = new Date();
-             desdeDate.setDate(desdeDate.getDate() - 1);
-          }
-          
-          const now = new Date();
-          // Skip if we already synced recently (e.g. within 60 minutes) to avoid rate limits on excessive refreshes
-          if (now.getTime() - desdeDate.getTime() < 60 * 60 * 1000) {
-              continue;
-          }
-
-          const formatLocalStr = (d: Date) => {
-             const pad = (n: number) => n.toString().padStart(2, '0');
-             return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-          };
-
-          const desde = formatLocalStr(desdeDate);
-          const hasta = formatLocalStr(now);
-
-          try {
-             console.log(`syncAllGPS: fetching data for ${v.patente} from ${desde} to ${hasta}`);
-             const res = await fetch('/api/gps/dominio', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ patente: v.patente, desde, hasta, token })
-             });
-             
-             if (res.ok) {
-                 const data = await res.json();
-                 console.log(`syncAllGPS data for ${v.patente}:`, data);
-                 if (data && data.totalKm && data.totalKm > 0) {
-                     const kmsActuales = typeof v.kilometraje_actual === 'number' ? v.kilometraje_actual : parseFloat(String(v.kilometraje_actual || '0').replace(/[^0-9.-]+/g, '')) || 0;
-                     const nuevoKm = kmsActuales + data.totalKm;
-                     
-                     // get existing details
-                     const detalles = v.detalles || {};
-                     const baseKmPromedio = v.km_promedio_dia || detalles.kmPromedioDia || 0;
-                     
-                     detalles.fecha_actualizacion_km = data.lastTimestamp && !isNaN(new Date(data.lastTimestamp).getTime()) ? new Date(data.lastTimestamp).toISOString() : now.toISOString();
-
-                     const updatePayload = {
-                         kilometraje_actual: Math.round(nuevoKm), // typically odometers are ints or round manually
-                         updated_at: now.toISOString(),
-                         km_promedio_dia: baseKmPromedio,
-                         detalles
-                     };
-                     console.log(`syncAllGPS updating ${v.patente} with:`, updatePayload);
-                     const { error } = await supabase.from('vehiculo').update(updatePayload).eq('id', v.id);
-
-                     if (!error) {
-                         console.log(`GPS Synced for ${v.patente}: added ${data.totalKm} km. New total: ${nuevoKm}`);
-                         wasUpdated = true;
-                     } else {
-                         console.error(`syncAllGPS update error for ${v.patente}:`, error);
-                     }
-                 } else {
-                     console.log(`syncAllGPS: no new totalKm for ${v.patente}`, data);
-                 }
-             } else {
-                 console.error(`syncAllGPS request failed for ${v.patente}:`, res.status, res.statusText);
-             }
-          } catch(e) {
-             console.error(`Error syncing GPS for ${v.patente}:`, e);
-          }
-      }
-
-      if (wasUpdated) {
-          fetchVehiculos();
-      }
-  };
 
   const handleGuardarKM = async () => {
     if (!vehiculoSeleccionadoKM || !nuevoKM || !fechaRegistroKM) return;

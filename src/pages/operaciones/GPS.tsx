@@ -80,7 +80,7 @@ export default function GPS() {
 
   const [vehiculosGPS, setVehiculosGPS] = useState<any[]>(initialVehicles);
 
-  const fetchGpsVehicles = async (updateOdometer = false) => {
+  const fetchGpsVehicles = async (updateOdometer = true) => {
     if (!activeCompanyId) return;
 
     try {
@@ -231,7 +231,12 @@ export default function GPS() {
                  } else {
                      detalles.fecha_actualizacion_km = new Date().toISOString();
                  }
-                 await supabase.from('vehiculo').update({ kilometraje_actual: newKm, detalles }).eq('id', v.id);
+                 const { error: updError } = await supabase.from('vehiculo').update({ kilometraje_actual: newKm, detalles }).eq('id', v.id);
+                 if (updError) {
+                     console.error("Error updating vehiculo:", updError);
+                 } else {
+                     console.log(`Vehiculo ${v.patente} updated on DB, newKm: ${newKm}`);
+                 }
              }
 
              return {

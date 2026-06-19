@@ -2,6 +2,14 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import dotenv from "dotenv";
+import { createClient } from "@supabase/supabase-js";
+
+dotenv.config();
+
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "";
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || "";
+const supabase = SUPABASE_URL && SUPABASE_ANON_KEY ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 async function startServer() {
   const app = express();
@@ -489,7 +497,7 @@ Responde de forma concisa.`;
               data.elements = allElements;
           }
           
-          const resultData = calculateOdometer(data);
+          const resultData: any = calculateOdometer(data);
           
           // attach the last timestamp so client knows exactly up to when data was synced
           if (data.elements && data.elements.length > 0) {
@@ -567,6 +575,177 @@ Responde de forma concisa.`;
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
+
+  // Start background GPS Cron job
+  if (supabase) {
+    const runGpsCronJob = async () => {
+      console.log("[GPS Cron] starting hourly sync run...");
+      try {
+        const { data: vehiculos, error: vehError } = await supabase.from('vehiculo').select('id, patente, kilometraje_actual, detalles, empresa_id');
+        const { data: empresas, error: empError } = await supabase.from('empresa').select('id, detalles');
+        
+        if (vehError || empError || !vehiculos || !empresas) {
+           console.error("[GPS Cron] Error fetching data from Supabase:", vehError, empError);
+           return;
+        }
+
+        const empresasMap = new Map(empresas.map((e: any) => [e.id, e]));
+
+        // Find configured vehicles
+        const configured = vehiculos.filter((v: any) => {
+            if (v.detalles?.gps_proveedor) return true;
+            return false;
+        });
+
+        if (configured.length === 0) {
+            console.log("[GPS Cron] No configured vehicles found for sync.");
+            return;
+        }
+
+        // We will call the local APIs internally or replicate the API call logic.
+        // For GPS2
+        // We'll group by company to avoid redundant GPS2 logins
+        const empresaIds = Array.from(new Set(configured.map((v: any) => v.empresa_id)));
+        const traccarDataByEmpresa = new Map<string, any[]>();
+        
+        for (const empId of empresaIds) {
+            const emp: any = empresasMap.get(empId);
+            const apiKeys = emp?.detalles?.gps_config || {};
+            if (apiKeys.traccar_url && apiKeys.traccar_user && apiKeys.traccar_pass) {
+               try {
+                  const url = new URL("/api/session", apiKeys.traccar_url).toString();
+                  const encodedStr = Buffer.from(apiKeys.traccar_user + ":" + apiKeys.traccar_pass).toString('base64');
+                  const response = await fetch(url, { headers: { 'Authorization': 'Basic ' + encodedStr } });
+                  if (response.ok) {
+                     let cookie = response.headers.get("set-cookie") || "";
+                     const devicesUrl = new URL("/api/devices", apiKeys.traccar_url).toString();
+                     const resDev = await fetch(devicesUrl, { headers: { "Cookie": cookie } });
+                     if (resDev.ok) {
+                        const parsed = await resDev.json();
+                        const positionsUrl = new URL("/api/positions", apiKeys.traccar_url).toString();
+                        const resPos = await fetch(positionsUrl, { headers: { "Cookie": cookie } });
+                        let positions: any[] = [];
+                        if (resPos.ok) positions = await resPos.json();
+                        
+                        const merged = (Array.isArray(parsed) ? parsed : []).map((dev: any) => {
+                            const pos = positions.find((p: any) => p.deviceId === dev.id);
+                            return { ...dev, odometer: pos?.attributes?.totalDistance ? pos.attributes.totalDistance / 1000 : undefined };
+                        });
+                        traccarDataByEmpresa.set(empId, merged);
+                     }
+                  }
+               } catch (e) {
+                  console.error(`[GPS Cron] Error fetching traccar for company ${empId}:`, e);
+               }
+            }
+        }
+
+        // Process each vehicle
+        for (const v of configured) {
+           const prov = v.detalles?.gps_proveedor;
+           let newKm = v.kilometraje_actual || 0;
+           let updatedTimestamp: string | null = null;
+           let hasUpdate = false;
+           
+           if (prov === 'traccar') {
+               const gData = traccarDataByEmpresa.get(v.empresa_id) || [];
+               const registro = gData.find((x: any) => x.plateNumber === v.patente || x.name === v.patente);
+               if (registro && registro.odometer) {
+                   const km = parseInt(registro.odometer);
+                   if (km > newKm) {
+                       newKm = km;
+                       hasUpdate = true;
+                   }
+               }
+           } else if (prov === 'dominio') {
+               try {
+                   const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiaWF0IjoxNzgwNTk0MDAxLCJleHAiOjQ5MzQxOTQwMDF9.XSMC_zxhn-d_BXzsWLuILtVkep4QxIhekRBGR0Hc8WA';
+                   const now = new Date();
+                   let past = v.detalles?.fecha_actualizacion_km ? new Date(v.detalles.fecha_actualizacion_km) : null;
+                   
+                   if (!past || isNaN(past.getTime())) {
+                       past = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                   }
+                   
+                   const formatLocalStr = (d: Date) => {
+                      const pad = (n: number) => n.toString().padStart(2, '0');
+                      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+                   };
+
+                   const desde = formatLocalStr(past);
+                   const hasta = formatLocalStr(now);
+                   
+                   // Fetch actual points from Dominio provider
+                   const fetchPage = async (page: number) => {
+                       const url = `https://wiatool-back.kuvesoft.com/api/v1/vehiculos/datos/${v.patente}?desde=${desde}&hasta=${hasta}&pageSize=1000&page=${page}`;
+                       let response = await fetch(url, { headers: { 'Authorization': token }, signal: AbortSignal.timeout(10000) });
+                       if (!response.ok && response.status === 401) {
+                          response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` }, signal: AbortSignal.timeout(10000) });
+                       }
+                       if (!response.ok) throw new Error("GPS API Error");
+                       return await response.json();
+                   };
+
+                   let data = await fetchPage(1);
+                   let allElements = data.elements || [];
+                   if (data.count && data.count > allElements.length) {
+                       const totalPages = Math.ceil(data.count / (data.pageSize || 100));
+                       const maxPages = Math.min(totalPages, 500);
+                       for (let p = 2; p <= maxPages; p++) {
+                           try {
+                               const pageData = await fetchPage(p);
+                               if (pageData.elements) allElements = allElements.concat(pageData.elements);
+                           } catch (err) { break; }
+                       }
+                       data.elements = allElements;
+                   }
+
+                   const resultData: any = calculateOdometer(data);
+                   if (data.elements && data.elements.length > 0) {
+                      const sorted = data.elements.slice().sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+                      resultData.lastTimestamp = sorted[sorted.length - 1].timestamp;
+                   }
+
+                   updatedTimestamp = resultData.lastTimestamp;
+                   if (resultData.totalKm && resultData.totalKm > 0) {
+                        newKm += resultData.totalKm;
+                        hasUpdate = true;
+                   }
+               } catch(e) {
+                   // silent fail for individual vehicle
+               }
+           }
+           
+           if (hasUpdate && newKm > (v.kilometraje_actual || 0) && !v.id.toString().startsWith('mock')) {
+               const detalles = v.detalles || {};
+               newKm = Math.round(newKm * 100) / 100;
+               
+               if (updatedTimestamp && !isNaN(new Date(updatedTimestamp).getTime())) {
+                   detalles.fecha_actualizacion_km = new Date(updatedTimestamp).toISOString();
+               } else {
+                   detalles.fecha_actualizacion_km = new Date().toISOString();
+               }
+               
+               const { error } = await supabase.from('vehiculo').update({ kilometraje_actual: newKm, detalles }).eq('id', v.id);
+               if (!error) {
+                   console.log(`[GPS Cron] Successfully updated vehicle ${v.patente} to ${newKm} km`);
+               } else {
+                   console.error(`[GPS Cron] Failed to update vehicle ${v.patente}:`, error);
+               }
+           }
+        }
+        console.log("[GPS Cron] Hourly sync run completed.");
+      } catch (err) {
+        console.error("[GPS Cron] Unexpected error:", err);
+      }
+    };
+
+    // run initially after 30 seconds
+    setTimeout(runGpsCronJob, 30000);
+
+    // then run every 1 hour (3600000 ms)
+    setInterval(runGpsCronJob, 3600000);
+  }
 }
 
 startServer();

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, logActividad } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import { useCompany } from '../contexts/CompanyContext';
+import { useSyncOdometers } from '../hooks/useSyncOdometers';
 import Swal from 'sweetalert2';
 import { ReservaTurismo, Conductor, Vehiculo, OrdenDeTrabajo, PautaMantenimiento, TareaEstandar, TipoFalla, KitRepuesto, Usuario, Proveedor, Collaborator, Repuesto } from '../types';
 
@@ -55,6 +56,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [repuestos, setRepuestos] = useState<Repuesto[]>([]);
   const { profile } = useAuth();
   const { activeCompanyId } = useCompany();
+
+  // Activa la sincronización del GPS en background cada vez que exista una compañía activa
+  useSyncOdometers(activeCompanyId, setVehiculos);
 
   const fetchAllData = React.useCallback(async () => {
     if (!activeCompanyId) return;

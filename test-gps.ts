@@ -22,7 +22,7 @@ async function test() {
       })
    });
    
-   const data = await res.json();
+   const data: any = await res.json();
    console.log("24h km:", data.totalKm);
 }
 test();

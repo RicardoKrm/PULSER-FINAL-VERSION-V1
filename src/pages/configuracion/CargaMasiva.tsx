@@ -282,6 +282,7 @@ const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[
   },
   reservas: { 
     table: 'operacion_reserva', 
+    matchKey: 'codigo_reserva',
     mapConfig: (r: any) => ({ codigo_reserva: r.CodigoReserva, cliente: r.Cliente, fecha_servicio: r.FechaServicio, origen: r.Origen, destino: r.Destino, pasajeros: r.Pasajeros }) 
   }
 };
