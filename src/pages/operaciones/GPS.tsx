@@ -90,20 +90,7 @@ export default function GPS() {
        ]);
        
        if (vehiculosRes.data && !vehiculosRes.error) {
-          const targetPatentes = ['BBWB48', 'LDTP16'];
-          let configured = vehiculosRes.data.filter(v => {
-            if (v.detalles?.gps_proveedor) return true;
-            if (!v.patente) return false;
-            const patenteClean = v.patente.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-            return targetPatentes.includes(patenteClean);
-          });
-          
-          if (configured.length === 0) {
-              configured = [
-                 { id: 'mock-1', patente: 'BBWB-48', kilometraje_actual: 801238, detalles: { gps_proveedor: 'dominio' } },
-                 { id: 'mock-2', patente: 'LDTP-16', kilometraje_actual: 203193, detalles: { gps_proveedor: 'dominio' } }
-              ];
-          }
+          let configured = vehiculosRes.data;
           
           let apiKeys: any = {};
           if (configRes.data && configRes.data.detalles) {
@@ -174,7 +161,7 @@ export default function GPS() {
                          if (km > newKm) newKm = km;
                      }
                  }
-             } else if (prov === 'dominio' || (v.patente && targetPatentes.includes(v.patente.replace(/[^A-Z0-9]/gi, '').toUpperCase()))) {
+             } else if (prov === 'dominio' || !prov) {
                 gpsName = 'dominio';
                 try {
                     const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiaWF0IjoxNzgwNTk0MDAxLCJleHAiOjQ5MzQxOTQwMDF9.XSMC_zxhn-d_BXzsWLuILtVkep4QxIhekRBGR0Hc8WA';
