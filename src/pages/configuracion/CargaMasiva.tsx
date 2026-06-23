@@ -83,8 +83,18 @@ const parseCurrencyCLP = (val: any) => {
   let str = String(val).replace(/\$/g, '').trim();
   str = str.replace(/\./g, ''); // Remover puntos (separadores de miles en formato chileno)
   str = str.replace(/,/g, '.'); // Convertir coma a punto decimal por si acaso
+  str = str.replace(/\s/g, ''); // Remover espacios en blanco
   const num = parseFloat(str);
   return isNaN(num) ? 0 : num;
+};
+
+const getValByKey = (obj: any, possibleKeys: string[]) => {
+  const keys = Object.keys(obj);
+  for (const pk of possibleKeys) {
+    const foundKey = keys.find(k => k.toLowerCase().trim() === pk.toLowerCase().trim());
+    if (foundKey) return obj[foundKey];
+  }
+  return undefined;
 };
 
 const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[], mapConfig: (r: any) => any }> = {
@@ -144,14 +154,14 @@ const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[
     table: 'logistica_repuestos', 
     matchKey: 'sku',
     mapConfig: (r: any) => ({
-      sku: r.numero_parte || r.Codigo || r.SKU,
-      nombre: r.nombre || r.Nombre || r.Repuesto,
-      calidad: r.calidad || r.Calidad,
-      stock: r.stock_actual || r.StockInicial || r.Stock || 0,
-      min_stock: r.stock_minim || r.stock_minimo || r.StockMinimo || 0,
-      ubicacion: r.ubicacion || r.Ubicacion,
-      proveedor: r.proveedor_habitua || r.proveedor_habitual || r.ProveedorPrincipal || r.Proveedor,
-      precio: parseCurrencyCLP(r.precio_unitario || r.PrecioUnitario || r.Precio)
+      sku: getValByKey(r, ['numero_parte', 'Codigo', 'SKU', 'numero', 'parte', 'nro_parte', 'codigo']),
+      nombre: getValByKey(r, ['nombre', 'Repuesto', 'descripcion']),
+      calidad: getValByKey(r, ['calidad']),
+      stock: getValByKey(r, ['stock_actual', 'StockInicial', 'Stock', 'stockinicial', 'stock']) || 0,
+      min_stock: getValByKey(r, ['stock_minim', 'stock_minimo', 'StockMinimo', 'minimo']) || 0,
+      ubicacion: getValByKey(r, ['ubicacion', 'Ubicacion']),
+      proveedor: getValByKey(r, ['proveedor_habitua', 'proveedor_habitual', 'ProveedorPrincipal', 'Proveedor']),
+      precio: parseCurrencyCLP(getValByKey(r, ['precio_unitario', 'PrecioUnitario', 'Precio', 'precio']))
     }) 
   },
   bodegas: { 
