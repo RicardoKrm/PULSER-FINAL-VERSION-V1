@@ -77,6 +77,16 @@ const parseExcelDate = (excelDate: any) => {
   return undefined;
 };
 
+const parseCurrencyCLP = (val: any) => {
+  if (val === null || val === undefined || val === '') return 0;
+  if (typeof val === 'number') return val;
+  let str = String(val).replace(/\$/g, '').trim();
+  str = str.replace(/\./g, ''); // Remover puntos (separadores de miles en formato chileno)
+  str = str.replace(/,/g, '.'); // Convertir coma a punto decimal por si acaso
+  const num = parseFloat(str);
+  return isNaN(num) ? 0 : num;
+};
+
 const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[], mapConfig: (r: any) => any }> = {
   empleados: { 
     table: 'colaborador', 
@@ -92,8 +102,8 @@ const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[
         apellido_materno: r.Ap_Materno || '',
         sexo: r.Sexo || 'HOMBRE',
         departamento: r.Departament || r.Departamento || '',
-        sueldo_base: parseFloat((r.Sueldo_Base || '0').toString().replace(/[^0-9.-]+/g,"")),
-        valor_hh: parseFloat((r['HH_$'] || r.Valor_HH || '0').toString().replace(/[^0-9.-]+/g,"")),
+        sueldo_base: parseCurrencyCLP(r.Sueldo_Base),
+        valor_hh: parseCurrencyCLP(r['HH_$'] || r.Valor_HH),
         hh_extras: parseFloat((r.HH_Extras || '0').toString().replace(/[^0-9.-]+/g,"")),
         prestador_de_servicio: r.Prestador_de_servicio || r.Prestador_de_s || ''
       }
@@ -138,10 +148,10 @@ const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[
       nombre: r.nombre || r.Nombre || r.Repuesto,
       calidad: r.calidad || r.Calidad,
       stock: r.stock_actual || r.StockInicial || r.Stock || 0,
-      min_stock: r.stock_minimo || r.StockMinimo || 0,
+      min_stock: r.stock_minim || r.stock_minimo || r.StockMinimo || 0,
       ubicacion: r.ubicacion || r.Ubicacion,
-      proveedor: r.proveedor_habitual || r.ProveedorPrincipal || r.Proveedor,
-      precio: r.precio_unitario ? parseFloat(r.precio_unitario.toString().replace(/[^0-9.-]+/g,"")) : (r.PrecioUnitario || r.Precio || 0)
+      proveedor: r.proveedor_habitua || r.proveedor_habitual || r.ProveedorPrincipal || r.Proveedor,
+      precio: parseCurrencyCLP(r.precio_unitario || r.PrecioUnitario || r.Precio)
     }) 
   },
   bodegas: { 
@@ -238,7 +248,7 @@ const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[
   suministros: { 
     table: 'suministro', 
     matchKey: 'codigo_suministro',
-    mapConfig: (r: any) => ({ codigo_suministro: r.CodigoSuministro, nombres: r.Nombres, tipo: r.Tipo, stock: r.Stock, precio_unitario: r.PrecioUnitario }) 
+    mapConfig: (r: any) => ({ codigo_suministro: r.CodigoSuministro, nombres: r.Nombres, tipo: r.Tipo, stock: r.Stock, precio_unitario: parseCurrencyCLP(r.PrecioUnitario) }) 
   },
   ots: { 
     table: 'orden_de_trabajo', 
@@ -273,8 +283,8 @@ const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[
         kilometraje_apertura: parseFloat(String(kmA || 0).replace(/[^0-9.-]+/g,"")),
         kilometraje_cierre: kmC ? parseFloat(String(kmC).replace(/[^0-9.-]+/g,"")) : undefined,
         tecnico_responsable: getVal(['RESPONS', 'TECNI']),
-        costo_insumos: parseFloat(String(getVal(['INSUM']) || 0).replace(/[^0-9.-]+/g,"")),
-        costo_mano_obra_tareas: parseFloat(String(getVal(['MANO', 'COSTO MA']) || 0).replace(/[^0-9.-]+/g,"")),
+        costo_insumos: parseCurrencyCLP(getVal(['INSUM'])),
+        costo_mano_obra_tareas: parseCurrencyCLP(getVal(['MANO', 'COSTO MA'])),
         observacion_inicial: getVal(['TAREA', 'OBSERV']),
         tipo_falla: getVal(['FALLA'])
       };

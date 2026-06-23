@@ -143,7 +143,7 @@ const router = createBrowserRouter([
       { path: "configuracion/vehiculos", element: <Vehiculos /> },
       { path: "configuracion/gps", element: <ConfiguracionGPS /> },
       { path: "configuracion/pausas", element: <GestionPausas /> },
-      { path: "configuracion/rutas", element: <GestionRutas /> },
+      { path: "operaciones/rutas", element: <GestionRutas /> },
       { path: "configuracion/carga-masiva", element: <CargaMasiva /> },
       { path: "herramientas/kits", element: <GestionKits /> },
       { path: "compras/ordenes", element: <OrdenesCompra /> },

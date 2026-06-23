@@ -99,7 +99,7 @@ export default async function handler(req, res) {
         data.elements = allElements;
     }
     
-    const resultData = calculateOdometer(data);
+    const resultData: any = calculateOdometer(data);
     
     // attach the last timestamp so client knows exactly up to when data was synced
     if (data.elements && data.elements.length > 0) {

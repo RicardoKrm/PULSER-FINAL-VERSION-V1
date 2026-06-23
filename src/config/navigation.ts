@@ -80,6 +80,7 @@ export const navigation = [
       { title: 'Historial', icon: Activity, href: '/operaciones/historial' },
       { title: 'GPS FleetSat', icon: MapPin, href: '/operaciones/gps' },
       { title: 'Portal Conductor', icon: UserCircle, href: '/operaciones/portal-conductor' },
+      { title: 'Gestión de Rutas', icon: MapIcon, href: '/operaciones/rutas' },
     ],
   },
   {
@@ -171,7 +172,6 @@ export const navigation = [
       { title: 'Gestión de Vehículos', icon: Archive, href: '/configuracion/vehiculos' },
       { title: 'Kit de Repuestos', icon: Package, href: '/herramientas/kits' },
       { title: 'Gestión de Pausas', icon: Clock, href: '/configuracion/pausas' },
-      { title: 'Gestión de Rutas', icon: MapIcon, href: '/configuracion/rutas' },
       { title: 'Carga Masiva', icon: Zap, href: '/configuracion/carga-masiva' },
     ],
   },
