@@ -172,10 +172,17 @@ export default function GestionSuministros() {
     
     try {
        // Find SKU in all bodegas
-       const { data: reps, error: rErr } = await supabase.from('logistica_repuestos')
-         .select('*')
-         .eq('empresa_id', currentCompany.id)
-         .eq('sku', terminalForm.sku);
+       let query = supabase.from('logistica_repuestos')
+         .select('*, logistica_bodegas(nombre)')
+         .eq('empresa_id', currentCompany.id);
+       
+       if (terminalForm.repuestoId) {
+           query = query.eq('id', terminalForm.repuestoId);
+       } else {
+           query = query.eq('sku', terminalForm.sku);
+       }
+
+       const { data: reps, error: rErr } = await query;
 
        let rep = null;
        if (reps && reps.length > 0) {
@@ -205,6 +212,11 @@ export default function GestionSuministros() {
              requiresValidation = true;
           } else {
              Swal.fire("Error", "SKU no encontrado en ninguna bodega, no puede extraer stock", "error");
+             return;
+          }
+       } else if (terminalForm.tipoMovimiento === 'SALIDA') {
+          if (rep.stock < terminalForm.cantidad) {
+             Swal.fire("Error", `Stock insuficiente. Stock actual en ${rep.logistica_bodegas?.nombre || 'la bodega'}: ${rep.stock} unidades.`, "error");
              return;
           }
        }
@@ -246,7 +258,7 @@ export default function GestionSuministros() {
        
        setIsTerminalModalOpen(false);
        setTerminalForm({
-         sku: '', nombre: '', bodegaId: '', tipoMovimiento: 'SALIDA', 
+         repuestoId: '', sku: '', nombre: '', bodegaId: '', tipoMovimiento: 'SALIDA', 
          cantidad: 1, solicitante: '', autorizador: '', destino: ''
        });
     } catch (e) {
@@ -308,7 +320,9 @@ export default function GestionSuministros() {
 
   // States for Terminal (Entrada / Salida)
   const [isTerminalModalOpen, setIsTerminalModalOpen] = useState(false);
+  const [showTerminalAutocomplete, setShowTerminalAutocomplete] = useState(false);
   const [terminalForm, setTerminalForm] = useState({
+    repuestoId: '',
     sku: '',
     nombre: '',
     bodegaId: '',
@@ -1820,15 +1834,45 @@ export default function GestionSuministros() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">SKU / CÓDIGO BARRAS</label>
+            <div className="relative">
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">SKU / CÓDIGO BARRAS / NOMBRE</label>
               <input 
                 type="text" 
                 placeholder="Escanee o escriba..."
                 className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-transparent text-sm dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
                 value={terminalForm.sku}
-                onChange={(e) => setTerminalForm({...terminalForm, sku: e.target.value})}
+                onChange={(e) => {
+                  setTerminalForm({...terminalForm, sku: e.target.value, repuestoId: ''});
+                  setShowTerminalAutocomplete(true);
+                }}
+                onFocus={() => setShowTerminalAutocomplete(true)}
               />
+              {showTerminalAutocomplete && terminalForm.sku.length > 1 && (
+                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  {sumInsumosData.filter(i => 
+                    i.sku?.toLowerCase().includes(terminalForm.sku.toLowerCase()) || 
+                    i.nombre?.toLowerCase().includes(terminalForm.sku.toLowerCase())
+                  ).slice(0, 50).map(item => (
+                    <div 
+                      key={item.id} 
+                      className="px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer text-sm"
+                      onClick={() => {
+                        setTerminalForm({
+                           ...terminalForm, 
+                           repuestoId: item.id || '',
+                           sku: item.sku || '', 
+                           nombre: item.nombre || '', 
+                           bodegaId: item.bodega_id || terminalForm.bodegaId
+                        });
+                        setShowTerminalAutocomplete(false);
+                      }}
+                    >
+                      <div className="font-semibold text-slate-900 dark:text-white">{item.sku}</div>
+                      <div className="text-xs text-slate-500">{item.nombre} - Stock: {item.stock} ({item.bodegaNombre})</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">NOMBRE (SI ES NUEVO)</label>
