@@ -379,13 +379,13 @@ export default function PuertoEscaneo() {
                          empresa_id: currentCompany.id,
                          sku: item.sku,
                          nombre: baseName,
-                         bodega_id: item.bodega_id,
+                         bodega_id: item.bodega_id || null,
                          stock: item.cantidad,
                          precio: 0,
                          valor_total: 0,
                          calidad: 'ORIGINAL',
                          estado: 'ACTIVO',
-                         ubicacion: item.ubicacion_conteo !== 'General' ? item.ubicacion_conteo : null,
+                         ubicacion: (item.ubicacion_conteo && item.ubicacion_conteo !== 'General' && item.ubicacion_conteo !== 'Sin Especificar') ? item.ubicacion_conteo : null,
                          ult_mov: new Date().toISOString()
                      }).select().single();
 
@@ -399,6 +399,9 @@ export default function PuertoEscaneo() {
                              estado: 'COMPLETADO'
                          });
                          if (!moveErr) success = true;
+                         else console.error('Move error:', moveErr);
+                     } else {
+                         console.error('Create error:', createErr);
                      }
                  } else {
                      // Update existing stock
@@ -512,6 +515,24 @@ export default function PuertoEscaneo() {
               placeholder="Buscar por SKU o Nombre..."
               value={manualSearch}
               onChange={(e) => handleSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && manualSearch.trim() !== '') {
+                  e.preventDefault();
+                  if (searchResults.length > 0) {
+                     // Choose first result
+                     const first = searchResults[0];
+                     setSearchResults([]);
+                     setManualSearch('');
+                     openConfirmationModal(first.sku, first.text.split('|')[0].trim());
+                  } else {
+                     // Not found, treat as new scan
+                     setSearchResults([]);
+                     const sku = manualSearch.trim();
+                     setManualSearch('');
+                     handleScanSuccess(sku);
+                  }
+                }
+              }}
               className="w-full border-none outline-none font-bold text-sm bg-transparent text-slate-800 dark:text-slate-100 placeholder-slate-400"
             />
           </div>

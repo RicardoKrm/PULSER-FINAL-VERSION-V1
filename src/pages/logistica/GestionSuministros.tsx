@@ -219,7 +219,7 @@ export default function GestionSuministros() {
                empresa_id: currentCompany.id,
                sku: terminalForm.sku,
                nombre: terminalForm.nombre || `Repuesto ${terminalForm.sku}`,
-               bodega_id: terminalForm.bodegaId,
+               bodega_id: terminalForm.bodegaId || null,
                stock: terminalForm.cantidad,
                precio: 0,
                valor_total: 0,
