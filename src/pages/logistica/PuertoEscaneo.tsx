@@ -181,22 +181,53 @@ export default function PuertoEscaneo() {
   const handleScanSuccess = async (sku: string) => {
     beepRef.current?.play();
     
-    if (modoRafaga && tipoMov === 'AUDITORIA') {
-      if (!auditoriaId) {
+    if (modoRafaga) {
+      if (tipoMov === 'AUDITORIA' && !auditoriaId) {
         Swal.fire('Atención', 'Seleccione una Auditoría Activa.', 'warning');
         return;
       }
       
       const bodegaNombre = bodegas.find(b => b.id.toString() === bodegaId)?.nombre || 'Bodega';
       
+      let nombre = "Escaneo Rápido...";
+      if (currentCompany?.id) {
+         try {
+           const { data, error } = await supabase
+             .from('logistica_repuestos')
+             .select('nombre, stock')
+             .eq('empresa_id', currentCompany.id)
+             .eq('sku', sku)
+             .eq('bodega_id', bodegaId)
+             .limit(1);
+             
+           if (!error && data && data.length > 0) {
+              nombre = data[0].nombre;
+              if (tipoMov === 'ENTRADA') {
+                 // The user requested to be notified about the coincidence
+                 Swal.fire({
+                   toast: true,
+                   position: 'top-end',
+                   icon: 'info',
+                   title: `Coincidencia: ${nombre}`,
+                   text: `Stock actual: ${data[0].stock}. Se sumará 1 unidad.`,
+                   showConfirmButton: false,
+                   timer: 2000
+                 });
+              }
+           } else if (tipoMov === 'ENTRADA') {
+              nombre = "NUEVO PRODUCTO";
+           }
+         } catch (e) {}
+      }
+
       const fastItem: ScanItem = {
         sku,
-        nombre: "Escaneo Rápido...",
+        nombre,
         cantidad: 1,
-        tipo_movimiento: 'AUDITORIA',
+        tipo_movimiento: tipoMov,
         bodega_id: bodegaId,
         bodega_nombre: bodegaNombre,
-        auditoria_id: auditoriaId,
+        auditoria_id: tipoMov === 'AUDITORIA' ? auditoriaId : undefined,
         ubicacion_conteo: ubicacionConteo || 'General',
         turno: getTurno()
       };
@@ -211,13 +242,26 @@ export default function PuertoEscaneo() {
        try {
          const { data, error } = await supabase
            .from('logistica_repuestos')
-           .select('nombre')
+           .select('nombre, stock')
            .eq('empresa_id', currentCompany.id)
            .eq('sku', sku)
+           .eq('bodega_id', bodegaId)
            .limit(1);
            
          if (!error && data && data.length > 0) {
             nombre = data[0].nombre;
+            if (tipoMov === 'ENTRADA') {
+               // Notify coincidence
+               Swal.fire({
+                 toast: true,
+                 position: 'top-end',
+                 icon: 'info',
+                 title: `Coincidencia Encontrada`,
+                 text: `Stock actual: ${data[0].stock}`,
+                 showConfirmButton: false,
+                 timer: 2000
+               });
+            }
          }
        } catch (e) {}
     }
@@ -310,29 +354,96 @@ export default function PuertoEscaneo() {
             });
             if (!err) success = true;
           } else {
-            if (item.nombre === "NUEVO PRODUCTO" || item.nombre.includes("Escaneo")) {
-               const { error: err } = await supabase.from('logistica_movimientos').insert({
-                 empresa_id: currentCompany.id,
-                 tipo: 'PENDIENTE_VALIDACION',
-                 cantidad: item.cantidad,
-                 notas: item.sku,
-                 referencia: item.nombre,
-                 usuario_nombre: 'Escaneo Rápido',
-                 estado: 'PENDIENTE'
-               });
-               if (!err) success = true;
-            } else {
-               const { error: err } = await supabase.from('logistica_movimientos').insert({
-                 empresa_id: currentCompany.id,
-                 tipo: item.tipo_movimiento,
-                 cantidad: item.cantidad,
-                 notas: item.sku,
-                 referencia: item.nombre,
-                 usuario_nombre: 'Escaneo Rápido',
-                 estado: 'COMPLETADO'
-               });
-               if (!err) success = true;
-            }
+             // For ENTRADA / SALIDA: Check if product exists in this bodega
+             const { data: reps, error: findErr } = await supabase.from('logistica_repuestos')
+               .select('*')
+               .eq('empresa_id', currentCompany.id)
+               .eq('sku', item.sku)
+               .eq('bodega_id', item.bodega_id);
+
+             let rep = reps && reps.length > 0 ? reps[0] : null;
+             
+             if (item.tipo_movimiento === 'ENTRADA') {
+                 if (!rep) {
+                     // Check if it exists in another bodega to copy its name and properties
+                     const { data: anyRep } = await supabase.from('logistica_repuestos')
+                       .select('*')
+                       .eq('empresa_id', currentCompany.id)
+                       .eq('sku', item.sku)
+                       .limit(1);
+                       
+                     const baseName = anyRep && anyRep.length > 0 ? anyRep[0].nombre : (item.nombre === "NUEVO PRODUCTO" ? `Repuesto ${item.sku}` : item.nombre);
+                     
+                     // Create new product
+                     const { data: newRep, error: createErr } = await supabase.from('logistica_repuestos').insert({
+                         empresa_id: currentCompany.id,
+                         sku: item.sku,
+                         nombre: baseName,
+                         bodega_id: item.bodega_id,
+                         stock: item.cantidad,
+                         precio: 0,
+                         valor_total: 0,
+                         calidad: 'ORIGINAL',
+                         estado: 'ACTIVO',
+                         ubicacion: item.ubicacion_conteo !== 'General' ? item.ubicacion_conteo : null,
+                         ult_mov: new Date().toISOString()
+                     }).select().single();
+
+                     if (!createErr && newRep) {
+                         const { error: moveErr } = await supabase.from('logistica_movimientos').insert({
+                             empresa_id: currentCompany.id,
+                             repuesto_id: newRep.id,
+                             tipo: 'ENTRADA',
+                             cantidad: item.cantidad,
+                             notas: `Ingreso Inicial - Escaneo Rápido`,
+                             estado: 'COMPLETADO'
+                         });
+                         if (!moveErr) success = true;
+                     }
+                 } else {
+                     // Update existing stock
+                     const newStock = rep.stock + item.cantidad;
+                     const { error: upErr } = await supabase.from('logistica_repuestos').update({ 
+                         stock: newStock,
+                         ult_mov: new Date().toISOString()
+                     }).eq('id', rep.id);
+                     
+                     if (!upErr) {
+                         const { error: moveErr } = await supabase.from('logistica_movimientos').insert({
+                             empresa_id: currentCompany.id,
+                             repuesto_id: rep.id,
+                             tipo: 'ENTRADA',
+                             cantidad: item.cantidad,
+                             notas: `Ingreso - Escaneo Rápido`,
+                             estado: 'COMPLETADO'
+                         });
+                         if (!moveErr) success = true;
+                     }
+                 }
+             } else if (item.tipo_movimiento === 'SALIDA') {
+                 if (!rep || rep.stock < item.cantidad) {
+                     // Stock insuficiente o no existe
+                     success = false;
+                 } else {
+                     const newStock = rep.stock - item.cantidad;
+                     const { error: upErr } = await supabase.from('logistica_repuestos').update({ 
+                         stock: newStock,
+                         ult_mov: new Date().toISOString()
+                     }).eq('id', rep.id);
+                     
+                     if (!upErr) {
+                         const { error: moveErr } = await supabase.from('logistica_movimientos').insert({
+                             empresa_id: currentCompany.id,
+                             repuesto_id: rep.id,
+                             tipo: 'SALIDA',
+                             cantidad: item.cantidad,
+                             notas: `Consumo - Escaneo Rápido`,
+                             estado: 'COMPLETADO'
+                         });
+                         if (!moveErr) success = true;
+                     }
+                 }
+             }
           }
         }
         
@@ -354,7 +465,6 @@ export default function PuertoEscaneo() {
       await Swal.fire('¡Éxito!', `Se registraron ${ok} movimientos correctamente.`, 'success');
       setScannedList([]);
       localStorage.removeItem('pulser_scan_list');
-      // Refresh state if needed or stay on page
     }
   };
 
