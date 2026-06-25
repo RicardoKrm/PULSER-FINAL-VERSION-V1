@@ -83,22 +83,44 @@ export default function GestionSuministros() {
       // Intentar cargar desde supabase
       if (!currentCompany?.id) return;
       
-      const { data: bData, error: bErr } = await supabase.from('logistica_bodegas').select('*').eq('empresa_id', currentCompany.id);
-      if (!bErr && bData) {
+      const fetchAllRows = async (queryBuilder: any) => {
+        let allData: any[] = [];
+        let start = 0;
+        const pageSize = 1000;
+        let hasMore = true;
+        while (hasMore) {
+          const { data, error } = await queryBuilder.range(start, start + pageSize - 1);
+          if (error) {
+            console.error(error);
+            break;
+          }
+          if (data && data.length > 0) {
+            allData = [...allData, ...data];
+            start += pageSize;
+          }
+          if (!data || data.length < pageSize) {
+            hasMore = false;
+          }
+        }
+        return allData;
+      };
+
+      const bData = await fetchAllRows(supabase.from('logistica_bodegas').select('*').eq('empresa_id', currentCompany.id));
+      if (bData && bData.length > 0) {
         setBodegasList(bData);
       } else {
         // Fallback or empty
         setBodegasList([]);
       }
 
-      const { data: rData, error: rErr } = await supabase.from('logistica_repuestos').select(`
+      const rData = await fetchAllRows(supabase.from('logistica_repuestos').select(`
         *,
         logistica_bodegas (
           nombre
         )
-      `).eq('empresa_id', currentCompany.id);
+      `).eq('empresa_id', currentCompany.id));
       
-      if (!rErr && rData) {
+      if (rData && rData.length > 0) {
         setSumInsumosData(rData.map((r: any) => {
           const parsedPrecio = parseFloat(r.precio) || 0;
           const parsedStock = parseInt(r.stock) || 0;
@@ -116,11 +138,13 @@ export default function GestionSuministros() {
       } else {
          setSumInsumosData([]);
       }
-      const { data: mvData, error: mvErr } = await supabase.from('logistica_movimientos').select(`
+
+      const mvData = await fetchAllRows(supabase.from('logistica_movimientos').select(`
         *,
         logistica_repuestos (nombre, sku, proveedor, ubicacion, logistica_bodegas(nombre))
-      `).eq('empresa_id', currentCompany.id).order('created_at', { ascending: false });
-      if (!mvErr && mvData) {
+      `).eq('empresa_id', currentCompany.id).order('created_at', { ascending: false }));
+      
+      if (mvData && mvData.length > 0) {
          setAuditoriaData(mvData);
          
          const pendientes = mvData.filter((m: any) => m.tipo === 'PENDIENTE_VALIDACION' && m.estado === 'PENDIENTE');
@@ -252,6 +276,10 @@ export default function GestionSuministros() {
   const [selectedItems, setSelectedItems] = useState<any[]>([]);
   const [selectedRepuestoDetalle, setSelectedRepuestoDetalle] = useState<Insumo | null>(null);
   const [repuestoMovimientos, setRepuestoMovimientos] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedBodega, selectedUbicacion, selectedCalidad, selectedCategoria, selectedProveedor, filterBajoStock, filterSinMov]);
 
   React.useEffect(() => {
      if (selectedRepuestoDetalle) {
@@ -1143,11 +1171,25 @@ export default function GestionSuministros() {
             <Boxes className="w-8 h-8 text-slate-800 dark:text-slate-200" />
             <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Gestión de Suministros</h1>
           </div>
-          <div className="mt-2 flex items-center gap-2 text-sm">
-            <span>💰 Valorización Filtrada:</span>
-            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-              {formatCurrency(valorizacionFiltrada)}
-            </span>
+          <div className="mt-2 flex flex-col gap-1">
+            <div className="flex items-center gap-2 text-sm">
+              <span>💰 Valorización Filtrada:</span>
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                {formatCurrency(valorizacionFiltrada)}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+              <span>📦 Total de artículos en stock:</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                {filteredData.reduce((acc, item) => acc + item.stock, 0)} unidades
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+              <span>🏷️ Tipos de repuestos (SKUs):</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                {filteredData.length}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -1285,29 +1327,7 @@ export default function GestionSuministros() {
 
       {/* Table section */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-        <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-800">
-          <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-            Show 
-            <select 
-              className="border border-slate-300 dark:border-slate-700 rounded px-2 py-1 mx-1 bg-transparent"
-              value={entriesPerPage}
-              onChange={(e) => {
-                setEntriesPerPage(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-            >
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-              <option value={500}>500</option>
-              <option value={1000}>1000</option>
-            </select> 
-            entries
-            <span className="ml-4 font-medium text-slate-700 dark:text-slate-300">
-              Mostrando {Math.min((currentPage - 1) * entriesPerPage + 1, filteredData.length)} - {Math.min(currentPage * entriesPerPage, filteredData.length)} de {filteredData.length} repuestos
-            </span>
-          </div>
-
+        <div className="flex justify-end items-center p-4 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2">
             <span className="text-sm text-slate-600 dark:text-slate-400">Buscador SKU / Nombre / Equivalente:</span>
             <div className="relative">
@@ -1404,6 +1424,77 @@ export default function GestionSuministros() {
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination controls */}
+        <div className="flex flex-col xl:flex-row items-center justify-between p-4 border-t border-slate-200 dark:border-slate-800 gap-4">
+          <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+            Show 
+            <select 
+              className="border border-slate-300 dark:border-slate-700 rounded px-2 py-1 mx-1 bg-transparent"
+              value={entriesPerPage}
+              onChange={(e) => {
+                setEntriesPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+            >
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={500}>500</option>
+              <option value={1000}>1000</option>
+              <option value={5000}>5000</option>
+            </select> 
+            entries
+          </div>
+
+          <div className="text-sm text-slate-500 font-medium">
+            Mostrando {filteredData.length === 0 ? 0 : Math.min((currentPage - 1) * entriesPerPage + 1, filteredData.length)} - {Math.min(currentPage * entriesPerPage, filteredData.length)} de {filteredData.length} tipos de repuestos
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="secondary" 
+              className="px-3 py-1.5 h-auto text-xs font-semibold"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            >
+              Anterior
+            </Button>
+            <div className="flex items-center gap-1 hidden sm:flex">
+              {Array.from({ length: Math.min(5, Math.ceil(filteredData.length / entriesPerPage) || 1) }, (_, i) => {
+                const total = Math.ceil(filteredData.length / entriesPerPage) || 1;
+                let pageNum = currentPage - 2 + i;
+                if (currentPage <= 3) pageNum = i + 1;
+                else if (currentPage >= total - 2) pageNum = total - 4 + i;
+                
+                if (pageNum > 0 && pageNum <= total) {
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`w-8 h-8 flex items-center justify-center rounded-md text-xs font-bold transition-colors
+                        ${currentPage === pageNum 
+                          ? 'bg-blue-600 text-white' 
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                }
+                return null;
+              })}
+            </div>
+            <Button 
+              variant="secondary" 
+              className="px-3 py-1.5 h-auto text-xs font-semibold"
+              disabled={currentPage >= (Math.ceil(filteredData.length / entriesPerPage) || 1)}
+              onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredData.length / entriesPerPage) || 1, prev + 1))}
+            >
+              Siguiente
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -2060,14 +2151,13 @@ export default function GestionSuministros() {
                   precio: newRepuestoForm.precioUnitario,
                   valor_total: newRepuestoForm.precioUnitario * newRepuestoForm.stockActual,
                   is_critico: newRepuestoForm.nivelCriticidad === "CRÍTICO",
-                  categoria: newRepuestoForm.categoria,
-                  bodega_id: newRepuestoForm.bodegaId,
+                  bodega_id: newRepuestoForm.bodegaId || null,
                   estado: 'ACTIVO'
                 };
 
                 try {
                   if (!currentCompany?.id) {
-                    alert("Error: No hay empresa seleccionada.");
+                    Swal.fire("Error", "No hay empresa seleccionada.", "error");
                     return;
                   }
                   
@@ -2075,7 +2165,7 @@ export default function GestionSuministros() {
                   
                   if (error) {
                     console.error("Error al guardar:", error);
-                    alert("Hubo un error al guardar: " + error.message);
+                    Swal.fire("Error", "Hubo un error al guardar: " + error.message, "error");
                     return;
                   }
                   
@@ -2083,7 +2173,7 @@ export default function GestionSuministros() {
                   await loadData();
                   
                   setIsNewRepuestoModalOpen(false);
-                  alert(`Se agregó ${newRepuestoForm.nombre} con ${newRepuestoForm.stockActual} cantidad a la ${bodegaName}.`);
+                  Swal.fire("Éxito", `Se agregó ${newRepuestoForm.nombre} con ${newRepuestoForm.stockActual} cantidad a la ${bodegaName}.`, "success");
                   
                   setNewRepuestoForm({
                     nombre: '', numeroParte: '', calidad: 'ORIGINAL', origen: 'OEM', 
@@ -2092,7 +2182,7 @@ export default function GestionSuministros() {
                   });
                 } catch (e) {
                   console.error(e);
-                  alert("Error al intentar guardar el repuesto.");
+                  Swal.fire("Error", "Error al intentar guardar el repuesto.", "error");
                 }
               }}
             >

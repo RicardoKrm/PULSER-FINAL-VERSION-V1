@@ -80,18 +80,25 @@ const parseExcelDate = (excelDate: any) => {
 const parseCurrencyCLP = (val: any) => {
   if (val === null || val === undefined || val === '') return 0;
   if (typeof val === 'number') return val;
-  let str = String(val).replace(/\$/g, '').trim();
-  str = str.replace(/\./g, ''); // Remover puntos (separadores de miles en formato chileno)
-  str = str.replace(/,/g, '.'); // Convertir coma a punto decimal por si acaso
-  str = str.replace(/\s/g, ''); // Remover espacios en blanco
+  let str = String(val);
+  // Keep only digits, dots, commas, and minus signs
+  str = str.replace(/[^\d.,-]/g, '');
+  // Remove all dots (thousands separator in Chile)
+  str = str.replace(/\./g, '');
+  // Replace comma with dot (decimal separator)
+  str = str.replace(/,/g, '.');
   const num = parseFloat(str);
   return isNaN(num) ? 0 : num;
 };
 
+const normalizeKey = (k: string) => (k || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
 const getValByKey = (obj: any, possibleKeys: string[]) => {
+  if (!obj || typeof obj !== 'object') return undefined;
   const keys = Object.keys(obj);
   for (const pk of possibleKeys) {
-    const foundKey = keys.find(k => k.toLowerCase().trim() === pk.toLowerCase().trim());
+    const normPk = normalizeKey(pk);
+    const foundKey = keys.find(k => normalizeKey(k) === normPk);
     if (foundKey) return obj[foundKey];
   }
   return undefined;
@@ -161,7 +168,7 @@ const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[
       min_stock: getValByKey(r, ['stock_minim', 'stock_minimo', 'StockMinimo', 'minimo']) || 0,
       ubicacion: getValByKey(r, ['ubicacion', 'Ubicacion']),
       proveedor: getValByKey(r, ['proveedor_habitua', 'proveedor_habitual', 'ProveedorPrincipal', 'Proveedor']),
-      precio: parseCurrencyCLP(getValByKey(r, ['precio_unitario', 'PrecioUnitario', 'Precio', 'precio']))
+      precio: parseCurrencyCLP(getValByKey(r, ['precio_unitario', 'PrecioUnitario', 'Precio', 'precio', 'valor_unitario', 'costo_unitario', 'valor', 'costo']))
     }) 
   },
   bodegas: { 
@@ -258,7 +265,7 @@ const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[
   suministros: { 
     table: 'suministro', 
     matchKey: 'codigo_suministro',
-    mapConfig: (r: any) => ({ codigo_suministro: r.CodigoSuministro, nombres: r.Nombres, tipo: r.Tipo, stock: r.Stock, precio_unitario: parseCurrencyCLP(r.PrecioUnitario) }) 
+    mapConfig: (r: any) => ({ codigo_suministro: getValByKey(r, ['CodigoSuministro', 'codigo']), nombres: getValByKey(r, ['Nombres', 'nombre']), tipo: getValByKey(r, ['Tipo', 'tipo']), stock: getValByKey(r, ['Stock', 'stock_actual', 'stock']), precio_unitario: parseCurrencyCLP(getValByKey(r, ['PrecioUnitario', 'precio_unitario', 'precio', 'valor'])) }) 
   },
   ots: { 
     table: 'orden_de_trabajo', 
@@ -480,7 +487,7 @@ export default function CargaMasiva() {
           return newResults;
         });
       } else {
-        alert("Por favor suba un archivo Excel (.xlsx, .xls) o CSV.");
+        setResults(prev => ({ ...prev, [moduleId]: { success: false, message: "Por favor suba un archivo Excel (.xlsx, .xls) o CSV." } }));
       }
     }
   };
@@ -796,7 +803,7 @@ export default function CargaMasiva() {
                       if (mod.template) {
                         exportToExcel(mod.template, `Plantilla_${mod.title.replace(/ /g, '_')}`);
                       } else {
-                        alert("Plantilla no disponible para este módulo");
+                        setResults(prev => ({ ...prev, [mod.id]: { success: false, message: "Plantilla no disponible para este módulo" } }));
                       }
                     }}
                     className="text-xs font-bold text-cyan-600 hover:text-cyan-700 hover:underline bg-transparent border-none cursor-pointer"
