@@ -79,16 +79,41 @@ const parseExcelDate = (excelDate: any) => {
 
 const parseCurrencyCLP = (val: any) => {
   if (val === null || val === undefined || val === '') return 0;
-  if (typeof val === 'number') return val;
-  let str = String(val);
+  if (typeof val === 'number') return Math.round(val);
+  let str = String(val).trim();
+  
   // Keep only digits, dots, commas, and minus signs
   str = str.replace(/[^\d.,-]/g, '');
-  // Remove all dots (thousands separator in Chile)
-  str = str.replace(/\./g, '');
-  // Replace comma with dot (decimal separator)
-  str = str.replace(/,/g, '.');
+
+  const lastDot = str.lastIndexOf('.');
+  const lastComma = str.lastIndexOf(',');
+
+  if (lastDot > lastComma) {
+    // US Format: 1,500.00 -> dot is decimal
+    str = str.replace(/,/g, '');
+  } else if (lastComma > lastDot) {
+    // LatAm format: 1.500,00 -> comma is decimal
+    str = str.replace(/\./g, '');
+    str = str.replace(/,/g, '.');
+  } else {
+    // Only one type of separator or none
+    if (str.includes('.')) {
+      const parts = str.split('.');
+      if (parts[parts.length - 1].length === 3) {
+        str = str.replace(/\./g, '');
+      }
+    } else if (str.includes(',')) {
+      const parts = str.split(',');
+      if (parts[parts.length - 1].length === 3) {
+        str = str.replace(/,/g, '');
+      } else {
+        str = str.replace(/,/g, '.');
+      }
+    }
+  }
+
   const num = parseFloat(str);
-  return isNaN(num) ? 0 : num;
+  return isNaN(num) ? 0 : Math.round(num); // CLP does not use decimals in real life
 };
 
 const normalizeKey = (k: string) => (k || '').toLowerCase().replace(/[^a-z0-9]/g, '');
