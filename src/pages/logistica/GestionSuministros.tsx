@@ -185,54 +185,83 @@ export default function GestionSuministros() {
        const { data: reps, error: rErr } = await query;
 
        let rep = null;
-       if (reps && reps.length > 0) {
-           rep = reps.find(r => r.bodega_id === terminalForm.bodegaId);
-           if (!rep) {
-               // Auto-detect other bodega if not found in selected
-               if (terminalForm.tipoMovimiento === 'SALIDA') {
-                   rep = reps.find(r => r.stock >= terminalForm.cantidad) || reps[0];
-               } else if (!terminalForm.bodegaId) {
-                   // If ENTRADA and no bodega selected, auto-detect the existing one
-                   rep = reps[0];
-               }
-               // If ENTRADA and a SPECIFIC bodega was selected but not found, 
-               // we deliberately leave rep = null so it goes to validation as a new product in that bodega.
-           }
-       }
+       let isNewProduct = false;
 
-       let repId = rep?.id;
-       let requiresValidation = false;
-         
-       if (!rep) {
+       if (reps && reps.length > 0) {
+           if (terminalForm.tipoMovimiento === 'ENTRADA') {
+               // Prefer the one in the selected bodega, or just the first one we find
+               rep = reps.find(r => r.bodega_id === terminalForm.bodegaId) || reps[0];
+               
+               // Alert about coincidence if it was scanned
+               await Swal.fire("Coincidencia Encontrada", `El SKU ${rep.sku} ya existe como "${rep.nombre}" en ${rep.logistica_bodegas?.nombre || 'la bodega'}. Se sumará al stock existente.`, "info");
+           } else {
+               rep = reps.find(r => r.bodega_id === terminalForm.bodegaId);
+               if (!rep) {
+                   rep = reps.find(r => r.stock >= terminalForm.cantidad) || reps[0];
+               }
+           }
+       } else {
           if (terminalForm.tipoMovimiento === 'ENTRADA') {
              if (!terminalForm.bodegaId) {
                 Swal.fire("Error", "Seleccione una bodega destino para este nuevo SKU", "error");
                 return;
              }
-             requiresValidation = true;
+             isNewProduct = true;
           } else {
              Swal.fire("Error", "SKU no encontrado en ninguna bodega, no puede extraer stock", "error");
              return;
           }
-       } else if (terminalForm.tipoMovimiento === 'SALIDA') {
-          if (rep.stock < terminalForm.cantidad) {
+       }
+
+       if (isNewProduct) {
+           // Create new product
+           const { data: newRep, error: createErr } = await supabase.from('logistica_repuestos').insert({
+               empresa_id: currentCompany.id,
+               sku: terminalForm.sku,
+               nombre: terminalForm.nombre || `Repuesto ${terminalForm.sku}`,
+               bodega_id: terminalForm.bodegaId,
+               stock: terminalForm.cantidad,
+               precio: 0,
+               valor_total: 0,
+               calidad: 'ORIGINAL',
+               estado: 'ACTIVO',
+               ult_mov: new Date().toISOString()
+           }).select().single();
+
+           if (createErr || !newRep) {
+               Swal.fire("Error", "No se pudo crear el nuevo repuesto.", "error");
+               return;
+           }
+
+           await supabase.from('logistica_movimientos').insert({
+               empresa_id: currentCompany.id,
+               repuesto_id: newRep.id,
+               tipo: 'ENTRADA',
+               cantidad: terminalForm.cantidad,
+               notas: `Ingreso Inicial - Solicitante: ${terminalForm.solicitante}, Destino: ${terminalForm.destino}`,
+               estado: 'COMPLETADO'
+           });
+
+           Swal.fire("Éxito", `Nuevo producto creado y stock ingresado correctamente.`, "success");
+           await loadData();
+           setIsTerminalModalOpen(false);
+           setTerminalForm({
+             repuestoId: '', sku: '', nombre: '', bodegaId: '', tipoMovimiento: 'SALIDA', 
+             cantidad: 1, solicitante: '', autorizador: '', destino: ''
+           });
+           return;
+       }
+
+       let repId = rep?.id;
+       
+       if (terminalForm.tipoMovimiento === 'SALIDA') {
+          if (rep && rep.stock < terminalForm.cantidad) {
              Swal.fire("Error", `Stock insuficiente. Stock actual en ${rep.logistica_bodegas?.nombre || 'la bodega'}: ${rep.stock} unidades.`, "error");
              return;
           }
        }
 
-       if (requiresValidation) {
-          await supabase.from('logistica_movimientos').insert({
-             empresa_id: currentCompany.id,
-             tipo: 'PENDIENTE_VALIDACION',
-             cantidad: terminalForm.cantidad,
-             notas: terminalForm.sku,
-             referencia: terminalForm.nombre || 'NUEVO PRODUCTO',
-             usuario_nombre: terminalForm.solicitante || 'Escaneo Terminal',
-             estado: 'PENDIENTE'
-          });
-          Swal.fire("Guardado", "Enviado a validación", "info");
-       } else if (repId) {
+       if (repId && rep) {
           // Normal movement
           const newStock = terminalForm.tipoMovimiento === 'ENTRADA' ? rep.stock + terminalForm.cantidad : rep.stock - terminalForm.cantidad;
           
