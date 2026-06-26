@@ -477,17 +477,19 @@ export default function ControlDocumental() {
         <div className="flex items-center gap-2">
           {activeTab === "conductores" ? (
             <button
+              key="btn-add-driver"
               onClick={() => setIsAddingEntity("driver")}
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-colors flex items-center justify-center gap-2 text-sm"
             >
-              <UserPlus className="w-4 h-4" /> Registrar Conductor
+              <UserPlus className="w-4 h-4" /> <span>Registrar Conductor</span>
             </button>
           ) : (
             <button
+              key="btn-add-vehicle"
               onClick={() => setIsAddingEntity("vehicle")}
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-colors flex items-center justify-center gap-2 text-sm"
             >
-              <Truck className="w-4 h-4" /> Registrar Vehículo
+              <Truck className="w-4 h-4" /> <span>Registrar Vehículo</span>
             </button>
           )}
         </div>
@@ -503,7 +505,7 @@ export default function ControlDocumental() {
             }}
             className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${activeTab === "conductores" ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
           >
-            <User className="w-4 h-4" /> Personal Operativo
+            <User className="w-4 h-4" /> <span>Personal Operativo</span>
           </button>
           <button
             onClick={() => {
@@ -512,7 +514,7 @@ export default function ControlDocumental() {
             }}
             className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${activeTab === "vehiculos" ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
           >
-            <Truck className="w-4 h-4" /> Unidades Motrices
+            <Truck className="w-4 h-4" /> <span>Unidades Motrices</span>
           </button>
         </div>
 
@@ -559,7 +561,7 @@ export default function ControlDocumental() {
                           {d.nombre}
                         </h4>
                         <p className="text-xs text-slate-500 font-medium dark:text-slate-400">
-                          {d.rut} • {d.cargo}
+                          <span>{d.rut}</span> • <span>{d.cargo}</span>
                         </p>
                       </div>
                       <Badge
@@ -572,7 +574,7 @@ export default function ControlDocumental() {
                             : "animate-pulse"
                         }
                       >
-                        {status}
+                        <span>{status}</span>
                       </Badge>
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-sm mt-4">
@@ -606,7 +608,7 @@ export default function ControlDocumental() {
                         <ul className="text-xs text-red-600 dark:text-red-400 font-medium space-y-0.5">
                           {reasons.map((r, idx) => (
                             <li key={idx} className="flex gap-1.5 items-center">
-                              <AlertCircle className="w-3 h-3" /> {r}
+                              <AlertCircle className="w-3 h-3" /> <span>{r}</span>
                             </li>
                           ))}
                         </ul>
@@ -641,7 +643,7 @@ export default function ControlDocumental() {
                           {v.patente}
                         </h4>
                         <p className="text-xs text-slate-500 font-medium dark:text-slate-400">
-                          {v.tipo} • Año {v.anio} ({2026 - v.anio} Años)
+                          <span>{v.tipo}</span> • Año <span>{v.anio}</span> ({2026 - v.anio} Años)
                         </p>
                       </div>
                       <Badge
@@ -654,7 +656,7 @@ export default function ControlDocumental() {
                             : "animate-pulse"
                         }
                       >
-                        {status}
+                        <span>{status}</span>
                       </Badge>
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-sm mt-4">
@@ -679,7 +681,7 @@ export default function ControlDocumental() {
                         <ul className="text-xs text-red-600 dark:text-red-400 font-medium space-y-0.5">
                           {reasons.map((r, idx) => (
                             <li key={idx} className="flex gap-1.5 items-center">
-                              <AlertCircle className="w-3 h-3" /> {r}
+                              <AlertCircle className="w-3 h-3" /> <span>{r}</span>
                             </li>
                           ))}
                         </ul>
@@ -1020,14 +1022,14 @@ export default function ControlDocumental() {
                 </div>
                 <div>
                   <h2 className="font-black text-slate-800 dark:text-white text-lg">
-                    {modalType === "driver"
+                    <span>{modalType === "driver"
                       ? selectedEntity.nombre
-                      : selectedEntity.patente}
+                      : selectedEntity.patente}</span>
                   </h2>
                   <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                    {modalType === "driver"
+                    <span>{modalType === "driver"
                       ? `${selectedEntity.rut} - ${selectedEntity.cargo}`
-                      : `${selectedEntity.tipo} - Año ${selectedEntity.anio}`}
+                      : `${selectedEntity.tipo} - Año ${selectedEntity.anio}`}</span>
                   </p>
                 </div>
               </div>
@@ -1053,11 +1055,11 @@ export default function ControlDocumental() {
               <div>
                 <div className="flex justify-between items-end mb-4">
                   <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-slate-400" /> Control
-                    Documental
+                    <FileText className="w-4 h-4 text-slate-400" /> <span>Control
+                    Documental</span>
                   </h3>
                   <label className="text-indigo-600 font-bold text-xs hover:underline flex items-center gap-1 cursor-pointer">
-                    <Upload className="w-3 h-3" /> Adjuntar Documento
+                    <Upload className="w-3 h-3" /> <span>Adjuntar Documento</span>
                     <input
                       type="file"
                       className="hidden"
@@ -1136,7 +1138,7 @@ export default function ControlDocumental() {
                             </div>
                             <div>
                               <p className="font-bold text-sm text-slate-800 dark:text-white">
-                                {doc.nombre || doc.tipo_documento}
+                                <span>{doc.nombre || doc.tipo_documento}</span>
                               </p>
                               <p
                                 className={`text-[10px] font-bold uppercase tracking-wide ${(doc.estado || "").toLowerCase() === "vigente" ? "text-emerald-600" : "text-red-500"}`}
