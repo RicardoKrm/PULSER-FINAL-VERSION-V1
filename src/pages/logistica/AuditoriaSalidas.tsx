@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ClipboardCheck, CheckCheck, CheckCircle2, XCircle } from 'lucide-react';
+import { ClipboardCheck, CheckCheck, CheckCircle2, XCircle, Truck, FileText } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
+import { useAppContext } from '../../context/AppContext';
 import Swal from 'sweetalert2';
+import { Modal } from '../../components/ui/Modal';
 
 interface MovimientoPendiente {
   id: number;
@@ -20,8 +22,16 @@ interface MovimientoPendiente {
 
 export default function AuditoriaSalidas() {
   const { currentCompany } = useCompany();
+  const { ordenesTrabajo, vehiculos } = useAppContext();
   const [pendientes, setPendientes] = useState<MovimientoPendiente[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedMov, setSelectedMov] = useState<MovimientoPendiente | null>(null);
+  const [modo, setModo] = useState<'OT' | 'GASTO'>('OT');
+  const [selectedOtId, setSelectedOtId] = useState('');
+  const [selectedGasto, setSelectedGasto] = useState('TALLER');
 
   useEffect(() => {
     fetchPendientes();
@@ -52,24 +62,57 @@ export default function AuditoriaSalidas() {
     }
   };
 
-  const handleValidar = async (mov: MovimientoPendiente) => {
+  const handleAbrirModal = (mov: MovimientoPendiente) => {
+    setSelectedMov(mov);
+    setModo('OT');
+    setSelectedOtId('');
+    setSelectedGasto('TALLER');
+    setIsModalOpen(true);
+  };
+
+  const handleValidarConfirmar = async () => {
+    if (!selectedMov || !currentCompany) return;
+
+    if (modo === 'OT' && !selectedOtId) {
+      Swal.fire('Atención', 'Debe seleccionar una Orden de Trabajo', 'warning');
+      return;
+    }
+
     try {
-      // 1. Deduct stock
+      // 1. Deduct stock (it was not deducted during the scan)
       const { error: stockErr } = await supabase
         .from('logistica_repuestos')
-        .update({ stock: Math.max(0, mov.repuesto.stock - mov.cantidad) })
-        .eq('id', mov.repuesto_id);
+        .update({ stock: Math.max(0, selectedMov.repuesto.stock - selectedMov.cantidad) })
+        .eq('id', selectedMov.repuesto_id);
 
       if (stockErr) throw stockErr;
+
+      // Determine notes based on selection
+      let newNotas = selectedMov.notas;
+      if (modo === 'OT') {
+        const ot = ordenesTrabajo.find(o => o.id === selectedOtId);
+        newNotas = `Cargado a OT-${ot?.folio || selectedOtId} | ${newNotas}`;
+        
+        // Also insert into detalle_insumo_ot
+        await supabase.from('detalle_insumo_ot').insert({
+          orden_id: selectedOtId,
+          repuesto_id: selectedMov.repuesto_id,
+          cantidad: selectedMov.cantidad,
+          empresa_id: currentCompany.id
+        });
+      } else {
+        newNotas = `Gasto General (${selectedGasto}) | ${newNotas}`;
+      }
 
       // 2. Mark movement as COMPLETED and change type to regular SALIDA
       const { error: movErr } = await supabase
         .from('logistica_movimientos')
         .update({ 
           estado: 'COMPLETADO',
-          tipo: 'SALIDA'
+          tipo: 'SALIDA',
+          notas: newNotas
         })
-        .eq('id', mov.id);
+        .eq('id', selectedMov.id);
 
       if (movErr) throw movErr;
 
@@ -77,10 +120,11 @@ export default function AuditoriaSalidas() {
         toast: true,
         position: 'top-end',
         icon: 'success',
-        title: 'Salida validada correctamente',
+        title: 'Salida validada y descontada',
         showConfirmButton: false,
         timer: 2000
       });
+      setIsModalOpen(false);
       fetchPendientes();
     } catch (error: any) {
       Swal.fire('Error', 'No se pudo validar la salida', 'error');
@@ -90,7 +134,7 @@ export default function AuditoriaSalidas() {
   const handleRechazar = async (mov: MovimientoPendiente) => {
     const result = await Swal.fire({
       title: '¿Rechazar esta salida?',
-      text: "El repuesto no será descontado de la bodega.",
+      text: "El registro pasará a estado RECHAZADO. No se aplicará descuento de stock.",
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
@@ -171,11 +215,11 @@ export default function AuditoriaSalidas() {
         ) : (
           <div className="grid gap-4">
             {pendientes.map((mov) => (
-              <div key={mov.id} className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 md:p-6 flex flex-col md:flex-row justify-between gap-6 border border-slate-100 dark:border-slate-800">
+              <div key={mov.id} className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 md:p-6 flex flex-col md:flex-row justify-between gap-6 border border-slate-100 dark:border-slate-800 transition-all hover:-translate-y-1 hover:shadow-md hover:border-indigo-500/30">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <span className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">
-                      RETIRO SIN OT
+                    <span className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                      {mov.notas.toLowerCase().includes('noche') ? '🌙 NOCHE' : '☀️ DÍA'}
                     </span>
                     <span className="text-xs text-slate-400 font-bold">
                       {new Date(mov.created_at).toLocaleString('es-ES')}
@@ -188,12 +232,8 @@ export default function AuditoriaSalidas() {
                   
                   <div className="mt-4 flex flex-col gap-1 text-sm">
                     <div className="flex items-start gap-2">
-                      <span className="font-bold text-slate-400 w-24">Destino:</span>
-                      <span className="text-slate-700 dark:text-slate-300 font-medium">{mov.notas}</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="font-bold text-slate-400 w-24">Aprobación:</span>
-                      <span className="text-slate-700 dark:text-slate-300 font-medium">{mov.referencia}</span>
+                      <span className="font-bold text-slate-400 w-28 text-[10px] uppercase tracking-widest mt-0.5">Registro de Terminal:</span>
+                      <span className="text-indigo-600 dark:text-indigo-400 font-bold italic text-xs">{mov.notas}</span>
                     </div>
                   </div>
                 </div>
@@ -210,22 +250,16 @@ export default function AuditoriaSalidas() {
                     <button 
                       onClick={() => handleRechazar(mov)}
                       className="flex-1 p-3 text-rose-600 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 dark:hover:bg-rose-900/40 rounded-xl transition-colors flex items-center justify-center"
-                      title="Rechazar (o para cargar en OT)"
+                      title="Rechazar (Ignorar)"
                     >
                       <XCircle className="w-6 h-6" />
                     </button>
                     <button 
-                      onClick={() => handleValidar(mov)}
-                      className="flex-[3] px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                      onClick={() => handleAbrirModal(mov)}
+                      className="flex-[3] px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all hover:scale-105 flex items-center justify-center gap-2"
                     >
-                      <CheckCircle2 className="w-5 h-5" />
-                      VALIDAR SALIDA
+                      GESTIONAR
                     </button>
-                  </div>
-                  <div className="mt-2 text-center w-full">
-                    <span className="text-[9px] text-slate-400 font-bold uppercase block leading-tight">
-                      Para cargar a una OT, debe <strong className="text-rose-500">rechazar</strong> aquí<br/>y agregar el insumo en la OT.
-                    </span>
                   </div>
                 </div>
               </div>
@@ -233,6 +267,116 @@ export default function AuditoriaSalidas() {
           </div>
         )}
       </div>
+
+      {/* Modal de Gestión */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Validar Movimiento"
+      >
+        {selectedMov && (
+          <div className="space-y-6">
+            <div>
+              <p className="text-indigo-500 text-xs font-black uppercase mb-4">
+                {selectedMov.repuesto?.nombre}
+              </p>
+              
+              <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl mb-6 border border-slate-100 dark:border-slate-700">
+                <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">
+                  Información capturada por Scanner:
+                </label>
+                <p className="text-xs font-bold text-slate-700 dark:text-slate-300 italic mb-0">
+                  {selectedMov.notas}
+                </p>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-xs font-black text-slate-500 mb-3 uppercase tracking-widest">
+                  Seleccione Destino del Insumo
+                </label>
+
+                <div className="flex gap-3 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => setModo('OT')}
+                    className={`flex-1 p-3 rounded-xl border-2 font-bold transition-all flex items-center justify-center gap-2 ${
+                      modo === 'OT' 
+                        ? 'border-indigo-600 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' 
+                        : 'border-slate-100 bg-slate-50 text-slate-400 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    <Truck className="w-4 h-4" /> ORDEN TRABAJO
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModo('GASTO')}
+                    className={`flex-1 p-3 rounded-xl border-2 font-bold transition-all flex items-center justify-center gap-2 ${
+                      modo === 'GASTO' 
+                        ? 'border-indigo-600 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' 
+                        : 'border-slate-100 bg-slate-50 text-slate-400 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    <FileText className="w-4 h-4" /> GASTO GENERAL
+                  </button>
+                </div>
+
+                {modo === 'OT' ? (
+                  <div>
+                    <select
+                      value={selectedOtId}
+                      onChange={(e) => setSelectedOtId(e.target.value)}
+                      className="w-full p-4 bg-slate-100 dark:bg-slate-800 border-none rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                    >
+                      <option value="">Seleccione Vehículo / OT...</option>
+                      {ordenesTrabajo.filter(ot => ot.estado !== 'Cerrada').map(ot => {
+                        const v = vehiculos.find(v => v.id === ot.vehiculoId);
+                        return (
+                          <option key={ot.id} value={ot.id}>
+                            OT-{ot.folio} | {v?.numero_interno || 'S/N'} ({v?.patente || 'S/P'})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <select
+                      value={selectedGasto}
+                      onChange={(e) => setSelectedGasto(e.target.value)}
+                      className="w-full p-4 bg-slate-100 dark:bg-slate-800 border-none rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                    >
+                      <option value="TALLER">Insumos Taller (Grasas, Pernos, etc)</option>
+                      <option value="EPP">Seguridad / EPP</option>
+                      <option value="ASEO">Aseo / Oficina</option>
+                      <option value="OTROS">Otros Gastos</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={handleValidarConfirmar}
+                  className="w-full bg-indigo-600 text-white p-4 rounded-xl font-black text-sm hover:bg-indigo-700 shadow-xl shadow-indigo-100 dark:shadow-none transition-all uppercase tracking-wider"
+                >
+                  VALIDAR Y APLICAR DESCUENTO
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsModalOpen(false);
+                    handleRechazar(selectedMov);
+                  }}
+                  className="w-full bg-white dark:bg-slate-800 text-rose-500 border-2 border-rose-100 dark:border-rose-900/30 p-3 rounded-xl font-bold text-xs hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all uppercase"
+                >
+                  RECHAZAR (Eliminar registro sin descontar)
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
