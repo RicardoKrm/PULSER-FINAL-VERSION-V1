@@ -159,6 +159,9 @@ export default function GestionSuministros() {
              notas: `Solicitado por ${p.usuario_nombre || 'Desconocido'}`,
              usuario: p.usuario_nombre || 'Sistema'
          })));
+      } else {
+         setAuditoriaData([]);
+         setValidacionesList([]);
       }
     }, [currentCompany]);
 
