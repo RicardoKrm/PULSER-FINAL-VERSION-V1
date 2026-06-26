@@ -43,7 +43,7 @@ export default function Aprobaciones() {
 
   const openApproveModal = (item: any) => {
     setSelectedItem(item);
-    setEditNombre(item.referencia === 'NUEVO PRODUCTO' ? '' : (item.referencia || '')); // referencia acts as captured SKU info
+    setEditNombre(item.referencia?.startsWith('NUEVO PRODUCTO') ? '' : (item.referencia || '')); // referencia acts as captured SKU info
     setEditPrecio(0);
     setEditCantidad(item.cantidad || 1);
     setIsModalOpen(true);
@@ -56,7 +56,8 @@ export default function Aprobaciones() {
       const newRepuesto = {
         empresa_id: currentCompany.id,
         nombre: editNombre,
-        sku: selectedItem.referencia === 'NUEVO PRODUCTO' ? `SKU-${Math.floor(Math.random() * 10000)}` : selectedItem.notas || `SKU-${Math.floor(Math.random() * 10000)}`,
+        sku: selectedItem.notas || `SKU-${Math.floor(Math.random() * 10000)}`,
+        bodega_id: selectedItem.referencia?.includes('|') ? selectedItem.referencia.split('|')[1] : null,
         stock: editCantidad,
         precio: editPrecio,
         valor_total: editCantidad * editPrecio,
@@ -137,7 +138,7 @@ export default function Aprobaciones() {
                 pendientes.map((item, idx) => (
                   <tr key={item.id || idx} className="border-t border-slate-100 dark:border-slate-800">
                     <td className="px-6 py-4 font-medium">{item.notas || 'N/A'}</td>
-                    <td className="px-6 py-4">{item.referencia || 'NUEVO PRODUCTO'}</td>
+                    <td className="px-6 py-4">{item.referencia?.split('|')[0] || 'NUEVO PRODUCTO'}</td>
                     <td className="px-6 py-4 text-center">{item.cantidad}</td>
                     <td className="px-6 py-4 text-center">
                       <button 

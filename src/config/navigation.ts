@@ -116,6 +116,7 @@ export const navigation = [
       { title: 'Gestión de Suministros', icon: Package, href: '/logistica/suministros' },
       { title: 'Gestión de Bodegas', icon: Boxes, href: '/logistica/bodegas' },
       { title: 'Puerto de Escaneo', icon: ScanBarcode, href: '/logistica/escaneo' },
+      { title: 'Auditoría de Salidas', icon: CheckSquare, href: '/logistica/auditoria-salidas' },
       { title: 'Aprobaciones', icon: CheckSquare, href: '/logistica/validaciones' },
       { title: 'Auditorías', icon: ClipboardList, href: '/logistica/auditorias' },
     ],

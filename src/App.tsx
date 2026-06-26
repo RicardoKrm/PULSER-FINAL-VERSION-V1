@@ -54,6 +54,7 @@ import PuertoEscaneo from './pages/logistica/PuertoEscaneo';
 import Aprobaciones from './pages/logistica/Aprobaciones';
 import GestionAuditorias from './pages/logistica/GestionAuditorias';
 import DetalleAuditoria from './pages/logistica/DetalleAuditoria';
+import AuditoriaSalidas from './pages/logistica/AuditoriaSalidas';
 import OrdenesCompra from './pages/compras/OrdenesCompra';
 import IngresoFacturas from './pages/compras/IngresoFacturas';
 import Cotizaciones from './pages/compras/Cotizaciones';
@@ -165,6 +166,7 @@ const router = createBrowserRouter([
       { path: "logistica/suministros", element: <GestionSuministros /> },
       { path: "logistica/bodegas", element: <GestionBodegas /> },
       { path: "logistica/escaneo", element: <PuertoEscaneo /> },
+      { path: "logistica/auditoria-salidas", element: <AuditoriaSalidas /> },
       { path: "logistica/validaciones", element: <Aprobaciones /> },
       { path: "logistica/auditorias", element: <GestionAuditorias /> },
       { path: "logistica/auditorias/:id", element: <DetalleAuditoria /> },

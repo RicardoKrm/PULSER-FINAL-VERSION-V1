@@ -393,40 +393,58 @@ export default function PuertoEscaneo() {
                        .eq('sku', item.sku)
                        .limit(1);
                        
-                     const baseName = anyRep && anyRep.length > 0 ? anyRep[0].nombre : (item.nombre === "NUEVO PRODUCTO" ? `Repuesto ${item.sku}` : item.nombre);
-                     
-                     // Create new product
-                     const { data: newRep, error: createErr } = await supabase.from('logistica_repuestos').insert({
-                         empresa_id: currentCompany.id,
-                         sku: item.sku,
-                         nombre: baseName,
-                         bodega_id: item.bodega_id || null,
-                         stock: item.cantidad,
-                         precio: 0,
-                         valor_total: 0,
-                         calidad: 'ORIGINAL',
-                         estado: 'ACTIVO',
-                         ubicacion: (item.ubicacion_conteo && item.ubicacion_conteo !== 'General' && item.ubicacion_conteo !== 'Sin Especificar') ? item.ubicacion_conteo : null,
-                         ult_mov: new Date().toISOString()
-                     }).select().single();
-
-                     if (!createErr && newRep) {
+                     if (anyRep && anyRep.length > 0) {
+                         const baseName = anyRep[0].nombre;
+                         
+                         // Create new product in this bodega based on the existing one
+                         const { data: newRep, error: createErr } = await supabase.from('logistica_repuestos').insert({
+                             empresa_id: currentCompany.id,
+                             sku: item.sku,
+                             nombre: baseName,
+                             bodega_id: item.bodega_id || null,
+                             stock: item.cantidad,
+                             precio: 0,
+                             valor_total: 0,
+                             calidad: 'ORIGINAL',
+                             estado: 'ACTIVO',
+                             ubicacion: (item.ubicacion_conteo && item.ubicacion_conteo !== 'General' && item.ubicacion_conteo !== 'Sin Especificar') ? item.ubicacion_conteo : null,
+                             ult_mov: new Date().toISOString()
+                         }).select().single();
+    
+                         if (!createErr && newRep) {
+                             const { error: moveErr } = await supabase.from('logistica_movimientos').insert({
+                                 empresa_id: currentCompany.id,
+                                 repuesto_id: newRep.id,
+                                 tipo: 'ENTRADA',
+                                 cantidad: item.cantidad,
+                                 notas: `Ingreso Inicial - Escaneo Rápido`,
+                                 estado: 'COMPLETADO'
+                             });
+                             if (!moveErr) success = true;
+                             else {
+                               console.error('Move error:', moveErr);
+                               errors.push(`${item.nombre} (Movimiento: ${moveErr.message})`);
+                             }
+                         } else {
+                             console.error('Create error:', createErr);
+                             errors.push(`${item.nombre} (Creación: ${createErr?.message || 'Error desconocido'})`);
+                         }
+                     } else {
+                         // Brand new product, needs validation
                          const { error: moveErr } = await supabase.from('logistica_movimientos').insert({
                              empresa_id: currentCompany.id,
-                             repuesto_id: newRep.id,
-                             tipo: 'ENTRADA',
+                             tipo: 'PENDIENTE_VALIDACION',
                              cantidad: item.cantidad,
-                             notas: `Ingreso Inicial - Escaneo Rápido`,
-                             estado: 'COMPLETADO'
+                             notas: item.sku, // the SKU
+                             referencia: `NUEVO PRODUCTO${item.bodega_id ? '|' + item.bodega_id : ''}`,
+                             usuario_nombre: 'Escaneo Rápido',
+                             estado: 'PENDIENTE'
                          });
                          if (!moveErr) success = true;
                          else {
-                           console.error('Move error:', moveErr);
-                           errors.push(`${item.nombre} (Movimiento: ${moveErr.message})`);
+                             console.error('Validación error:', moveErr);
+                             errors.push(`${item.nombre} (Validación: ${moveErr.message})`);
                          }
-                     } else {
-                         console.error('Create error:', createErr);
-                         errors.push(`${item.nombre} (Creación: ${createErr?.message || 'Error desconocido'})`);
                      }
                  } else {
                      // Update existing stock
@@ -453,22 +471,23 @@ export default function PuertoEscaneo() {
                      // Stock insuficiente o no existe
                      success = false;
                  } else {
-                     const newStock = rep.stock - item.cantidad;
-                     const { error: upErr } = await supabase.from('logistica_repuestos').update({ 
-                         stock: newStock,
-                         ult_mov: new Date().toISOString()
-                     }).eq('id', rep.id);
+                     // NO DEDUCIMOS STOCK AQUI! (Reservorio Temporal)
+                     const { error: moveErr } = await supabase.from('logistica_movimientos').insert({
+                         empresa_id: currentCompany.id,
+                         repuesto_id: rep.id,
+                         tipo: 'SALIDA_PENDIENTE',
+                         cantidad: item.cantidad,
+                         notas: `Retiro sin OT - ${item.solicitante || 'S/N'} a ${item.destino || 'S/D'}`,
+                         referencia: `Autoriza: ${item.autorizador || 'S/N'}`,
+                         usuario_nombre: 'Terminal Escaneo',
+                         estado: 'PENDIENTE'
+                     });
                      
-                     if (!upErr) {
-                         const { error: moveErr } = await supabase.from('logistica_movimientos').insert({
-                             empresa_id: currentCompany.id,
-                             repuesto_id: rep.id,
-                             tipo: 'SALIDA',
-                             cantidad: item.cantidad,
-                             notas: `Consumo - Escaneo Rápido`,
-                             estado: 'COMPLETADO'
-                         });
-                         if (!moveErr) success = true;
+                     if (!moveErr) {
+                         success = true;
+                     } else {
+                         console.error('Move error (SALIDA_PENDIENTE):', moveErr);
+                         errors.push(`${item.nombre} (Movimiento: ${moveErr.message})`);
                      }
                  }
              }

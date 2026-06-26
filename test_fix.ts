@@ -9,9 +9,10 @@ const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || ''; // Needs service r
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function test() {
-  const file = fs.readFileSync('fix_logistica_rls_with_check.sql', 'utf8');
+  const file = fs.readFileSync('add_bodega_id_to_movimientos.sql', 'utf8');
   const { data, error } = await supabase.rpc('run_sql', { sql: file });
   if (error) {
+     console.log("e1", error);
      const { data: d2, error: e2 } = await supabase.rpc('exec_sql', { query: file });
      console.log("e2", e2);
   }
