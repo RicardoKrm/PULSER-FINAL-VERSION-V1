@@ -10,6 +10,7 @@ import { useAppContext } from '../../context/AppContext';
 import { useCompany } from '../../contexts/CompanyContext';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import { exportToExcel } from '../../lib/excelExport';
 import Swal from 'sweetalert2';
 
 // Interfaces to maintain TypeScript types
@@ -504,33 +505,21 @@ export default function GestionSuministros() {
   });
 
   const exportInventario = () => {
-    const headers = ['Nombre', 'SKU', 'Ubicación', 'Posición', 'Calidad', 'Proveedor', 'Precio Un.', 'Stock Actual', 'Mínimo', 'Último Mov.', 'Valor Total'];
-    
-    const rows = filteredData.map(item => [
-      `"${item.nombre}"`,
-      `"${item.sku}"`,
-      `"${item.ubicacion}"`,
-      `""`,
-      `"${item.calidad}"`,
-      `"${item.proveedor}"`,
-      item.precio,
-      item.stock,
-      item.min,
-      `"${item.ultMov}"`,
-      item.valorTotal
-    ]);
+    const data = filteredData.map(item => ({
+      'Nombre': item.nombre,
+      'SKU': item.sku,
+      'Ubicación': item.ubicacion,
+      'Posición': '',
+      'Calidad': item.calidad,
+      'Proveedor': item.proveedor,
+      'Precio Un.': item.precio,
+      'Stock Actual': item.stock,
+      'Mínimo': item.min,
+      'Último Mov.': item.ultMov,
+      'Valor Total': item.valorTotal
+    }));
 
-    const csvContent = "\uFEFF" + [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `inventario_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+    exportToExcel(data, `inventario_${new Date().toISOString().split('T')[0]}`, 'Inventario');
   };
 
   const [auditoriaPage, setAuditoriaPage] = useState(1);
@@ -538,29 +527,22 @@ export default function GestionSuministros() {
   const paginatedAuditoria = filteredAuditoria.slice((auditoriaPage - 1) * auditoriaPerPage, auditoriaPage * auditoriaPerPage);
 
   const exportAuditoria = () => {
-    const headers = ['Fecha/Hora', 'Repuesto', 'SKU', 'Proveedor', 'Ubicación', 'Tipo', 'Cantidad', 'Notas/Referencia', 'Usuario'];
-    const rows = filteredAuditoria.map(item => {
+    const data = filteredAuditoria.map(item => {
       const cant = (item.tipo === 'ENTRADA' || (item.cantidad > 0 && item.tipo !== 'ENTRADA' && item.tipo !== 'SALIDA' && item.tipo !== 'TRASLADO') ? '+' : item.tipo === 'SALIDA' ? '-' : '') + Math.abs(item.cantidad);
-      return [
-        `"${new Date(item.created_at).toLocaleString()}"`,
-        `"${item.logistica_repuestos?.nombre || 'Eliminado'}"`,
-        `"${item.logistica_repuestos?.sku || '--'}"`,
-        `"${item.logistica_repuestos?.proveedor || '--'}"`,
-        `"${item.logistica_repuestos?.logistica_bodegas?.nombre || '--'} - ${item.logistica_repuestos?.ubicacion || '--'}"`,
-        `"${item.tipo}"`,
-        cant,
-        `"${item.notas || item.referencia || ''}"`,
-        `"${item.usuario_nombre || 'Sistema'}"`
-      ];
+      return {
+        'Fecha/Hora': new Date(item.created_at).toLocaleString(),
+        'Repuesto': item.logistica_repuestos?.nombre || 'Eliminado',
+        'SKU': item.logistica_repuestos?.sku || '--',
+        'Proveedor': item.logistica_repuestos?.proveedor || '--',
+        'Ubicación': `${item.logistica_repuestos?.logistica_bodegas?.nombre || '--'} - ${item.logistica_repuestos?.ubicacion || '--'}`,
+        'Tipo': item.tipo,
+        'Cantidad': cant,
+        'Notas/Referencia': item.notas || item.referencia || '',
+        'Usuario': item.usuario_nombre || 'Sistema'
+      };
     });
 
-    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `auditoria_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+    exportToExcel(data, `auditoria_${new Date().toISOString().split('T')[0]}`, 'Auditoría');
   };
 
   const valorizacionFiltrada = filteredData.reduce((acc, item) => acc + item.valorTotal, 0);

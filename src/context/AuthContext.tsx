@@ -65,7 +65,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await query.limit(1).single();
         
       if (error && error.code !== 'PGRST116') throw error;
-      if (data) setProfile(data);
+      if (data) {
+        // PostgREST sometimes returns relationships as arrays if constraints aren't explicitly unique.
+        if (Array.isArray(data.rol)) data.rol = data.rol[0];
+        if (Array.isArray(data.empresa)) data.empresa = data.empresa[0];
+        setProfile(data);
+      }
     } catch (error) {
       console.error('Error cargando perfil:', error);
     }

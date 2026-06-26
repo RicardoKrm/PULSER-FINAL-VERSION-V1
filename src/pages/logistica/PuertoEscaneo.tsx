@@ -52,7 +52,7 @@ export default function PuertoEscaneo() {
   
   // Form State
   const [bodegaId, setBodegaId] = useState('');
-  const [tipoMov, setTipoMov] = useState('INGRESO');
+  const [tipoMov, setTipoMov] = useState('ENTRADA');
   const [ubicacionConteo, setUbicacionConteo] = useState('');
   const [modoRafaga, setModoRafaga] = useState(false);
   const [auditoriaId, setAuditoriaId] = useState('');
@@ -192,13 +192,20 @@ export default function PuertoEscaneo() {
       let nombre = "Escaneo Rápido...";
       if (currentCompany?.id) {
          try {
-           const { data, error } = await supabase
+           let query = supabase
              .from('logistica_repuestos')
              .select('nombre, stock')
              .eq('empresa_id', currentCompany.id)
              .eq('sku', sku)
-             .eq('bodega_id', bodegaId)
              .limit(1);
+           
+           if (bodegaId) {
+             query = query.eq('bodega_id', bodegaId);
+           } else {
+             query = query.is('bodega_id', null);
+           }
+           
+           const { data, error } = await query;
              
            if (!error && data && data.length > 0) {
               nombre = data[0].nombre;
@@ -240,13 +247,20 @@ export default function PuertoEscaneo() {
     let nombre = "NUEVO PRODUCTO";
     if (currentCompany?.id) {
        try {
-         const { data, error } = await supabase
+         let query = supabase
            .from('logistica_repuestos')
            .select('nombre, stock')
            .eq('empresa_id', currentCompany.id)
            .eq('sku', sku)
-           .eq('bodega_id', bodegaId)
            .limit(1);
+           
+         if (bodegaId) {
+           query = query.eq('bodega_id', bodegaId);
+         } else {
+           query = query.is('bodega_id', null);
+         }
+         
+         const { data, error } = await query;
            
          if (!error && data && data.length > 0) {
             nombre = data[0].nombre;
@@ -355,11 +369,18 @@ export default function PuertoEscaneo() {
             if (!err) success = true;
           } else {
              // For ENTRADA / SALIDA: Check if product exists in this bodega
-             const { data: reps, error: findErr } = await supabase.from('logistica_repuestos')
+             let q = supabase.from('logistica_repuestos')
                .select('*')
                .eq('empresa_id', currentCompany.id)
-               .eq('sku', item.sku)
-               .eq('bodega_id', item.bodega_id);
+               .eq('sku', item.sku);
+               
+             if (item.bodega_id) {
+               q = q.eq('bodega_id', item.bodega_id);
+             } else {
+               q = q.is('bodega_id', null);
+             }
+             
+             const { data: reps, error: findErr } = await q;
 
              let rep = reps && reps.length > 0 ? reps[0] : null;
              
@@ -399,9 +420,13 @@ export default function PuertoEscaneo() {
                              estado: 'COMPLETADO'
                          });
                          if (!moveErr) success = true;
-                         else console.error('Move error:', moveErr);
+                         else {
+                           console.error('Move error:', moveErr);
+                           errors.push(`${item.nombre} (Movimiento: ${moveErr.message})`);
+                         }
                      } else {
                          console.error('Create error:', createErr);
+                         errors.push(`${item.nombre} (Creación: ${createErr?.message || 'Error desconocido'})`);
                      }
                  } else {
                      // Update existing stock
@@ -453,10 +478,14 @@ export default function PuertoEscaneo() {
         if (success) {
           ok++;
         } else {
-          errors.push(item.nombre);
+          if (!errors.some(e => e.includes(item.nombre))) {
+            errors.push(item.nombre);
+          }
         }
-      } catch (e) {
-        errors.push(item.nombre);
+      } catch (e: any) {
+        if (!errors.some(err => err.includes(item.nombre))) {
+          errors.push(`${item.nombre} (Excepción: ${e.message || 'Error'})`);
+        }
       }
     }
 
@@ -589,7 +618,7 @@ export default function PuertoEscaneo() {
               onChange={(e) => setTipoMov(e.target.value)}
               className="w-full text-sm font-bold bg-transparent outline-none text-slate-800 dark:text-slate-200"
             >
-              <option value="INGRESO">📥 INGRESO</option>
+              <option value="ENTRADA">📥 INGRESO</option>
               <option value="SALIDA">📤 SALIDA</option>
               <option value="AUDITORIA">🔍 AUDITORÍA</option>
             </select>
