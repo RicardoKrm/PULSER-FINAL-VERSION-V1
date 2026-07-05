@@ -123,6 +123,17 @@ export default function CentroAyuda() {
   const handleResolveTicket = async () => {
     if (!selectedTicket) return;
     
+    const confirm = await Swal.fire({
+      title: '¿Resolver ticket?',
+      text: '¿Estás seguro de que deseas marcar este ticket como resuelto? Esta acción cerrará el caso.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, resolver',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (!confirm.isConfirmed) return;
+
     try {
       const { error } = await supabase.from('tickets_ayuda').update({
         estado: 'RESUELTO'
@@ -148,11 +159,12 @@ export default function CentroAyuda() {
 
     const { value: newPassword } = await Swal.fire({
       title: 'Restablecer Contraseña',
-      text: `Ingresa una clave temporal para el usuario ${selectedTicket.email_contacto}`,
+      text: `¿Estás seguro de cambiar la clave del usuario ${selectedTicket.email_contacto}? Ingresa la nueva clave temporal:`,
+      icon: 'warning',
       input: 'text',
       inputPlaceholder: 'Ej: Temporal2026',
       showCancelButton: true,
-      confirmButtonText: 'Cambiar',
+      confirmButtonText: 'Sí, cambiar',
       cancelButtonText: 'Cancelar',
       inputValidator: (value) => {
         if (!value || value.length < 6) {
@@ -431,25 +443,30 @@ export default function CentroAyuda() {
             </div>
 
             {selectedTicket.estado !== 'RESUELTO' ? (
-              <div className="shrink-0 pt-4 border-t border-slate-200 dark:border-slate-800">
+              <div className="shrink-0 pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-3">
                 <div className="flex gap-3">
                   <textarea 
                     value={replyMessage}
                     onChange={(e) => setReplyMessage(e.target.value)}
                     placeholder="Escriba su respuesta aquí..."
-                    className="flex-1 h-12 min-h-[48px] max-h-32 p-3 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-medium resize-y dark:text-white"
+                    className="flex-1 min-h-[80px] p-3 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-medium resize-y dark:text-white"
                   />
-                  <div className="flex flex-col gap-2 shrink-0 justify-center">
-                    <Button onClick={handleSendReply} disabled={!replyMessage.trim()} className="h-12 w-12 flex items-center justify-center p-0 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">
+                  <div className="flex flex-col gap-2 shrink-0">
+                    <Button onClick={handleSendReply} disabled={!replyMessage.trim()} className="h-full flex items-center justify-center gap-2 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">
                       <Send className="w-5 h-5 text-white" />
+                      <span className="font-bold text-white">Enviar</span>
                     </Button>
-                    <button onClick={handleResolveTicket} className="text-[10px] font-bold text-emerald-600 dark:text-emerald-500 hover:underline px-1 py-0.5">
-                      Marcar Resuelto
-                    </button>
-                    <button onClick={handleResetPassword} className="text-[10px] font-bold text-amber-600 dark:text-amber-500 hover:underline px-1 py-0.5 flex items-center justify-center gap-1">
-                      <Key className="w-3 h-3" /> Reset Clave
-                    </button>
                   </div>
+                </div>
+                <div className="flex gap-3 justify-end border-t border-slate-100 dark:border-slate-800 pt-3">
+                  <Button variant="outline" onClick={handleResetPassword} className="border-amber-200 text-amber-600 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-500 dark:hover:bg-amber-900/30 flex items-center gap-2 shadow-sm font-bold">
+                    <Key className="w-4 h-4" />
+                    Resetear Contraseña
+                  </Button>
+                  <Button onClick={handleResolveTicket} className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2 shadow-sm font-bold">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Marcar como Resuelto
+                  </Button>
                 </div>
               </div>
             ) : (
