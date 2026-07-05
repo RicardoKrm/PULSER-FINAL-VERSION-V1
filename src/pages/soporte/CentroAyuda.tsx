@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, MessageSquare, Clock, CheckCircle2, Ticket, Filter, Building2, User, Send, X, AlertTriangle } from 'lucide-react';
+import { Search, Plus, MessageSquare, Clock, CheckCircle2, Ticket, Filter, Building2, User, Send, X, AlertTriangle, Key } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import Swal from 'sweetalert2';
@@ -137,6 +137,64 @@ export default function CentroAyuda() {
     } catch (e) {
       console.error(e);
       Swal.fire('Error', 'No se pudo resolver el ticket', 'error');
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!selectedTicket || !selectedTicket.email_contacto) {
+      Swal.fire('Error', 'Este ticket no tiene un email de contacto asociado.', 'error');
+      return;
+    }
+
+    const { value: newPassword } = await Swal.fire({
+      title: 'Restablecer Contraseña',
+      text: `Ingresa una clave temporal para el usuario ${selectedTicket.email_contacto}`,
+      input: 'text',
+      inputPlaceholder: 'Ej: Temporal2026',
+      showCancelButton: true,
+      confirmButtonText: 'Cambiar',
+      cancelButtonText: 'Cancelar',
+      inputValidator: (value) => {
+        if (!value || value.length < 6) {
+          return 'La contraseña debe tener al menos 6 caracteres';
+        }
+      }
+    });
+
+    if (newPassword) {
+      try {
+        // 1. Find user by email in usuario_aplicacion
+        const { data: userData, error: userError } = await supabase
+          .from('usuario_aplicacion')
+          .select('auth_user_id')
+          .eq('email', selectedTicket.email_contacto)
+          .single();
+
+        if (userError || !userData?.auth_user_id) {
+           throw new Error('No se encontró el usuario en la base de datos (verifique que el email coincida).');
+        }
+
+        // 2. Call the backend to reset the password securely using service_role
+        const response = await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: userData.auth_user_id, newPassword })
+        });
+
+        const result = await response.json();
+        
+        if (!response.ok) {
+           throw new Error(result.error || 'Error al actualizar la contraseña');
+        }
+
+        Swal.fire('Contraseña Actualizada', 'La contraseña temporal ha sido configurada correctamente.', 'success');
+        
+        // Auto-reply ticket with the new password
+        setReplyMessage(`Hola, hemos restablecido tu contraseña.\n\nTu nueva clave temporal es: ${newPassword}\n\nTe recomendamos cambiarla en cuanto inicies sesión nuevamente.`);
+      } catch (err: any) {
+        console.error(err);
+        Swal.fire('Error', err.message, 'error');
+      }
     }
   };
 
@@ -387,6 +445,9 @@ export default function CentroAyuda() {
                     </Button>
                     <button onClick={handleResolveTicket} className="text-[10px] font-bold text-emerald-600 dark:text-emerald-500 hover:underline px-1 py-0.5">
                       Marcar Resuelto
+                    </button>
+                    <button onClick={handleResetPassword} className="text-[10px] font-bold text-amber-600 dark:text-amber-500 hover:underline px-1 py-0.5 flex items-center justify-center gap-1">
+                      <Key className="w-3 h-3" /> Reset Clave
                     </button>
                   </div>
                 </div>

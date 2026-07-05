@@ -321,6 +321,38 @@ async function startServer() {
     res.json({ status: "success", message: "Conteo registrado correctamente" });
   });
 
+  // API Route to reset user password (Admin)
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { userId, newPassword } = req.body;
+      if (!userId || !newPassword) {
+        return res.status(400).json({ error: "Missing userId or newPassword" });
+      }
+
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (!serviceRoleKey) {
+        return res.status(500).json({ error: "No se ha configurado SUPABASE_SERVICE_ROLE_KEY en el servidor. Agrégala en los secretos para poder resetear contraseñas." });
+      }
+
+      const supabaseAdmin = createClient(SUPABASE_URL, serviceRoleKey);
+      
+      const { data, error } = await supabaseAdmin.auth.admin.updateUserById(
+        userId,
+        { password: newPassword }
+      );
+
+      if (error) {
+        console.error("Supabase Admin Error:", error);
+        return res.status(400).json({ error: error.message });
+      }
+
+      res.json({ status: "success", message: "Contraseña actualizada correctamente" });
+    } catch (error: any) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ error: "Ocurrió un error al procesar tu solicitud." });
+    }
+  });
+
   // API Route for chat
   app.post("/api/chat", async (req, res) => {
     try {
