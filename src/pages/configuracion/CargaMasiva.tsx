@@ -250,9 +250,9 @@ const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[
     }) 
   },
   proveedores: { 
-    table: 'proveedor', 
+    table: 'proveedores_directorio', 
     matchKey: 'rut',
-    mapConfig: (r: any) => ({ rut: r.Rut, razon_social: r.RazonSocial, contacto: r.Contacto, telefono: r.Telefono, email: r.Email, tipo_servicio: r.TipoServicio }) 
+    mapConfig: (r: any) => ({ rut: r.Rut, nombre: r.RazonSocial || r.Nombre, telefono: r.Telefono, email: r.Email }) 
   },
   kits: { 
     table: 'kit_repuesto', 
