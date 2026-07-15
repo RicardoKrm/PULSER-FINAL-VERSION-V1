@@ -90,11 +90,17 @@ export default function Personal() {
           department: c.detalles?.departamento || "-",
           status: (c.estado || "ACTIVO").toUpperCase(),
           email: c.email || "",
-          phone: c.telefono || "",
+          phone: c.detalles?.telefono || c.telefono || "",
           sueldoBase: c.detalles?.sueldo_base || undefined,
           valorHH: c.detalles?.valor_hh || undefined,
           prestadorServicio: c.detalles?.prestador_de_servicio || "INTERNO",
           licencia: c.detalles?.tipoLicencia || undefined,
+          fechaContrato: c.detalles?.fecha_contrato || undefined,
+          tipoContrato: c.detalles?.tipo_contrato || undefined,
+          vencimiento: c.detalles?.vencimiento || undefined,
+          turnoAsignado: c.detalles?.turno_asignado || undefined,
+          empresaAsignada: c.detalles?.empresa_asignada || undefined,
+          direccion: c.detalles?.direccion || undefined,
           isConductor: c.rol?.includes("Conductor") || false,
           isMecanico: c.rol?.includes("Mecánico") || false,
           isSupervisor:
@@ -1024,11 +1030,11 @@ export default function Personal() {
                     </div>
                     <div>
                       <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">
-                        Empresa
+                        Empresa Asignada
                       </label>
                       <input
                         type="text"
-                        defaultValue="Empresa Principal"
+                        defaultValue={selectedUserForProfile.empresaAsignada || "Empresa Principal"}
                         className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100"
                       />
                     </div>
@@ -1038,7 +1044,61 @@ export default function Personal() {
                       </label>
                       <input
                         type="text"
-                        defaultValue="Operaciones"
+                        defaultValue={selectedUserForProfile.departamento || "Operaciones"}
+                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">
+                        Fecha Contrato
+                      </label>
+                      <input
+                        type="date"
+                        defaultValue={selectedUserForProfile.fechaContrato ? new Date(selectedUserForProfile.fechaContrato).toISOString().split('T')[0] : ''}
+                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">
+                        Tipo Contrato
+                      </label>
+                      <select 
+                        defaultValue={selectedUserForProfile.tipoContrato || "INDEFINIDO"}
+                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100">
+                        <option value="INDEFINIDO">Indefinido</option>
+                        <option value="PLAZO FIJO">Plazo Fijo</option>
+                        <option value="POR OBRA">Por Obra o Faena</option>
+                        <option value="HONORARIOS">Honorarios</option>
+                        <option value="ART 22">Art. 22</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">
+                        Fecha Vencimiento
+                      </label>
+                      <input
+                        type="date"
+                        defaultValue={selectedUserForProfile.vencimiento ? new Date(selectedUserForProfile.vencimiento).toISOString().split('T')[0] : ''}
+                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">
+                        Turno Asignado
+                      </label>
+                      <input
+                        type="text"
+                        defaultValue={selectedUserForProfile.turnoAsignado || "7X7"}
+                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">
+                        Dirección
+                      </label>
+                      <input
+                        type="text"
+                        defaultValue={selectedUserForProfile.direccion || ""}
                         className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100"
                       />
                     </div>
@@ -1046,7 +1106,9 @@ export default function Personal() {
                       <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">
                         Sexo
                       </label>
-                      <select className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100">
+                      <select 
+                        defaultValue={selectedUserForProfile.sexo || "HOMBRE"}
+                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100">
                         <option value="HOMBRE">Hombre</option>
                         <option value="MUJER">Mujer</option>
                         <option value="OTRO">Otro</option>
@@ -1056,7 +1118,9 @@ export default function Personal() {
                       <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">
                         Prestador de servicio
                       </label>
-                      <select className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100">
+                      <select 
+                        defaultValue={selectedUserForProfile.prestadorServicio || "INTERNO"}
+                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-slate-100">
                         <option value="INTERNO">Interno</option>
                         <option value="EXTERNO">Externo</option>
                       </select>

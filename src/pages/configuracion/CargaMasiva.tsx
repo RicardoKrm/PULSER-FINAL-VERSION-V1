@@ -133,23 +133,61 @@ const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[
   empleados: { 
     table: 'colaborador', 
     matchKey: 'rut',
-    mapConfig: (r: any) => ({
-      rut: r.Rut || r.RUT || '',
-      nombre: (`${r.Nombre || r.Nombres || ''} ${r.Ap_Paterno || r.Apellidos || ''} ${r.Ap_Materno || ''}`).trim(),
-      rol: r.Cargo || r.Rol || '',
-      estado: r.Estado || 'ACTIVO',
-      detalles: {
-        nombres: r.Nombre || r.Nombres || '',
-        apellido_paterno: r.Ap_Paterno || '',
-        apellido_materno: r.Ap_Materno || '',
-        sexo: r.Sexo || 'HOMBRE',
-        departamento: r.Departament || r.Departamento || '',
-        sueldo_base: parseCurrencyCLP(r.Sueldo_Base),
-        valor_hh: parseCurrencyCLP(r['HH_$'] || r.Valor_HH),
-        hh_extras: parseFloat((r.HH_Extras || '0').toString().replace(/[^0-9.-]+/g,"")),
-        prestador_de_servicio: r.Prestador_de_servicio || r.Prestador_de_s || ''
+    mapConfig: (r: any) => {
+      const findKey = (possible: string[]) => {
+        const k = Object.keys(r).find(key => possible.some(p => key.toUpperCase().includes(p)));
+        return k ? r[k] : undefined;
+      };
+
+      const nombre = findKey(['TRABAJADOR', 'NOMBRE', 'NOMBRES']) || '';
+      const rut = r.Rut || r.RUT || '';
+      const cargo = findKey(['CARGO', 'ROL']) || '';
+      
+      // Manejo de duplicados en F. CONTRATO
+      const fContratoKeys = Object.keys(r).filter(k => k.toUpperCase().includes('F. CONTRATO') || k.toUpperCase().includes('CONTRATO'));
+      let fechaContrato;
+      let tipoContrato;
+      
+      if (fContratoKeys.length >= 2) {
+        // Asumimos que el primero que parece fecha es la fecha, o el primero es fecha y el segundo tipo
+        fechaContrato = parseExcelDate(r[fContratoKeys[0]]);
+        tipoContrato = r[fContratoKeys[1]];
+      } else if (fContratoKeys.length === 1) {
+        // Solo hay uno
+        const val = String(r[fContratoKeys[0]]).toUpperCase();
+        if (val.includes('INDEFINIDO') || val.includes('FIJO') || val.includes('PLAZO') || val.includes('ART')) {
+          tipoContrato = r[fContratoKeys[0]];
+        } else {
+          fechaContrato = parseExcelDate(r[fContratoKeys[0]]);
+        }
       }
-    })
+
+      return {
+        rut: rut,
+        nombre: nombre,
+        rol: cargo,
+        estado: r.Estado || 'ACTIVO',
+        detalles: {
+          nombres: r.Nombre || r.Nombres || nombre,
+          apellido_paterno: r.Ap_Paterno || '',
+          apellido_materno: r.Ap_Materno || '',
+          cargo: cargo,
+          fecha_contrato: fechaContrato,
+          tipo_contrato: tipoContrato || r['TIPO CONTRATO'] || '',
+          vencimiento: parseExcelDate(findKey(['VENCIMIENTO', 'VENCE'])),
+          turno_asignado: findKey(['TURNO ASIGNADO', 'TURNO']) || '',
+          empresa_asignada: findKey(['EMPRESA', 'RAZON SOCIAL']) || '',
+          direccion: findKey(['DIRECCION', 'DIRECCIÓN']) || '',
+          telefono: findKey(['TELEFONO', 'TELÉFONO', 'CELULAR']) || '',
+          sexo: r.Sexo || 'HOMBRE',
+          departamento: r.Departament || r.Departamento || '',
+          sueldo_base: parseCurrencyCLP(r.Sueldo_Base),
+          valor_hh: parseCurrencyCLP(r['HH_$'] || r.Valor_HH),
+          hh_extras: parseFloat((r.HH_Extras || '0').toString().replace(/[^0-9.-]+/g,"")),
+          prestador_de_servicio: r.Prestador_de_servicio || r.Prestador_de_s || ''
+        }
+      };
+    }
   },
   vehiculos: { 
     table: 'vehiculo', 
@@ -350,7 +388,7 @@ const MODULES: UploadModule[] = [
     description: 'Carga masiva de conductores, técnicos y administrativos desde archivo Excel.',
     icon: Users,
     template: [
-      { Rut: '10.001.002-1', Prestador_de_servicio: 'EXTERNO', Ap_Paterno: 'AEDO', Ap_Materno: 'ZAMBRA', Nombre: 'CARLOS', Sexo: 'HOMBRE', Estado: 'ACTIVO', Cargo: 'ELECTRICO', Departament: 'MANTENCION', Sueldo_Base: 1257210, 'HH_$': 7143, HH_Extras: 10001 }
+      { TRABAJADOR: 'Acuña Villagrán Claudio Andrés', RUT: '11.572.766-4', 'F. CONTRATO': '6/17/2026', CARGO: 'CONDUCTOR', 'F. CONTRATO_1': 'PLAZO FIJO', VENCIMIENTO: '10/31/2026', 'TURNO ASIGNADO': '7X7', DIRECCION: 'Av. Siempre Viva 742', TELEFONO: '+56912345678', EMPRESA: 'INVERSIONES IMPERIA SpA' }
     ]
   },
   {

@@ -19,6 +19,12 @@ export interface Collaborator {
   sexo?: 'HOMBRE' | 'MUJER' | 'OTRO';
   prestadorServicio?: 'INTERNO' | 'EXTERNO';
   panelInicio?: string;
+  fechaContrato?: string;
+  tipoContrato?: string;
+  vencimiento?: string;
+  turnoAsignado?: string;
+  empresaAsignada?: string;
+  direccion?: string;
 }
 
 export interface ReservaTurismo {

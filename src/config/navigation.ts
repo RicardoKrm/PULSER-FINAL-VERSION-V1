@@ -149,6 +149,16 @@ export const navigation = [
     ],
   },
   {
+    title: 'Recursos Humanos',
+    icon: Users,
+    href: '/recursos-humanos',
+    submodules: [
+      { title: 'Personal', icon: Users, href: '/recursos-humanos/personal' },
+      { title: 'Asignación de Cargos', icon: UserCircle, href: '/recursos-humanos/permisos' },
+      { title: 'Turnos', icon: CalendarClock, href: '/recursos-humanos/turnos' },
+    ],
+  },
+  {
     title: 'Biblioteca Técnica',
     icon: BookOpen,
     href: '/biblioteca',
@@ -163,8 +173,6 @@ export const navigation = [
     href: '/configuracion',
     submodules: [
       { title: 'Gestión de Empresa', icon: Settings, href: '/configuracion/empresa' },
-      { title: 'Personal', icon: Users, href: '/configuracion/personal' },
-      { title: 'Asignación de Cargos', icon: UserCircle, href: '/configuracion/permisos' },
       { title: 'Integración GPS', icon: MapPin, href: '/configuracion/gps' },
       { title: 'Precio de Combustible', icon: DollarSign, href: '/configuracion/precio-combustible' },
       { title: 'Gestión de Pautas', icon: FileText, href: '/configuracion/pautas' },

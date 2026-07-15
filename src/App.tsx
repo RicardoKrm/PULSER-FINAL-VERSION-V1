@@ -60,8 +60,9 @@ import IngresoFacturas from './pages/compras/IngresoFacturas';
 import Cotizaciones from './pages/compras/Cotizaciones';
 import ContratosProveedores from './pages/compras/ContratosProveedores';
 import PrecioCombustible from './pages/configuracion/PrecioCombustible';
-import Personal from './pages/configuracion/Personal';
-import AsignacionPermisos from './pages/configuracion/AsignacionPermisos';
+import Personal from './pages/recursos-humanos/Personal';
+import AsignacionPermisos from './pages/recursos-humanos/AsignacionPermisos';
+import Turnos from './pages/recursos-humanos/Turnos';
 import GestionFallas from './pages/configuracion/GestionFallas';
 import ConfiguracionEmpresa from './pages/configuracion/ConfiguracionEmpresa';
 import CargaMasiva from './pages/configuracion/CargaMasiva';
@@ -136,8 +137,9 @@ const router = createBrowserRouter([
       { path: "flota/neumaticos", element: <GestionNeumaticos /> },
       { path: "flota/combustible", element: <GestionCombustible /> },
       { path: "configuracion/pautas", element: <GestionPautas /> },
-      { path: "configuracion/personal", element: <Personal /> },
-      { path: "configuracion/permisos", element: <AsignacionPermisos /> },
+      { path: "recursos-humanos/personal", element: <Personal /> },
+      { path: "recursos-humanos/permisos", element: <AsignacionPermisos /> },
+      { path: "recursos-humanos/turnos", element: <Turnos /> },
       { path: "configuracion/fallas", element: <GestionFallas /> },
       { path: "configuracion/empresa", element: <ConfiguracionEmpresa /> },
       { path: "configuracion/tareas", element: <GestionTareas /> },
