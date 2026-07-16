@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
   ChevronLeft, 
@@ -22,6 +22,8 @@ import { exportToExcel } from "../../lib/excelExport";
 import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import Swal from 'sweetalert2';
+import { useCompany } from "../../contexts/CompanyContext";
+import { supabase } from "../../lib/supabase";
 
 // --- Types ---
 type EmployeeStatus = 'ACTIVO' | 'VACACIONES' | 'LICENCIA' | 'AUSENTE';
@@ -151,10 +153,28 @@ const getTurnoTipo = (title: string) => {
 };
 
 export default function Turnos() {
+  const { currentCompany } = useCompany();
   const [activeArea, setActiveArea] = useState<Area>('TRANSPORTE');
-  const [boardData, setBoardData] = useState(initialData);
+  const [boardData, setBoardData] = useState<Record<Area, ShiftGroup[]>>(initialData);
   const [searchQuery, setSearchQuery] = useState('');
   
+  const [currentWeekId, setCurrentWeekId] = useState<string | null>(null);
+  const [weekDates, setWeekDates] = useState({ inicio: '2024-07-15', fin: '2024-07-22' });
+  const [isNuevoTurnoModalOpen, setIsNuevoTurnoModalOpen] = useState(false);
+  const [newWeek, setNewWeek] = useState({ inicio: '', fin: '' });
+  const [isLoading, setIsLoading] = useState(false);
+  const [colaboradores, setColaboradores] = useState<any[]>([]);
+
+  const [addWorkerModal, setAddWorkerModal] = useState<{
+    isOpen: boolean;
+    groupId: string;
+  }>({
+    isOpen: false,
+    groupId: '',
+  });
+
+  const [addWorkerSearch, setAddWorkerSearch] = useState('');
+
   const [statusModal, setStatusModal] = useState<{
     isOpen: boolean;
     workerId: string;
@@ -176,6 +196,131 @@ export default function Turnos() {
     fechaFin: '',
     notes: ''
   });
+
+  useEffect(() => {
+    if (currentCompany?.id) {
+      fetchCurrentWeek();
+      fetchColaboradores();
+    }
+  }, [currentCompany?.id]);
+
+  const fetchColaboradores = async () => {
+    if (!currentCompany?.id) return;
+    const { data, error } = await supabase
+      .from('colaborador')
+      .select('id, nombre, rol')
+      .eq('empresa_id', currentCompany.id)
+      .eq('estado', 'ACTIVO')
+      .order('nombre');
+    
+    if (data) {
+      setColaboradores(data);
+    }
+  };
+
+  const fetchCurrentWeek = async () => {
+    if (!currentCompany?.id) return;
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from('turnos_semanales')
+      .select('*')
+      .eq('empresa_id', currentCompany.id)
+      .order('fecha_inicio', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error("Error fetching turnos:", error);
+    } else if (data) {
+      setCurrentWeekId(data.id);
+      setWeekDates({ inicio: data.fecha_inicio, fin: data.fecha_fin });
+      setBoardData(data.data as Record<Area, ShiftGroup[]>);
+    }
+    setIsLoading(false);
+  };
+
+  const saveToDatabase = async (newData: Record<Area, ShiftGroup[]>) => {
+    if (!currentCompany?.id) return;
+    if (currentWeekId) {
+      const { error } = await supabase
+        .from('turnos_semanales')
+        .update({ data: newData })
+        .eq('id', currentWeekId);
+      if (error) console.error("Error updating turnos:", error);
+    }
+  };
+
+  const createNuevoTurno = async () => {
+    if (!currentCompany?.id || !newWeek.inicio || !newWeek.fin) return;
+    setIsLoading(true);
+    // Podríamos limpiar los trabajadores o copiar la semana anterior.
+    // Por simplicidad, copiaremos la base de datos actual si existe, sino initialData.
+    const newDataToInsert = boardData || initialData;
+    
+    const { data, error } = await supabase
+      .from('turnos_semanales')
+      .insert({
+        empresa_id: currentCompany.id,
+        area: 'TODAS', // En caso de que se agrupen todas en un solo registro
+        fecha_inicio: newWeek.inicio,
+        fecha_fin: newWeek.fin,
+        data: newDataToInsert
+      })
+      .select()
+      .single();
+      
+    if (error) {
+      Swal.fire('Error', 'No se pudo crear el turno', 'error');
+      console.error(error);
+    } else if (data) {
+      setCurrentWeekId(data.id);
+      setWeekDates({ inicio: data.fecha_inicio, fin: data.fecha_fin });
+      setBoardData(data.data as Record<Area, ShiftGroup[]>);
+      setIsNuevoTurnoModalOpen(false);
+      Swal.fire('¡Éxito!', 'Nuevo turno creado', 'success');
+    }
+    setIsLoading(false);
+  };
+
+  const getWorkerCurrentShift = (workerName: string) => {
+    for (const area of Object.keys(boardData) as Area[]) {
+      for (const group of boardData[area]) {
+        if (group.workers.some(w => w.name === workerName)) {
+          return `${area} - ${group.title}`;
+        }
+      }
+    }
+    return null;
+  };
+
+  const handleQuickAddWorker = (colaborador: any) => {
+    const newData = { ...boardData };
+    const group = newData[activeArea].find(g => g.id === addWorkerModal.groupId);
+    
+    if (group) {
+      const newWorker: Worker = {
+        id: colaborador.id || crypto.randomUUID(),
+        name: colaborador.nombre,
+        role: colaborador.rol || 'Operador',
+        details: '',
+        status: 'ACTIVO',
+        isApoyo: false
+      };
+      
+      group.workers.push(newWorker);
+      setBoardData(newData);
+      saveToDatabase(newData);
+      setAddWorkerModal({ ...addWorkerModal, isOpen: false });
+      setAddWorkerSearch('');
+      Swal.fire({
+        title: '¡Agregado!',
+        text: 'Trabajador agregado exitosamente.',
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false
+      });
+    }
+  };
 
   const handleExportExcel = () => {
     const dataToExport: any[] = [];
@@ -214,6 +359,7 @@ export default function Turnos() {
       const newData = { ...boardData };
       newData[activeArea][groupIndex] = { ...group, workers: newWorkers };
       setBoardData(newData);
+      saveToDatabase(newData);
     } else {
       // Move between groups
       const sourceGroupIndex = boardData[activeArea].findIndex(g => g.id === source.droppableId);
@@ -232,6 +378,7 @@ export default function Turnos() {
       newData[activeArea][sourceGroupIndex] = { ...sourceGroup, workers: sourceWorkers };
       newData[activeArea][destGroupIndex] = { ...destGroup, workers: destWorkers };
       setBoardData(newData);
+      saveToDatabase(newData);
     }
   };
 
@@ -277,6 +424,7 @@ export default function Turnos() {
             worker.fechaFin = statusModal.fechaFin;
             worker.notes = statusModal.notes;
             setBoardData(newData);
+            saveToDatabase(newData);
             Swal.fire('¡Actualizado!', 'El estado ha sido actualizado.', 'success');
             setStatusModal({ ...statusModal, isOpen: false });
           }
@@ -312,8 +460,8 @@ export default function Turnos() {
             <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors">
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <div className="px-4 py-1.5 font-bold text-sm text-slate-700 dark:text-slate-200 min-w-[140px] text-center">
-              15 al 22 de JULIO
+            <div className="px-4 py-1.5 font-bold text-sm text-slate-700 dark:text-slate-200 min-w-[140px] text-center uppercase">
+              {weekDates.inicio ? `${weekDates.inicio} AL ${weekDates.fin}` : '15 AL 22 DE JULIO'}
             </div>
             <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors">
               <ChevronRight className="w-4 h-4" />
@@ -328,7 +476,10 @@ export default function Turnos() {
             Exportar Excel
           </button>
 
-          <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 text-sm transition-all shadow-sm">
+          <button 
+            onClick={() => setIsNuevoTurnoModalOpen(true)}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 text-sm transition-all shadow-sm"
+          >
             <Plus className="w-4 h-4" />
             Nuevo Turno
           </button>
@@ -408,6 +559,7 @@ export default function Turnos() {
                       }`}
                     >
                       {group.workers.map((worker, index) => (
+                        // @ts-expect-error key is required by React
                         <Draggable key={worker.id} draggableId={worker.id} index={index}>
                           {(provided, snapshot) => (
                             <div
@@ -473,7 +625,10 @@ export default function Turnos() {
                 
                 {/* Add Worker Button */}
                 <div className="p-3 border-t border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-800/50">
-                  <button className="w-full py-2 flex items-center justify-center gap-2 text-sm font-bold text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors border border-dashed border-slate-300 dark:border-slate-600">
+                  <button 
+                    onClick={() => setAddWorkerModal({ ...addWorkerModal, isOpen: true, groupId: group.id })}
+                    className="w-full py-2 flex items-center justify-center gap-2 text-sm font-bold text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors border border-dashed border-slate-300 dark:border-slate-600"
+                  >
                     <Plus className="w-4 h-4" />
                     Agregar
                   </button>
@@ -483,6 +638,70 @@ export default function Turnos() {
           </div>
         </DragDropContext>
       </div>
+
+      {/* Agregar Trabajador Modal */}
+      <Modal 
+        isOpen={addWorkerModal.isOpen} 
+        onClose={() => {
+          setAddWorkerModal({ ...addWorkerModal, isOpen: false });
+          setAddWorkerSearch('');
+        }}
+        title="Agregar Trabajador al Turno"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input 
+              type="text"
+              value={addWorkerSearch}
+              onChange={(e) => setAddWorkerSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+              placeholder="Buscar colaborador por nombre o rol..."
+            />
+          </div>
+
+          <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+            {colaboradores
+              .filter(c => 
+                c.nombre.toLowerCase().includes(addWorkerSearch.toLowerCase()) || 
+                (c.rol && c.rol.toLowerCase().includes(addWorkerSearch.toLowerCase()))
+              )
+              .map(c => {
+                const currentShift = getWorkerCurrentShift(c.nombre);
+                
+                return (
+                  <div key={c.id} className={`flex items-center justify-between p-3 rounded-lg border ${currentShift ? 'border-slate-200 bg-slate-50 dark:bg-slate-800/50 dark:border-slate-700 opacity-60' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'}`}>
+                    <div>
+                      <p className="font-bold text-sm text-slate-700 dark:text-slate-200">{c.nombre}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{c.rol || 'Operador'}</p>
+                    </div>
+                    {currentShift ? (
+                      <div className="text-right">
+                        <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-400/10 px-2 py-1 rounded">
+                          En: {currentShift}
+                        </span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleQuickAddWorker(c)}
+                        className="text-xs font-bold bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20 px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        Agregar
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            
+            {colaboradores.length === 0 && (
+              <div className="text-center py-4 text-sm text-slate-500">
+                No hay colaboradores registrados en la base de datos.
+              </div>
+            )}
+          </div>
+        </div>
+      </Modal>
 
       {/* Status Edit Modal */}
       <Modal 
@@ -561,6 +780,48 @@ export default function Turnos() {
             </Button>
             <Button onClick={saveStatus}>
               Guardar Cambios
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Nuevo Turno Modal */}
+      <Modal 
+        isOpen={isNuevoTurnoModalOpen} 
+        onClose={() => setIsNuevoTurnoModalOpen(false)}
+        title="Crear Nueva Semana de Turnos"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Fecha Inicio</label>
+              <input 
+                type="date"
+                value={newWeek.inicio}
+                onChange={(e) => setNewWeek({ ...newWeek, inicio: e.target.value })}
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Fecha Fin</label>
+              <input 
+                type="date"
+                value={newWeek.fin}
+                onChange={(e) => setNewWeek({ ...newWeek, fin: e.target.value })}
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+          <div className="text-sm text-slate-500 dark:text-slate-400">
+            Se creará una copia de la distribución actual para esta nueva semana, la cual podrás modificar independientemente.
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+            <Button variant="outline" onClick={() => setIsNuevoTurnoModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={createNuevoTurno} disabled={isLoading || !newWeek.inicio || !newWeek.fin}>
+              {isLoading ? 'Creando...' : 'Crear Turno'}
             </Button>
           </div>
         </div>
