@@ -1,8 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Calendar, Truck, TrendingUp, AlertCircle, Droplet, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import * as XLSX from 'xlsx';
 
 type TurnoDetalle = {
+
   camion: string;
   chofer: string;
   tonelaje: number;
@@ -36,25 +39,19 @@ export default function ReporteDiarioPanel() {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const res = await fetch('/api/reportes');
-      
-      let data;
-      try {
-         const text = await res.text();
-         data = JSON.parse(text);
-      } catch (parseError) {
-         throw new Error("El servidor devolvió una respuesta no válida. Esto puede suceder si se está reiniciando.");
-      }
-      
-      if (!res.ok) {
-         if (data.error && data.error.includes('Could not find the table')) {
-             throw new Error("La tabla 'produccion_registro_diario' no existe en la base de datos. Por favor créala usando el script SQL.");
+      const { data, error } = await supabase
+        .from('produccion_registro_diario')
+        .select('*');
+        
+      if (error) {
+         if (error.code === '42P01') {
+             throw new Error("La tabla 'produccion_registro_diario' no existe en la base de datos.");
          }
-         throw new Error(data.error || "Error al cargar los reportes");
+         throw new Error(error.message || "Error al cargar los reportes");
       }
       
       if (!Array.isArray(data)) {
-         throw new Error("Invalid response format");
+         throw new Error("Formato de respuesta inválido");
       }
 
       // Group by date, then by turno
@@ -165,28 +162,127 @@ export default function ReporteDiarioPanel() {
     if (!file) return;
 
     setUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
-
+    
     try {
-      const res = await fetch('/api/upload-excel', {
-        method: 'POST',
-        body: formData,
-      });
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const data: any[] = XLSX.utils.sheet_to_json(worksheet);
 
-      let data;
-      try {
-         const text = await res.text();
-         data = JSON.parse(text);
-      } catch (parseError) {
-         throw new Error("El servidor devolvió una respuesta no válida. Esto puede suceder si se está reiniciando.");
-      }
-      
-      if (!res.ok) {
-        throw new Error(data.error || 'Error uploading file');
+      if (data.length === 0) {
+        throw new Error("El archivo Excel está vacío");
       }
 
-      alert(`Carga exitosa. ${data.count} registros insertados.`);
+      // Format data for DB
+      const formattedData = data.map((row, index) => {
+        // Find keys dynamically to handle variations in whitespace or casing
+        const getVal = (searchStr: string) => {
+           const key = Object.keys(row).find(k => k.toLowerCase().includes(searchStr.toLowerCase()));
+           return key ? row[key] : undefined;
+        };
+
+        // Handle dates
+        let fecha = new Date();
+        const fechaVal = getVal('fecha');
+        if (fechaVal) {
+           const fechaStr = fechaVal;
+           if (typeof fechaStr === 'number') {
+             fecha = new Date(Math.round((fechaStr - 25569) * 86400 * 1000));
+           } else {
+             const str = String(fechaStr).trim();
+             const cleanStr = str.replace(/\//g, '-');
+             
+             const dateMatch = cleanStr.match(/(\d{1,2})-(\d{1,2})-(\d{4})/);
+             if (dateMatch) {
+               const [_, d, m, y] = dateMatch;
+               fecha = new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T12:00:00Z`);
+             } else {
+               const dateMatchRev = cleanStr.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+               if (dateMatchRev) {
+                 const [_, y, m, d] = dateMatchRev;
+                 fecha = new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T12:00:00Z`);
+               } else {
+                 fecha = new Date(str);
+               }
+             }
+           }
+        }
+
+        let fechaString = new Date().toISOString().split('T')[0];
+        if (!isNaN(fecha.getTime())) {
+          fechaString = fecha.toISOString().split('T')[0];
+        }
+
+        const parseNumber = (val: any) => {
+          if (typeof val === 'number') return val;
+          if (!val) return 0;
+          let str = String(val).trim();
+          
+          if (str.includes('.') && str.includes(',')) {
+             const lastDot = str.lastIndexOf('.');
+             const lastComma = str.lastIndexOf(',');
+             if (lastComma > lastDot) {
+                 str = str.replace(/\./g, '').replace(',', '.');
+             } else {
+                 str = str.replace(/,/g, '');
+             }
+          } else if (str.includes(',')) {
+             str = str.replace(',', '.');
+          }
+          
+          const num = parseFloat(str);
+          return isNaN(num) ? 0 : num;
+        };
+
+        const camionVal = getVal('cami');
+        const choferVal = getVal('chofer');
+        const turnoVal = getVal('turno');
+        const tonelajeVal = getVal('tonela');
+        const vueltasVal = getVal('vuelta');
+        const petroleoVal = getVal('petr');
+        const novedadesVal = getVal('novedad') || getVal('totales');
+        const transferVal = getVal('transfer');
+
+        return {
+          fecha: fechaString,
+          turno: String(turnoVal || 'Día'),
+          camion: String(camionVal || ''),
+          chofer: String(choferVal || ''),
+          tonelaje: parseNumber(tonelajeVal),
+          vueltas: parseNumber(vueltasVal),
+          petroleo: petroleoVal ? parseNumber(petroleoVal) : null,
+          novedades: String(novedadesVal || ''),
+          transfer: String(transferVal || '')
+        };
+      }).filter(r => r.camion);
+
+      if (formattedData.length === 0) {
+        throw new Error("No se encontraron filas válidas en el Excel");
+      }
+
+      // Delete existing data for the same fecha and turno before inserting
+      const turnosAEliminar = Array.from(new Set(formattedData.map(d => `${d.fecha}|${d.turno}`)));
+      for (const combo of turnosAEliminar) {
+         const [fecha, turno] = combo.split('|');
+         await supabase
+           .from('produccion_registro_diario')
+           .delete()
+           .eq('fecha', fecha)
+           .eq('turno', turno);
+      }
+
+      // Bulk insert
+      const { data: insertedData, error } = await supabase
+        .from('produccion_registro_diario')
+        .insert(formattedData)
+        .select();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      alert(`Carga exitosa. ${formattedData.length} registros insertados.`);
       await fetchReportes();
     } catch (err: any) {
       alert(`Error al subir el archivo: ${err.message}`);
