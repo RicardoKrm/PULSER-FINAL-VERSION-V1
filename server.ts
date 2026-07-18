@@ -443,10 +443,17 @@ Responde de forma concisa.`;
 
       // Format data for DB
       const formattedData = data.map((row, index) => {
+        // Find keys dynamically to handle variations in whitespace or casing
+        const getVal = (searchStr: string) => {
+           const key = Object.keys(row).find(k => k.toLowerCase().includes(searchStr.toLowerCase()));
+           return key ? row[key] : undefined;
+        };
+
         // Handle dates: parse DD-MM-YYYY or Excel serial dates
         let fecha = new Date();
-        if (row['Fecha'] || row['fecha']) {
-           const fechaStr = row['Fecha'] || row['fecha'];
+        const fechaVal = getVal('fecha');
+        if (fechaVal) {
+           const fechaStr = fechaVal;
            if (typeof fechaStr === 'number') {
              fecha = new Date(Math.round((fechaStr - 25569) * 86400 * 1000));
            } else {
@@ -495,21 +502,41 @@ Responde de forma concisa.`;
           return isNaN(num) ? 0 : num;
         };
 
+        const camionVal = getVal('cami');
+        const choferVal = getVal('chofer');
+        const turnoVal = getVal('turno');
+        const tonelajeVal = getVal('tonela');
+        const vueltasVal = getVal('vuelta');
+        const petroleoVal = getVal('petr');
+        const novedadesVal = getVal('novedad') || getVal('totales');
+        const transferVal = getVal('transfer');
+
         return {
           fecha: fechaString,
-          turno: String(row['Turno'] || row['turno'] || 'Día'),
-          camion: String(row['Camión'] || row['Camion'] || row['camion'] || ''),
-          chofer: String(row['Chofer'] || row['chofer'] || ''),
-          tonelaje: parseNumber(row['Tonelaje'] || row['tonelaje']),
-          vueltas: parseNumber(row['Vueltas'] || row['vueltas']),
-          petroleo: row['Petróleo'] || row['Petroleo'] || row['petroleo'] ? parseNumber(row['Petróleo'] || row['Petroleo'] || row['petroleo']) : null,
-          novedades: String(row['Totales de Novedades'] || row['Novedades'] || row['novedades'] || ''),
-          transfer: String(row['Transfer'] || row['transfer'] || '')
+          turno: String(turnoVal || 'Día'),
+          camion: String(camionVal || ''),
+          chofer: String(choferVal || ''),
+          tonelaje: parseNumber(tonelajeVal),
+          vueltas: parseNumber(vueltasVal),
+          petroleo: petroleoVal ? parseNumber(petroleoVal) : null,
+          novedades: String(novedadesVal || ''),
+          transfer: String(transferVal || '')
         };
       }).filter(r => r.camion);
 
       if (formattedData.length === 0) {
         return res.status(400).json({ error: "No valid rows found in Excel" });
+      }
+
+      // Delete existing data for the same fecha and turno before inserting
+      const turnosAEliminar = Array.from(new Set(formattedData.map(d => `${d.fecha}|${d.turno}`)));
+      for (const combo of turnosAEliminar) {
+         const [fecha, turno] = combo.split('|');
+         await supabase!
+           .from('produccion_registro_diario')
+           .delete()
+           .eq('fecha', fecha)
+           .eq('turno', turno);
       }
 
       // Bulk insert
