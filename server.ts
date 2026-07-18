@@ -474,15 +474,36 @@ Responde de forma concisa.`;
           fechaString = fecha.toISOString().split('T')[0];
         }
 
+        const parseNumber = (val: any) => {
+          if (typeof val === 'number') return val;
+          if (!val) return 0;
+          let str = String(val).trim();
+          
+          if (str.includes('.') && str.includes(',')) {
+             const lastDot = str.lastIndexOf('.');
+             const lastComma = str.lastIndexOf(',');
+             if (lastComma > lastDot) {
+                 str = str.replace(/\./g, '').replace(',', '.');
+             } else {
+                 str = str.replace(/,/g, '');
+             }
+          } else if (str.includes(',')) {
+             str = str.replace(',', '.');
+          }
+          
+          const num = parseFloat(str);
+          return isNaN(num) ? 0 : num;
+        };
+
         return {
           fecha: fechaString,
           turno: String(row['Turno'] || row['turno'] || 'Día'),
           camion: String(row['Camión'] || row['Camion'] || row['camion'] || ''),
           chofer: String(row['Chofer'] || row['chofer'] || ''),
-          tonelaje: Number(row['Tonelaje'] || row['tonelaje']) || 0,
-          vueltas: Number(row['Vueltas'] || row['vueltas']) || 0,
-          petroleo: Number(row['Petróleo'] || row['Petroleo'] || row['petroleo']) || null,
-          novedades: String(row['Novedades'] || row['novedades'] || ''),
+          tonelaje: parseNumber(row['Tonelaje'] || row['tonelaje']),
+          vueltas: parseNumber(row['Vueltas'] || row['vueltas']),
+          petroleo: row['Petróleo'] || row['Petroleo'] || row['petroleo'] ? parseNumber(row['Petróleo'] || row['Petroleo'] || row['petroleo']) : null,
+          novedades: String(row['Totales de Novedades'] || row['Novedades'] || row['novedades'] || ''),
           transfer: String(row['Transfer'] || row['transfer'] || '')
         };
       }).filter(r => r.camion);
