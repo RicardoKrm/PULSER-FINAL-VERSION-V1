@@ -37,7 +37,14 @@ export default function ReporteDiarioPanel() {
     setErrorMsg(null);
     try {
       const res = await fetch('/api/reportes');
-      const data = await res.json();
+      
+      let data;
+      try {
+         const text = await res.text();
+         data = JSON.parse(text);
+      } catch (parseError) {
+         throw new Error("El servidor devolvió una respuesta no válida. Esto puede suceder si se está reiniciando.");
+      }
       
       if (!res.ok) {
          if (data.error && data.error.includes('Could not find the table')) {
@@ -167,7 +174,14 @@ export default function ReporteDiarioPanel() {
         body: formData,
       });
 
-      const data = await res.json();
+      let data;
+      try {
+         const text = await res.text();
+         data = JSON.parse(text);
+      } catch (parseError) {
+         throw new Error("El servidor devolvió una respuesta no válida. Esto puede suceder si se está reiniciando.");
+      }
+      
       if (!res.ok) {
         throw new Error(data.error || 'Error uploading file');
       }

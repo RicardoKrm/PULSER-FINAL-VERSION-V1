@@ -442,7 +442,7 @@ Responde de forma concisa.`;
       }
 
       // Format data for DB
-      const formattedData = data.map(row => {
+      const formattedData = data.map((row, index) => {
         // Handle dates: parse DD-MM-YYYY or Excel serial dates
         let fecha = new Date();
         if (row['Fecha'] || row['fecha']) {
@@ -450,23 +450,32 @@ Responde de forma concisa.`;
            if (typeof fechaStr === 'number') {
              fecha = new Date(Math.round((fechaStr - 25569) * 86400 * 1000));
            } else {
-             // Try parsing string date if needed, fallback to basic format
-             const parts = String(fechaStr).split(' ')[1]; // "Lunes 13-07-2026"
-             if (parts) {
-               const [dd, mm, yyyy] = parts.split('-');
-               if (dd && mm && yyyy) {
-                 fecha = new Date(`${yyyy}-${mm}-${dd}`);
-               } else {
-                 fecha = new Date(fechaStr);
-               }
+             const str = String(fechaStr).trim();
+             const cleanStr = str.replace(/\//g, '-');
+             
+             const dateMatch = cleanStr.match(/(\d{1,2})-(\d{1,2})-(\d{4})/);
+             if (dateMatch) {
+               const [_, d, m, y] = dateMatch;
+               fecha = new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T12:00:00Z`);
              } else {
-               fecha = new Date(fechaStr);
+               const dateMatchRev = cleanStr.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+               if (dateMatchRev) {
+                 const [_, y, m, d] = dateMatchRev;
+                 fecha = new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T12:00:00Z`);
+               } else {
+                 fecha = new Date(str);
+               }
              }
            }
         }
 
+        let fechaString = new Date().toISOString().split('T')[0];
+        if (!isNaN(fecha.getTime())) {
+          fechaString = fecha.toISOString().split('T')[0];
+        }
+
         return {
-          fecha: fecha.toISOString().split('T')[0],
+          fecha: fechaString,
           turno: String(row['Turno'] || row['turno'] || 'Día'),
           camion: String(row['Camión'] || row['Camion'] || row['camion'] || ''),
           chofer: String(row['Chofer'] || row['chofer'] || ''),
