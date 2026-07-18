@@ -4,6 +4,8 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
+import multer from "multer";
+import * as xlsx from "xlsx";
 
 dotenv.config();
 
@@ -395,6 +397,105 @@ Responde de forma concisa.`;
     } catch (error: any) {
       console.error("Chat API Error:", error);
       res.status(500).json({ error: "Ocurrió un error al procesar tu solicitud." });
+    }
+  });
+
+  app.get("/api/reportes", async (req, res) => {
+    try {
+      const { fecha } = req.query;
+      
+      let query = supabase!.from('produccion_registro_diario').select('*').order('turno');
+      
+      if (fecha) {
+        query = query.eq('fecha', fecha);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        throw error;
+      }
+      
+      res.json(data);
+    } catch (error: any) {
+      console.error("Error fetching reportes:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  const upload = multer({ storage: multer.memoryStorage() });
+
+  app.post("/api/upload-excel", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file provided" });
+      }
+
+      // Read file
+      const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const data: any[] = xlsx.utils.sheet_to_json(worksheet);
+
+      if (data.length === 0) {
+        return res.status(400).json({ error: "The Excel file is empty" });
+      }
+
+      // Format data for DB
+      const formattedData = data.map(row => {
+        // Handle dates: parse DD-MM-YYYY or Excel serial dates
+        let fecha = new Date();
+        if (row['Fecha'] || row['fecha']) {
+           const fechaStr = row['Fecha'] || row['fecha'];
+           if (typeof fechaStr === 'number') {
+             fecha = new Date(Math.round((fechaStr - 25569) * 86400 * 1000));
+           } else {
+             // Try parsing string date if needed, fallback to basic format
+             const parts = String(fechaStr).split(' ')[1]; // "Lunes 13-07-2026"
+             if (parts) {
+               const [dd, mm, yyyy] = parts.split('-');
+               if (dd && mm && yyyy) {
+                 fecha = new Date(`${yyyy}-${mm}-${dd}`);
+               } else {
+                 fecha = new Date(fechaStr);
+               }
+             } else {
+               fecha = new Date(fechaStr);
+             }
+           }
+        }
+
+        return {
+          fecha: fecha.toISOString().split('T')[0],
+          turno: String(row['Turno'] || row['turno'] || 'Día'),
+          camion: String(row['Camión'] || row['Camion'] || row['camion'] || ''),
+          chofer: String(row['Chofer'] || row['chofer'] || ''),
+          tonelaje: Number(row['Tonelaje'] || row['tonelaje']) || 0,
+          vueltas: Number(row['Vueltas'] || row['vueltas']) || 0,
+          petroleo: Number(row['Petróleo'] || row['Petroleo'] || row['petroleo']) || null,
+          novedades: String(row['Novedades'] || row['novedades'] || ''),
+          transfer: String(row['Transfer'] || row['transfer'] || '')
+        };
+      }).filter(r => r.camion);
+
+      if (formattedData.length === 0) {
+        return res.status(400).json({ error: "No valid rows found in Excel" });
+      }
+
+      // Bulk insert
+      const { data: insertedData, error } = await supabase!
+        .from('produccion_registro_diario')
+        .insert(formattedData)
+        .select();
+
+      if (error) {
+        throw error;
+      }
+
+      res.json({ success: true, count: insertedData?.length || 0 });
+    } catch (error: any) {
+      console.error("Upload Excel Error:", error);
+      res.status(500).json({ error: error.message || "An error occurred during upload" });
     }
   });
 
