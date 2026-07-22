@@ -777,8 +777,8 @@ export default function ReporteDiarioPanel() {
 
       <Modal isOpen={isProduccionModalOpen} onClose={() => setIsProduccionModalOpen(false)} title={editData ? "Editar Producción" : "Agregar Producción"}>
         {!editData && (
-          <div className="mb-4 p-4 bg-blue-50 border border-blue-100 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <span className="text-sm text-blue-800 font-medium">¿Tienes el reporte diario en Excel (Formato Vueltas)?</span>
+          <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800/50 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <span className="text-sm text-blue-800 dark:text-blue-300 font-medium">¿Tienes el reporte diario en Excel (Formato Vueltas)?</span>
             <label className={`flex items-center justify-center ${uploading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-500'} text-white py-1.5 px-3 rounded-md transition-colors text-sm font-medium cursor-pointer shadow-sm`}>
               {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileSpreadsheet className="w-4 h-4 mr-2" />}
               {uploading ? 'Importando...' : 'Importar Excel Diario'}
@@ -789,12 +789,12 @@ export default function ReporteDiarioPanel() {
         <form onSubmit={handleSaveProduccion} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
-              <input type="date" required value={prodForm.fecha} onChange={e => setProdForm({...prodForm, fecha: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Fecha</label>
+              <input type="date" required value={prodForm.fecha} onChange={e => setProdForm({...prodForm, fecha: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Turno</label>
-              <select required value={prodForm.turno} onChange={e => setProdForm({...prodForm, turno: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Turno</label>
+              <select required value={prodForm.turno} onChange={e => setProdForm({...prodForm, turno: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500">
                 <option value="Día">Día</option>
                 <option value="Noche">Noche</option>
               </select>
@@ -802,34 +802,34 @@ export default function ReporteDiarioPanel() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Camión</label>
-              <input type="text" required value={prodForm.camion} onChange={e => setProdForm({...prodForm, camion: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Camión</label>
+              <input type="text" required value={prodForm.camion} onChange={e => setProdForm({...prodForm, camion: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Chofer</label>
-              <input type="text" required value={prodForm.chofer} onChange={e => setProdForm({...prodForm, chofer: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Chofer</label>
+              <input type="text" required value={prodForm.chofer} onChange={e => setProdForm({...prodForm, chofer: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Vueltas</label>
-              <input type="number" step="1" required value={prodForm.vueltas} onChange={e => setProdForm({...prodForm, vueltas: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Vueltas</label>
+              <input type="number" step="1" required value={prodForm.vueltas} onChange={e => setProdForm({...prodForm, vueltas: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tonelaje</label>
-              <input type="number" step="0.01" required value={prodForm.tonelaje} onChange={e => setProdForm({...prodForm, tonelaje: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Tonelaje</label>
+              <input type="number" step="0.01" required value={prodForm.tonelaje} onChange={e => setProdForm({...prodForm, tonelaje: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Petróleo</label>
-              <input type="number" step="0.01" value={prodForm.petroleo} onChange={e => setProdForm({...prodForm, petroleo: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Petróleo</label>
+              <input type="number" step="0.01" value={prodForm.petroleo} onChange={e => setProdForm({...prodForm, petroleo: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Supervisor a cargo (Firma)</label>
-            <input type="text" placeholder="Ej: Juan Pérez" value={prodForm.supervisor} onChange={e => setProdForm({...prodForm, supervisor: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Supervisor a cargo (Firma)</label>
+            <input type="text" placeholder="Ej: Juan Pérez" value={prodForm.supervisor} onChange={e => setProdForm({...prodForm, supervisor: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
           </div>
           <div className="flex justify-end space-x-3 mt-6">
-            <button type="button" onClick={() => setIsProduccionModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">Cancelar</button>
+            <button type="button" onClick={() => setIsProduccionModalOpen(false)} className="px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-md text-sm font-medium text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">Cancelar</button>
             <button type="submit" disabled={uploading} className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
               {uploading ? 'Guardando...' : 'Guardar'}
             </button>
@@ -841,27 +841,27 @@ export default function ReporteDiarioPanel() {
         <form onSubmit={handleSaveNovedad} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
-              <input type="date" required value={novForm.fecha} onChange={e => setNovForm({...novForm, fecha: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Fecha</label>
+              <input type="date" required value={novForm.fecha} onChange={e => setNovForm({...novForm, fecha: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Turno</label>
-              <select required value={novForm.turno} onChange={e => setNovForm({...novForm, turno: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Turno</label>
+              <select required value={novForm.turno} onChange={e => setNovForm({...novForm, turno: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500">
                 <option value="Día">Día</option>
                 <option value="Noche">Noche</option>
               </select>
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Supervisor a cargo (Firma)</label>
-            <input type="text" required placeholder="Ej: Juan Pérez" value={novForm.supervisor} onChange={e => setNovForm({...novForm, supervisor: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Supervisor a cargo (Firma)</label>
+            <input type="text" required placeholder="Ej: Juan Pérez" value={novForm.supervisor} onChange={e => setNovForm({...novForm, supervisor: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Novedad</label>
-            <textarea required rows={4} placeholder="Describa la novedad del turno..." value={novForm.novedad} onChange={e => setNovForm({...novForm, novedad: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Novedad</label>
+            <textarea required rows={4} placeholder="Describa la novedad del turno..." value={novForm.novedad} onChange={e => setNovForm({...novForm, novedad: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
           </div>
           <div className="flex justify-end space-x-3 mt-6">
-            <button type="button" onClick={() => setIsNovedadModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">Cancelar</button>
+            <button type="button" onClick={() => setIsNovedadModalOpen(false)} className="px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-md text-sm font-medium text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">Cancelar</button>
             <button type="submit" disabled={uploading} className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
               {uploading ? 'Guardando...' : 'Confirmar Novedad'}
             </button>
