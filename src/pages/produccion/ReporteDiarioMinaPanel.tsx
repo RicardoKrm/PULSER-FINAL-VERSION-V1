@@ -12,6 +12,7 @@ type TurnoDetalle = {
   tonelaje: number;
   vueltas: number;
   petroleo?: number;
+  vueltas_detalle?: number[];
 };
 
 type Turno = {
@@ -35,6 +36,7 @@ export default function ReporteDiarioMinaPanel() {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [expandedDetalle, setExpandedDetalle] = useState<string | null>(null);
 
   const [isProduccionModalOpen, setIsProduccionModalOpen] = useState(false);
   const [isNovedadModalOpen, setIsNovedadModalOpen] = useState(false);
@@ -215,7 +217,8 @@ export default function ReporteDiarioMinaPanel() {
                  operador: r.operador,
                  tonelaje: Number(r.tonelaje) || 0,
                  vueltas: Number(r.vueltas) || 0,
-                 petroleo: r.petroleo ? Number(r.petroleo) : undefined
+                 petroleo: r.petroleo ? Number(r.petroleo) : undefined,
+                 vueltas_detalle: r.vueltas_detalle
                };
             });
 
@@ -410,6 +413,143 @@ export default function ReporteDiarioMinaPanel() {
     }
   };
 
+  const handleFileUploadDiario = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const data: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      
+      if (data.length === 0) throw new Error("El archivo Excel está vacío");
+
+      let globalDate = new Date().toISOString().split('T')[0];
+      let globalTurno = "Día";
+
+      for (let i = 0; i < Math.min(10, data.length); i++) {
+        const row = data[i];
+        if (!row) continue;
+        for (let j = 0; j < row.length; j++) {
+           const cell = String(row[j]).trim().toLowerCase();
+           if (cell.includes('turno')) {
+             if (cell.includes('noche')) globalTurno = 'Noche';
+             else globalTurno = 'Día';
+           }
+           if (/^\d{2}\.\d{2}\.\d{2}$/.test(cell)) {
+              const [d, m, y] = cell.split('.');
+              globalDate = `20${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+           }
+        }
+      }
+
+      let headerRowIndex = -1;
+      for (let i = 0; i < data.length; i++) {
+        if (data[i] && data[i].some(cell => String(cell).toUpperCase().includes('NOMBRE') || String(cell).toUpperCase().includes('CONDUCTOR'))) {
+           headerRowIndex = i;
+           break;
+        }
+      }
+
+      if (headerRowIndex === -1) {
+         throw new Error("No se encontraron las cabeceras del reporte (buscando 'CONDUCTOR')");
+      }
+      
+      const payloadData: any[] = [];
+      for (let i = headerRowIndex + 2; i < data.length; i++) {
+         const row = data[i];
+         if (!row || row.length === 0) continue;
+         const n_equipo = row[0];
+         const conductor = row[1];
+         
+         if (String(n_equipo).toUpperCase().includes('TONS TRANSPORTADAS') || String(conductor).toUpperCase().includes('TONS TRANSPORTADAS')) {
+            break;
+         }
+         
+         if (!n_equipo && !conductor) continue;
+
+         const vueltas_detalle = [];
+         for (let col = 2; col <= 7; col++) {
+             const val = row[col];
+             if (val !== undefined && val !== null && val !== '') {
+                 let num = parseFloat(String(val).replace(',', '.'));
+                 if (!isNaN(num)) {
+                    if (num > 1000) num = num / 1000;
+                    vueltas_detalle.push(Number(num.toFixed(3)));
+                 }
+             }
+         }
+         
+         let totalTons = row[8];
+         if (totalTons !== undefined) {
+             let num = parseFloat(String(totalTons).replace(',', '.'));
+             if (!isNaN(num)) {
+                if (num > 1000) num = num / 1000;
+                totalTons = num;
+             }
+         } else {
+             totalTons = vueltas_detalle.reduce((a,b) => a+b, 0);
+         }
+         
+         let totalVueltas = row[9];
+         if (totalVueltas === undefined || isNaN(parseInt(String(totalVueltas)))) {
+             totalVueltas = vueltas_detalle.length;
+         } else {
+             totalVueltas = parseInt(String(totalVueltas));
+         }
+         
+         payloadData.push({
+             fecha: globalDate,
+             turno: globalTurno,
+             equipo: String(n_equipo || ''),
+             operador: String(conductor || ''),
+             tonelaje: totalTons || 0,
+             vueltas: totalVueltas || 0,
+             vueltas_detalle: vueltas_detalle,
+             petroleo: null
+         });
+      }
+
+      if (payloadData.length === 0) {
+        throw new Error("No se encontraron registros de producción válidos en el archivo.");
+      }
+      
+      // Delete existing data for the same fecha and turno before inserting
+      const turnosAEliminar = Array.from(new Set(payloadData.map(d => `${d.fecha}|${d.turno}`)));
+      for (const combo of turnosAEliminar) {
+         const [fecha, turno] = combo.split('|');
+         await supabase
+           .from('produccion_registro_diario_mina')
+           .delete()
+           .eq('fecha', fecha)
+           .eq('turno', turno);
+      }
+
+      const { error } = await supabase
+        .from('produccion_registro_diario_mina')
+        .insert(payloadData);
+
+      if (error) throw error;
+      
+      await fetchReportes();
+      alert(`Se importaron ${payloadData.length} registros de forma masiva.`);
+      setIsProduccionModalOpen(false);
+      
+    } catch (err: any) {
+      console.error(err);
+      alert(`Error al procesar excel: ${err.message}`);
+    } finally {
+      setUploading(false);
+      if (e.target) {
+        e.target.value = '';
+      }
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* KPI Totals Section */}
@@ -564,12 +704,13 @@ export default function ReporteDiarioMinaPanel() {
                       {(() => {
                         const maxTonelaje = Math.max(...turno.detalles.map(d => d.tonelaje), 0.01);
                         return turno.detalles.map((detalle, dIdx) => (
-                          <tr key={dIdx} className="hover:bg-gray-50">
+                          <React.Fragment key={dIdx}>
+                          <tr className={`hover:bg-gray-50 cursor-pointer ${expandedDetalle === detalle.id ? 'bg-blue-50/30' : ''}`} onClick={() => setExpandedDetalle(expandedDetalle === detalle.id ? null : (detalle.id || null))}>
                             <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 flex items-center">
                               <Truck className="w-4 h-4 mr-2 text-gray-400" />
                               {detalle.equipo}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{detalle.operador}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600 hover:underline">{detalle.operador}</td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
                               <div className="flex flex-col items-end">
                                 <span className="font-medium mb-1">{formatNumber(detalle.tonelaje)}</span>
@@ -592,7 +733,7 @@ export default function ReporteDiarioMinaPanel() {
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 text-right">
                               <button
-                                onClick={() => handleOpenProduccionModal(detalle, activeReport.id, turno.nombre)}
+                                onClick={(e) => { e.stopPropagation(); handleOpenProduccionModal(detalle, activeReport.id, turno.nombre); }}
                                 className="text-blue-600 hover:text-blue-900 p-1"
                                 title="Editar fila"
                               >
@@ -600,6 +741,28 @@ export default function ReporteDiarioMinaPanel() {
                               </button>
                             </td>
                           </tr>
+                          {expandedDetalle === detalle.id && (
+                            <tr>
+                              <td colSpan={6} className="px-4 py-4 bg-gray-50/80 border-b border-gray-100">
+                                <div className="text-sm text-gray-700">
+                                   <span className="font-semibold block mb-2 text-gray-900">Detalle de Vueltas (Toneladas):</span>
+                                   {detalle.vueltas_detalle && detalle.vueltas_detalle.length > 0 ? (
+                                     <div className="flex flex-wrap gap-2">
+                                        {detalle.vueltas_detalle.map((ton, idx) => (
+                                           <div key={idx} className="bg-white px-3 py-1.5 border border-gray-200 rounded-md shadow-sm flex flex-col items-center min-w-[70px]">
+                                             <span className="text-[10px] text-gray-500 uppercase font-semibold">Vuelta {idx + 1}</span>
+                                             <span className="font-mono font-medium text-blue-700">{formatNumber(ton)}</span>
+                                           </div>
+                                        ))}
+                                     </div>
+                                   ) : (
+                                     <span className="text-gray-500 italic">No hay detalles por vuelta registrados para este conductor.</span>
+                                   )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                          </React.Fragment>
                         ));
                       })()}
                     </tbody>
@@ -613,6 +776,16 @@ export default function ReporteDiarioMinaPanel() {
       )}
 
       <Modal isOpen={isProduccionModalOpen} onClose={() => setIsProduccionModalOpen(false)} title={editData ? "Editar Producción" : "Agregar Producción"}>
+        {!editData && (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-100 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <span className="text-sm text-blue-800 font-medium">¿Tienes el reporte diario en Excel (Formato Vueltas)?</span>
+            <label className={`flex items-center justify-center ${uploading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-500'} text-white py-1.5 px-3 rounded-md transition-colors text-sm font-medium cursor-pointer shadow-sm`}>
+              {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileSpreadsheet className="w-4 h-4 mr-2" />}
+              {uploading ? 'Importando...' : 'Importar Excel Diario'}
+              <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleFileUploadDiario} disabled={uploading} />
+            </label>
+          </div>
+        )}
         <form onSubmit={handleSaveProduccion} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
