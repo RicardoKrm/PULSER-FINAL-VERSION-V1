@@ -89,9 +89,8 @@ export const navigation = [
     href: '/produccion',
     submodules: [
       { title: 'Dashboard de Producción', icon: BarChart3, href: '/produccion/dashboard' },
-      { title: 'Procesos Internos', icon: Settings, href: '/produccion/procesos' },
-      { title: 'Logística en Ruta', icon: Truck, href: '/produccion/logistica' },
-      { title: 'Reportes Diarios', icon: PenTool, href: '/produccion/reportes' },
+      { title: 'Reportes Diarios Transporte', icon: Truck, href: '/produccion/reportes-transporte' },
+      { title: 'Reportes Diarios Mina', icon: PenTool, href: '/produccion/reportes-mina' },
       { title: 'Trazabilidad', icon: History, href: '/produccion/trazabilidad' },
     ],
   },

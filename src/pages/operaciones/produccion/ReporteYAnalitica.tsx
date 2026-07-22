@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { PenTool, Send, CheckCircle2, TrendingUp, X, Filter } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import React, { useState, useEffect, useMemo } from 'react';
+import { PenTool, Send, CheckCircle2, TrendingUp, X, Filter, Calendar as CalendarIcon, User as UserIcon } from 'lucide-react';
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { GlobalStats } from '../../../contexts/ProduccionContext';
+import { supabase } from '../../../lib/supabase';
 
 interface Props {
   onReporteProduccion: (ext: number, mol: number, stock: number, fecha: string, hora: string) => void;
@@ -11,7 +12,7 @@ interface Props {
 
 export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransporte, stats }: Props) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [periodo, setPeriodo] = useState('Semanal');
+  const [vista, setVista] = useState<'chofer' | 'camion'>('chofer');
   const [selectedDataIndex, setSelectedDataIndex] = useState<number | null>(null);
 
   const [area, setArea] = useState('produccion');
@@ -33,72 +34,221 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
   const [transTipo, setTransTipo] = useState('Sal Gruesa');
   const [transSuceso, setTransSuceso] = useState('Normal');
 
+  // Filtros
+  const [periodoFiltro, setPeriodoFiltro] = useState<'dia' | 'semana' | 'mes' | 'todos'>('todos');
+  const [choferFiltro, setChoferFiltro] = useState<string>('todos');
+
   // Chart data
-  const [chartDataSemanal, setChartDataSemanal] = useState([
-    { name: 'Lunes', ext: 4200, mol: 3100, desp: 2500 },
-    { name: 'Martes', ext: 4500, mol: 3200, desp: 2600 },
-    { name: 'Miércoles', ext: 4100, mol: 2900, desp: 2400 },
-    { name: 'Jueves', ext: 4800, mol: 3400, desp: 2800 },
-    { name: 'Viernes', ext: 4600, mol: 3300, desp: 2700 },
-    { name: 'Sábado', ext: 4300, mol: 3000, desp: 2300 },
-    { name: 'Domingo', ext: 4850, mol: 3200, desp: 2650 },
-  ]);
+  const [rawData, setRawData] = useState<any[]>([]);
+  const [chartDataChofer, setChartDataChofer] = useState<{name: string, vueltas: number, tonelaje: number}[]>([]);
+  const [chartDataCamion, setChartDataCamion] = useState<{name: string, vueltas: number, tonelaje: number}[]>([]);
+  const [choferesDisponibles, setChoferesDisponibles] = useState<string[]>([]);
 
-  const [chartDataMensual] = useState([
-    { name: 'Semana 1', ext: 28000, mol: 22000, desp: 18000 },
-    { name: 'Semana 2', ext: 31000, mol: 24000, desp: 19000 },
-    { name: 'Semana 3', ext: 30000, mol: 23500, desp: 18500 },
-    { name: 'Semana 4', ext: 32000, mol: 25000, desp: 20000 },
-  ]);
+  // KPIs
+  const [kpiCamion, setKpiCamion] = useState<{ nombre: string; freq: number }>({ nombre: '-', freq: 0 });
+  const [kpiTonDia, setKpiTonDia] = useState<number>(0);
+  const [kpiVueltasDia, setKpiVueltasDia] = useState<number>(0);
 
-  const [chartDataDiario] = useState([
-    { name: 'Turno 1 (00-08)', ext: 1500, mol: 1000, desp: 800 },
-    { name: 'Turno 2 (08-16)', ext: 1800, mol: 1200, desp: 900 },
-    { name: 'Turno 3 (16-24)', ext: 1550, mol: 1000, desp: 950 },
-  ]);
+  const currentData = vista === 'chofer' ? chartDataChofer : chartDataCamion;
 
-  const currentData = periodo === 'Diario' ? chartDataDiario : periodo === 'Semanal' ? chartDataSemanal : chartDataMensual;
+  const fetchData = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('produccion_registro_diario')
+        .select('*');
+        
+      if (error || !data) return;
+      setRawData(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   useEffect(() => {
+    fetchData();
     const today = new Date();
     setFecha(today.toISOString().substring(0, 10));
     setHora(`${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (area === 'produccion') {
-      const ext = parseFloat(prodExt) || 0;
-      const mol = parseFloat(prodMol) || 0;
-      const stock = parseFloat(prodStock) || 0;
-      onReporteProduccion(ext, mol, stock, fecha, hora);
-      
-      setChartDataSemanal(prev => {
-        const newData = [...prev];
-        const last = newData[newData.length - 1];
-        newData[newData.length - 1] = { ...last, ext: last.ext + ext, mol: last.mol + mol };
-        return newData;
+  useEffect(() => {
+    // Process data when rawData or filters change
+    if (!rawData.length) return;
+
+    let filteredData = [...rawData];
+
+    // Filter by period
+    if (periodoFiltro !== 'todos') {
+      const now = new Date();
+      filteredData = filteredData.filter(row => {
+        if (!row.fecha) return false;
+        const rowDate = new Date(row.fecha);
+        if (isNaN(rowDate.getTime())) return false;
+
+        if (periodoFiltro === 'dia') {
+          return rowDate.toDateString() === now.toDateString();
+        } else if (periodoFiltro === 'semana') {
+          const pastWeek = new Date(now);
+          pastWeek.setDate(now.getDate() - 7);
+          return rowDate >= pastWeek && rowDate <= now;
+        } else if (periodoFiltro === 'mes') {
+          const pastMonth = new Date(now);
+          pastMonth.setMonth(now.getMonth() - 1);
+          return rowDate >= pastMonth && rowDate <= now;
+        }
+        return true;
       });
-      setProdExt(''); setProdMol(''); setProdStock('');
-    } else {
-      const ton = parseFloat(transTon) || 0;
-      const vuelta = parseInt(transVuelta) || 1;
-      onReporteTransporte(transCamion || 'TR-X', transChofer || 'Operario', vuelta, ton, transTipo, transSuceso, notas, fecha, hora);
-      
-      setChartDataSemanal(prev => {
-        const newData = [...prev];
-        const last = newData[newData.length - 1];
-        newData[newData.length - 1] = { ...last, desp: last.desp + ton };
-        return newData;
-      });
-      setTransCamion(''); setTransVuelta(''); setTransTon(''); setTransChofer(''); setNotas('');
     }
 
-    setShowToast(true);
-    setTimeout(() => {
-      setShowToast(false);
-      setIsModalOpen(false);
-    }, 2000);
+    // Filter by chofer
+    if (choferFiltro !== 'todos') {
+      filteredData = filteredData.filter(row => row.chofer === choferFiltro);
+    }
+
+    const choferMap: Record<string, {vueltas: number, tonelaje: number}> = {};
+    const camionMap: Record<string, {vueltas: number, tonelaje: number}> = {};
+    const uniqueChoferes = new Set<string>();
+    
+    // Always build full unique chofer list from rawData
+    rawData.forEach(row => {
+      const chofer = row.chofer;
+      if (chofer && chofer !== '-') uniqueChoferes.add(chofer);
+    });
+    setChoferesDisponibles(Array.from(uniqueChoferes).sort());
+
+    filteredData.forEach(row => {
+        const ton = row.tonelaje || 0;
+        const vueltas = row.vueltas || 0;
+        const chofer = row.chofer || 'Desconocido';
+        const camion = row.camion || 'Desconocido';
+        
+        if (chofer && chofer !== '-') {
+            if (!choferMap[chofer]) choferMap[chofer] = { vueltas: 0, tonelaje: 0 };
+            choferMap[chofer].vueltas += vueltas;
+            choferMap[chofer].tonelaje += ton;
+        }
+        
+        if (camion && camion !== '-') {
+            if (!camionMap[camion]) camionMap[camion] = { vueltas: 0, tonelaje: 0 };
+            camionMap[camion].vueltas += vueltas;
+            camionMap[camion].tonelaje += ton;
+        }
+    });
+
+    // If chofer filter is applied, grouping by chofer will only have 1 bar.
+    // In this specific view, we might want to group by Date instead if a single chofer is selected!
+    // But the UI requires 'name' (which can be Date or Chofer).
+    if (vista === 'chofer' && choferFiltro !== 'todos') {
+      // Group by Date for that specific chofer
+      const dateMap: Record<string, {vueltas: number, tonelaje: number}> = {};
+      filteredData.forEach(row => {
+        const dateStr = row.fecha || 'Sin fecha';
+        const ton = row.tonelaje || 0;
+        const vueltas = row.vueltas || 0;
+        if (!dateMap[dateStr]) dateMap[dateStr] = { vueltas: 0, tonelaje: 0 };
+        dateMap[dateStr].vueltas += vueltas;
+        dateMap[dateStr].tonelaje += ton;
+      });
+      const dateArr = Object.entries(dateMap).map(([name, vals]) => ({name, ...vals}));
+      dateArr.sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime());
+      setChartDataChofer(dateArr);
+    } else {
+      const choferArr = Object.entries(choferMap).map(([name, vals]) => ({name, ...vals}));
+      choferArr.sort((a, b) => b.tonelaje - a.tonelaje);
+      setChartDataChofer(choferArr);
+    }
+
+    const camionArr = Object.entries(camionMap).map(([name, vals]) => ({name, ...vals}));
+    camionArr.sort((a, b) => b.tonelaje - a.tonelaje);
+    setChartDataCamion(camionArr);
+
+    // Compute KPIs
+    const freqCamion: Record<string, number> = {};
+    const dateSet = new Set<string>();
+    let sumTon = 0;
+    let sumVueltas = 0;
+
+    filteredData.forEach(row => {
+      if (row.camion && row.camion !== '-') {
+        freqCamion[row.camion] = (freqCamion[row.camion] || 0) + 1;
+      }
+      if (row.fecha) {
+        dateSet.add(row.fecha);
+      }
+      sumTon += (row.tonelaje || 0);
+      sumVueltas += (row.vueltas || 0);
+    });
+
+    let maxC = '-';
+    let maxF = 0;
+    Object.entries(freqCamion).forEach(([c, f]) => {
+      if (f > maxF) {
+        maxF = f;
+        maxC = c;
+      }
+    });
+    setKpiCamion({ nombre: maxC, freq: maxF });
+
+    const totalDays = dateSet.size || 1;
+    setKpiTonDia(sumTon / totalDays);
+    setKpiVueltasDia(sumVueltas / totalDays);
+
+    setSelectedDataIndex(null); // Reset selection on filter change
+
+  }, [rawData, periodoFiltro, choferFiltro, vista]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (area === 'produccion') {
+        const ext = parseFloat(prodExt) || 0;
+        const mol = parseFloat(prodMol) || 0;
+        const stock = parseFloat(prodStock) || 0;
+        onReporteProduccion(ext, mol, stock, fecha, hora);
+        
+        // Optionally store to a different table for production if needed, but for now we just update charts.
+        // Or we can save to the same table but without camion.
+        await supabase.from('produccion_registro_diario').insert({
+           fecha: fecha,
+           turno: parseInt(hora.split(':')[0]) >= 12 ? 'Noche' : 'Día',
+           camion: '-',
+           chofer: '-',
+           tonelaje: 0,
+           vueltas: 0,
+           petroleo: null,
+           novedades: `Producción - Ext: ${ext}, Mol: ${mol}, Stock: ${stock}. ${notas}`
+        });
+
+        setProdExt(''); setProdMol(''); setProdStock('');
+      } else {
+        const ton = parseFloat(transTon) || 0;
+        const vuelta = parseInt(transVuelta) || 1;
+        onReporteTransporte(transCamion || 'TR-X', transChofer || 'Operario', vuelta, ton, transTipo, transSuceso, notas, fecha, hora);
+        
+        await supabase.from('produccion_registro_diario').insert({
+           fecha: fecha,
+           turno: parseInt(hora.split(':')[0]) >= 12 ? 'Noche' : 'Día',
+           camion: transCamion || 'TR-X',
+           chofer: transChofer || 'Operario',
+           tonelaje: ton,
+           vueltas: vuelta,
+           petroleo: null,
+           novedades: `${transSuceso} - ${transTipo}. ${notas}`
+        });
+
+        setTransCamion(''); setTransVuelta(''); setTransTon(''); setTransChofer(''); setNotas('');
+      }
+
+      await fetchData(); // Refresh charts with new data
+      setShowToast(true);
+      setTimeout(() => {
+        setShowToast(false);
+        setIsModalOpen(false);
+      }, 2000);
+    } catch (err: any) {
+      console.error(err);
+      alert("Error al guardar: " + err.message);
+    }
   };
 
   return (
@@ -116,76 +266,96 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg pr-2 overflow-hidden transition-colors">
                 <div className="bg-slate-100 dark:bg-slate-800 px-2 py-1.5 h-full flex items-center justify-center border-r border-slate-200 dark:border-slate-800">
+                  <CalendarIcon className="w-3 h-3 text-slate-500 dark:text-slate-400" />
+                </div>
+                <select 
+                  value={periodoFiltro} 
+                  onChange={e => setPeriodoFiltro(e.target.value as any)} 
+                  className="bg-transparent text-[10px] font-bold text-slate-700 dark:text-slate-300 focus:outline-none py-1.5"
+                >
+                  <option value="todos">Todo Histórico</option>
+                  <option value="dia">Día Actual</option>
+                  <option value="semana">Últimos 7 Días</option>
+                  <option value="mes">Últimos 30 Días</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg pr-2 overflow-hidden transition-colors">
+                <div className="bg-slate-100 dark:bg-slate-800 px-2 py-1.5 h-full flex items-center justify-center border-r border-slate-200 dark:border-slate-800">
+                  <UserIcon className="w-3 h-3 text-slate-500 dark:text-slate-400" />
+                </div>
+                <select 
+                  value={choferFiltro} 
+                  onChange={e => setChoferFiltro(e.target.value)} 
+                  className="bg-transparent text-[10px] font-bold text-slate-700 dark:text-slate-300 focus:outline-none py-1.5"
+                >
+                  <option value="todos">Todos los Choferes</option>
+                  {choferesDisponibles.map(chofer => (
+                    <option key={chofer} value={chofer}>{chofer}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg pr-2 overflow-hidden transition-colors">
+                <div className="bg-slate-100 dark:bg-slate-800 px-2 py-1.5 h-full flex items-center justify-center border-r border-slate-200 dark:border-slate-800">
                   <Filter className="w-3 h-3 text-slate-500 dark:text-slate-400" />
                 </div>
                 <select 
-                  value={periodo} 
+                  value={vista} 
                   onChange={e => {
-                    setPeriodo(e.target.value);
+                    setVista(e.target.value as 'chofer' | 'camion');
                     setSelectedDataIndex(null);
                   }} 
                   className="bg-transparent text-[10px] font-bold text-slate-700 dark:text-slate-300 focus:outline-none py-1.5"
                 >
-                  <option value="Diario">Vista Diaria</option>
-                  <option value="Semanal">Vista Semanal</option>
-                  <option value="Mensual">Vista Mensual</option>
+                  <option value="chofer">Por Chofer</option>
+                  <option value="camion">Por Camión</option>
                 </select>
               </div>
-
-              <button 
-                onClick={() => setIsModalOpen(true)}
-                className="bg-amber-500 hover:bg-amber-600 text-slate-900 text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
-              >
-                <PenTool className="w-3 h-3" /> Nuevo Reporte Diario
-              </button>
             </div>
           </div>
 
           <div className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 h-80 transition-colors">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={currentData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} onClick={(data) => {
+              <ComposedChart data={currentData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} onClick={(data) => {
                 if (data && data.activeTooltipIndex !== undefined) {
                   setSelectedDataIndex(data.activeTooltipIndex);
                 }
               }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" className="opacity-30" vertical={false} />
                 <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis yAxisId="left" stroke="#3b82f6" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" fontSize={10} tickLine={false} axisLine={false} />
                 <Tooltip 
-                  cursor={{ fill: 'rgba(245, 158, 11, 0.05)' }}
-                  contentStyle={{ backgroundColor: 'var(--tw-colors-slate-900)', borderColor: 'var(--tw-colors-slate-800)', color: 'white', borderRadius: '8px', fontSize: '12px' }}
+                  cursor={{ fill: 'rgba(59, 130, 246, 0.05)' }}
+                  contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', color: '#1e293b', borderRadius: '8px', fontSize: '12px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   itemStyle={{ fontWeight: 'bold' }}
                 />
                 <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
-                <Bar dataKey="ext" name="Extraído Rajo (Ton)" fill="#f59e0b" radius={[4, 4, 0, 0]} className="cursor-pointer" />
-                <Bar dataKey="mol" name="Molido Planta (Ton)" fill="#10b981" radius={[4, 4, 0, 0]} className="cursor-pointer" />
-                <Bar dataKey="desp" name="Despachado Puerto (Ton)" fill="#3b82f6" radius={[4, 4, 0, 0]} className="cursor-pointer" />
-              </BarChart>
+                <Bar yAxisId="left" dataKey="tonelaje" name="Tonelaje (Ton)" fill="#3b82f6" radius={[4, 4, 0, 0]} className="cursor-pointer" />
+                <Line yAxisId="right" type="monotone" dataKey="vueltas" name="Vueltas" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} className="cursor-pointer" />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
           
-          {selectedDataIndex !== null && (
+          {selectedDataIndex !== null && currentData[selectedDataIndex] && (
             <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-colors">
               <div>
-                <h4 className="text-xs font-bold text-amber-600 dark:text-amber-500 uppercase tracking-wider mb-1">
+                <h4 className="text-xs font-bold text-blue-600 dark:text-blue-500 uppercase tracking-wider mb-1">
                   Detalle: {currentData[selectedDataIndex].name}
                 </h4>
                 <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                  Desglose numérico del periodo seleccionado en el gráfico.
+                  Desglose del rendimiento para el registro seleccionado.
                 </p>
               </div>
               <div className="flex flex-wrap gap-4 text-xs">
                 <div className="bg-white dark:bg-slate-900 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
-                  <span className="block text-[9px] text-slate-500 dark:text-slate-400 font-bold mb-0.5">Extracción Rajo</span>
-                  <span className="font-black text-amber-600 dark:text-amber-500">{currentData[selectedDataIndex].ext.toLocaleString()} T</span>
+                  <span className="block text-[9px] text-slate-500 dark:text-slate-400 font-bold mb-0.5">Tonelaje Transportado</span>
+                  <span className="font-black text-blue-600 dark:text-blue-500">{currentData[selectedDataIndex].tonelaje.toLocaleString('es-CL')} T</span>
                 </div>
                 <div className="bg-white dark:bg-slate-900 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
-                  <span className="block text-[9px] text-slate-500 dark:text-slate-400 font-bold mb-0.5">Molienda Planta</span>
-                  <span className="font-black text-emerald-600 dark:text-emerald-500">{currentData[selectedDataIndex].mol.toLocaleString()} T</span>
-                </div>
-                <div className="bg-white dark:bg-slate-900 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
-                  <span className="block text-[9px] text-slate-500 dark:text-slate-400 font-bold mb-0.5">Despacho Puerto</span>
-                  <span className="font-black text-blue-600 dark:text-blue-500">{currentData[selectedDataIndex].desp.toLocaleString()} T</span>
+                  <span className="block text-[9px] text-slate-500 dark:text-slate-400 font-bold mb-0.5">Vueltas Realizadas</span>
+                  <span className="font-black text-amber-600 dark:text-amber-500">{currentData[selectedDataIndex].vueltas} Vueltas</span>
                 </div>
               </div>
             </div>
@@ -194,19 +364,19 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
 
         <div className="mt-4 border-t border-slate-200 dark:border-slate-800 pt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-center text-xs transition-colors">
           <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-2 rounded-lg transition-colors cursor-pointer hover:border-emerald-500/50">
-            <span className="block text-[9px] text-slate-500 dark:text-slate-400 uppercase font-bold">Mantenimiento</span>
-            <span className="text-sm font-black text-slate-900 dark:text-white mt-1 transition-colors">92.5%</span>
-            <p className="text-[8px] text-emerald-600 dark:text-emerald-400 mt-0.5">Disp. Mecánica</p>
+            <span className="block text-[9px] text-slate-500 dark:text-slate-400 uppercase font-bold">Camión Frecuente</span>
+            <span className="text-sm font-black text-slate-900 dark:text-white mt-1 transition-colors">{kpiCamion.nombre}</span>
+            <p className="text-[8px] text-emerald-600 dark:text-emerald-400 mt-0.5">{kpiCamion.freq} registros asociados</p>
           </div>
           <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-2 rounded-lg transition-colors cursor-pointer hover:border-emerald-500/50">
-            <span className="block text-[9px] text-slate-500 dark:text-slate-400 uppercase font-bold">Humedad Sal</span>
-            <span className="text-sm font-black text-slate-900 dark:text-white mt-1 transition-colors">0.12%</span>
-            <p className="text-[8px] text-emerald-600 dark:text-emerald-400 mt-0.5">Bajo el límite (0.2%)</p>
+            <span className="block text-[9px] text-slate-500 dark:text-slate-400 uppercase font-bold">Promedio Toneladas / Día</span>
+            <span className="text-sm font-black text-slate-900 dark:text-white mt-1 transition-colors">{Math.round(kpiTonDia).toLocaleString('es-CL')} T</span>
+            <p className="text-[8px] text-emerald-600 dark:text-emerald-400 mt-0.5">En el periodo seleccionado</p>
           </div>
           <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-2 rounded-lg transition-colors cursor-pointer hover:border-emerald-500/50">
-            <span className="block text-[9px] text-slate-500 dark:text-slate-400 uppercase font-bold">Pureza Química</span>
-            <span className="text-sm font-black text-slate-900 dark:text-white mt-1 transition-colors">99.4%</span>
-            <p className="text-[8px] text-emerald-600 dark:text-emerald-400 mt-0.5">Grado Industrial</p>
+            <span className="block text-[9px] text-slate-500 dark:text-slate-400 uppercase font-bold">Promedio Vueltas / Día</span>
+            <span className="text-sm font-black text-slate-900 dark:text-white mt-1 transition-colors">{Math.round(kpiVueltasDia * 10) / 10}</span>
+            <p className="text-[8px] text-emerald-600 dark:text-emerald-400 mt-0.5">En el periodo seleccionado</p>
           </div>
         </div>
       </div>

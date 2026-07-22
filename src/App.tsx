@@ -21,9 +21,8 @@ import Mantenedores from './pages/operaciones/Mantenedores';
 import Reservas from './pages/operaciones/Reservas';
 import ProduccionLayout from './pages/produccion/ProduccionLayout';
 import DashboardProduccion from './pages/produccion/DashboardProduccion';
-import ProcesosInternosPage from './pages/produccion/ProcesosInternosPage';
-import LogisticaRutaPage from './pages/produccion/LogisticaRutaPage';
 import ReportesDiariosPage from './pages/produccion/ReportesDiariosPage';
+import ReportesDiariosMinaPage from './pages/produccion/ReportesDiariosMinaPage';
 import TrazabilidadPage from './pages/produccion/TrazabilidadPage';
 import GPS from './pages/operaciones/GPS';
 import PortalConductor from './pages/operaciones/PortalConductor';
@@ -108,9 +107,8 @@ const router = createBrowserRouter([
       { path: "produccion", element: <ProduccionLayout />, children: [
         { index: true, element: <Navigate to="/produccion/dashboard" replace /> },
         { path: "dashboard", element: <DashboardProduccion /> },
-        { path: "procesos", element: <ProcesosInternosPage /> },
-        { path: "logistica", element: <LogisticaRutaPage /> },
-        { path: "reportes", element: <ReportesDiariosPage /> },
+        { path: "reportes-transporte", element: <ReportesDiariosPage /> },
+        { path: "reportes-mina", element: <ReportesDiariosMinaPage /> },
         { path: "trazabilidad", element: <TrazabilidadPage /> }
       ]},
 
