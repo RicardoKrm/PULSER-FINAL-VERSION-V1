@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Card } from '../../components/ui/Card';
-import { Calendar, Truck, TrendingUp, AlertCircle, Droplet, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Calendar, Truck, TrendingUp, AlertCircle, Droplet, FileSpreadsheet, Loader2, Plus, MessageSquarePlus, Edit2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import * as XLSX from 'xlsx';
+import { Modal } from '../../components/ui/Modal';
 
 type TurnoDetalle = {
-
+  id?: string;
   camion: string;
   chofer: string;
   tonelaje: number;
@@ -34,6 +35,120 @@ export default function ReporteDiarioPanel() {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const [isProduccionModalOpen, setIsProduccionModalOpen] = useState(false);
+  const [isNovedadModalOpen, setIsNovedadModalOpen] = useState(false);
+  const [editData, setEditData] = useState<any>(null);
+
+  const [prodForm, setProdForm] = useState({
+    fecha: new Date().toISOString().split('T')[0],
+    turno: 'Día',
+    camion: '',
+    chofer: '',
+    vueltas: '',
+    tonelaje: '',
+    petroleo: '',
+    supervisor: ''
+  });
+
+  const [novForm, setNovForm] = useState({
+    fecha: new Date().toISOString().split('T')[0],
+    turno: 'Día',
+    novedad: '',
+    supervisor: ''
+  });
+
+  const handleOpenProduccionModal = (data: any = null, fechaContext?: string, turnoContext?: string) => {
+    if (data) {
+      setEditData(data);
+      setProdForm({
+        fecha: fechaContext || data.fecha || new Date().toISOString().split('T')[0],
+        turno: turnoContext || data.turno || 'Día',
+        camion: data.camion || '',
+        chofer: data.chofer || '',
+        vueltas: data.vueltas?.toString() || '',
+        tonelaje: data.tonelaje?.toString() || '',
+        petroleo: data.petroleo?.toString() || '',
+        supervisor: ''
+      });
+    } else {
+      setEditData(null);
+      setProdForm({
+        fecha: fechaContext || activeReport?.id || new Date().toISOString().split('T')[0],
+        turno: turnoContext || 'Día',
+        camion: '',
+        chofer: '',
+        vueltas: '',
+        tonelaje: '',
+        petroleo: '',
+        supervisor: ''
+      });
+    }
+    setIsProduccionModalOpen(true);
+  };
+
+  const handleSaveProduccion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUploading(true);
+    try {
+      const payload: any = {
+        fecha: prodForm.fecha,
+        turno: prodForm.turno,
+        camion: prodForm.camion,
+        chofer: prodForm.chofer,
+        vueltas: parseFloat(prodForm.vueltas) || 0,
+        tonelaje: parseFloat(prodForm.tonelaje) || 0,
+        petroleo: prodForm.petroleo ? parseFloat(prodForm.petroleo) : null
+      };
+
+      if (prodForm.supervisor) {
+        payload.novedades = `Firma (Ingreso Manual): ${prodForm.supervisor}`;
+      }
+
+      if (editData && editData.id) {
+        const { error } = await supabase
+          .from('produccion_registro_diario')
+          .update(payload)
+          .eq('id', editData.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('produccion_registro_diario')
+          .insert([payload]);
+        if (error) throw error;
+      }
+      setIsProduccionModalOpen(false);
+      fetchReportes();
+    } catch (err: any) {
+      alert(`Error al guardar: ${err.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSaveNovedad = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUploading(true);
+    try {
+      const novedadStr = `${novForm.novedad} | Supervisor: ${novForm.supervisor}`;
+      const payload = {
+        fecha: novForm.fecha,
+        turno: novForm.turno,
+        novedades: novedadStr
+      };
+      const { error } = await supabase
+        .from('produccion_registro_diario')
+        .insert([payload]);
+      if (error) throw error;
+      setIsNovedadModalOpen(false);
+      setNovForm({ ...novForm, novedad: '', supervisor: '' });
+      fetchReportes();
+    } catch (err: any) {
+      alert(`Error al guardar novedad: ${err.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const fetchReportes = async () => {
     setLoading(true);
@@ -95,6 +210,7 @@ export default function ReporteDiarioPanel() {
                }
                
                return {
+                 id: r.id,
                  camion: r.camion,
                  chofer: r.chofer,
                  tonelaje: Number(r.tonelaje) || 0,
@@ -303,21 +419,37 @@ export default function ReporteDiarioPanel() {
             <TrendingUp className="w-5 h-5 mr-2" />
             Total Acumulado del Mes
           </h2>
-          <label className={`mt-4 md:mt-0 flex items-center ${uploading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-500'} text-white py-2 px-4 rounded-md transition-colors text-sm font-medium border border-blue-400 cursor-pointer`}>
-            {uploading ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
-            )}
-            {uploading ? 'Subiendo...' : 'Importar Excel'}
-            <input 
-              type="file" 
-              accept=".xlsx, .xls, .csv" 
-              className="hidden" 
-              onChange={handleFileUpload}
-              disabled={uploading}
-            />
-          </label>
+          <div className="mt-4 md:mt-0 flex items-center space-x-3">
+            <button
+              onClick={() => handleOpenProduccionModal()}
+              className="flex items-center bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-md transition-colors text-sm font-medium border border-white/20"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Agregar Producción
+            </button>
+            <button
+              onClick={() => setIsNovedadModalOpen(true)}
+              className="flex items-center bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-md transition-colors text-sm font-medium border border-white/20"
+            >
+              <MessageSquarePlus className="w-4 h-4 mr-2" />
+              Novedades
+            </button>
+            <label className={`flex items-center ${uploading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-500'} text-white py-2 px-4 rounded-md transition-colors text-sm font-medium border border-blue-400 cursor-pointer`}>
+              {uploading ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+              )}
+              {uploading ? 'Subiendo...' : 'Importar Excel'}
+              <input 
+                type="file" 
+                accept=".xlsx, .xls, .csv" 
+                className="hidden" 
+                onChange={handleFileUpload}
+                disabled={uploading}
+              />
+            </label>
+          </div>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -425,6 +557,7 @@ export default function ReporteDiarioPanel() {
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Tonelaje</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Vueltas</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Petróleo</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -457,6 +590,15 @@ export default function ReporteDiarioPanel() {
                                 </span>
                               ) : '-'}
                             </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 text-right">
+                              <button
+                                onClick={() => handleOpenProduccionModal(detalle, activeReport.id, turno.nombre)}
+                                className="text-blue-600 hover:text-blue-900 p-1"
+                                title="Editar fila"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                            </td>
                           </tr>
                         ));
                       })()}
@@ -469,6 +611,90 @@ export default function ReporteDiarioPanel() {
         </div>
         </div>
       )}
+
+      <Modal isOpen={isProduccionModalOpen} onClose={() => setIsProduccionModalOpen(false)} title={editData ? "Editar Producción" : "Agregar Producción"}>
+        <form onSubmit={handleSaveProduccion} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
+              <input type="date" required value={prodForm.fecha} onChange={e => setProdForm({...prodForm, fecha: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Turno</label>
+              <select required value={prodForm.turno} onChange={e => setProdForm({...prodForm, turno: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                <option value="Día">Día</option>
+                <option value="Noche">Noche</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Camión</label>
+              <input type="text" required value={prodForm.camion} onChange={e => setProdForm({...prodForm, camion: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Chofer</label>
+              <input type="text" required value={prodForm.chofer} onChange={e => setProdForm({...prodForm, chofer: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Vueltas</label>
+              <input type="number" step="1" required value={prodForm.vueltas} onChange={e => setProdForm({...prodForm, vueltas: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tonelaje</label>
+              <input type="number" step="0.01" required value={prodForm.tonelaje} onChange={e => setProdForm({...prodForm, tonelaje: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Petróleo</label>
+              <input type="number" step="0.01" value={prodForm.petroleo} onChange={e => setProdForm({...prodForm, petroleo: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Supervisor a cargo (Firma)</label>
+            <input type="text" placeholder="Ej: Juan Pérez" value={prodForm.supervisor} onChange={e => setProdForm({...prodForm, supervisor: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+          </div>
+          <div className="flex justify-end space-x-3 mt-6">
+            <button type="button" onClick={() => setIsProduccionModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">Cancelar</button>
+            <button type="submit" disabled={uploading} className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+              {uploading ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal isOpen={isNovedadModalOpen} onClose={() => setIsNovedadModalOpen(false)} title="Agregar Novedad">
+        <form onSubmit={handleSaveNovedad} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
+              <input type="date" required value={novForm.fecha} onChange={e => setNovForm({...novForm, fecha: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Turno</label>
+              <select required value={novForm.turno} onChange={e => setNovForm({...novForm, turno: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                <option value="Día">Día</option>
+                <option value="Noche">Noche</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Supervisor a cargo (Firma)</label>
+            <input type="text" required placeholder="Ej: Juan Pérez" value={novForm.supervisor} onChange={e => setNovForm({...novForm, supervisor: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Novedad</label>
+            <textarea required rows={4} placeholder="Describa la novedad del turno..." value={novForm.novedad} onChange={e => setNovForm({...novForm, novedad: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+          </div>
+          <div className="flex justify-end space-x-3 mt-6">
+            <button type="button" onClick={() => setIsNovedadModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">Cancelar</button>
+            <button type="submit" disabled={uploading} className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+              {uploading ? 'Guardando...' : 'Confirmar Novedad'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
