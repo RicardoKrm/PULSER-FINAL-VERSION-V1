@@ -35,7 +35,7 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
   const [transSuceso, setTransSuceso] = useState('Normal');
 
   // Filtros
-  const [periodoFiltro, setPeriodoFiltro] = useState<'dia' | 'semana' | 'mes' | 'todos'>('todos');
+  const [dateRange, setDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
   const [choferFiltro, setChoferFiltro] = useState<string>('todos');
 
   // Chart data
@@ -78,24 +78,14 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
     let filteredData = [...rawData];
 
     // Filter by period
-    if (periodoFiltro !== 'todos') {
-      const now = new Date();
+    if (dateRange.start || dateRange.end) {
       filteredData = filteredData.filter(row => {
         if (!row.fecha) return false;
-        const rowDate = new Date(row.fecha);
-        if (isNaN(rowDate.getTime())) return false;
-
-        if (periodoFiltro === 'dia') {
-          return rowDate.toDateString() === now.toDateString();
-        } else if (periodoFiltro === 'semana') {
-          const pastWeek = new Date(now);
-          pastWeek.setDate(now.getDate() - 7);
-          return rowDate >= pastWeek && rowDate <= now;
-        } else if (periodoFiltro === 'mes') {
-          const pastMonth = new Date(now);
-          pastMonth.setMonth(now.getMonth() - 1);
-          return rowDate >= pastMonth && rowDate <= now;
-        }
+        
+        // Comparar directamente los strings (YYYY-MM-DD) es seguro y evita problemas de zona horaria
+        if (dateRange.start && row.fecha < dateRange.start) return false;
+        if (dateRange.end && row.fecha > dateRange.end) return false;
+        
         return true;
       });
     }
@@ -195,7 +185,7 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
 
     setSelectedDataIndex(null); // Reset selection on filter change
 
-  }, [rawData, periodoFiltro, choferFiltro, vista]);
+  }, [rawData, dateRange, choferFiltro, vista]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -268,16 +258,32 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
                 <div className="bg-slate-100 dark:bg-slate-800 px-2 py-1.5 h-full flex items-center justify-center border-r border-slate-200 dark:border-slate-800">
                   <CalendarIcon className="w-3 h-3 text-slate-500 dark:text-slate-400" />
                 </div>
-                <select 
-                  value={periodoFiltro} 
-                  onChange={e => setPeriodoFiltro(e.target.value as any)} 
-                  className="bg-transparent text-[10px] font-bold text-slate-700 dark:text-slate-300 focus:outline-none py-1.5"
-                >
-                  <option value="todos">Todo Histórico</option>
-                  <option value="dia">Día Actual</option>
-                  <option value="semana">Últimos 7 Días</option>
-                  <option value="mes">Últimos 30 Días</option>
-                </select>
+                <div className="flex items-center">
+                  <input
+                    type="date"
+                    title="Fecha de inicio"
+                    value={dateRange.start}
+                    onChange={e => setDateRange({ ...dateRange, start: e.target.value })}
+                    className="bg-transparent text-[10px] font-bold text-slate-700 dark:text-slate-300 focus:outline-none py-1.5 w-24"
+                  />
+                  <span className="text-slate-400 dark:text-slate-500 text-[10px] font-bold px-1">-</span>
+                  <input
+                    type="date"
+                    title="Fecha de fin"
+                    value={dateRange.end}
+                    onChange={e => setDateRange({ ...dateRange, end: e.target.value })}
+                    className="bg-transparent text-[10px] font-bold text-slate-700 dark:text-slate-300 focus:outline-none py-1.5 w-24"
+                  />
+                  {(dateRange.start || dateRange.end) && (
+                    <button 
+                      onClick={() => setDateRange({start: '', end: ''})} 
+                      className="ml-1 p-0.5 text-slate-400 hover:text-red-500 rounded-full"
+                      title="Limpiar fechas"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg pr-2 overflow-hidden transition-colors">
