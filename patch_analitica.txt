@@ -1,0 +1,56 @@
+@@ -42,4 +42,4 @@
+   const [rawData, setRawData] = useState<any[]>([]);
+-  const [chartDataChofer, setChartDataChofer] = useState<{name: string, vueltas: number, tonelaje: number}[]>([]);
+-  const [chartDataCamion, setChartDataCamion] = useState<{name: string, vueltas: number, tonelaje: number}[]>([]);
++  const [chartDataChofer, setChartDataChofer] = useState<{name: string, vueltas: number, tonelaje: number, choferes?: Record<string, number>}[]>([]);
++  const [chartDataCamion, setChartDataCamion] = useState<{name: string, vueltas: number, tonelaje: number, choferes?: Record<string, number>}[]>([]);
+   const [choferesDisponibles, setChoferesDisponibles] = useState<string[]>([]);
+@@ -97,3 +97,3 @@
+   const choferMap: Record<string, {vueltas: number, tonelaje: number}> = {};
+-  const camionMap: Record<string, {vueltas: number, tonelaje: number}> = {};
++  const camionMap: Record<string, {vueltas: number, tonelaje: number, choferes: Record<string, number>}> = {};
+   const uniqueChoferes = new Set<string>();
+@@ -120,5 +120,8 @@
+         if (camion && camion !== '-') {
+-            if (!camionMap[camion]) camionMap[camion] = { vueltas: 0, tonelaje: 0 };
++            if (!camionMap[camion]) camionMap[camion] = { vueltas: 0, tonelaje: 0, choferes: {} };
+             camionMap[camion].vueltas += vueltas;
+             camionMap[camion].tonelaje += ton;
++            if (chofer && chofer !== '-') {
++                camionMap[camion].choferes[chofer] = (camionMap[camion].choferes[chofer] || 0) + ton;
++            }
+         }
+@@ -334,6 +337,27 @@
+                 <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" fontSize={10} tickLine={false} axisLine={false} />
+-                <Tooltip 
+-                  cursor={{ fill: 'rgba(59, 130, 246, 0.05)' }}
+-                  contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', color: '#1e293b', borderRadius: '8px', fontSize: '12px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+-                  itemStyle={{ fontWeight: 'bold' }}
++                <Tooltip
++                  cursor={{ fill: 'rgba(59, 130, 246, 0.05)' }}
++                  content={({ active, payload, label }: any) => {
++                    if (active && payload && payload.length) {
++                      const data = payload[0].payload;
++                      return (
++                        <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-md text-xs">
++                          <p className="font-bold mb-2 text-slate-800">{label}</p>
++                          <div className="flex flex-col gap-1">
++                            <p className="text-blue-600 font-semibold">Tonelaje: {data.tonelaje?.toFixed(2)} T</p>
++                            <p className="text-amber-500 font-semibold">Vueltas: {data.vueltas}</p>
++                            {data.choferes && Object.keys(data.choferes).length > 0 && (
++                              <div className="mt-2 pt-2 border-t border-slate-100">
++                                <p className="font-semibold text-slate-600 mb-1">Choferes:</p>
++                                {Object.entries(data.choferes).sort((a: any, b: any) => b[1] - a[1]).map(([chofer, ton]: any) => (
++                                  <p key={chofer} className="text-slate-500 flex justify-between gap-3">
++                                    <span>• {chofer}</span><span className="font-medium">{ton.toFixed(2)} T</span>
++                                  </p>
++                                ))}
++                              </div>
++                            )}
++                          </div>
++                        </div>
++                      );
++                    }
++                    return null;
++                  }}
+                 />

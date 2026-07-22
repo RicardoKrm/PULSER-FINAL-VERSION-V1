@@ -613,16 +613,16 @@ export default function ReporteDiarioPanel() {
           <div className="bg-red-50 text-red-500 p-4 rounded-full mb-4">
             <AlertCircle className="w-8 h-8" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Error de Conexión</h3>
-          <p className="text-gray-500 max-w-md">{errorMsg}</p>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Error de Conexión</h3>
+          <p className="text-gray-500 dark:text-slate-500 max-w-md">{errorMsg}</p>
         </Card>
       ) : reportes.length === 0 ? (
         <Card className="p-12 flex flex-col items-center justify-center text-center">
           <div className="bg-blue-50 text-blue-500 p-4 rounded-full mb-4">
             <AlertCircle className="w-8 h-8" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No hay datos de producción</h3>
-          <p className="text-gray-500 max-w-md">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No hay datos de producción</h3>
+          <p className="text-gray-500 dark:text-slate-500 max-w-md">
             El módulo de reportes diarios está listo. Utiliza el botón "Importar Excel" en la parte superior para realizar la carga masiva de los datos de este mes.
           </p>
         </Card>
@@ -630,7 +630,7 @@ export default function ReporteDiarioPanel() {
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Date Selector Sidebar */}
           <Card className="p-4 lg:w-64 shrink-0">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center">
               <Calendar className="w-4 h-4 mr-2" />
               Seleccionar Día
             </h3>
@@ -641,8 +641,8 @@ export default function ReporteDiarioPanel() {
                   onClick={() => setSelectedDateId(reporte.id)}
                   className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
                     selectedDateId === reporte.id
-                      ? 'bg-blue-50 text-blue-700 font-medium border border-blue-200'
-                      : 'text-gray-600 hover:bg-gray-50 border border-transparent'
+                      ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium border border-blue-200 dark:border-blue-800/50'
+                      : 'text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 border border-transparent'
                   }`}
                 >
                   {reporte.fechaStr}
@@ -655,16 +655,16 @@ export default function ReporteDiarioPanel() {
           <div className="flex-1 space-y-6">
             {activeReport?.turnos.map((turno, idx) => (
               <Card key={idx} className="p-6">
-              <div className="border-b border-gray-200 pb-4 mb-4">
+              <div className="border-b border-gray-200 dark:border-slate-700 pb-4 mb-4">
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Fecha: <span className="font-normal text-gray-600">{activeReport.fechaStr}</span>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Fecha: <span className="font-normal text-gray-600 dark:text-slate-400">{activeReport.fechaStr}</span>
                   </h3>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200">
                     Turno: {turno.nombre}
                   </span>
                 </div>
-                <div className="text-md text-gray-700 font-medium">
+                <div className="text-md text-gray-700 dark:text-slate-300 font-medium">
                   Totales del turno:{' '}
                   <span className="text-blue-600">{turno.totalVueltas} Vueltas</span> |{' '}
                   <span className="text-blue-600">{formatNumber(turno.totalToneladas)} Toneladas</span>
@@ -672,46 +672,46 @@ export default function ReporteDiarioPanel() {
               </div>
 
               <div className="mb-6">
-                <h4 className="text-sm font-bold text-gray-900 mb-2">Novedades:</h4>
+                <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-2">Novedades:</h4>
                 <ul className="list-disc pl-5 space-y-1">
                   {turno.novedades.map((novedad, nIdx) => (
-                    <li key={nIdx} className="text-sm text-gray-600">{novedad}</li>
+                    <li key={nIdx} className="text-sm text-gray-600 dark:text-slate-400">{novedad}</li>
                   ))}
                 </ul>
               </div>
 
               {turno.transfer && (
-                <div className="mb-6 bg-yellow-50 p-3 rounded-md border border-yellow-200 text-sm text-yellow-800">
+                <div className="mb-6 bg-yellow-50 dark:bg-amber-900/20 p-3 rounded-md border border-yellow-200 dark:border-amber-800/50 text-sm text-yellow-800 dark:text-amber-400">
                   <span className="font-bold">Transfer:</span> {turno.transfer}
                 </div>
               )}
 
               <div>
-                <h4 className="text-sm font-bold text-gray-900 mb-3">Detalle por Camión y Chofer:</h4>
+                <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Detalle por Camión y Chofer:</h4>
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                    <thead className="bg-gray-50 dark:bg-slate-800">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Camión</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Chofer</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Tonelaje</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Vueltas</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Petróleo</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Camión</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Chofer</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Tonelaje</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Vueltas</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Petróleo</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Acciones</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-200 dark:divide-slate-700">
                       {(() => {
                         const maxTonelaje = Math.max(...turno.detalles.map(d => d.tonelaje), 0.01);
                         return turno.detalles.map((detalle, dIdx) => (
                           <React.Fragment key={dIdx}>
-                          <tr className={`hover:bg-gray-50 cursor-pointer ${expandedDetalle === detalle.id ? 'bg-blue-50/30' : ''}`} onClick={() => setExpandedDetalle(expandedDetalle === detalle.id ? null : (detalle.id || null))}>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 flex items-center">
+                          <tr className={`hover:bg-gray-50 dark:hover:bg-slate-800 cursor-pointer ${expandedDetalle === detalle.id ? 'bg-blue-50/30 dark:bg-blue-900/20' : ''}`} onClick={() => setExpandedDetalle(expandedDetalle === detalle.id ? null : (detalle.id || null))}>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white flex items-center">
                               <Truck className="w-4 h-4 mr-2 text-gray-400" />
                               {detalle.camion}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600 hover:underline">{detalle.chofer}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">
                               <div className="flex flex-col items-end">
                                 <span className="font-medium mb-1">{formatNumber(detalle.tonelaje)}</span>
                                 <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
@@ -722,8 +722,8 @@ export default function ReporteDiarioPanel() {
                                 </div>
                               </div>
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{detalle.vueltas}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 text-right">
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">{detalle.vueltas}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-slate-400 text-right">
                               {detalle.petroleo ? (
                                 <span className="flex items-center justify-end">
                                   {formatNumber(detalle.petroleo)}
@@ -731,7 +731,7 @@ export default function ReporteDiarioPanel() {
                                 </span>
                               ) : '-'}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 text-right">
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-slate-400 text-right">
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleOpenProduccionModal(detalle, activeReport.id, turno.nombre); }}
                                 className="text-blue-600 hover:text-blue-900 p-1"
@@ -743,20 +743,20 @@ export default function ReporteDiarioPanel() {
                           </tr>
                           {expandedDetalle === detalle.id && (
                             <tr>
-                              <td colSpan={6} className="px-4 py-4 bg-gray-50/80 border-b border-gray-100">
-                                <div className="text-sm text-gray-700">
-                                   <span className="font-semibold block mb-2 text-gray-900">Detalle de Vueltas (Toneladas):</span>
+                              <td colSpan={6} className="px-4 py-4 bg-gray-50 dark:bg-slate-800/80 border-b border-gray-100">
+                                <div className="text-sm text-gray-700 dark:text-slate-300">
+                                   <span className="font-semibold block mb-2 text-gray-900 dark:text-white">Detalle de Vueltas (Toneladas):</span>
                                    {detalle.vueltas_detalle && detalle.vueltas_detalle.length > 0 ? (
                                      <div className="flex flex-wrap gap-2">
                                         {detalle.vueltas_detalle.map((ton, idx) => (
-                                           <div key={idx} className="bg-white px-3 py-1.5 border border-gray-200 rounded-md shadow-sm flex flex-col items-center min-w-[70px]">
-                                             <span className="text-[10px] text-gray-500 uppercase font-semibold">Vuelta {idx + 1}</span>
-                                             <span className="font-mono font-medium text-blue-700">{formatNumber(ton)}</span>
+                                           <div key={idx} className="bg-white dark:bg-slate-800 px-3 py-1.5 border border-gray-200 dark:border-slate-700 rounded-md shadow-sm flex flex-col items-center min-w-[70px]">
+                                             <span className="text-[10px] text-gray-500 dark:text-slate-500 uppercase font-semibold">Vuelta {idx + 1}</span>
+                                             <span className="font-mono font-medium text-blue-700 dark:text-blue-400">{formatNumber(ton)}</span>
                                            </div>
                                         ))}
                                      </div>
                                    ) : (
-                                     <span className="text-gray-500 italic">No hay detalles por vuelta registrados para este conductor.</span>
+                                     <span className="text-gray-500 dark:text-slate-500 italic">No hay detalles por vuelta registrados para este conductor.</span>
                                    )}
                                 </div>
                               </td>
@@ -790,11 +790,11 @@ export default function ReporteDiarioPanel() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Fecha</label>
-              <input type="date" required value={prodForm.fecha} onChange={e => setProdForm({...prodForm, fecha: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
+              <input type="date" required value={prodForm.fecha} onChange={e => setProdForm({...prodForm, fecha: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Turno</label>
-              <select required value={prodForm.turno} onChange={e => setProdForm({...prodForm, turno: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500">
+              <select required value={prodForm.turno} onChange={e => setProdForm({...prodForm, turno: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500">
                 <option value="Día">Día</option>
                 <option value="Noche">Noche</option>
               </select>
@@ -803,30 +803,30 @@ export default function ReporteDiarioPanel() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Camión</label>
-              <input type="text" required value={prodForm.camion} onChange={e => setProdForm({...prodForm, camion: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
+              <input type="text" required value={prodForm.camion} onChange={e => setProdForm({...prodForm, camion: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Chofer</label>
-              <input type="text" required value={prodForm.chofer} onChange={e => setProdForm({...prodForm, chofer: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
+              <input type="text" required value={prodForm.chofer} onChange={e => setProdForm({...prodForm, chofer: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Vueltas</label>
-              <input type="number" step="1" required value={prodForm.vueltas} onChange={e => setProdForm({...prodForm, vueltas: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
+              <input type="number" step="1" required value={prodForm.vueltas} onChange={e => setProdForm({...prodForm, vueltas: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Tonelaje</label>
-              <input type="number" step="0.01" required value={prodForm.tonelaje} onChange={e => setProdForm({...prodForm, tonelaje: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
+              <input type="number" step="0.01" required value={prodForm.tonelaje} onChange={e => setProdForm({...prodForm, tonelaje: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Petróleo</label>
-              <input type="number" step="0.01" value={prodForm.petroleo} onChange={e => setProdForm({...prodForm, petroleo: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
+              <input type="number" step="0.01" value={prodForm.petroleo} onChange={e => setProdForm({...prodForm, petroleo: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Supervisor a cargo (Firma)</label>
-            <input type="text" placeholder="Ej: Juan Pérez" value={prodForm.supervisor} onChange={e => setProdForm({...prodForm, supervisor: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
+            <input type="text" placeholder="Ej: Juan Pérez" value={prodForm.supervisor} onChange={e => setProdForm({...prodForm, supervisor: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
           </div>
           <div className="flex justify-end space-x-3 mt-6">
             <button type="button" onClick={() => setIsProduccionModalOpen(false)} className="px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-md text-sm font-medium text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">Cancelar</button>
@@ -842,11 +842,11 @@ export default function ReporteDiarioPanel() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Fecha</label>
-              <input type="date" required value={novForm.fecha} onChange={e => setNovForm({...novForm, fecha: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
+              <input type="date" required value={novForm.fecha} onChange={e => setNovForm({...novForm, fecha: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Turno</label>
-              <select required value={novForm.turno} onChange={e => setNovForm({...novForm, turno: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500">
+              <select required value={novForm.turno} onChange={e => setNovForm({...novForm, turno: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500">
                 <option value="Día">Día</option>
                 <option value="Noche">Noche</option>
               </select>
@@ -854,11 +854,11 @@ export default function ReporteDiarioPanel() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Supervisor a cargo (Firma)</label>
-            <input type="text" required placeholder="Ej: Juan Pérez" value={novForm.supervisor} onChange={e => setNovForm({...novForm, supervisor: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
+            <input type="text" required placeholder="Ej: Juan Pérez" value={novForm.supervisor} onChange={e => setNovForm({...novForm, supervisor: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Novedad</label>
-            <textarea required rows={4} placeholder="Describa la novedad del turno..." value={novForm.novedad} onChange={e => setNovForm({...novForm, novedad: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-700 shadow-sm px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
+            <textarea required rows={4} placeholder="Describa la novedad del turno..." value={novForm.novedad} onChange={e => setNovForm({...novForm, novedad: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
           </div>
           <div className="flex justify-end space-x-3 mt-6">
             <button type="button" onClick={() => setIsNovedadModalOpen(false)} className="px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-md text-sm font-medium text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">Cancelar</button>

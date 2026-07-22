@@ -36,12 +36,13 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
 
   // Filtros
   const [dateRange, setDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
+  const [plazo, setPlazo] = useState<string>('todos');
   const [choferFiltro, setChoferFiltro] = useState<string>('todos');
 
   // Chart data
   const [rawData, setRawData] = useState<any[]>([]);
-  const [chartDataChofer, setChartDataChofer] = useState<{name: string, vueltas: number, tonelaje: number}[]>([]);
-  const [chartDataCamion, setChartDataCamion] = useState<{name: string, vueltas: number, tonelaje: number}[]>([]);
+  const [chartDataChofer, setChartDataChofer] = useState<{name: string, vueltas: number, tonelaje: number, choferes?: Record<string, number>}[]>([]);
+  const [chartDataCamion, setChartDataCamion] = useState<{name: string, vueltas: number, tonelaje: number, choferes?: Record<string, number>}[]>([]);
   const [choferesDisponibles, setChoferesDisponibles] = useState<string[]>([]);
 
   // KPIs
@@ -50,6 +51,51 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
   const [kpiVueltasDia, setKpiVueltasDia] = useState<number>(0);
 
   const currentData = vista === 'chofer' ? chartDataChofer : chartDataCamion;
+
+  const handlePlazoChange = (nuevoPlazo: string) => {
+    setPlazo(nuevoPlazo);
+    
+    const hoy = new Date();
+    let start = '';
+    let end = '';
+
+    const formatDate = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    if (nuevoPlazo === 'hoy') {
+      start = formatDate(hoy);
+      end = formatDate(hoy);
+    } else if (nuevoPlazo === 'ayer') {
+      const ayer = new Date(hoy);
+      ayer.setDate(hoy.getDate() - 1);
+      start = formatDate(ayer);
+      end = formatDate(ayer);
+    } else if (nuevoPlazo === 'esta_semana') {
+      const sieteDiasAtras = new Date(hoy);
+      sieteDiasAtras.setDate(hoy.getDate() - 7);
+      start = formatDate(sieteDiasAtras);
+      end = formatDate(hoy);
+    } else if (nuevoPlazo === 'este_mes') {
+      const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+      start = formatDate(inicioMes);
+      end = formatDate(hoy);
+    } else if (nuevoPlazo === 'mes_pasado') {
+      const inicioMesPasado = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+      const finMesPasado = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+      start = formatDate(inicioMesPasado);
+      end = formatDate(finMesPasado);
+    } else if (nuevoPlazo === 'este_ano') {
+      const inicioAno = new Date(hoy.getFullYear(), 0, 1);
+      start = formatDate(inicioAno);
+      end = formatDate(hoy);
+    }
+
+    setDateRange({ start, end });
+  };
 
   const fetchData = async () => {
     try {
@@ -96,7 +142,7 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
     }
 
     const choferMap: Record<string, {vueltas: number, tonelaje: number}> = {};
-    const camionMap: Record<string, {vueltas: number, tonelaje: number}> = {};
+    const camionMap: Record<string, {vueltas: number, tonelaje: number, choferes: Record<string, number>}> = {};
     const uniqueChoferes = new Set<string>();
     
     // Always build full unique chofer list from rawData
@@ -119,9 +165,12 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
         }
         
         if (camion && camion !== '-') {
-            if (!camionMap[camion]) camionMap[camion] = { vueltas: 0, tonelaje: 0 };
+            if (!camionMap[camion]) camionMap[camion] = { vueltas: 0, tonelaje: 0, choferes: {} };
             camionMap[camion].vueltas += vueltas;
             camionMap[camion].tonelaje += ton;
+        if (chofer && chofer !== "-") {
+            camionMap[camion].choferes[chofer] = (camionMap[camion].choferes[chofer] || 0) + ton;
+        }
         }
     });
 
@@ -254,6 +303,23 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
             </div>
             
             <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden transition-colors">
+                <select
+                  value={plazo}
+                  onChange={(e) => handlePlazoChange(e.target.value)}
+                  className="bg-transparent text-[10px] font-bold text-slate-700 dark:text-slate-300 focus:outline-none py-1.5 px-3"
+                >
+                  <option value="hoy">Hoy</option>
+                  <option value="ayer">Ayer</option>
+                  <option value="esta_semana">Últimos 7 días</option>
+                  <option value="este_mes">Este Mes</option>
+                  <option value="mes_pasado">Mes Pasado</option>
+                  <option value="este_ano">Este Año</option>
+                  <option value="todos">Todos</option>
+                  <option value="personalizado">Personalizado</option>
+                </select>
+              </div>
+
               <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg pr-2 overflow-hidden transition-colors">
                 <div className="bg-slate-100 dark:bg-slate-800 px-2 py-1.5 h-full flex items-center justify-center border-r border-slate-200 dark:border-slate-800">
                   <CalendarIcon className="w-3 h-3 text-slate-500 dark:text-slate-400" />
@@ -263,7 +329,10 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
                     type="date"
                     title="Fecha de inicio"
                     value={dateRange.start}
-                    onChange={e => setDateRange({ ...dateRange, start: e.target.value })}
+                    onChange={e => {
+                      setDateRange({ ...dateRange, start: e.target.value });
+                      setPlazo('personalizado');
+                    }}
                     className="bg-transparent text-[10px] font-bold text-slate-700 dark:text-slate-300 focus:outline-none py-1.5 w-24"
                   />
                   <span className="text-slate-400 dark:text-slate-500 text-[10px] font-bold px-1">-</span>
@@ -271,12 +340,18 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
                     type="date"
                     title="Fecha de fin"
                     value={dateRange.end}
-                    onChange={e => setDateRange({ ...dateRange, end: e.target.value })}
+                    onChange={e => {
+                      setDateRange({ ...dateRange, end: e.target.value });
+                      setPlazo('personalizado');
+                    }}
                     className="bg-transparent text-[10px] font-bold text-slate-700 dark:text-slate-300 focus:outline-none py-1.5 w-24"
                   />
                   {(dateRange.start || dateRange.end) && (
                     <button 
-                      onClick={() => setDateRange({start: '', end: ''})} 
+                      onClick={() => {
+                        setDateRange({start: '', end: ''});
+                        setPlazo('todos');
+                      }} 
                       className="ml-1 p-0.5 text-slate-400 hover:text-red-500 rounded-full"
                       title="Limpiar fechas"
                     >
@@ -332,12 +407,34 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
                 <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
                 <YAxis yAxisId="left" stroke="#3b82f6" fontSize={10} tickLine={false} axisLine={false} />
                 <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" fontSize={10} tickLine={false} axisLine={false} />
-                <Tooltip 
+                                <Tooltip
                   cursor={{ fill: 'rgba(59, 130, 246, 0.05)' }}
-                  contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', color: '#1e293b', borderRadius: '8px', fontSize: '12px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  itemStyle={{ fontWeight: 'bold' }}
+                  content={({ active, payload, label }: any) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-white dark:bg-slate-900 p-3 border border-slate-200 dark:border-slate-800 rounded-lg shadow-md text-xs">
+                          <p className="font-bold mb-2 text-slate-800 dark:text-slate-100">{label}</p>
+                          <div className="flex flex-col gap-1">
+                            <p className="text-blue-600 dark:text-blue-400 font-semibold">Tonelaje: {data.tonelaje?.toFixed(2)} T</p>
+                            <p className="text-amber-500 font-semibold">Vueltas: {data.vueltas}</p>
+                            {data.choferes && Object.keys(data.choferes).length > 0 && (
+                              <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                <p className="font-semibold text-slate-600 dark:text-slate-300 mb-1">Choferes:</p>
+                                {Object.entries(data.choferes).sort((a: any, b: any) => b[1] - a[1]).map(([chofer, ton]: any) => (
+                                  <p key={chofer} className="text-slate-500 dark:text-slate-400 flex justify-between gap-4">
+                                    <span>• {chofer}</span><span className="font-medium text-slate-700 dark:text-slate-200">{ton.toFixed(2)} T</span>
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
                 />
-                <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
                 <Bar yAxisId="left" dataKey="tonelaje" name="Tonelaje (Ton)" fill="#3b82f6" radius={[4, 4, 0, 0]} className="cursor-pointer" />
                 <Line yAxisId="right" type="monotone" dataKey="vueltas" name="Vueltas" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} className="cursor-pointer" />
               </ComposedChart>
