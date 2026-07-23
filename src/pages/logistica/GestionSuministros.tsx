@@ -179,6 +179,16 @@ export default function GestionSuministros() {
        Swal.fire("Error", "La cantidad debe ser mayor a 0", "error");
        return;
     }
+    if (terminalForm.tipoMovimiento === 'ENTRADA') {
+       if (!terminalForm.proveedorId) {
+          Swal.fire("Error", "Debe seleccionar un proveedor para la entrada", "error");
+          return;
+       }
+       if (terminalForm.precioUnitario <= 0) {
+          Swal.fire("Error", "El valor unitario debe ser mayor a 0", "error");
+          return;
+       }
+    }
     
     setTerminalItems(prev => [...prev, {
        id: Date.now().toString(),
@@ -187,7 +197,9 @@ export default function GestionSuministros() {
        nombre: terminalForm.nombre,
        bodegaId: terminalForm.bodegaId,
        cantidad: terminalForm.cantidad,
-       ubicacion: terminalForm.ubicacion
+       ubicacion: terminalForm.ubicacion,
+       proveedorId: terminalForm.proveedorId,
+       precioUnitario: terminalForm.precioUnitario
     }]);
     
     // Reset item inputs but keep common data
@@ -197,7 +209,9 @@ export default function GestionSuministros() {
        sku: '',
        nombre: '',
        cantidad: 1,
-       ubicacion: ''
+       ubicacion: '',
+       proveedorId: '',
+       precioUnitario: 0
     }));
   };
 
@@ -253,16 +267,18 @@ export default function GestionSuministros() {
          }
 
          if (isNewProduct) {
+             const provName = proveedores.find(p => p.id === item.proveedorId)?.nombre || item.proveedorId || '';
              const { data: newRep, error: createErr } = await supabase.from('logistica_repuestos').insert({
                  empresa_id: currentCompany.id,
                  sku: item.sku || `SKU-${Date.now()}`,
                  nombre: item.nombre || `Repuesto ${item.sku}`,
                  bodega_id: item.bodegaId || null,
                  stock: item.cantidad,
-                 precio: 0,
-                 valor_total: 0,
+                 precio: item.precioUnitario || 0,
+                 valor_total: (item.precioUnitario || 0) * item.cantidad,
                  calidad: 'ORIGINAL',
                  estado: 'ACTIVO',
+                 proveedor: provName,
                  ubicacion: item.ubicacion || 'Sin Ubicación',
                  ult_mov: new Date().toISOString()
              }).select().single();
@@ -297,8 +313,11 @@ export default function GestionSuministros() {
                ult_mov: new Date().toISOString()
             };
             // Only update ubicacion if it was explicitly provided during ENTRADA
-            if (terminalForm.tipoMovimiento === 'ENTRADA' && item.ubicacion) {
-               updatePayload.ubicacion = item.ubicacion;
+            if (terminalForm.tipoMovimiento === 'ENTRADA') {
+               if (item.ubicacion) updatePayload.ubicacion = item.ubicacion;
+               const provName = proveedores.find(p => p.id === item.proveedorId)?.nombre || item.proveedorId || '';
+               if (provName) updatePayload.proveedor = provName;
+               if (item.precioUnitario > 0) updatePayload.precio = item.precioUnitario;
             }
             
             await supabase.from('logistica_repuestos').update(updatePayload).eq('id', rep.id);
@@ -325,7 +344,7 @@ export default function GestionSuministros() {
       setTerminalItems([]);
       setTerminalForm({
         repuestoId: '', sku: '', nombre: '', bodegaId: '', tipoMovimiento: 'SALIDA', 
-        cantidad: 1, solicitante: '', autorizador: '', destino: '', ubicacion: ''
+        cantidad: 1, solicitante: '', autorizador: '', destino: '', ubicacion: '', proveedorId: '', precioUnitario: 0
       });
 
     } catch (e) {
@@ -398,7 +417,9 @@ export default function GestionSuministros() {
     solicitante: '',
     autorizador: '',
     destino: '',
-    ubicacion: '' // Added for new repuestos
+    ubicacion: '', // Added for new repuestos
+    proveedorId: '',
+    precioUnitario: 0
   });
   const [terminalItems, setTerminalItems] = useState<any[]>([]);
 
@@ -1951,7 +1972,7 @@ export default function GestionSuministros() {
                 </div>
              </div>
 
-             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mt-4">
+             <div className={`grid grid-cols-1 ${terminalForm.tipoMovimiento === 'ENTRADA' ? 'md:grid-cols-6' : 'md:grid-cols-4'} gap-4 items-end mt-4`}>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CANTIDAD</label>
                   <input 
@@ -1985,7 +2006,34 @@ export default function GestionSuministros() {
                     onChange={(e) => setTerminalForm({...terminalForm, ubicacion: e.target.value})}
                   />
                 </div>
-                <div>
+                {terminalForm.tipoMovimiento === 'ENTRADA' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold text-emerald-600 dark:text-emerald-500 uppercase mb-1">PROVEEDOR</label>
+                      <select 
+                        className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-white dark:bg-slate-900 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
+                        value={terminalForm.proveedorId}
+                        onChange={(e) => setTerminalForm({...terminalForm, proveedorId: e.target.value})}
+                      >
+                        <option value="">Seleccione...</option>
+                        {proveedores.map(p => (
+                          <option key={p.id} value={p.id}>{p.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-emerald-600 dark:text-emerald-500 uppercase mb-1">VALOR UNIT.</label>
+                      <input 
+                        type="number"
+                        min="0"
+                        className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-white dark:bg-slate-900 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
+                        value={terminalForm.precioUnitario || ''}
+                        onChange={(e) => setTerminalForm({...terminalForm, precioUnitario: parseFloat(e.target.value) || 0})}
+                      />
+                    </div>
+                  </>
+                )}
+                <div className={terminalForm.tipoMovimiento === 'ENTRADA' ? "md:col-span-2" : ""}>
                   <Button 
                     className="w-full bg-slate-800 hover:bg-slate-700 text-white"
                     onClick={handleAddTerminalItem}
@@ -2011,6 +2059,7 @@ export default function GestionSuministros() {
                        <th className="px-4 py-2">Cant</th>
                        <th className="px-4 py-2">Bodega</th>
                        <th className="px-4 py-2">Ubicación</th>
+                       <th className="px-4 py-2 text-right">Datos</th>
                        <th className="px-4 py-2 text-right">Acción</th>
                      </tr>
                    </thead>
@@ -2024,6 +2073,10 @@ export default function GestionSuministros() {
                              {bodegasList.find(b => b.id === item.bodegaId)?.nombre || 'Auto'}
                            </td>
                            <td className="px-4 py-2 text-slate-600 dark:text-slate-300">{item.ubicacion || '-'}</td>
+                           <td className="px-4 py-2 text-right text-xs text-slate-500">
+                             {item.proveedorId ? (proveedores.find(p => p.id === item.proveedorId)?.nombre || 'Prov') : ''}
+                             {item.precioUnitario ? ` ${item.precioUnitario}` : ''}
+                           </td>
                            <td className="px-4 py-2 text-right">
                               <button 
                                 onClick={() => setTerminalItems(prev => prev.filter(i => i.id !== item.id))}
