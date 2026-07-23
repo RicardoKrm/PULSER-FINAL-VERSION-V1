@@ -4,6 +4,10 @@ export interface MetasObjetivos {
   daily: number;
   weekly: number;
   monthly: number;
+  minaDaily: number;
+  minaMonthly: number;
+  transporteDaily: number;
+  transporteMonthly: number;
 }
 
 export interface GlobalStats {
@@ -11,6 +15,7 @@ export interface GlobalStats {
   millingTotal: number;
   stockpile: number;
   transported: number;
+  transporteTotal: number;
   dispatchesCount: number;
   arrivedCount: number;
   inTransitCount: number;
@@ -59,6 +64,10 @@ export function ProduccionProvider({ children }: { children: ReactNode }) {
     daily: 5000,
     weekly: 18000,
     monthly: 75000,
+    minaDaily: 5000,
+    minaMonthly: 75000,
+    transporteDaily: 5000,
+    transporteMonthly: 75000
   });
 
   const [stats, setStats] = useState<GlobalStats>({

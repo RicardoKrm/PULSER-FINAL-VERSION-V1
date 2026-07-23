@@ -12,6 +12,7 @@ export default function DashboardProduccion() {
     millingTotal: 0,
     stockpile: 0,
     transported: 0,
+    transporteTotal: 0,
     dispatchesCount: 0,
     arrivedCount: 0,
     inTransitCount: 0,
@@ -21,7 +22,11 @@ export default function DashboardProduccion() {
   const [metas, setMetas] = useState<MetasObjetivos>({
     daily: 5000,
     weekly: 18000,
-    monthly: 75000
+    monthly: 75000,
+    minaDaily: 5000,
+    minaMonthly: 75000,
+    transporteDaily: 5000,
+    transporteMonthly: 75000
   });
 
   useEffect(() => {
@@ -41,9 +46,9 @@ export default function DashboardProduccion() {
         .select('fecha, tonelaje');
 
       // Fetch Transporte
-      const { data: transporteData } = await supabase
+      const { data: transporteData, error: transporteError } = await supabase
         .from('produccion_registro_diario')
-        .select('fecha, tonelaje, suceso');
+        .select('fecha, tonelaje');
 
       let minaHoy = 0;
       let minaMes = 0;
@@ -63,14 +68,12 @@ export default function DashboardProduccion() {
       if (transporteData) {
         transporteData.forEach(row => {
           if (!row.fecha) return;
-          const ton = row.tonelaje || 0;
-          if (row.fecha === hoyStr) {
+          const ton = Number(row.tonelaje) || 0;
+          const rowFechaStr = String(row.fecha).split('T')[0].split(' ')[0]; // Ensure just YYYY-MM-DD
+          if (rowFechaStr === hoyStr) {
             transporteHoy += ton;
-            if (row.suceso && row.suceso !== 'Normal' && row.suceso !== 'Normal (En Tránsito óptimo)') {
-                alertasHoy++;
-            }
           }
-          if (row.fecha.startsWith(mesActualStr)) transporteMes += ton;
+          if (rowFechaStr.startsWith(mesActualStr)) transporteMes += ton;
         });
       }
 
@@ -79,6 +82,7 @@ export default function DashboardProduccion() {
         rajoTotal: minaHoy,
         millingTotal: minaMes,
         transported: transporteHoy,
+        transporteTotal: transporteMes,
         stockpile: Math.max(0, minaMes - transporteMes),
         alertsCount: alertasHoy
       }));
