@@ -23,6 +23,7 @@ import ProduccionLayout from './pages/produccion/ProduccionLayout';
 import DashboardProduccion from './pages/produccion/DashboardProduccion';
 import ReportesDiariosPage from './pages/produccion/ReportesDiariosPage';
 import ReportesDiariosMinaPage from './pages/produccion/ReportesDiariosMinaPage';
+import PlanificadorTransportePage from './pages/produccion/PlanificadorTransportePage';
 import TrazabilidadPage from './pages/produccion/TrazabilidadPage';
 import GPS from './pages/operaciones/GPS';
 import PortalConductor from './pages/operaciones/PortalConductor';
@@ -109,6 +110,7 @@ const router = createBrowserRouter([
         { path: "dashboard", element: <DashboardProduccion /> },
         { path: "reportes-transporte", element: <ReportesDiariosPage /> },
         { path: "reportes-mina", element: <ReportesDiariosMinaPage /> },
+        { path: "planificador", element: <PlanificadorTransportePage /> },
         { path: "trazabilidad", element: <TrazabilidadPage /> }
       ]},
 
