@@ -224,9 +224,28 @@ export default function GestionSuministros() {
 
     setIsProcessingTerminal(true);
     try {
-      const { data: reps } = await supabase.from('logistica_repuestos')
-         .select('*, logistica_bodegas(nombre)')
-         .eq('empresa_id', currentCompany.id);
+      let reps: any[] = [];
+      let start = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+      while (hasMore) {
+        const { data, error } = await supabase.from('logistica_repuestos')
+           .select('*, logistica_bodegas(nombre)')
+           .eq('empresa_id', currentCompany.id)
+           .range(start, start + pageSize - 1);
+        
+        if (error) {
+           console.error('Error fetching reps in terminal:', error);
+           break;
+        }
+        if (data && data.length > 0) {
+           reps = [...reps, ...data];
+           start += pageSize;
+        }
+        if (!data || data.length < pageSize) {
+           hasMore = false;
+        }
+      }
 
       let errorMessages: string[] = [];
 
