@@ -227,7 +227,7 @@ export default function GestionSuministros() {
          .select('*, logistica_bodegas(nombre)')
          .eq('empresa_id', currentCompany.id);
 
-      let hasErrors = false;
+      let errorMessages: string[] = [];
 
       for (const item of terminalItems) {
          let rep = null;
@@ -256,12 +256,12 @@ export default function GestionSuministros() {
          if (!rep) {
             if (terminalForm.tipoMovimiento === 'ENTRADA') {
                if (!item.bodegaId) {
-                  hasErrors = true;
+                  errorMessages.push(`Falta bodega para nuevo producto (${item.sku || item.nombre})`);
                   continue;
                }
                isNewProduct = true;
             } else {
-               hasErrors = true;
+               errorMessages.push(`Producto no encontrado para SALIDA (${item.sku || item.nombre})`);
                continue;
             }
          }
@@ -284,7 +284,7 @@ export default function GestionSuministros() {
              }).select().single();
 
              if (createErr || !newRep) {
-                 hasErrors = true;
+                 errorMessages.push(`Error creando producto (${item.sku || item.nombre}): ${createErr?.message}`);
                  continue;
              }
 
@@ -300,10 +300,14 @@ export default function GestionSuministros() {
          }
 
          if (terminalForm.tipoMovimiento === 'SALIDA') {
-            if (rep && rep.stock < item.cantidad) {
-               hasErrors = true;
+            if (rep && Number(rep.stock) < Number(item.cantidad)) {
+               errorMessages.push(`Stock insuficiente para ${rep.nombre} (Stock: ${rep.stock}, Solicitado: ${item.cantidad})`);
                continue;
             }
+         }
+         
+         if (!rep) {
+            console.log("Rep is null for item", item);
          }
 
          if (rep) {
@@ -320,9 +324,13 @@ export default function GestionSuministros() {
                if (item.precioUnitario > 0) updatePayload.precio = item.precioUnitario;
             }
             
-            await supabase.from('logistica_repuestos').update(updatePayload).eq('id', rep.id);
+            const { error: updErr } = await supabase.from('logistica_repuestos').update(updatePayload).eq('id', rep.id);
+            if (updErr) {
+               errorMessages.push(`Error actualizando stock para ${rep.nombre}: ${updErr.message}`);
+               continue;
+            }
             
-            await supabase.from('logistica_movimientos').insert({
+            const { error: insErr } = await supabase.from('logistica_movimientos').insert({
                empresa_id: currentCompany.id,
                repuesto_id: rep.id,
                tipo: terminalForm.tipoMovimiento,
@@ -330,11 +338,20 @@ export default function GestionSuministros() {
                notas: `Solicitante: ${terminalForm.solicitante}, Autorizador: ${terminalForm.autorizador}, Destino: ${terminalForm.destino}`,
                estado: 'COMPLETADO'
             });
+            if (insErr) {
+               errorMessages.push(`Error registrando movimiento para ${rep.nombre}: ${insErr.message}`);
+               continue;
+            }
          }
       }
 
-      if (hasErrors) {
-         Swal.fire("Aviso", "Se procesaron algunos movimientos, pero otros fallaron por falta de stock, errores o falta de bodega destino.", "warning");
+      if (errorMessages.length > 0) {
+         Swal.fire({
+            icon: 'warning',
+            title: 'Aviso',
+            html: `<div style="text-align: left; font-size: 14px;">Se procesaron algunos movimientos, pero hubo errores:<br/><ul style="margin-top: 10px; padding-left: 20px;">${errorMessages.map(e => `<li>${e}</li>`).join('')}</ul></div>`,
+            width: '600px'
+         });
       } else {
          Swal.fire("Éxito", "Movimientos procesados correctamente.", "success");
       }

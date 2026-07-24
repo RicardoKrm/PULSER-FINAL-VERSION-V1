@@ -97,6 +97,11 @@ export default function Turnos() {
   const [allWeeks, setAllWeeks] = useState<any[]>([]);
   const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
 
+  // Selector de trabajador modal
+  const [selectorModalOpen, setSelectorModalOpen] = useState(false);
+  const [activeSelectorTarget, setActiveSelectorTarget] = useState<{groupId: string, workerId: string} | null>(null);
+  const [selectorSearch, setSelectorSearch] = useState('');
+
   // Track if there are unsaved changes
   const [hasChanges, setHasChanges] = useState(false);
 
@@ -111,7 +116,7 @@ export default function Turnos() {
     if (!currentCompany?.id) return;
     const { data, error } = await supabase
       .from('colaborador')
-      .select('id, nombre, rol')
+      .select('id, nombre, rut, rol')
       .eq('empresa_id', currentCompany.id)
       .eq('estado', 'ACTIVO')
       .order('nombre');
@@ -467,13 +472,6 @@ export default function Turnos() {
         </div>
       </div>
 
-      {/* Data List for Autocomplete */}
-      <datalist id="colaboradores-list">
-        {colaboradores.map(c => (
-          <option key={c.id} value={c.nombre} />
-        ))}
-      </datalist>
-
       {/* Tables Layout */}
       <div className="space-y-8">
         {boardData[activeArea].map((group) => {
@@ -542,12 +540,16 @@ export default function Turnos() {
                         </td>
                         <td className="p-2">
                           <input 
-                            list="colaboradores-list"
                             type="text" 
                             value={worker.name}
-                            onChange={(e) => updateWorkerField(group.id, worker.id, 'name', e.target.value)}
-                            placeholder="Nombre..."
-                            className="w-full bg-transparent border border-transparent hover:border-slate-200 focus:border-indigo-500 dark:hover:border-slate-700 dark:focus:border-indigo-500 rounded px-2 py-1.5 text-sm font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:bg-white dark:focus:bg-slate-900 transition-colors"
+                            onClick={() => {
+                              setActiveSelectorTarget({ groupId: group.id, workerId: worker.id });
+                              setSelectorSearch('');
+                              setSelectorModalOpen(true);
+                            }}
+                            readOnly
+                            placeholder="Seleccionar..."
+                            className="w-full bg-transparent border border-transparent hover:border-slate-200 focus:border-indigo-500 dark:hover:border-slate-700 dark:focus:border-indigo-500 rounded px-2 py-1.5 text-sm font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:bg-white dark:focus:bg-slate-900 transition-colors cursor-pointer"
                           />
                         </td>
                         <td className="p-2">
@@ -672,6 +674,62 @@ export default function Turnos() {
             <Button onClick={createNuevoTurno} disabled={isLoading || !newWeek.inicio || !newWeek.fin}>
               {isLoading ? 'Creando...' : 'Crear Turno'}
             </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Selector de Trabajador Modal */}
+      <Modal
+        isOpen={selectorModalOpen}
+        onClose={() => setSelectorModalOpen(false)}
+        title="Seleccionar Colaborador"
+      >
+        <div className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Buscar por nombre o RUT..."
+              value={selectorSearch}
+              onChange={(e) => setSelectorSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white"
+            />
+          </div>
+          <div className="max-h-80 overflow-y-auto space-y-1 bg-slate-50 dark:bg-slate-800/50 rounded-xl p-2 border border-slate-200 dark:border-slate-800">
+            {colaboradores
+              .filter((c) =>
+                c.nombre.toLowerCase().includes(selectorSearch.toLowerCase()) ||
+                (c.rut && c.rut.toLowerCase().includes(selectorSearch.toLowerCase()))
+              )
+              .map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => {
+                    if (activeSelectorTarget) {
+                      updateWorkerField(activeSelectorTarget.groupId, activeSelectorTarget.workerId, 'name', c.nombre);
+                    }
+                    setSelectorModalOpen(false);
+                  }}
+                  className="w-full flex items-center justify-between px-3 py-2 text-left rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
+                >
+                  <div className="flex flex-col">
+                    <span className="font-bold text-sm text-slate-800 dark:text-slate-200">{c.nombre}</span>
+                    <span className="text-xs font-semibold text-slate-500">{c.rut}</span>
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded">
+                    {c.rol || 'N/A'}
+                  </span>
+                </button>
+              ))}
+            {colaboradores.length > 0 &&
+              colaboradores.filter((c) =>
+                c.nombre.toLowerCase().includes(selectorSearch.toLowerCase()) ||
+                (c.rut && c.rut.toLowerCase().includes(selectorSearch.toLowerCase()))
+              ).length === 0 && (
+                <div className="p-4 text-center text-sm font-medium text-slate-500">
+                  No se encontraron colaboradores.
+                </div>
+              )}
           </div>
         </div>
       </Modal>
