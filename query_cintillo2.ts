@@ -1,0 +1,15 @@
+import { createClient } from '@supabase/supabase-js';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
+
+const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY);
+
+async function check() {
+  const { data, error } = await supabase.from('logistica_repuestos').select('*').ilike('nombre', '%CINTILLO%');
+  console.log("CINTILLO:", data);
+  const { data: mData } = await supabase.from('logistica_repuestos').select('*').ilike('sku', '%MASCARILLA%');
+  console.log("MASCARILLA:", mData);
+}
+
+check();

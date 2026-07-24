@@ -222,6 +222,7 @@ export default function GestionSuministros() {
       return;
     }
 
+    setIsProcessingTerminal(true);
     try {
       const { data: reps } = await supabase.from('logistica_repuestos')
          .select('*, logistica_bodegas(nombre)')
@@ -236,18 +237,32 @@ export default function GestionSuministros() {
          if (reps && reps.length > 0) {
             let found = [];
             if (item.repuestoId) {
-                found = reps.filter((r: any) => r.id === item.repuestoId);
-            } else {
-                found = reps.filter((r: any) => r.sku === item.sku);
+                found = reps.filter((r: any) => String(r.id) === String(item.repuestoId));
+            }
+            if (found.length === 0) {
+                found = reps.filter((r: any) => {
+                   const qSku = (item.sku || '').toUpperCase().trim();
+                   const qNom = (item.nombre || '').toUpperCase().trim();
+                   const rSku = (r.sku || '').toUpperCase().trim();
+                   const rNom = (r.nombre || '').toUpperCase().trim();
+                   
+                   if (qSku && rSku === qSku) return true;
+                   if (qSku && rNom === qSku) return true;
+                   if (qNom && rNom === qNom) return true;
+                   if (qNom && rSku === qNom) return true;
+                   return false;
+                });
             }
 
             if (found.length > 0) {
                 if (terminalForm.tipoMovimiento === 'ENTRADA') {
-                    rep = found.find((r: any) => r.bodega_id === item.bodegaId) || found[0];
+                    rep = found.find((r: any) => String(r.bodega_id) === String(item.bodegaId)) || found[0];
                 } else {
-                    rep = found.find((r: any) => r.bodega_id === item.bodegaId);
+                    if (item.bodegaId) {
+                       rep = found.find((r: any) => String(r.bodega_id) === String(item.bodegaId));
+                    }
                     if (!rep) {
-                        rep = found.find((r: any) => r.stock >= item.cantidad) || found[0];
+                        rep = found.find((r: any) => Number(r.stock) >= Number(item.cantidad)) || found[0];
                     }
                 }
             }
@@ -367,6 +382,8 @@ export default function GestionSuministros() {
     } catch (e) {
       console.error(e);
       Swal.fire("Error", "Error al procesar", "error");
+    } finally {
+      setIsProcessingTerminal(false);
     }
   };
 
@@ -439,12 +456,15 @@ export default function GestionSuministros() {
     precioUnitario: 0
   });
   const [terminalItems, setTerminalItems] = useState<any[]>([]);
+  const [isProcessingTerminal, setIsProcessingTerminal] = useState(false);
 
   const [isEditRepuestoModalOpen, setIsEditRepuestoModalOpen] = useState(false);
+  const [isUpdatingRepuesto, setIsUpdatingRepuesto] = useState(false);
   const [editRepuestoObj, setEditRepuestoObj] = useState<Insumo | null>(null);
 
   // States for New Repuesto (Nuevo)
   const [isNewRepuestoModalOpen, setIsNewRepuestoModalOpen] = useState(false);
+  const [isCreatingRepuesto, setIsCreatingRepuesto] = useState(false);
   const [newRepuestoForm, setNewRepuestoForm] = useState({
     nombre: '',
     numeroParte: '',
@@ -2118,9 +2138,9 @@ export default function GestionSuministros() {
             <Button 
               className="bg-amber-500 hover:bg-amber-600 text-white px-8"
               onClick={handleTerminalSubmit}
-              disabled={terminalItems.length === 0}
+              disabled={terminalItems.length === 0 || isProcessingTerminal}
             >
-              Procesar Movimientos ({terminalItems.length})
+              {isProcessingTerminal ? 'Procesando...' : `Procesar Movimientos (${terminalItems.length})`}
             </Button>
           </div>
         </div>
@@ -2154,6 +2174,19 @@ export default function GestionSuministros() {
              </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
+             <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Bodega</label>
+                <select 
+                  className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 bg-white dark:bg-slate-900 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  value={editRepuestoObj?.bodega_id || ''}
+                  onChange={e => setEditRepuestoObj(prev => prev ? {...prev, bodega_id: e.target.value} : prev)}
+                >
+                  <option value="">Seleccione bodega...</option>
+                  {bodegasList.map(b => (
+                    <option key={b.id} value={b.id}>{b.nombre}</option>
+                  ))}
+                </select>
+             </div>
              <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Ubicación (Rack/Pasillo)</label>
                 <input 
@@ -2195,8 +2228,11 @@ export default function GestionSuministros() {
              <Button variant="secondary" onClick={() => setIsEditRepuestoModalOpen(false)}>Cancelar</Button>
              <Button 
                className="bg-[#10b981] hover:bg-[#059669] text-white"
+               disabled={isUpdatingRepuesto}
                onClick={async () => {
                  if (editRepuestoObj) {
+                    setIsUpdatingRepuesto(true);
+                    try {
                     const originalObj = sumInsumosData.find(r => r.id === editRepuestoObj.id);
                     
                     const { error } = await supabase.from('logistica_repuestos').update({
@@ -2227,10 +2263,16 @@ export default function GestionSuministros() {
                     } else {
                        Swal.fire("Error", "No se pudo actualizar", "error");
                     }
+                    } catch(e) {
+                      console.error(e);
+                      Swal.fire("Error", "Error al actualizar", "error");
+                    } finally {
+                      setIsUpdatingRepuesto(false);
+                    }
                  }
                }}
              >
-               Guardar Cambios
+               {isUpdatingRepuesto ? 'Guardando...' : 'Guardar Cambios'}
              </Button>
           </div>
         </div>
@@ -2381,8 +2423,9 @@ export default function GestionSuministros() {
             <Button variant="secondary" onClick={() => setIsNewRepuestoModalOpen(false)}>Cancelar</Button>
             <Button 
               className="bg-cyan-600 hover:bg-cyan-700 text-white"
-              disabled={!newRepuestoForm.nombre || !newRepuestoForm.numeroParte}
+              disabled={!newRepuestoForm.nombre || !newRepuestoForm.numeroParte || isCreatingRepuesto}
               onClick={async () => {
+                setIsCreatingRepuesto(true);
                 const provName = proveedores.find(p => p.id === newRepuestoForm.proveedorId)?.nombre || newRepuestoForm.proveedorId || "--";
                 const bodegaName = bodegasList.find(b => b.id === newRepuestoForm.bodegaId)?.nombre || "bodega no especificada";
 
@@ -2431,10 +2474,12 @@ export default function GestionSuministros() {
                 } catch (e) {
                   console.error(e);
                   Swal.fire("Error", "Error al intentar guardar el repuesto.", "error");
+                } finally {
+                  setIsCreatingRepuesto(false);
                 }
               }}
             >
-              Guardar Repuesto
+              {isCreatingRepuesto ? 'Guardando...' : 'Guardar Repuesto'}
             </Button>
           </div>
         </div>
