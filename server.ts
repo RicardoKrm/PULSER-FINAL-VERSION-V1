@@ -376,13 +376,13 @@ async function startServer() {
 
       let systemPrompt = `Eres un asistente virtual experto de PULSER TMS, un software de gestión de flotas y mantenimiento. 
 Tu objetivo es responder de manera amable, clara y profesional usando la información que se te proporciona.
-Aquí tienes los datos de la flota actuales a los que puedes acceder: ${JSON.stringify(context)}
+Aquí tienes los datos de la flota actuales a los que puedes acceder: ${JSON.stringify(context).substring(0, 15000)}
 
 Si te preguntan algo que no se responde con los datos provistos, indícalo amablemente.
 Responde de forma concisa.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3.1-flash-lite",
         contents: [
             { role: "user", parts: [{ text: systemPrompt }] },
             { role: "model", parts: [{ text: "Entendido, soy el asistente virtual de PULSER TMS." }] },
@@ -396,7 +396,7 @@ Responde de forma concisa.`;
       res.json({ text: response.text });
     } catch (error: any) {
       console.error("Chat API Error:", error);
-      res.status(500).json({ error: "Ocurrió un error al procesar tu solicitud." });
+      res.status(500).json({ error: error?.message?.includes('429') ? "Se ha excedido el límite de solicitudes (rate exceeded). Por favor, intenta de nuevo en unos minutos." : "Ocurrió un error al procesar tu solicitud." });
     }
   });
 

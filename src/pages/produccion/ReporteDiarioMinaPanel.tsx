@@ -22,6 +22,11 @@ type Turno = {
   novedades: string[];
   transfer?: string;
   detalles: TurnoDetalle[];
+  maquinasActivas: number;
+  validacionCompania?: {
+    id: string;
+    tonelaje: number;
+  };
 };
 
 type ReporteDia = {
@@ -196,10 +201,24 @@ export default function ReporteDiarioMinaPanel() {
             let totalToneladas = 0;
             let novedades = new Set<string>();
             let transfers = new Set<string>();
+            let maquinasActivas = 0;
+            let validacionCompania = undefined;
             
-            const detalles = rows.map(r => {
-               totalVueltas += Number(r.vueltas) || 0;
+            const detalles = rows
+              .filter(r => {
+                if (r.equipo === 'REPORTE_COMPAÑIA') {
+                  validacionCompania = {
+                    id: r.id,
+                    tonelaje: Number(r.tonelaje) || 0,
+                  };
+                  return false;
+                }
+                return true;
+              })
+              .map(r => {
+               totalVueltas += (Number(r.vueltas) || 0) + (Number(r.petroleo) || 0);
                totalToneladas += Number(r.tonelaje) || 0;
+               maquinasActivas += 1;
                
                if (r.novedades) {
                  r.novedades.split('|').forEach((n: string) => {
@@ -228,7 +247,9 @@ export default function ReporteDiarioMinaPanel() {
                totalToneladas,
                novedades: Array.from(novedades),
                transfer: Array.from(transfers).join(' | '),
-               detalles
+               detalles,
+               maquinasActivas,
+               validacionCompania
             };
          });
          
@@ -256,7 +277,7 @@ export default function ReporteDiarioMinaPanel() {
   }, []);
 
   const formatNumber = (num: number) => {
-    return num.toLocaleString('es-CL', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+    return num.toLocaleString('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   };
 
   const activeReport = useMemo(() => reportes.find(r => r.id === selectedDateId), [reportes, selectedDateId]);
@@ -359,7 +380,7 @@ export default function ReporteDiarioMinaPanel() {
         const turnoVal = getVal('turno');
         const tonelajeVal = getVal('tonela');
         const vueltasVal = getVal('vuelta');
-        const petroleoVal = getVal('petr');
+        const petroleoVal = getVal('petr') || getVal('acopio');
         const novedadesVal = getVal('novedad') || getVal('totales');
         const transferVal = getVal('transfer');
 
@@ -412,6 +433,206 @@ export default function ReporteDiarioMinaPanel() {
       }
     }
   };
+
+  
+  const handleFileUploadSupervisores = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const data: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      
+      if (data.length === 0) throw new Error("El archivo Excel está vacío");
+
+      const payloadData: any[] = [];
+      const blocks: { colIndex: number; rowIndex: number; equipoName: string }[] = [];
+
+      // Step 1: Find equipment blocks
+      for (let r = 0; r < Math.min(20, data.length); r++) {
+        const row = data[r];
+        if (!row) continue;
+        for (let c = 0; c < row.length; c++) {
+          const cellStr = String(row[c] || '').trim().toLowerCase();
+          if (cellStr.includes('caex') && !cellStr.includes('producción')) {
+             blocks.push({ colIndex: c, rowIndex: r, equipoName: String(row[c]).trim() });
+          } else if (cellStr === 'operador:' || cellStr === 'operador') {
+             // If we found 'operador' but no 'caex' block for this column yet
+             const alreadyExists = blocks.some(b => b.colIndex === c || b.colIndex === c - 1);
+             if (!alreadyExists) {
+                blocks.push({ colIndex: c, rowIndex: r, equipoName: 'CAEX 05' });
+             }
+          }
+        }
+      }
+
+      if (blocks.length === 0) {
+         throw new Error("No se encontraron bloques de equipos (e.g. 'Caex Sany') en el Excel.");
+      }
+
+      // Step 2: Extract data for each block
+      for (const block of blocks) {
+         let operador = '';
+         let fecha = '';
+         let turno = 'Día';
+         
+         // Look in the rows immediately following the equipment name
+         for (let r = block.rowIndex + 1; r < block.rowIndex + 10; r++) {
+            const row = data[r];
+            if (!row) continue;
+            
+            for (let c = Math.max(0, block.colIndex - 1); c <= block.colIndex + 3; c++) {
+                const cellStr = String(row[c] || '').trim().toLowerCase();
+                
+                if (cellStr.includes('operador')) {
+                    let opStr = String(row[c] || '');
+                    if (opStr.toLowerCase() === 'operador' || opStr.toLowerCase() === 'operador:') {
+                        operador = String(row[c+1] || '').trim();
+                    } else {
+                        operador = opStr.replace(/operador:?/i, '').trim();
+                    }
+                }
+                
+                if (cellStr === 'dia' || cellStr === 'día') {
+                    fecha = String(row[c+1] || '').trim();
+                }
+                
+                if (cellStr === 'turno') {
+                    turno = String(row[c+1] || '').trim();
+                }
+            }
+         }
+         
+         let dataStartRow = -1;
+         let colTonAcopio = -1;
+         let colTonPrimario = -1;
+         
+         for (let r = block.rowIndex + 1; r < block.rowIndex + 15; r++) {
+            const row = data[r];
+            if (!row) continue;
+            for (let c = Math.max(0, block.colIndex - 1); c <= block.colIndex + 5; c++) {
+                const cellStr = String(row[c] || '').trim().toLowerCase();
+                if (cellStr.includes('acopio')) colTonAcopio = c;
+                if (cellStr.includes('primario')) colTonPrimario = c;
+            }
+            if (colTonAcopio !== -1 || colTonPrimario !== -1) {
+                dataStartRow = r + 1;
+                break;
+            }
+         }
+         
+         if (dataStartRow !== -1) {
+             const vueltas_detalle: number[] = [];
+             let primarioVueltas = 0;
+             let acopioVueltas = 0;
+             for (let r = dataStartRow; r < data.length; r++) {
+                 const row = data[r];
+                 if (!row) continue;
+                 
+                 // Break condition for this block
+                 if (String(row[block.colIndex] || '').toUpperCase().includes('EQUIPO')) break;
+                 if (String(row[Math.max(0, block.colIndex - 1)] || '').toUpperCase().includes('EQUIPO')) break;
+                 
+                 let tonAcopio = 0;
+                 let tonPrimario = 0;
+                 let hasHr = false;
+                 
+                 // Look for Hr to see if there's a valid row, Hr is usually at colIndex
+                 let colHr = block.colIndex;
+                 if (row[colHr] !== undefined && row[colHr] !== '') {
+                     hasHr = true;
+                 }
+                 
+                 if (colTonAcopio !== -1 && row[colTonAcopio] !== undefined && row[colTonAcopio] !== '') {
+                     let val = String(row[colTonAcopio]).replace(',', '.');
+                     let num = parseFloat(val);
+                     if (!isNaN(num)) tonAcopio = num;
+                 }
+                 
+                 if (colTonPrimario !== -1 && row[colTonPrimario] !== undefined && row[colTonPrimario] !== '') {
+                     let val = String(row[colTonPrimario]).replace(',', '.');
+                     let num = parseFloat(val);
+                     if (!isNaN(num)) tonPrimario = num;
+                 }
+                 
+                 // Fallback if there is a time but no tonnage
+                 if (hasHr && tonAcopio === 0 && tonPrimario === 0) {
+                     tonPrimario = 55; // Default for CAEX 05
+                 }
+                 
+                 if (tonAcopio > 0) {
+                     vueltas_detalle.push(Number(tonAcopio.toFixed(3)));
+                     acopioVueltas++;
+                 }
+                 if (tonPrimario > 0) {
+                     vueltas_detalle.push(Number(tonPrimario.toFixed(3)));
+                     primarioVueltas++;
+                 }
+             }
+             
+             let finalDateStr = new Date().toISOString().split('T')[0];
+             if (fecha) {
+                 const dMatch = fecha.match(/(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+                 if (dMatch) {
+                     finalDateStr = `${dMatch[3]}-${dMatch[2].padStart(2, '0')}-${dMatch[1].padStart(2, '0')}`;
+                 }
+             }
+             
+             let totalTons = vueltas_detalle.reduce((a, b) => a + b, 0);
+             
+             if (vueltas_detalle.length > 0) {
+                 payloadData.push({
+                     fecha: finalDateStr,
+                     turno: turno.toUpperCase().includes('NOCHE') ? 'Noche' : 'Día',
+                     equipo: block.equipoName,
+                     operador: operador || '',
+                     tonelaje: Number(totalTons.toFixed(3)),
+                     vueltas: primarioVueltas,
+                     vueltas_detalle: vueltas_detalle,
+                     petroleo: acopioVueltas
+                 });
+             }
+         }
+      }
+
+      if (payloadData.length === 0) {
+        throw new Error("No se encontraron registros de producción de equipos en el archivo.");
+      }
+      
+      const turnosAEliminar = Array.from(new Set(payloadData.map(d => `${d.fecha}|${d.turno}`)));
+      for (const combo of turnosAEliminar) {
+         const [fecha, turno] = combo.split('|');
+         await supabase
+           .from('produccion_registro_diario_mina')
+           .delete()
+           .eq('fecha', fecha)
+           .eq('turno', turno)
+           .in('equipo', payloadData.filter(d => d.fecha === fecha && d.turno === turno).map(d => d.equipo));
+      }
+
+      const { error } = await supabase
+        .from('produccion_registro_diario_mina')
+        .insert(payloadData);
+
+      if (error) throw error;
+      
+      await fetchReportes();
+      alert(`Se importaron ${payloadData.length} equipos desde el informe de supervisores.`);
+      
+    } catch (err: any) {
+      console.error(err);
+      alert(`Error al procesar excel: ${err.message}`);
+    } finally {
+      setUploading(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
 
   const handleFileUploadDiario = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -574,20 +795,15 @@ export default function ReporteDiarioMinaPanel() {
               <MessageSquarePlus className="w-4 h-4 mr-2" />
               Novedades
             </button>
-            <label className={`flex items-center ${uploading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-500'} text-white py-2 px-4 rounded-md transition-colors text-sm font-medium border border-blue-400 cursor-pointer`}>
-              {uploading ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-              )}
-              {uploading ? 'Subiendo...' : 'Importar Excel'}
-              <input 
-                type="file" 
-                accept=".xlsx, .xls, .csv" 
-                className="hidden" 
-                onChange={handleFileUpload}
-                disabled={uploading}
-              />
+            <label className={`flex items-center ${uploading ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-500'} text-white py-2 px-4 rounded-md transition-colors text-sm font-medium border border-indigo-400 cursor-pointer`}>
+              {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileSpreadsheet className="w-4 h-4 mr-2" />}
+              {uploading ? 'Importando...' : 'Excel Supervisores'}
+              <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleFileUploadSupervisores} disabled={uploading} />
+            </label>
+            <label className={`flex items-center ${uploading ? 'bg-blue-400' : 'bg-slate-600 hover:bg-slate-500'} text-white py-2 px-4 rounded-md transition-colors text-sm font-medium border border-slate-500 cursor-pointer`}>
+              {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileSpreadsheet className="w-4 h-4 mr-2" />}
+              {uploading ? 'Subiendo...' : 'Excel General'}
+              <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleFileUpload} disabled={uploading} />
             </label>
           </div>
         </div>
@@ -664,10 +880,44 @@ export default function ReporteDiarioMinaPanel() {
                     Turno: {turno.nombre}
                   </span>
                 </div>
-                <div className="text-md text-gray-700 dark:text-slate-300 font-medium">
-                  Totales del turno:{' '}
-                  <span className="text-blue-600">{turno.totalVueltas} Vueltas</span> |{' '}
-                  <span className="text-blue-600">{formatNumber(turno.totalToneladas)} Toneladas</span>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+                  <div className="text-md text-gray-700 dark:text-slate-300 font-medium">
+                    <span className="text-slate-500 text-sm block mb-1">Registro Supervisores (Excel)</span>
+                    <span className="text-blue-600 mr-3">{turno.maquinasActivas} Máquinas</span>
+                    <span className="text-blue-600 mr-3">{turno.totalVueltas} Vueltas</span>
+                    <span className="text-blue-600 mr-3">{formatNumber(turno.totalToneladas)} Toneladas</span>
+                    <span className="text-blue-600 font-semibold">{turno.totalVueltas > 0 ? formatNumber(turno.totalToneladas / turno.totalVueltas) : '0.0'} Ton / Vuelta</span>
+                  </div>
+                  
+                  <div className="mt-3 sm:mt-0 text-right">
+                    <span className="text-slate-500 text-sm block mb-1">Validación Compañía</span>
+                    {turno.validacionCompania ? (
+                      <div className="flex flex-col items-end">
+                        <span className="text-green-600 font-bold mb-1">
+                          {formatNumber(turno.validacionCompania.tonelaje)} Toneladas
+                        </span>
+                        {turno.validacionCompania.tonelaje !== turno.totalToneladas && (
+                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${turno.totalToneladas > turno.validacionCompania.tonelaje ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                            Dif: {formatNumber(turno.totalToneladas - turno.validacionCompania.tonelaje)} Ton 
+                            ({turno.totalToneladas > turno.validacionCompania.tonelaje ? 'En Contra' : 'A Favor'})
+                          </span>
+                        )}
+                        <button 
+                          onClick={() => handleOpenProduccionModal({ id: turno.validacionCompania?.id, equipo: 'REPORTE_COMPAÑIA', tonelaje: turno.validacionCompania?.tonelaje }, activeReport.id, turno.nombre)}
+                          className="text-xs text-blue-500 hover:underline mt-1"
+                        >
+                          Editar validación
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleOpenProduccionModal({ equipo: 'REPORTE_COMPAÑIA' }, activeReport.id, turno.nombre)}
+                        className="text-sm bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-md transition-colors"
+                      >
+                        Ingresar validación
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -686,6 +936,38 @@ export default function ReporteDiarioMinaPanel() {
                 </div>
               )}
 
+              {/* Sany Specific Summary */}
+              {(() => {
+                const sanyEquipos = turno.detalles.filter(d => d.equipo.toLowerCase().includes('sany'));
+                if (sanyEquipos.length === 0) return null;
+                const totalSanyTon = sanyEquipos.reduce((acc, eq) => acc + eq.tonelaje, 0);
+                const totalSanyVueltas = sanyEquipos.reduce((acc, eq) => acc + eq.vueltas + (eq.petroleo || 0), 0);
+                return (
+                  <div className="mb-6 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Producción Equipos Sany:</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {sanyEquipos.map(sany => (
+                        <div key={sany.id} className="bg-white dark:bg-slate-800 p-3 rounded-md shadow-sm border border-slate-200 dark:border-slate-700">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="font-bold text-blue-600 dark:text-blue-400">{sany.equipo}</span>
+                            <span className="text-xs text-slate-500 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">{sany.operador}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Vueltas: <span className="font-medium">{sany.vueltas + (sany.petroleo || 0)}</span></span>
+                            <span>Tonelaje: <span className="font-medium">{formatNumber(sany.tonelaje)}</span></span>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="bg-blue-600 text-white p-3 rounded-md shadow-sm flex flex-col justify-center">
+                        <span className="text-sm text-blue-100 font-medium">Total Sany (Turno)</span>
+                        <div className="text-xl font-bold mt-1">{formatNumber(totalSanyTon)} Ton</div>
+                        <div className="text-sm text-blue-200">{totalSanyVueltas} Vueltas</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div>
                 <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Detalle por Equipo y Operador:</h4>
                 <div className="overflow-x-auto">
@@ -694,9 +976,11 @@ export default function ReporteDiarioMinaPanel() {
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Equipo</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Operador</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Tonelaje</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Primario</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Acopio</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Vueltas</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Petróleo</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Ton / Vuelta</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Tonelaje</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Acciones</th>
                       </tr>
                     </thead>
@@ -711,25 +995,26 @@ export default function ReporteDiarioMinaPanel() {
                               {detalle.equipo}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600 hover:underline">{detalle.operador}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">{detalle.vueltas}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-slate-400 text-right">
+                              {detalle.petroleo ? formatNumber(detalle.petroleo) : '-'}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">
+                              {detalle.vueltas + (detalle.petroleo || 0)}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">
+                              {((detalle.vueltas + (detalle.petroleo || 0)) > 0) ? formatNumber(detalle.tonelaje / (detalle.vueltas + (detalle.petroleo || 0))) : '-'}
+                            </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">
                               <div className="flex flex-col items-end">
                                 <span className="font-medium mb-1">{formatNumber(detalle.tonelaje)}</span>
                                 <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                                   <div 
                                     className="h-full bg-blue-500 rounded-full" 
-                                    style={{ width: `${Math.min(100, (detalle.tonelaje / maxTonelaje) * 100)}%` }}
+                                    style={{ width: `${Math.min(100, (detalle.tonelaje / maxTonelaje) * 100)}%` }} 
                                   />
                                 </div>
                               </div>
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">{detalle.vueltas}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-slate-400 text-right">
-                              {detalle.petroleo ? (
-                                <span className="flex items-center justify-end">
-                                  {formatNumber(detalle.petroleo)}
-                                  <Droplet className="w-3 h-3 ml-1 text-blue-400" />
-                                </span>
-                              ) : '-'}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-slate-400 text-right">
                               <button
@@ -743,7 +1028,7 @@ export default function ReporteDiarioMinaPanel() {
                           </tr>
                           {expandedDetalle === detalle.id && (
                             <tr>
-                              <td colSpan={6} className="px-4 py-4 bg-gray-50 dark:bg-slate-800/80 border-b border-gray-100">
+                              <td colSpan={8} className="px-4 py-4 bg-gray-50 dark:bg-slate-800/80 border-b border-gray-100">
                                 <div className="text-sm text-gray-700 dark:text-slate-300">
                                    <span className="font-semibold block mb-2 text-gray-900 dark:text-white">Detalle de Vueltas (Toneladas):</span>
                                    {detalle.vueltas_detalle && detalle.vueltas_detalle.length > 0 ? (
@@ -800,34 +1085,47 @@ export default function ReporteDiarioMinaPanel() {
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Equipo</label>
-              <input type="text" required value={prodForm.equipo} onChange={e => setProdForm({...prodForm, equipo: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Operador</label>
-              <input type="text" required value={prodForm.operador} onChange={e => setProdForm({...prodForm, operador: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Vueltas</label>
-              <input type="number" step="1" required value={prodForm.vueltas} onChange={e => setProdForm({...prodForm, vueltas: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Tonelaje</label>
-              <input type="number" step="0.01" required value={prodForm.tonelaje} onChange={e => setProdForm({...prodForm, tonelaje: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Petróleo</label>
-              <input type="number" step="0.01" value={prodForm.petroleo} onChange={e => setProdForm({...prodForm, petroleo: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Supervisor a cargo (Firma)</label>
-            <input type="text" placeholder="Ej: Juan Pérez" value={prodForm.supervisor} onChange={e => setProdForm({...prodForm, supervisor: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
-          </div>
+          
+          {prodForm.equipo === 'REPORTE_COMPAÑIA' ? (
+             <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-md mb-4 border border-blue-100 dark:border-blue-800/50">
+               <h4 className="font-semibold text-blue-800 dark:text-blue-300 mb-3">Validación con Informe Compañía</h4>
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Tonelaje Total Compañía</label>
+                 <input type="number" step="0.01" required value={prodForm.tonelaje} onChange={e => setProdForm({...prodForm, tonelaje: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
+               </div>
+             </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Equipo</label>
+                  <input type="text" required value={prodForm.equipo} onChange={e => setProdForm({...prodForm, equipo: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Operador</label>
+                  <input type="text" required value={prodForm.operador} onChange={e => setProdForm({...prodForm, operador: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Primario</label>
+                  <input type="number" step="1" required value={prodForm.vueltas} onChange={e => setProdForm({...prodForm, vueltas: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Acopio</label>
+                  <input type="number" step="1" value={prodForm.petroleo} onChange={e => setProdForm({...prodForm, petroleo: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Tonelaje</label>
+                  <input type="number" step="0.1" required value={prodForm.tonelaje} onChange={e => setProdForm({...prodForm, tonelaje: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Supervisor a cargo (Firma)</label>
+                <input type="text" placeholder="Ej: Juan Pérez" value={prodForm.supervisor} onChange={e => setProdForm({...prodForm, supervisor: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
+              </div>
+            </>
+          )}
           <div className="flex justify-end space-x-3 mt-6">
             <button type="button" onClick={() => setIsProduccionModalOpen(false)} className="px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-md text-sm font-medium text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">Cancelar</button>
             <button type="submit" disabled={uploading} className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
