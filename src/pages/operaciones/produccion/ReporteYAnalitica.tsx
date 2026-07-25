@@ -41,8 +41,10 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
 
   // Chart data
   const [rawData, setRawData] = useState<any[]>([]);
-  const [chartDataChofer, setChartDataChofer] = useState<{name: string, vueltas: number, tonelaje: number, choferes?: Record<string, number>}[]>([]);
-  const [chartDataCamion, setChartDataCamion] = useState<{name: string, vueltas: number, tonelaje: number, choferes?: Record<string, number>}[]>([]);
+  const [chartDataChofer, setChartDataChofer] = useState<any[]>([]);
+  const [chartDataCamion, setChartDataCamion] = useState<any[]>([]);
+  const [top5ChoferesPromedio, setTop5ChoferesPromedio] = useState<any[]>([]);
+  const [top5ChoferesTonelaje, setTop5ChoferesTonelaje] = useState<any[]>([]);
   const [choferesDisponibles, setChoferesDisponibles] = useState<string[]>([]);
 
   // KPIs
@@ -141,8 +143,8 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
       filteredData = filteredData.filter(row => row.chofer === choferFiltro);
     }
 
-    const choferMap: Record<string, {vueltas: number, tonelaje: number}> = {};
-    const camionMap: Record<string, {vueltas: number, tonelaje: number, choferes: Record<string, number>}> = {};
+    const choferMap: Record<string, {vueltas: number, tonelaje: number, dias: Set<string>}> = {};
+    const camionMap: Record<string, {vueltas: number, tonelaje: number, choferes: Record<string, number>, diasActivo: Set<string>, pannes: number, registros: number}> = {};
     const uniqueChoferes = new Set<string>();
     
     // Always build full unique chofer list from rawData
@@ -157,22 +159,38 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
         const vueltas = row.vueltas || 0;
         const chofer = row.chofer || 'Desconocido';
         const camion = row.camion || 'Desconocido';
+        const isPanne = row.novedades && row.novedades.toLowerCase().includes('panne');
+        const fechaStr = row.fecha || 'Sin fecha';
         
         if (chofer && chofer !== '-') {
-            if (!choferMap[chofer]) choferMap[chofer] = { vueltas: 0, tonelaje: 0 };
+            if (!choferMap[chofer]) choferMap[chofer] = { vueltas: 0, tonelaje: 0, dias: new Set() };
             choferMap[chofer].vueltas += vueltas;
             choferMap[chofer].tonelaje += ton;
+            if (row.fecha) choferMap[chofer].dias.add(row.fecha);
         }
         
         if (camion && camion !== '-') {
-            if (!camionMap[camion]) camionMap[camion] = { vueltas: 0, tonelaje: 0, choferes: {} };
+            if (!camionMap[camion]) camionMap[camion] = { vueltas: 0, tonelaje: 0, choferes: {}, diasActivo: new Set(), pannes: 0, registros: 0 };
             camionMap[camion].vueltas += vueltas;
             camionMap[camion].tonelaje += ton;
-        if (chofer && chofer !== "-") {
-            camionMap[camion].choferes[chofer] = (camionMap[camion].choferes[chofer] || 0) + ton;
-        }
+            camionMap[camion].registros += 1;
+            if (isPanne) camionMap[camion].pannes += 1;
+            if (row.fecha) camionMap[camion].diasActivo.add(row.fecha);
+            if (chofer && chofer !== "-") {
+                camionMap[camion].choferes[chofer] = (camionMap[camion].choferes[chofer] || 0) + ton;
+            }
         }
     });
+
+    // Top 5 drivers calculation
+    const choferesArr = Object.entries(choferMap).map(([name, stats]) => ({
+      name,
+      tonelaje: stats.tonelaje,
+      promedio: stats.vueltas / Math.max(stats.dias.size, 1)
+    }));
+
+    setTop5ChoferesPromedio([...choferesArr].sort((a,b) => b.promedio - a.promedio).slice(0, 5));
+    setTop5ChoferesTonelaje([...choferesArr].sort((a,b) => b.tonelaje - a.tonelaje).slice(0, 5));
 
     // If chofer filter is applied, grouping by chofer will only have 1 bar.
     // In this specific view, we might want to group by Date instead if a single chofer is selected!
@@ -197,7 +215,21 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
       setChartDataChofer(choferArr);
     }
 
-    const camionArr = Object.entries(camionMap).map(([name, vals]) => ({name, ...vals}));
+    const camionArr = Object.entries(camionMap).map(([name, vals]) => {
+      const { diasActivo, pannes, registros, choferes, ...rest } = vals;
+      let mejorChofer = 'Desconocido';
+      if (Object.keys(choferes).length > 0) {
+        mejorChofer = Object.entries(choferes).sort((a, b) => b[1] - a[1])[0][0];
+      }
+      return {
+        name,
+        ...rest,
+        choferes,
+        confiabilidad: registros > 0 ? ((registros - pannes) / registros) * 100 : 100,
+        promedioDiasVuelta: diasActivo.size > 0 ? rest.vueltas / diasActivo.size : 0,
+        mejorChofer
+      };
+    });
     camionArr.sort((a, b) => b.tonelaje - a.tonelaje);
     setChartDataCamion(camionArr);
 
@@ -413,11 +445,22 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
                     if (active && payload && payload.length) {
                       const data = payload[0].payload;
                       return (
-                        <div className="bg-white dark:bg-slate-900 p-3 border border-slate-200 dark:border-slate-800 rounded-lg shadow-md text-xs">
+                        <div className="bg-white dark:bg-slate-900 p-3 border border-slate-200 dark:border-slate-800 rounded-lg shadow-md text-xs z-50">
                           <p className="font-bold mb-2 text-slate-800 dark:text-slate-100">{label}</p>
                           <div className="flex flex-col gap-1">
                             <p className="text-blue-600 dark:text-blue-400 font-semibold">Tonelaje: {data.tonelaje?.toFixed(2)} T</p>
                             <p className="text-amber-500 font-semibold">Vueltas: {data.vueltas}</p>
+                            {data.confiabilidad !== undefined && (
+                              <p className="text-emerald-600 dark:text-emerald-400 font-semibold">Confiabilidad: {data.confiabilidad.toFixed(1)}%</p>
+                            )}
+                            {data.promedioDiasVuelta !== undefined && (
+                              <p className="text-indigo-600 dark:text-indigo-400 font-semibold">Prom. Vueltas/Día: {data.promedioDiasVuelta.toFixed(1)}</p>
+                            )}
+                            {data.mejorChofer && data.mejorChofer !== 'Desconocido' && (
+                              <p className="text-slate-600 dark:text-slate-300 font-semibold mt-1 border-t border-slate-100 dark:border-slate-800 pt-1">
+                                Mejor Chofer: {data.mejorChofer}
+                              </p>
+                            )}
                             {data.choferes && Object.keys(data.choferes).length > 0 && (
                               <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                                 <p className="font-semibold text-slate-600 dark:text-slate-300 mb-1">Choferes:</p>
@@ -460,6 +503,24 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
                   <span className="block text-[9px] text-slate-500 dark:text-slate-400 font-bold mb-0.5">Vueltas Realizadas</span>
                   <span className="font-black text-amber-600 dark:text-amber-500">{currentData[selectedDataIndex].vueltas} Vueltas</span>
                 </div>
+                {currentData[selectedDataIndex].confiabilidad !== undefined && (
+                  <div className="bg-white dark:bg-slate-900 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+                    <span className="block text-[9px] text-slate-500 dark:text-slate-400 font-bold mb-0.5">Confiabilidad</span>
+                    <span className="font-black text-emerald-600 dark:text-emerald-500">{currentData[selectedDataIndex].confiabilidad.toFixed(1)}%</span>
+                  </div>
+                )}
+                {currentData[selectedDataIndex].promedioDiasVuelta !== undefined && (
+                  <div className="bg-white dark:bg-slate-900 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+                    <span className="block text-[9px] text-slate-500 dark:text-slate-400 font-bold mb-0.5">Promedio Vueltas/Día</span>
+                    <span className="font-black text-indigo-600 dark:text-indigo-500">{currentData[selectedDataIndex].promedioDiasVuelta.toFixed(1)}</span>
+                  </div>
+                )}
+                {currentData[selectedDataIndex].mejorChofer && currentData[selectedDataIndex].mejorChofer !== 'Desconocido' && (
+                  <div className="bg-white dark:bg-slate-900 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+                    <span className="block text-[9px] text-slate-500 dark:text-slate-400 font-bold mb-0.5">Mejor Chofer</span>
+                    <span className="font-black text-slate-700 dark:text-slate-300">{currentData[selectedDataIndex].mejorChofer}</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -480,6 +541,68 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
             <span className="block text-[9px] text-slate-500 dark:text-slate-400 uppercase font-bold">Promedio Vueltas / Día</span>
             <span className="text-sm font-black text-slate-900 dark:text-white mt-1 transition-colors">{Math.round(kpiVueltasDia * 10) / 10}</span>
             <p className="text-[8px] text-emerald-600 dark:text-emerald-400 mt-0.5">En el periodo seleccionado</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-xl transition-colors">
+          <h3 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase flex items-center gap-1.5 mb-4">
+            <TrendingUp className="w-4 h-4 text-emerald-500" /> Top 5 Choferes - Promedio Vueltas/Día
+          </h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={top5ChoferesPromedio} layout="vertical" margin={{ top: 0, right: 30, left: 20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" className="opacity-30" horizontal={false} />
+                <XAxis type="number" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} width={100} />
+                <Tooltip
+                  cursor={{ fill: 'rgba(16, 185, 129, 0.05)' }}
+                  content={({ active, payload }: any) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-white dark:bg-slate-900 p-2 border border-slate-200 dark:border-slate-800 rounded-lg shadow-md text-xs">
+                          <p className="font-bold text-slate-800 dark:text-slate-100">{payload[0].payload.name}</p>
+                          <p className="text-emerald-600 dark:text-emerald-400 font-semibold">{payload[0].value.toFixed(1)} Vueltas/Día</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar dataKey="promedio" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-xl transition-colors">
+          <h3 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase flex items-center gap-1.5 mb-4">
+            <TrendingUp className="w-4 h-4 text-blue-500" /> Top 5 Choferes - Toneladas
+          </h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={top5ChoferesTonelaje} layout="vertical" margin={{ top: 0, right: 30, left: 20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" className="opacity-30" horizontal={false} />
+                <XAxis type="number" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} width={100} />
+                <Tooltip
+                  cursor={{ fill: 'rgba(59, 130, 246, 0.05)' }}
+                  content={({ active, payload }: any) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-white dark:bg-slate-900 p-2 border border-slate-200 dark:border-slate-800 rounded-lg shadow-md text-xs">
+                          <p className="font-bold text-slate-800 dark:text-slate-100">{payload[0].payload.name}</p>
+                          <p className="text-blue-600 dark:text-blue-400 font-semibold">{payload[0].value.toFixed(2)} T</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar dataKey="tonelaje" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
+              </ComposedChart>
+            </ResponsiveContainer>
           </div>
         </div>
       </div>
