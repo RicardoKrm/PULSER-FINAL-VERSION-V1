@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Card } from '../../components/ui/Card';
-import { Calendar, Truck, TrendingUp, AlertCircle, Droplet, FileSpreadsheet, Loader2, Plus, MessageSquarePlus, Edit2 } from 'lucide-react';
+import { Calendar, Truck, TrendingUp, AlertCircle, Droplet, FileSpreadsheet, Loader2, Plus, MessageSquarePlus, Edit2, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import * as XLSX from 'xlsx';
 import { Modal } from '../../components/ui/Modal';
@@ -23,10 +23,7 @@ type Turno = {
   transfer?: string;
   detalles: TurnoDetalle[];
   maquinasActivas: number;
-  validacionCompania?: {
-    id: string;
-    tonelaje: number;
-  };
+  supervisorTurno?: string;
 };
 
 type ReporteDia = {
@@ -127,7 +124,7 @@ export default function ReporteDiarioMinaPanel() {
       setIsProduccionModalOpen(false);
       fetchReportes();
     } catch (err: any) {
-      alert(`Error al guardar: ${err.message}`);
+      console.log(`Error al guardar: ${err.message}`);
     } finally {
       setUploading(false);
     }
@@ -151,7 +148,7 @@ export default function ReporteDiarioMinaPanel() {
       setNovForm({ ...novForm, novedad: '', supervisor: '' });
       fetchReportes();
     } catch (err: any) {
-      alert(`Error al guardar novedad: ${err.message}`);
+      console.log(`Error al guardar novedad: ${err.message}`);
     } finally {
       setUploading(false);
     }
@@ -202,15 +199,12 @@ export default function ReporteDiarioMinaPanel() {
             let novedades = new Set<string>();
             let transfers = new Set<string>();
             let maquinasActivas = 0;
-            let validacionCompania = undefined;
+            let supervisorTurno: string | undefined = undefined;
             
             const detalles = rows
               .filter(r => {
-                if (r.equipo === 'REPORTE_COMPAÑIA') {
-                  validacionCompania = {
-                    id: r.id,
-                    tonelaje: Number(r.tonelaje) || 0,
-                  };
+                if (r.equipo === 'SUPERVISOR_TURNO') {
+                  supervisorTurno = r.operador;
                   return false;
                 }
                 return true;
@@ -249,7 +243,7 @@ export default function ReporteDiarioMinaPanel() {
                transfer: Array.from(transfers).join(' | '),
                detalles,
                maquinasActivas,
-               validacionCompania
+               supervisorTurno
             };
          });
          
@@ -268,6 +262,28 @@ export default function ReporteDiarioMinaPanel() {
       console.error(err);
       setErrorMsg(err.message);
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteDate = async (dateId: string) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('produccion_registro_diario_mina')
+        .delete()
+        .eq('fecha', dateId);
+        
+      if (error) throw error;
+      
+      if (selectedDateId === dateId) {
+        setSelectedDateId(null);
+      }
+      
+      await fetchReportes();
+    } catch (err: any) {
+      console.error(err);
+      console.log(`Error al eliminar: ${err.message}`);
       setLoading(false);
     }
   };
@@ -422,10 +438,10 @@ export default function ReporteDiarioMinaPanel() {
         throw new Error(error.message);
       }
 
-      alert(`Carga exitosa. ${formattedData.length} registros insertados.`);
+      console.log(`Carga exitosa. ${formattedData.length} registros insertados.`);
       await fetchReportes();
     } catch (err: any) {
-      alert(`Error al subir el archivo: ${err.message}`);
+      console.log(`Error al subir el archivo: ${err.message}`);
     } finally {
       setUploading(false);
       if (e.target) {
@@ -453,7 +469,11 @@ export default function ReporteDiarioMinaPanel() {
       const payloadData: any[] = [];
       const blocks: { colIndex: number; rowIndex: number; equipoName: string }[] = [];
 
-      // Step 1: Find equipment blocks
+      // Step 1: Find equipment blocks and global metadata
+      let globalFecha = '';
+      let globalTurno = 'Día';
+      let globalSupervisor = '';
+
       for (let r = 0; r < Math.min(20, data.length); r++) {
         const row = data[r];
         if (!row) continue;
@@ -461,12 +481,20 @@ export default function ReporteDiarioMinaPanel() {
           const cellStr = String(row[c] || '').trim().toLowerCase();
           if (cellStr.includes('caex') && !cellStr.includes('producción')) {
              blocks.push({ colIndex: c, rowIndex: r, equipoName: String(row[c]).trim() });
-          } else if (cellStr === 'operador:' || cellStr === 'operador') {
-             // If we found 'operador' but no 'caex' block for this column yet
-             const alreadyExists = blocks.some(b => b.colIndex === c || b.colIndex === c - 1);
-             if (!alreadyExists) {
-                blocks.push({ colIndex: c, rowIndex: r, equipoName: 'CAEX 05' });
-             }
+          }
+          
+          if (cellStr === 'dia' || cellStr === 'día') {
+              let rawDate = row[c+1] !== undefined && row[c+1] !== '' ? row[c+1] : row[c+2];
+              if (typeof rawDate === 'number') {
+                  let d = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
+                  globalFecha = `${d.getUTCDate().toString().padStart(2, '0')}-${(d.getUTCMonth()+1).toString().padStart(2, '0')}-${d.getUTCFullYear()}`;
+              } else if (rawDate) {
+                  globalFecha = String(rawDate).trim();
+              }
+          }
+          if (cellStr === 'turno') {
+              let t = String(row[c+1] !== undefined && row[c+1] !== '' ? row[c+1] : (row[c+2] || '')).trim();
+              if (t) globalTurno = t;
           }
         }
       }
@@ -492,18 +520,24 @@ export default function ReporteDiarioMinaPanel() {
                 if (cellStr.includes('operador')) {
                     let opStr = String(row[c] || '');
                     if (opStr.toLowerCase() === 'operador' || opStr.toLowerCase() === 'operador:') {
-                        operador = String(row[c+1] || '').trim();
+                        operador = String(row[c+1] !== undefined && row[c+1] !== '' ? row[c+1] : (row[c+2] || '')).trim();
                     } else {
                         operador = opStr.replace(/operador:?/i, '').trim();
                     }
                 }
                 
                 if (cellStr === 'dia' || cellStr === 'día') {
-                    fecha = String(row[c+1] || '').trim();
+                    let rawDate = row[c+1] !== undefined && row[c+1] !== '' ? row[c+1] : row[c+2];
+                    if (typeof rawDate === 'number') {
+                        let d = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
+                        fecha = `${d.getUTCDate().toString().padStart(2, '0')}-${(d.getUTCMonth()+1).toString().padStart(2, '0')}-${d.getUTCFullYear()}`;
+                    } else {
+                        fecha = String(rawDate || '').trim();
+                    }
                 }
                 
                 if (cellStr === 'turno') {
-                    turno = String(row[c+1] || '').trim();
+                    turno = String(row[c+1] !== undefined && row[c+1] !== '' ? row[c+1] : (row[c+2] || '')).trim();
                 }
             }
          }
@@ -511,16 +545,18 @@ export default function ReporteDiarioMinaPanel() {
          let dataStartRow = -1;
          let colTonAcopio = -1;
          let colTonPrimario = -1;
+         let colHr = -1;
          
          for (let r = block.rowIndex + 1; r < block.rowIndex + 15; r++) {
             const row = data[r];
             if (!row) continue;
-            for (let c = Math.max(0, block.colIndex - 1); c <= block.colIndex + 5; c++) {
+            for (let c = Math.max(0, block.colIndex - 1); c <= block.colIndex + 3; c++) {
                 const cellStr = String(row[c] || '').trim().toLowerCase();
-                if (cellStr.includes('acopio')) colTonAcopio = c;
-                if (cellStr.includes('primario')) colTonPrimario = c;
+                if (colTonAcopio === -1 && cellStr.includes('acopio')) colTonAcopio = c;
+                if (colTonPrimario === -1 && cellStr.includes('primario')) colTonPrimario = c;
+                if (colHr === -1 && (cellStr === 'hr' || cellStr === 'hora')) colHr = c;
             }
-            if (colTonAcopio !== -1 || colTonPrimario !== -1) {
+            if (colTonAcopio !== -1 || colTonPrimario !== -1 || colHr !== -1) {
                 dataStartRow = r + 1;
                 break;
             }
@@ -536,15 +572,12 @@ export default function ReporteDiarioMinaPanel() {
                  
                  // Break condition for this block
                  if (String(row[block.colIndex] || '').toUpperCase().includes('EQUIPO')) break;
-                 if (String(row[Math.max(0, block.colIndex - 1)] || '').toUpperCase().includes('EQUIPO')) break;
                  
                  let tonAcopio = 0;
                  let tonPrimario = 0;
                  let hasHr = false;
                  
-                 // Look for Hr to see if there's a valid row, Hr is usually at colIndex
-                 let colHr = block.colIndex;
-                 if (row[colHr] !== undefined && row[colHr] !== '') {
+                 if (colHr !== -1 && row[colHr] !== undefined && row[colHr] !== '') {
                      hasHr = true;
                  }
                  
@@ -562,7 +595,10 @@ export default function ReporteDiarioMinaPanel() {
                  
                  // Fallback if there is a time but no tonnage
                  if (hasHr && tonAcopio === 0 && tonPrimario === 0) {
-                     tonPrimario = 55; // Default for CAEX 05
+                     const eqName = block.equipoName.toUpperCase().replace(/\s+/g, '');
+                     if (eqName.includes('CAEX05') || eqName.includes('CAEX5')) {
+                         tonPrimario = 55; // Default for CAEX 05
+                     }
                  }
                  
                  if (tonAcopio > 0) {
@@ -577,9 +613,15 @@ export default function ReporteDiarioMinaPanel() {
              
              let finalDateStr = new Date().toISOString().split('T')[0];
              if (fecha) {
-                 const dMatch = fecha.match(/(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+                 let cleanFecha = fecha.replace(/\//g, '-');
+                 const dMatch = cleanFecha.match(/(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
                  if (dMatch) {
                      finalDateStr = `${dMatch[3]}-${dMatch[2].padStart(2, '0')}-${dMatch[1].padStart(2, '0')}`;
+                 } else {
+                     const dMatchRev = cleanFecha.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+                     if (dMatchRev) {
+                         finalDateStr = `${dMatchRev[1]}-${dMatchRev[2].padStart(2, '0')}-${dMatchRev[3].padStart(2, '0')}`;
+                     }
                  }
              }
              
@@ -598,6 +640,106 @@ export default function ReporteDiarioMinaPanel() {
                  });
              }
          }
+      }
+
+      // Step 3: Parse summary table for missing CAEX
+      let summaryStartRow = -1;
+      let summaryColEquipo = -1;
+      let summaryColPrimario = -1;
+      let summaryColAcopio = -1;
+      
+      for (let r = 0; r < data.length; r++) {
+         const row = data[r];
+         if (!row) continue;
+         for (let c = 0; c < row.length; c++) {
+            const cellStr = String(row[c] || '').toUpperCase();
+            if (cellStr.includes('SUPERVISOR')) {
+               globalSupervisor = String(row[c+1] !== undefined && row[c+1] !== '' ? row[c+1] : (row[c+2] || '')).trim();
+            }
+            if (cellStr.includes('EQUIPO')) {
+                if (String(row[c+1] || '').toUpperCase().includes('VUELTAS') || String(row[c+2] || '').toUpperCase().includes('VUELTAS') || String(row[c+3] || '').toUpperCase().includes('VUELTAS')) {
+                    summaryStartRow = r + 1;
+                    summaryColEquipo = c;
+                }
+            }
+         }
+         
+         if (summaryStartRow !== -1 && summaryColPrimario === -1) {
+             for (let rHeader = Math.max(0, r - 1); rHeader <= Math.min(data.length - 1, r + 2); rHeader++) {
+                 if (!data[rHeader]) continue;
+                 for (let cHeader = 0; cHeader < data[rHeader].length; cHeader++) {
+                     const cellStr2 = String(data[rHeader][cHeader] || '').trim().toLowerCase();
+                     if (cellStr2.includes('primario')) summaryColPrimario = cHeader;
+                     if (cellStr2.includes('acopio')) summaryColAcopio = cHeader;
+                 }
+             }
+             if (summaryColPrimario === -1) summaryColPrimario = summaryColEquipo + 1;
+             if (summaryColAcopio === -1) summaryColAcopio = summaryColEquipo + 2;
+         }
+      }
+
+      if (summaryStartRow !== -1) {
+          for (let r = summaryStartRow; r < data.length; r++) {
+              const row = data[r];
+              if (!row) continue;
+              const equipoName = String(row[summaryColEquipo] || '').trim();
+              
+              if (!equipoName.toUpperCase().includes('CAEX')) {
+                  if (equipoName.toUpperCase().includes('SUPERVISOR') || String(row[summaryColEquipo + 1] || '').toUpperCase().includes('SUPERVISOR')) break;
+                  continue;
+              }
+              
+              const exists = payloadData.some(p => p.equipo.toUpperCase().replace(/\s+/g, '') === equipoName.toUpperCase().replace(/\s+/g, ''));
+              if (!exists) {
+                  let primarioVueltas = parseInt(String(row[summaryColPrimario] || '0'), 10) || 0;
+                  let acopioVueltas = parseInt(String(row[summaryColAcopio] || '0'), 10) || 0;
+                  
+                  if (primarioVueltas > 0 || acopioVueltas > 0) {
+                      let finalDateStr = new Date().toISOString().split('T')[0];
+                      if (globalFecha) {
+                          let cleanFecha = globalFecha.replace(/\//g, '-');
+                          const dMatch = cleanFecha.match(/(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+                          if (dMatch) {
+                              finalDateStr = `${dMatch[3]}-${dMatch[2].padStart(2, '0')}-${dMatch[1].padStart(2, '0')}`;
+                          } else {
+                              const dMatchRev = cleanFecha.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+                              if (dMatchRev) {
+                                  finalDateStr = `${dMatchRev[1]}-${dMatchRev[2].padStart(2, '0')}-${dMatchRev[3].padStart(2, '0')}`;
+                              }
+                          }
+                      }
+                      
+                      let vueltas_detalle = [];
+                      for (let i = 0; i < primarioVueltas; i++) vueltas_detalle.push(55);
+                      for (let i = 0; i < acopioVueltas; i++) vueltas_detalle.push(55);
+                      
+                      payloadData.push({
+                          fecha: finalDateStr,
+                          turno: globalTurno.toUpperCase().includes('NOCHE') ? 'Noche' : 'Día',
+                          equipo: equipoName,
+                          operador: globalSupervisor || 'N/A',
+                          tonelaje: Number(( (primarioVueltas + acopioVueltas) * 55 ).toFixed(3)),
+                          vueltas: primarioVueltas,
+                          vueltas_detalle: vueltas_detalle,
+                          petroleo: acopioVueltas
+                      });
+                  }
+              }
+          }
+      }
+
+      if (globalSupervisor) {
+          let superFecha = payloadData[0]?.fecha || new Date().toISOString().split('T')[0];
+          let superTurno = payloadData[0]?.turno || (globalTurno.toUpperCase().includes('NOCHE') ? 'Noche' : 'Día');
+          payloadData.push({
+              fecha: superFecha,
+              turno: superTurno,
+              equipo: 'SUPERVISOR_TURNO',
+              operador: globalSupervisor,
+              tonelaje: 0,
+              vueltas: 0,
+              petroleo: null,
+          });
       }
 
       if (payloadData.length === 0) {
@@ -622,11 +764,11 @@ export default function ReporteDiarioMinaPanel() {
       if (error) throw error;
       
       await fetchReportes();
-      alert(`Se importaron ${payloadData.length} equipos desde el informe de supervisores.`);
+      console.log(`Se importaron ${payloadData.length} equipos desde el informe de supervisores.`);
       
     } catch (err: any) {
       console.error(err);
-      alert(`Error al procesar excel: ${err.message}`);
+      console.log(`Error al procesar excel: ${err.message}`);
     } finally {
       setUploading(false);
       if (e.target) e.target.value = '';
@@ -757,12 +899,12 @@ export default function ReporteDiarioMinaPanel() {
       if (error) throw error;
       
       await fetchReportes();
-      alert(`Se importaron ${payloadData.length} registros de forma masiva.`);
+      console.log(`Se importaron ${payloadData.length} registros de forma masiva.`);
       setIsProduccionModalOpen(false);
       
     } catch (err: any) {
       console.error(err);
-      alert(`Error al procesar excel: ${err.message}`);
+      console.log(`Error al procesar excel: ${err.message}`);
     } finally {
       setUploading(false);
       if (e.target) {
@@ -852,17 +994,25 @@ export default function ReporteDiarioMinaPanel() {
             </h3>
             <div className="space-y-2">
               {reportes.map(reporte => (
-                <button
-                  key={reporte.id}
-                  onClick={() => setSelectedDateId(reporte.id)}
-                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                    selectedDateId === reporte.id
-                      ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium border border-blue-200 dark:border-blue-800/50'
-                      : 'text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 border border-transparent'
-                  }`}
-                >
-                  {reporte.fechaStr}
-                </button>
+                <div key={reporte.id} className="flex space-x-2">
+                  <button
+                    onClick={() => setSelectedDateId(reporte.id)}
+                    className={`flex-1 text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                      selectedDateId === reporte.id
+                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium border border-blue-200 dark:border-blue-800/50'
+                        : 'text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 border border-transparent'
+                    }`}
+                  >
+                    {reporte.fechaStr}
+                  </button>
+                  <button 
+                    onClick={() => handleDeleteDate(reporte.id)}
+                    title="Eliminar este día"
+                    className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-colors border border-transparent flex-shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               ))}
             </div>
           </Card>
@@ -890,32 +1040,13 @@ export default function ReporteDiarioMinaPanel() {
                   </div>
                   
                   <div className="mt-3 sm:mt-0 text-right">
-                    <span className="text-slate-500 text-sm block mb-1">Validación Compañía</span>
-                    {turno.validacionCompania ? (
-                      <div className="flex flex-col items-end">
-                        <span className="text-green-600 font-bold mb-1">
-                          {formatNumber(turno.validacionCompania.tonelaje)} Toneladas
-                        </span>
-                        {turno.validacionCompania.tonelaje !== turno.totalToneladas && (
-                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${turno.totalToneladas > turno.validacionCompania.tonelaje ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                            Dif: {formatNumber(turno.totalToneladas - turno.validacionCompania.tonelaje)} Ton 
-                            ({turno.totalToneladas > turno.validacionCompania.tonelaje ? 'En Contra' : 'A Favor'})
-                          </span>
-                        )}
-                        <button 
-                          onClick={() => handleOpenProduccionModal({ id: turno.validacionCompania?.id, equipo: 'REPORTE_COMPAÑIA', tonelaje: turno.validacionCompania?.tonelaje }, activeReport.id, turno.nombre)}
-                          className="text-xs text-blue-500 hover:underline mt-1"
-                        >
-                          Editar validación
-                        </button>
-                      </div>
+                    <span className="text-slate-500 text-sm block mb-1">Supervisor de Turno</span>
+                    {turno.supervisorTurno ? (
+                      <span className="inline-block font-semibold text-gray-900 dark:text-white bg-gray-100 dark:bg-slate-800 px-3 py-1.5 rounded-md border border-gray-200 dark:border-slate-700">
+                        {turno.supervisorTurno}
+                      </span>
                     ) : (
-                      <button
-                        onClick={() => handleOpenProduccionModal({ equipo: 'REPORTE_COMPAÑIA' }, activeReport.id, turno.nombre)}
-                        className="text-sm bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-md transition-colors"
-                      >
-                        Ingresar validación
-                      </button>
+                      <span className="text-gray-400 italic text-sm">No especificado</span>
                     )}
                   </div>
                 </div>
@@ -997,7 +1128,7 @@ export default function ReporteDiarioMinaPanel() {
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600 hover:underline">{detalle.operador}</td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">{detalle.vueltas}</td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-slate-400 text-right">
-                              {detalle.petroleo ? formatNumber(detalle.petroleo) : '-'}
+                              {detalle.petroleo ? Math.round(detalle.petroleo) : '-'}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">
                               {detalle.vueltas + (detalle.petroleo || 0)}
@@ -1086,15 +1217,6 @@ export default function ReporteDiarioMinaPanel() {
             </div>
           </div>
           
-          {prodForm.equipo === 'REPORTE_COMPAÑIA' ? (
-             <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-md mb-4 border border-blue-100 dark:border-blue-800/50">
-               <h4 className="font-semibold text-blue-800 dark:text-blue-300 mb-3">Validación con Informe Compañía</h4>
-               <div>
-                 <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Tonelaje Total Compañía</label>
-                 <input type="number" step="0.01" required value={prodForm.tonelaje} onChange={e => setProdForm({...prodForm, tonelaje: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
-               </div>
-             </div>
-          ) : (
             <>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1125,7 +1247,6 @@ export default function ReporteDiarioMinaPanel() {
                 <input type="text" placeholder="Ej: Juan Pérez" value={prodForm.supervisor} onChange={e => setProdForm({...prodForm, supervisor: e.target.value})} className="w-full rounded-md border border-gray-300 dark:border-slate-600 shadow-md px-4 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500" />
               </div>
             </>
-          )}
           <div className="flex justify-end space-x-3 mt-6">
             <button type="button" onClick={() => setIsProduccionModalOpen(false)} className="px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-md text-sm font-medium text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800">Cancelar</button>
             <button type="submit" disabled={uploading} className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">

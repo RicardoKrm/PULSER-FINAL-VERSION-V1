@@ -907,13 +907,13 @@ export default function ReservasTurismo() {
                       setMostrarFormulario(true);
                   }}>Editar</Button>
                   <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800/50 border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 flex-1 md:flex-none" onClick={() => {
-                      if (window.confirm('¿Estás seguro de anular esta Reserva (OP)?')) {
+                      if (true) {
                           handleActualizarEstado('cancelado');
                       }
                   }}>Anular OP</Button>
                   <Button onClick={() => {
                     if (reservaSeleccionada?.estado === 'pendiente' || reservaSeleccionada?.estado === 'confirmado' || reservaSeleccionada?.estado === 'en curso') {
-                        if (window.confirm('¿Desea marcar esta OP como Finalizada?')) {
+                        if (true) {
                             handleActualizarEstado('finalizado');
                         } else {
                             setMostrarDetalle(false);
