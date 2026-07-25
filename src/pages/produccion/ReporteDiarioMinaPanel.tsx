@@ -1019,6 +1019,28 @@ export default function ReporteDiarioMinaPanel() {
 
           {/* Daily Report Detail */}
           <div className="flex-1 space-y-6">
+            {activeReport && (() => {
+               const totalDiaTon = activeReport.turnos.reduce((acc, t) => acc + t.totalToneladas, 0);
+               const totalDiaVueltas = activeReport.turnos.reduce((acc, t) => acc + t.totalVueltas, 0);
+               return (
+                 <div className="bg-blue-600 text-white p-6 rounded-xl shadow-md flex flex-col md:flex-row justify-between items-center mb-6">
+                   <div className="mb-4 md:mb-0">
+                     <h3 className="text-lg text-blue-100 font-medium">Total Producción del Día</h3>
+                     <div className="text-sm text-blue-200">{activeReport.fechaStr}</div>
+                   </div>
+                   <div className="flex space-x-8 text-right">
+                     <div>
+                       <div className="text-sm text-blue-200 mb-1">Total Toneladas</div>
+                       <div className="text-3xl font-bold">{formatNumber(totalDiaTon)} Ton</div>
+                     </div>
+                     <div>
+                       <div className="text-sm text-blue-200 mb-1">Total Vueltas</div>
+                       <div className="text-3xl font-bold">{totalDiaVueltas} Vueltas</div>
+                     </div>
+                   </div>
+                 </div>
+               );
+            })()}
             {activeReport?.turnos.map((turno, idx) => (
               <Card key={idx} className="p-6">
               <div className="border-b border-gray-200 dark:border-slate-700 pb-4 mb-4">
