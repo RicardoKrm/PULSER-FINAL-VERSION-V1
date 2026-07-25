@@ -693,11 +693,23 @@ export default function CargaMasiva() {
           .select(`id, "${matchKeyStr}"`)
           .eq('empresa_id', currentCompany?.id);
         
+        const normalizeMatchKey = (val: any) => {
+           if (val === null || val === undefined) return '';
+           return String(val)
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "") // Remove accents
+              .toUpperCase()
+              .replace(/[^A-Z0-9]/g, ''); // Keep only alphanumeric
+        };
+
         const existingMap = new Map();
         if (existingRecords) {
            existingRecords.forEach(r => {
               if (r[matchKeyStr] !== undefined && r[matchKeyStr] !== null) {
-                 existingMap.set(String(r[matchKeyStr]).toUpperCase().trim(), r.id);
+                 const key = normalizeMatchKey(r[matchKeyStr]);
+                 if (key) {
+                   existingMap.set(key, r.id);
+                 }
               }
            });
         }
@@ -707,44 +719,51 @@ export default function CargaMasiva() {
 
         for (const row of cleanData) {
            const matchVal = row[matchKeyStr];
-           if (matchVal !== undefined && matchVal !== null) {
-              const key = String(matchVal).toUpperCase().trim();
-              if (existingMap.has(key)) {
-                 toUpdate.push({ ...row, id: existingMap.get(key) });
-              } else {
-                 toInsert.push(row);
-              }
+           const key = normalizeMatchKey(matchVal);
+           
+           if (key && existingMap.has(key)) {
+              toUpdate.push({ ...row, id: existingMap.get(key) });
            } else {
               toInsert.push(row);
            }
         }
 
-        if (toInsert.length > 0) {
-           const { error: insError } = await supabase.from(config.table).insert(toInsert);
+        // Dividir inserciones en lotes de 500 para evitar límites de payload
+        const chunkSize = 500;
+        
+        for (let i = 0; i < toInsert.length; i += chunkSize) {
+           const chunk = toInsert.slice(i, i + chunkSize);
+           const { error: insError } = await supabase.from(config.table).insert(chunk);
            if (insError) throw new Error("Error insertando registros nuevos: " + insError.message);
-           insertCount += toInsert.length;
+           insertCount += chunk.length;
         }
 
-        if (toUpdate.length > 0) {
-           const { error: updError } = await supabase.from(config.table).upsert(toUpdate, { onConflict: 'id' });
+        for (let i = 0; i < toUpdate.length; i += chunkSize) {
+           const chunk = toUpdate.slice(i, i + chunkSize);
+           const { error: updError } = await supabase.from(config.table).upsert(chunk, { onConflict: 'id' });
            if (updError) {
               console.warn("Bulk upsert failed, falling back to sequential update", updError);
-              for (const uRow of toUpdate) {
+              for (const uRow of chunk) {
                  const { id, ...updateData } = uRow;
                  const { error } = await supabase.from(config.table).update(updateData).eq('id', id);
                  if (error) console.error(`Error updating record ${id}:`, error);
               }
            }
-           updateCount += toUpdate.length;
+           updateCount += chunk.length;
         }
 
       } else {
-        const { error } = await supabase.from(config.table).insert(cleanData);
-        if (error) {
-          console.error("Supabase insert error:", error);
-          throw new Error(error.message);
+        // Dividir en lotes para inserción sin key
+        const chunkSize = 500;
+        for (let i = 0; i < cleanData.length; i += chunkSize) {
+           const chunk = cleanData.slice(i, i + chunkSize);
+           const { error } = await supabase.from(config.table).insert(chunk);
+           if (error) {
+             console.error("Supabase insert error:", error);
+             throw new Error(error.message);
+           }
+           insertCount += chunk.length;
         }
-        insertCount += cleanData.length;
       }
 
       const msgParts = [];
