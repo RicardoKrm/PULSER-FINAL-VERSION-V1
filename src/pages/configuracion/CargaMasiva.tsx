@@ -640,7 +640,19 @@ export default function CargaMasiva() {
       }
 
       if (moduleId === 'ots') {
-           const { data: vehiculos } = await supabase.from('vehiculo').select('id, patente, numero_interno').eq('empresa_id', currentCompany?.id);
+           let vehiculos: any[] = [];
+           let fromV = 0;
+           let fetchMoreV = true;
+           while (fetchMoreV) {
+             const { data: vData } = await supabase.from('vehiculo').select('id, patente, numero_interno').eq('empresa_id', currentCompany?.id).range(fromV, fromV + 999);
+             if (vData && vData.length > 0) {
+               vehiculos.push(...vData);
+               if (vData.length < 1000) fetchMoreV = false;
+               else fromV += 1000;
+             } else {
+               fetchMoreV = false;
+             }
+           }
            const vMapPatente = new Map();
            const vMapInterno = new Map();
            if (vehiculos) {
@@ -688,10 +700,28 @@ export default function CargaMasiva() {
 
       if (config.matchKey && config.matchKey !== 'NONE') {
         const matchKeyStr = config.matchKey as string;
-        const { data: existingRecords } = await supabase
-          .from(config.table)
-          .select(`id, "${matchKeyStr}"`)
-          .eq('empresa_id', currentCompany?.id);
+        
+        let existingRecords: any[] = [];
+        let fromIdx = 0;
+        let keepFetching = true;
+
+        while (keepFetching) {
+          const { data, error: fetchErr } = await supabase
+            .from(config.table)
+            .select(`id, "${matchKeyStr}"`)
+            .eq('empresa_id', currentCompany?.id)
+            .range(fromIdx, fromIdx + 999);
+            
+          if (fetchErr) break;
+          
+          if (data && data.length > 0) {
+            existingRecords.push(...data);
+            if (data.length < 1000) keepFetching = false;
+            else fromIdx += 1000;
+          } else {
+            keepFetching = false;
+          }
+        }
         
         const normalizeMatchKey = (val: any) => {
            if (val === null || val === undefined) return '';
