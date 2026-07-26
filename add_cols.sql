@@ -1,7 +1,5 @@
-ALTER TABLE public.logistica_bodegas 
-ADD COLUMN IF NOT EXISTS tipo VARCHAR(100),
-ADD COLUMN IF NOT EXISTS identificador INTEGER,
-ADD COLUMN IF NOT EXISTS proveedor VARCHAR(255),
-ADD COLUMN IF NOT EXISTS responsable VARCHAR(255),
-ADD COLUMN IF NOT EXISTS ubicacion VARCHAR(255),
-ADD COLUMN IF NOT EXISTS estado VARCHAR(100);
+ALTER TABLE prod_metas 
+ADD COLUMN IF NOT EXISTS mina_diaria numeric,
+ADD COLUMN IF NOT EXISTS mina_mensual numeric,
+ADD COLUMN IF NOT EXISTS transporte_diario numeric,
+ADD COLUMN IF NOT EXISTS transporte_mensual numeric;

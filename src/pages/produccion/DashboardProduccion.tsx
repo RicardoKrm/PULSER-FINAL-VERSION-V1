@@ -3,10 +3,12 @@ import { supabase } from '../../lib/supabase';
 import { Loader2 } from 'lucide-react';
 import KPIsResumen from '../operaciones/produccion/KPIsResumen';
 import ConfiguracionMetas from '../operaciones/produccion/ConfiguracionMetas';
-import { GlobalStats, MetasObjetivos } from '../../contexts/ProduccionContext';
+import { GlobalStats, MetasObjetivos, useProduccion } from '../../contexts/ProduccionContext';
 
 export default function DashboardProduccion() {
   const [loading, setLoading] = useState(true);
+  const { metas, setMetas } = useProduccion();
+  
   const [stats, setStats] = useState<GlobalStats>({
     rajoTotal: 0,
     millingTotal: 0,
@@ -17,16 +19,6 @@ export default function DashboardProduccion() {
     arrivedCount: 0,
     inTransitCount: 0,
     alertsCount: 0,
-  });
-
-  const [metas, setMetas] = useState<MetasObjetivos>({
-    daily: 5000,
-    weekly: 18000,
-    monthly: 75000,
-    minaDaily: 5000,
-    minaMonthly: 75000,
-    transporteDaily: 5000,
-    transporteMonthly: 75000
   });
 
   useEffect(() => {

@@ -179,7 +179,7 @@ export default function AnalisisFallas() {
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-bold text-slate-400 uppercase ml-2">Desde:</span>
               <div className="relative">
-                <input type="text" defaultValue="12 / 01 / 2025" className="pl-3 pr-8 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold w-[110px] outline-none text-slate-700 dark:text-slate-300" />
+                <input type="text" defaultValue="12 / 01 / 2026" className="pl-3 pr-8 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold w-[110px] outline-none text-slate-700 dark:text-slate-300" />
                 <Calendar className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2" />
               </div>
             </div>

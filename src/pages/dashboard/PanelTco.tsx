@@ -510,7 +510,7 @@ export default function PanelTco() {
                 <div className="space-y-1.5 focus-within:text-blue-600 transition-colors">
                   <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest pl-1">Fecha de Inicio</label>
                   <div className="relative">
-                    <input type="date" defaultValue="2025-11-05" onChange={simulateFiltering} className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-b dark:border-slate-800lue-500 focus:ring-4 focus:ring-blue-500/10 transition-all" />
+                    <input type="date" defaultValue="2026-11-05" onChange={simulateFiltering} className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-b dark:border-slate-800lue-500 focus:ring-4 focus:ring-blue-500/10 transition-all" />
                   </div>
                 </div>
                 <div className="space-y-1.5 focus-within:text-blue-600 transition-colors">

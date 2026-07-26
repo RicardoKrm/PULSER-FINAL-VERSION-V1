@@ -18,7 +18,7 @@ export default function ReporteYAnaliticaMina() {
 
   // Filters
   const [filtroMes, setFiltroMes] = useState<string>('todos');
-  const [filtroAno, setFiltroAno] = useState<string>('2024');
+  const [filtroAno, setFiltroAno] = useState<string>('2026');
   const [filtroTurno, setFiltroTurno] = useState<string>('todos');
   const [filtroSupervisor, setFiltroSupervisor] = useState<string>('todos');
   const [filtroEquipo, setFiltroEquipo] = useState<string>('todos');
@@ -88,8 +88,7 @@ export default function ReporteYAnaliticaMina() {
   const caexUtilizados = new Set(filteredData.filter(r => r.equipo && r.equipo.toUpperCase().includes('CAEX')).map(r => r.equipo)).size;
   
   // Real Cumplimiento based on meta
-  // If a specific month is selected, we use monthly meta, otherwise just a reference or sum of daily metas
-  const metaToneladas = filtroMes !== 'todos' ? metas.minaMonthly : metas.minaMonthly * 12; // Simplification
+  const metaToneladas = metas.minaMonthly;
   const cumplimiento = metaToneladas > 0 ? (totalToneladas / metaToneladas) * 100 : 0;
 
   return (
@@ -114,6 +113,7 @@ export default function ReporteYAnaliticaMina() {
             <option value="2023">2023</option>
             <option value="2024">2024</option>
             <option value="2025">2025</option>
+            <option value="2026">2026</option>
           </select>
           <select 
             value={filtroMes} 

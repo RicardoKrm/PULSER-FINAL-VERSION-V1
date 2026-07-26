@@ -334,7 +334,7 @@ export default function KpiRRHH() {
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-slate-400 uppercase">Desde:</span>
             <div className="relative">
-              <input type="text" defaultValue="12 / 01 / 2025" className="pl-3 pr-10 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-medium w-36 outline-none dark:text-white" />
+              <input type="text" defaultValue="12 / 01 / 2026" className="pl-3 pr-10 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-medium w-36 outline-none dark:text-white" />
               <Calendar className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
             </div>
           </div>

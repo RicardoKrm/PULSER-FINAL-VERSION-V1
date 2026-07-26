@@ -60,7 +60,7 @@ interface ProduccionContextData {
 const ProduccionContext = createContext<ProduccionContextData>({} as ProduccionContextData);
 
 export function ProduccionProvider({ children }: { children: ReactNode }) {
-  const [metas, setMetas] = useState<MetasObjetivos>({
+  const defaultMetas = {
     daily: 5000,
     weekly: 18000,
     monthly: 75000,
@@ -68,7 +68,23 @@ export function ProduccionProvider({ children }: { children: ReactNode }) {
     minaMonthly: 75000,
     transporteDaily: 5000,
     transporteMonthly: 75000
+  };
+
+  const [metas, setMetas] = useState<MetasObjetivos>(() => {
+    try {
+      const saved = localStorage.getItem('produccion_metas_config');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error('Error loading metas from localStorage', e);
+    }
+    return defaultMetas;
   });
+
+  useEffect(() => {
+    localStorage.setItem('produccion_metas_config', JSON.stringify(metas));
+  }, [metas]);
 
   const [stats, setStats] = useState<GlobalStats>({
     rajoTotal: 4850,
