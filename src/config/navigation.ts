@@ -126,6 +126,7 @@ export const navigation = [
     icon: ShoppingCart,
     href: '/compras',
     submodules: [
+      { title: 'Panel de Solicitudes', icon: FileText, href: '/compras/solicitudes' },
       { title: 'Órdenes de Compra', icon: ShoppingCart, href: '/compras/ordenes' },
       { title: 'Ingreso de Facturas', icon: FileText, href: '/compras/facturas' },
       { title: 'Proveedores', icon: Users, href: '/compras/proveedores' },
@@ -133,7 +134,7 @@ export const navigation = [
       { title: 'Contrato Proveedores', icon: Briefcase, href: '/compras/contratos' },
     ],
   },
-  {
+/* {
     title: 'Finanzas',
     icon: DollarSign,
     href: '/finanzas',
@@ -147,7 +148,7 @@ export const navigation = [
       { title: 'Trazabilidad', icon: Activity, href: '/finanzas/trazabilidad' },
       { title: 'Evaluación Empresa', icon: Briefcase, href: '/finanzas/evaluacion-empresa' },
     ],
-  },
+  }, */
   {
     title: 'Recursos Humanos',
     icon: Users,
@@ -158,7 +159,7 @@ export const navigation = [
       { title: 'Turnos', icon: CalendarClock, href: '/recursos-humanos/turnos' },
     ],
   },
-  {
+/* {
     title: 'Biblioteca Técnica',
     icon: BookOpen,
     href: '/biblioteca',
@@ -166,7 +167,7 @@ export const navigation = [
       { title: 'Explorar Documentos', icon: Search, href: '/biblioteca/explorador' },
       { title: 'Subir Documento', icon: FileCheck, href: '/biblioteca/subir' },
     ],
-  },
+  }, */
   {
     title: 'Configuración y Herramientas',
     icon: Settings,

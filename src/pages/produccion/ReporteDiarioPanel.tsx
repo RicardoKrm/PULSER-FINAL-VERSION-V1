@@ -17,6 +17,7 @@ type TurnoDetalle = {
 
 type Turno = {
   nombre: string;
+  supervisor?: string;
   totalVueltas: number;
   totalToneladas: number;
   novedades: string[];
@@ -196,8 +197,7 @@ export default function ReporteDiarioPanel() {
             let totalToneladas = 0;
             let novedades = new Set<string>();
             let transfers = new Set<string>();
-            
-            const detalles = rows.map(r => {
+                  const detalles = rows.map(r => {
                totalVueltas += Number(r.vueltas) || 0;
                totalToneladas += Number(r.tonelaje) || 0;
                
@@ -221,9 +221,28 @@ export default function ReporteDiarioPanel() {
                  vueltas_detalle: r.vueltas_detalle
                };
             });
+            
+            // Extract the supervisor from the first row of this shift that has it in novedades
+            let supervisor = '';
+            for (const r of rows) {
+              if (r.novedades) {
+                const novs = r.novedades.split('|');
+                for (const nov of novs) {
+                  if (nov.includes('Firma (Ingreso Manual):')) {
+                    supervisor = nov.split('Firma (Ingreso Manual):')[1]?.trim();
+                    break;
+                  } else if (nov.includes('Supervisor:')) {
+                    supervisor = nov.split('Supervisor:')[1]?.trim();
+                    break;
+                  }
+                }
+              }
+              if (supervisor) break;
+            }
 
             return {
                nombre: turnoName,
+               supervisor,
                totalVueltas,
                totalToneladas,
                novedades: Array.from(novedades),
@@ -361,6 +380,12 @@ export default function ReporteDiarioPanel() {
         const vueltasVal = getVal('vuelta');
         const petroleoVal = getVal('petr');
         const novedadesVal = getVal('novedad') || getVal('totales');
+        const supervisorVal = getVal('supervis');
+        
+        let nStr = String(novedadesVal || '');
+        if (supervisorVal) {
+           nStr = nStr ? `${nStr} | Supervisor: ${supervisorVal}` : `Supervisor: ${supervisorVal}`;
+        }
         const transferVal = getVal('transfer');
 
         return {
@@ -371,7 +396,7 @@ export default function ReporteDiarioPanel() {
           tonelaje: parseNumber(tonelajeVal),
           vueltas: parseNumber(vueltasVal),
           petroleo: petroleoVal ? parseNumber(petroleoVal) : null,
-          novedades: String(novedadesVal || ''),
+          novedades: nStr,
           transfer: String(transferVal || '')
         };
       }).filter(r => r.camion);
@@ -448,9 +473,11 @@ export default function ReporteDiarioPanel() {
       }
 
       let headerRowIndex = -1;
+      let supervisorColIndex = -1;
       for (let i = 0; i < data.length; i++) {
         if (data[i] && data[i].some(cell => String(cell).toUpperCase().includes('NOMBRE') || String(cell).toUpperCase().includes('CONDUCTOR'))) {
            headerRowIndex = i;
+           supervisorColIndex = data[i].findIndex(cell => String(cell).toUpperCase().includes('SUPERVISOR'));
            break;
         }
       }
@@ -502,6 +529,11 @@ export default function ReporteDiarioPanel() {
              totalVueltas = parseInt(String(totalVueltas));
          }
          
+         let supervisorVal = '';
+         if (supervisorColIndex !== -1 && row[supervisorColIndex]) {
+             supervisorVal = String(row[supervisorColIndex]);
+         }
+
          payloadData.push({
              fecha: globalDate,
              turno: globalTurno,
@@ -510,7 +542,8 @@ export default function ReporteDiarioPanel() {
              tonelaje: totalTons || 0,
              vueltas: totalVueltas || 0,
              vueltas_detalle: vueltas_detalle,
-             petroleo: null
+             petroleo: null,
+             novedades: supervisorVal ? `Supervisor: ${supervisorVal}` : ''
          });
       }
 
@@ -660,9 +693,19 @@ export default function ReporteDiarioPanel() {
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                     Fecha: <span className="font-normal text-gray-600 dark:text-slate-400">{activeReport.fechaStr}</span>
                   </h3>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200">
-                    Turno: {turno.nombre}
-                  </span>
+                  <div className="flex flex-col items-end">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200">
+                      Turno: {turno.nombre}
+                    </span>
+                    {turno.supervisor && (
+                      <div className="mt-2 flex flex-col items-end">
+                        <span className="text-sm text-slate-500 dark:text-slate-400">Supervisor de Turno</span>
+                        <div className="mt-1 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                          <span className="font-bold text-slate-900 dark:text-white uppercase tracking-wider">{turno.supervisor}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="text-md text-gray-700 dark:text-slate-300 font-medium">
                   Totales del turno:{' '}

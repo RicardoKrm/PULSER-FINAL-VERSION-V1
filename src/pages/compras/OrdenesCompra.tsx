@@ -31,6 +31,7 @@ import Swal from 'sweetalert2';
 
 import { useCompany } from '../../contexts/CompanyContext';
 import { supabase } from '../../lib/supabase';
+import OrdenCompraDetalle from './OrdenCompraDetalle';
 
 interface PedidoTaller {
   id: string;
@@ -300,148 +301,12 @@ export default function OrdenesCompra() {
       ordenesPendientes.find(o => o.folio === selectedOrder) || 
       historialOrdenes.find(o => o.folio === selectedOrder);
     
-    const isReceived = ordenObj?.estado === 'RECIBIDA';
-
-    const renderItems = ordenObj?.lineas?.map((l: any) => ({
-      repuesto: l.repuesto_nombre || l.descripcion,
-      cantidad: l.cantidad,
-      precioU: l.precio_unitario || 0,
-      total: (l.cantidad * (l.precio_unitario || 0)) || 0
-    })) || [];
-    
-    const totalMonto = renderItems.reduce((acc, curr) => acc + curr.total, 0);
-
     return (
-      <div className="p-6 max-w-[1600px] mx-auto space-y-6">
-        {/* Header Detalle */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 flex justify-between items-center">
-          <div>
-            <h1 className="text-[24px] font-black text-slate-800 dark:text-white flex items-center gap-3">
-              <FileText className="w-6 h-6 text-blue-500" /> Detalle de Orden de Compra {selectedOrder}
-            </h1>
-            <p className="text-slate-500 dark:text-slate-400 font-bold text-sm tracking-wide mt-1 uppercase">GEStión de compra y recepción de suministros</p>
-          </div>
-          <div className="flex gap-3">
-            <Button 
-              onClick={() => setView('historial')}
-              className="bg-[#64748b] hover:bg-slate-600 text-white font-bold h-10 px-5 rounded-lg text-sm tracking-wide"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" /> VOLVER AL PANEL
-            </Button>
-            <Button 
-              onClick={() => window.print()}
-              className="bg-[#ef4444] hover:bg-red-600 text-white font-bold h-10 px-5 rounded-lg text-sm tracking-wide"
-            >
-              <FileDown className="w-4 h-4 mr-2" /> EXPORTAR PDF
-            </Button>
-          </div>
-        </div>
-
-        {/* Información General */}
-        <Card className="rounded-2xl border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden bg-white dark:bg-slate-800">
-          <CardHeader className="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 py-4 px-6 flex flex-row items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Info className="w-5 h-5 text-blue-500" />
-              <CardTitle className="text-sm font-black text-slate-700 dark:text-slate-200 tracking-wider uppercase">Información General</CardTitle>
-            </div>
-            {!isReceived ? (
-              <Button 
-                onClick={handleRecibirMercaderia}
-                className="bg-[#10b981] hover:bg-emerald-600 text-white font-bold h-9 px-4 rounded-lg text-xs tracking-wider"
-              >
-                <PackageCheck className="w-4 h-4 mr-2" /> RECIBIR MERCADERÍA
-              </Button>
-            ) : (
-              <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg font-black text-xs">
-                <PackageCheck className="w-4 h-4" /> MERCADERÍA RECIBIDA
-              </div>
-            )}
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-slate-100 dark:divide-slate-700 bg-white dark:bg-slate-800">
-              <div className="p-6">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Proveedor</span>
-                <span className="font-black text-blue-600 dark:text-blue-400 text-lg">{ordenObj?.proveedor || "KAUFMANN"}</span>
-              </div>
-              <div className="p-6">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Fecha Emisión</span>
-                <span className="font-bold text-slate-700 dark:text-slate-200 text-lg">{ordenObj?.fecha || "20/04/2026 15:56"}</span>
-              </div>
-              <div className="p-6">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Estado Actual</span>
-                <span className={`${isReceived ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 dark:text-emerald-400' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-500 dark:text-blue-400'} px-3 py-1 rounded-md text-[10px] font-black tracking-wider inline-flex`}>
-                  {ordenObj?.estado || "PENDIENTE"}
-                </span>
-              </div>
-              <div className="p-6">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Emitida Por</span>
-                <span className="font-bold text-slate-700 dark:text-slate-200 text-lg">administrador</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Detalle de la compra */}
-        <Card className="rounded-2xl border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden mt-6 bg-white dark:bg-slate-800">
-          <CardHeader className="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 py-4 px-6">
-            <div className="flex items-center gap-2">
-              <List className="w-5 h-5 text-purple-500" />
-              <CardTitle className="text-sm font-black text-slate-700 dark:text-slate-200 tracking-wider uppercase">Detalle de la Compra</CardTitle>
-            </div>
-          </CardHeader>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50/50 dark:bg-slate-900/50">
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Descripción / Repuesto</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Cantidad</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right">Precio Unitario</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right">Total Línea</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-slate-800">
-                {renderItems.map((item: any, idx: number) => (
-                  <tr key={idx} className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-200 text-xs">{item.repuesto}</td>
-                    <td className="px-6 py-4">
-                      <span className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-2 py-1 rounded text-xs font-black">{item.cantidad} UND</span>
-                    </td>
-                    <td className="px-6 py-4 font-bold text-slate-600 dark:text-slate-300 text-xs text-right">${item.precioU.toLocaleString('es-CL')}</td>
-                    <td className="px-6 py-4 font-black text-slate-800 dark:text-white text-sm text-right">${item.total.toLocaleString('es-CL')}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-slate-50 dark:bg-slate-900">
-                <tr>
-                  <td colSpan={3} className="px-6 py-4 text-right text-[12px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest border-t border-slate-200 dark:border-slate-700">
-                    Inversión Total
-                  </td>
-                  <td className="px-6 py-4 text-right font-black text-slate-900 dark:text-white text-2xl border-t border-slate-200 dark:border-slate-700">
-                    ${totalMonto.toLocaleString('es-CL')}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </Card>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-          {/* Observaciones y Notas */}
-          <Card className="rounded-2xl border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden bg-white dark:bg-slate-800 md:col-span-2">
-            <CardHeader className="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 py-4 px-6">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-cyan-500" />
-                <CardTitle className="text-sm font-black text-slate-700 dark:text-slate-200 tracking-wider uppercase">Observaciones y Notas</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6">
-              <p className="text-sm text-slate-600 dark:text-slate-400 italic font-medium">
-                {ordenObj?.resumen || ordenObj?.notas || 'Sin notas ni observaciones adjuntas a esta orden de compra.'}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <OrdenCompraDetalle 
+        orden={ordenObj} 
+        onBack={() => setView('panel')} 
+        onRefresh={fetchOrdenes} 
+      />
     );
   }
 
@@ -520,27 +385,39 @@ export default function OrdenesCompra() {
               <thead>
                 <tr className="bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700">
                   <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Folio OC</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Fecha Emisión</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Proveedor</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Resumen de Ítems</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">Estado</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right">Monto Total</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">Recepción</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">Factura</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right">Total</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700 bg-white dark:bg-slate-800">
-                {filteredHistory.map((orden, idx) => (
+                {filteredHistory.map((orden, idx) => {
+                  const stateColor = orden.estado === 'CERRADA' ? 'text-slate-600 dark:text-slate-300' :
+                                     orden.estado === 'RECIBIDA' ? 'text-emerald-500' : 
+                                     orden.estado === 'PARCIAL' ? 'text-amber-500' : 'text-blue-500';
+                  
+                  const stateDot = orden.estado === 'CERRADA' ? '⚫' :
+                                   orden.estado === 'RECIBIDA' ? '🟢' : 
+                                   orden.estado === 'PARCIAL' ? '🟡' : '🔵';
+                                   
+                  const isFacturada = Math.random() > 0.5; // Placeholder
+                  const recepPct = orden.estado === 'PENDIENTE' ? '0%' : orden.estado === 'PARCIAL' ? '60%' : '100%'; // Placeholder
+                  
+                  return (
                   <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                     <td className="px-6 py-4 font-black text-slate-800 dark:text-white text-sm">{orden.folio}</td>
-                    <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-300 text-xs">{orden.fecha}</td>
                     <td className="px-6 py-4 font-bold text-slate-800 dark:text-slate-200 text-xs">{orden.proveedor}</td>
-                    <td className="px-6 py-4 font-medium text-slate-500 dark:text-slate-400 text-xs">{orden.resumen}</td>
                     <td className="px-6 py-4 text-center">
-                      <span className={`px-3 py-1 rounded-md text-[10px] font-black tracking-wider text-white ${orden.estado === 'PENDIENTE' ? 'bg-blue-500' : 'bg-emerald-500'}`}>
-                        {orden.estado}
+                      <span className={`text-xs font-black flex items-center justify-center gap-1.5 ${stateColor}`}>
+                        {stateDot} {orden.estado}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right font-black text-slate-800 dark:text-white text-sm">${orden.monto}</td>
+                    <td className="px-6 py-4 text-center font-bold text-slate-600 dark:text-slate-300 text-xs">{recepPct}</td>
+                    <td className="px-6 py-4 text-center font-bold text-slate-600 dark:text-slate-300 text-xs">{isFacturada ? '✔ Adjunta' : '✖ Sin factura'}</td>
+                    <td className="px-6 py-4 text-right font-black text-slate-800 dark:text-white text-sm">${orden.monto.toLocaleString('es-CL')}</td>
                     <td className="px-6 py-4 text-center">
                       <button 
                         onClick={() => handleViewDetail(orden.folio)}
@@ -550,7 +427,7 @@ export default function OrdenesCompra() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>

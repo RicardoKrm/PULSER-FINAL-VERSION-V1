@@ -1,0 +1,2 @@
+sed -i 's/ReporteYAnalitica from '\''..\/operaciones\/produccion\/ReporteYAnalitica'\'';/ReporteYAnalitica from '\''..\/operaciones\/produccion\/ReporteYAnalitica'\'';\nimport ListaPorTurnos from '\''.\/ListaPorTurnos'\'';/' src/pages/produccion/ReportesDiariosPage.tsx
+sed -i 's/const \[activeTab, setActiveTab\] = useState<'\''diario'\'' | '\''analitica'\''>('\''diario'\'');/const [activeTab, setActiveTab] = useState<'\''diario'\'' | '\''listas'\'' | '\''analitica'\''>('\''diario'\'');/' src/pages/produccion/ReportesDiariosPage.tsx

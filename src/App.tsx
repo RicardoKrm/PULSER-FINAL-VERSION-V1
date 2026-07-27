@@ -56,6 +56,7 @@ import GestionAuditorias from './pages/logistica/GestionAuditorias';
 import DetalleAuditoria from './pages/logistica/DetalleAuditoria';
 import AuditoriaSalidas from './pages/logistica/AuditoriaSalidas';
 import OrdenesCompra from './pages/compras/OrdenesCompra';
+import SolicitudesCompra from './pages/compras/SolicitudesCompra';
 import IngresoFacturas from './pages/compras/IngresoFacturas';
 import Cotizaciones from './pages/compras/Cotizaciones';
 import ContratosProveedores from './pages/compras/ContratosProveedores';
@@ -149,6 +150,7 @@ const router = createBrowserRouter([
       { path: "operaciones/rutas", element: <GestionRutas /> },
       { path: "configuracion/carga-masiva", element: <CargaMasiva /> },
       { path: "herramientas/kits", element: <GestionKits /> },
+      { path: "compras/solicitudes", element: <SolicitudesCompra /> },
       { path: "compras/ordenes", element: <OrdenesCompra /> },
       { path: "compras/facturas", element: <IngresoFacturas /> },
       { path: "compras/proveedores", element: <GestionProveedores /> },
