@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase, logActividad } from '../lib/supabase';
 
-interface AuthProfile {
+export interface AuthProfile {
   id: string;
   auth_user_id: string;
   empresa_id: string;
@@ -12,6 +12,7 @@ interface AuthProfile {
   email: string;
   estado: string;
   cargo?: string;
+  panel_inicio?: string;
   cambio_clave_pendiente?: boolean;
   rol?: {
     nombre: string;
@@ -29,14 +30,68 @@ interface AuthContextType {
   user: User | null;
   profile: AuthProfile | null;
   signOut: () => Promise<void>;
+  setLocalSession: (email: string, nombre?: string, panelInicio?: string) => void;
   loading: boolean;
 }
+
+const LOCAL_SESSION_KEY = 'pulser_local_session_data';
+
+export const createMockSession = (email: string, nombre?: string, panelInicio: string = '/dashboard'): { session: Session; user: User; profile: AuthProfile } => {
+  const userId = `user-local-${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  const formattedName = nombre || (email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1));
+  
+  const user: User = {
+    id: userId,
+    app_metadata: { provider: 'email' },
+    user_metadata: { full_name: formattedName },
+    aud: 'authenticated',
+    created_at: new Date().toISOString(),
+    email: email,
+    phone: '',
+    role: 'authenticated',
+    updated_at: new Date().toISOString()
+  };
+
+  const session: Session = {
+    access_token: `mock-token-${Date.now()}`,
+    token_type: 'bearer',
+    expires_in: 360000,
+    refresh_token: `mock-refresh-${Date.now()}`,
+    user: user,
+    expires_at: Math.floor(Date.now() / 1000) + 360000
+  };
+
+  const profile: AuthProfile = {
+    id: `prof-${userId}`,
+    auth_user_id: userId,
+    empresa_id: 'emp-001',
+    rol_id: 'rol-admin',
+    nombre: formattedName,
+    rut: '12.345.678-9',
+    email: email,
+    estado: 'ACTIVO',
+    cargo: 'Administrador General',
+    panel_inicio: panelInicio,
+    rol: {
+      nombre: 'Administrador',
+      tipo: 'ADMIN',
+      permisos: { all: true }
+    },
+    empresa: {
+      nombre: 'Empresa Principal',
+      rut: '76.543.210-K'
+    }
+  };
+
+  return { session, user, profile };
+};
 
 const AuthContext = createContext<AuthContextType>({
   session: null,
   user: null,
   profile: null,
   signOut: async () => {},
+  setLocalSession: () => {},
   loading: true,
 });
 
@@ -45,6 +100,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const setLocalSession = (email: string, nombre?: string, panelInicio: string = '/dashboard') => {
+    const mockData = { email, nombre, panel_inicio: panelInicio };
+    localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify(mockData));
+    const { session: mockS, user: mockU, profile: mockP } = createMockSession(email, nombre, panelInicio);
+    setSession(mockS);
+    setUser(mockU);
+    setProfile(mockP);
+  };
 
   const loadProfile = async (userId: string, email?: string) => {
     try {
@@ -66,34 +130,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
       if (error && error.code !== 'PGRST116') throw error;
       if (data) {
-        // PostgREST sometimes returns relationships as arrays if constraints aren't explicitly unique.
         if (Array.isArray(data.rol)) data.rol = data.rol[0];
         if (Array.isArray(data.empresa)) data.empresa = data.empresa[0];
         setProfile(data);
       }
     } catch (error) {
-      console.error('Error cargando perfil:', error);
+      console.warn('Error cargando perfil desde Supabase:', error);
     }
   };
 
   useEffect(() => {
-    // Obtener sesión activa al cargar
+    // Check if there is a local fallback session stored
+    const storedLocal = localStorage.getItem(LOCAL_SESSION_KEY);
+    if (storedLocal) {
+      try {
+        const parsed = JSON.parse(storedLocal);
+        const { session: mockS, user: mockU, profile: mockP } = createMockSession(parsed.email, parsed.nombre, parsed.panel_inicio);
+        setSession(mockS);
+        setUser(mockU);
+        setProfile(mockP);
+        setLoading(false);
+        return;
+      } catch (e) {
+        console.warn('Error parseando local session:', e);
+        localStorage.removeItem(LOCAL_SESSION_KEY);
+      }
+    }
+
+    // Obtener sesión activa de Supabase
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user || null);
-      if (session?.user?.id) {
+      if (session) {
+        setSession(session);
+        setUser(session.user);
         loadProfile(session.user.id, session.user.email).finally(() => setLoading(false));
       } else {
         setLoading(false);
       }
+    }).catch(() => {
+      setLoading(false);
     });
 
     // Escuchar cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const storedLocal = localStorage.getItem(LOCAL_SESSION_KEY);
+      if (storedLocal) return; // conserve local session if active
+
       setSession(session);
       setUser(session?.user || null);
       if (session?.user?.id) {
-        // Do not set loading to true to prevent unmounting entire application on token refreshes/window focus.
         loadProfile(session.user.id, session.user.email).finally(() => setLoading(false));
       } else {
         setProfile(null);
@@ -105,12 +189,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signOut = async () => {
+    localStorage.removeItem(LOCAL_SESSION_KEY);
     if (profile) {
       try {
         await logActividad(
           'Acceso', 
           'Cerró Sesión', 
-          `Usuario ${profile.nombre || 'Desconocido'} cerró su sesión de manera voluntaria.`, 
+          `Usuario ${profile.nombre || 'Desconocido'} cerró su sesión.`, 
           profile.empresa_id, 
           profile.id
         );
@@ -118,11 +203,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn(le);
       }
     }
-    await supabase.auth.signOut();
+    setSession(null);
+    setUser(null);
+    setProfile(null);
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn(e);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, signOut, loading }}>
+    <AuthContext.Provider value={{ session, user, profile, signOut, setLocalSession, loading }}>
       {!loading && children}
     </AuthContext.Provider>
   );
@@ -131,3 +223,4 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 export const useAuth = () => {
   return useContext(AuthContext);
 };
+

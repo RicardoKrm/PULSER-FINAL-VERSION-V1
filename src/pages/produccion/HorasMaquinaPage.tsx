@@ -85,6 +85,7 @@ export default function HorasMaquinaPage() {
   // Modals State
   const [isNewModalOpen, setIsNewModalOpen] = useState<boolean>(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
+  const [isClearModalOpen, setIsClearModalOpen] = useState<boolean>(false);
   const [editingRecord, setEditingRecord] = useState<HorasMaquinaRecord | null>(null);
 
   // Form State
@@ -204,6 +205,22 @@ export default function HorasMaquinaPage() {
     setCurrentPage(1);
     setImportNotice('Filtro activado: Mostrando registros e indicadores del mes de Julio 2026.');
     setTimeout(() => setImportNotice(null), 5000);
+  };
+
+  const handleClearAllData = async () => {
+    setLoading(true);
+    try {
+      await clearHorasMaquinaRecords();
+      setRecords([]);
+      setIsClearModalOpen(false);
+      setImportNotice('Se han borrado exitosamente todos los registros del panel. Puedes ingresar tu archivo Excel totalmente limpio.');
+      setTimeout(() => setImportNotice(null), 8000);
+    } catch (err) {
+      console.error('Error al vaciar datos:', err);
+      alert('Ocurrió un error al intentar vaciar la base de datos.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handle Excel Upload
@@ -394,6 +411,11 @@ export default function HorasMaquinaPage() {
 
   // Export Filtered Table to Excel
   const handleExportExcel = () => {
+    if (filteredRecords.length === 0) {
+      alert('No hay registros filtrados para exportar en este momento.');
+      return;
+    }
+
     const dataToExport = filteredRecords.map(r => ({
       'Fecha': r.fecha,
       'Turno': r.turno === 'a' ? 'Noche (a)' : 'Día (b)',
@@ -411,8 +433,34 @@ export default function HorasMaquinaPage() {
 
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Horas_Maquina");
-    XLSX.writeFile(wb, `Reporte_Horas_Maquina_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "Horas_Maquina_Filtradas");
+    XLSX.writeFile(wb, `Reporte_Horas_Maquina_Filtrado_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  // Export Monthly Availability Summary to Excel
+  const handleExportDisponibilidadExcel = () => {
+    if (monthlyStatsPerMachine.length === 0) {
+      alert('No hay datos de disponibilidad para exportar con los filtros seleccionados.');
+      return;
+    }
+
+    const dataToExport = monthlyStatsPerMachine.map(r => ({
+      'Equipo / Máquina': r.equipo,
+      'Mes / Periodo': r.mesNombre,
+      'Año': dispoYear,
+      'Días Operados': r.diasTrabajados,
+      'Horas Máquina (Uso)': r.horasUso,
+      'Combustible Consumido (L)': r.combustibleL,
+      'Consumo Promedio (L/Hr)': r.consumoPromedio,
+      'Base Horas Mes': r.baseHoras,
+      'Disponibilidad Mensual (%)': `${r.disponibilidadPct}%`,
+      'Vueltas Totales': r.vueltas
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Resumen_Disponibilidad");
+    XLSX.writeFile(wb, `Reporte_Disponibilidad_Flota_${dispoYear}_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   // -------------------------------------------------------------
@@ -631,6 +679,19 @@ export default function HorasMaquinaPage() {
             </Button>
           )}
 
+          {records.length > 0 && (
+            <Button
+              onClick={() => setIsClearModalOpen(true)}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-1.5 font-bold border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/50"
+              title="Borrar todos los registros para iniciar con una base de datos en blanco"
+            >
+              <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
+              Vaciar Módulo ({records.length.toLocaleString()} regs)
+            </Button>
+          )}
+
           <label className="cursor-pointer bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2.5 rounded-lg transition-colors flex items-center gap-2 shadow-sm">
             {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
             {uploading ? 'Procesando Excel...' : 'Importar Excel'}
@@ -644,13 +705,12 @@ export default function HorasMaquinaPage() {
           </label>
 
           <Button
-            onClick={handleExportExcel}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-1.5 font-bold"
+            onClick={activeTab === 'disponibilidad' ? handleExportDisponibilidadExcel : handleExportExcel}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-lg transition-colors flex items-center gap-2 shadow-sm"
+            title="Exportar la información filtrada del sistema a un archivo Excel (.xlsx)"
           >
-            <Download className="w-4 h-4 text-emerald-600" />
-            Exportar a Excel
+            <FileSpreadsheet className="w-4 h-4" />
+            Exportar a Excel ({activeTab === 'disponibilidad' ? monthlyStatsPerMachine.length : filteredRecords.length})
           </Button>
 
           <Button
@@ -1032,6 +1092,27 @@ export default function HorasMaquinaPage() {
               </div>
             ) : (
               <>
+                <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                      <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                      Registros Filtrados en el Sistema ({filteredRecords.length.toLocaleString()})
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Exporta únicamente los datos resultantes del filtro activo de fecha, equipo o turno.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleExportExcel}
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 shadow-sm"
+                    title="Descargar tabla filtrada en formato Excel (.xlsx)"
+                  >
+                    <Download className="w-4 h-4" />
+                    Descargar Excel Filtrado ({filteredRecords.length.toLocaleString()})
+                  </Button>
+                </div>
+
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left text-slate-700 dark:text-slate-300 border-collapse">
                     <thead className="bg-slate-100 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 font-extrabold border-b border-slate-200 dark:border-slate-700 uppercase tracking-wider">
@@ -1355,18 +1436,30 @@ export default function HorasMaquinaPage() {
 
           {/* Detailed Monthly Availability Table per Machine */}
           <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
+                <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
                   Detalle Mensual de Uso y Disponibilidad por Máquina
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Fórmula de Disponibilidad = (Horas Operativas Reportadas / {baseHorasMes} hrs base mes) × 100
                 </p>
               </div>
-              <span className="text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
-                {monthlyStatsPerMachine.length} registros mensuales
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
+                  {monthlyStatsPerMachine.length} registros
+                </span>
+                <Button
+                  onClick={handleExportDisponibilidadExcel}
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 shadow-sm"
+                  title="Exportar resumen de disponibilidad a Excel (.xlsx)"
+                >
+                  <Download className="w-4 h-4" />
+                  Descargar Reporte Disponibilidad (.xlsx)
+                </Button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -1592,6 +1685,50 @@ export default function HorasMaquinaPage() {
               </Button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* Modal de Confirmación para Vaciar Toda la Base de Datos */}
+      {isClearModalOpen && (
+        <Modal
+          isOpen={isClearModalOpen}
+          onClose={() => setIsClearModalOpen(false)}
+          title="⚠️ Confirmar Eliminación Total de Registros"
+        >
+          <div className="space-y-4">
+            <div className="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl flex items-start gap-3">
+              <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+              <div className="text-sm text-red-900 dark:text-red-200 leading-relaxed">
+                <p className="font-bold text-base mb-1">¿Estás seguro de vaciar el módulo?</p>
+                <p>
+                  Esta acción eliminará de forma permanente los <strong>{records.length.toLocaleString()} registros</strong> actualmente almacenados en la base de datos de Horas Máquina ( IndexedDB y Supabase).
+                </p>
+                <p className="mt-2 text-xs font-semibold text-red-700 dark:text-red-300">
+                  Usa esta opción para dejar el panel en blanco antes de importar un archivo Excel completamente nuevo o actualizado.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsClearModalOpen(false)}
+                disabled={loading}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={handleClearAllData}
+                disabled={loading}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold flex items-center gap-2"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                Sí, Vaciar Base de Datos
+              </Button>
+            </div>
+          </div>
         </Modal>
       )}
     </div>
