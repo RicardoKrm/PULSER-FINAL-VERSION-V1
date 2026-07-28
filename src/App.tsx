@@ -25,6 +25,7 @@ import ReportesDiariosPage from './pages/produccion/ReportesDiariosPage';
 import ReportesDiariosMinaPage from './pages/produccion/ReportesDiariosMinaPage';
 import PlanificadorTransportePage from './pages/produccion/PlanificadorTransportePage';
 import TrazabilidadPage from './pages/produccion/TrazabilidadPage';
+import HorasMaquinaPage from './pages/produccion/HorasMaquinaPage';
 import GPS from './pages/operaciones/GPS';
 import PortalConductor from './pages/operaciones/PortalConductor';
 import ControlDocumental from './pages/operaciones/ControlDocumental';
@@ -109,6 +110,7 @@ const router = createBrowserRouter([
       { path: "produccion", element: <ProduccionLayout />, children: [
         { index: true, element: <Navigate to="/produccion/dashboard" replace /> },
         { path: "dashboard", element: <DashboardProduccion /> },
+        { path: "horas-maquina", element: <HorasMaquinaPage /> },
         { path: "reportes-transporte", element: <ReportesDiariosPage /> },
         { path: "reportes-mina", element: <ReportesDiariosMinaPage /> },
         { path: "planificador", element: <PlanificadorTransportePage /> },

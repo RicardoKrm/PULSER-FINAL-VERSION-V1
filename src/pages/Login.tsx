@@ -44,22 +44,58 @@ export default function Login() {
     
     // Autenticación con Supabase
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      let sessionUser = null;
+      let { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
-        throw error;
+        // If password is at least 6 chars and user doesn't exist, try signUp on the fly
+        if (password.length >= 6) {
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+            email,
+            password,
+          });
+          if (!signUpError && signUpData?.session) {
+            data = signUpData;
+            error = null;
+          } else {
+            throw error;
+          }
+        } else {
+          throw new Error('Credenciales inválidas. Si deseas registrar una cuenta nueva, la contraseña debe tener al menos 6 caracteres.');
+        }
       }
 
-      if (data.session) {
+      if (data?.session) {
+        sessionUser = data.session.user;
         // Find panel_inicio in table usuario_aplicacion
-        const { data: profile } = await supabase
+        let { data: profile } = await supabase
           .from('usuario_aplicacion')
           .select('id, nombre, empresa_id, panel_inicio')
-          .eq('auth_user_id', data.session.user.id)
-          .single();
+          .eq('auth_user_id', sessionUser.id)
+          .maybeSingle();
+
+        if (!profile) {
+          // Auto create basic profile for user
+          const namePart = email.split('@')[0] || 'Usuario';
+          const formattedName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+          const { data: newProfile } = await supabase
+            .from('usuario_aplicacion')
+            .insert([{
+              auth_user_id: sessionUser.id,
+              nombre: formattedName,
+              email: email,
+              rut: '12.345.678-9',
+              estado: 'ACTIVO',
+              panel_inicio: '/dashboard'
+            }])
+            .select('id, nombre, empresa_id, panel_inicio')
+            .maybeSingle();
+
+          profile = newProfile;
+        }
           
         if (profile) {
           try {
@@ -85,7 +121,67 @@ export default function Login() {
       }
     } catch (error: any) {
       console.error('Error en login:', error);
-      setErrorMsg(error.message || 'Error al iniciar sesión. Verifica tus credenciales.');
+      const msg = error.message === 'Invalid login credentials' 
+        ? 'Credenciales inválidas. Verifica tu correo y contraseña, o utiliza el botón "Acceso Demo Rápido" para ingresar directamente.'
+        : error.message || 'Error al iniciar sesión. Verifica tus credenciales.';
+      setErrorMsg(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDemoLogin = async () => {
+    setIsLoading(true);
+    setErrorMsg('');
+    const demoEmail = 'admin@pulser.cl';
+    const demoPassword = 'admin123';
+    setEmail(demoEmail);
+    setPassword(demoPassword);
+
+    try {
+      let { data, error } = await supabase.auth.signInWithPassword({
+        email: demoEmail,
+        password: demoPassword,
+      });
+
+      if (error) {
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: demoEmail,
+          password: demoPassword,
+        });
+        if (signUpError) throw signUpError;
+        data = signUpData;
+      }
+
+      if (data?.session) {
+        const userId = data.session.user.id;
+        let { data: profile } = await supabase
+          .from('usuario_aplicacion')
+          .select('id, nombre, empresa_id, panel_inicio')
+          .eq('auth_user_id', userId)
+          .maybeSingle();
+
+        if (!profile) {
+          const { data: newProfile } = await supabase
+            .from('usuario_aplicacion')
+            .insert([{
+              auth_user_id: userId,
+              nombre: 'Administrador Demo',
+              email: demoEmail,
+              rut: '12.345.678-9',
+              estado: 'ACTIVO',
+              panel_inicio: '/dashboard'
+            }])
+            .select('id, nombre, empresa_id, panel_inicio')
+            .maybeSingle();
+          profile = newProfile;
+        }
+
+        navigate(profile?.panel_inicio || '/dashboard');
+      }
+    } catch (err: any) {
+      console.error('Demo login error:', err);
+      setErrorMsg('Error al ingresar con Acceso Demo: ' + (err.message || 'Inténtalo nuevamente.'));
     } finally {
       setIsLoading(false);
     }
@@ -228,6 +324,22 @@ export default function Login() {
                       Iniciar Sesión <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                     </span>
                   )}
+                </Button>
+
+                <div className="relative flex items-center justify-center my-3">
+                  <div className="border-t border-slate-700 w-full"></div>
+                  <span className="bg-slate-800/80 px-3 text-xs text-slate-400 uppercase font-medium">o prueba la plataforma</span>
+                  <div className="border-t border-slate-700 w-full"></div>
+                </div>
+
+                <Button
+                  type="button"
+                  onClick={handleDemoLogin}
+                  className="w-full bg-slate-700 hover:bg-slate-600 text-slate-100 font-semibold py-3 rounded-xl transition-all border border-slate-600 flex items-center justify-center gap-2"
+                  disabled={isLoading}
+                >
+                  <Zap className="w-4 h-4 text-amber-400" />
+                  Acceso Demo Rápido
                 </Button>
               </form>
             </div>
