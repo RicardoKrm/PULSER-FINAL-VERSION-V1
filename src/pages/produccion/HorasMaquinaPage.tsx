@@ -25,7 +25,9 @@ import {
   Database,
   ChevronLeft,
   ChevronRight,
-  Info
+  Info,
+  Sun,
+  Moon
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -85,7 +87,6 @@ export default function HorasMaquinaPage() {
   // Modals State
   const [isNewModalOpen, setIsNewModalOpen] = useState<boolean>(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
-  const [isClearModalOpen, setIsClearModalOpen] = useState<boolean>(false);
   const [editingRecord, setEditingRecord] = useState<HorasMaquinaRecord | null>(null);
 
   // Form State
@@ -127,75 +128,6 @@ export default function HorasMaquinaPage() {
     }
   };
 
-  const handleGenerateSample = async () => {
-    if (confirm('¿Desea cargar un conjunto de datos de ejemplo con ~1,500 registros para todo el año 2026? Esto reemplazará los datos actuales.')) {
-      setLoading(true);
-      const sample = generateSampleDataset();
-      await saveAllHorasMaquina(sample);
-      setRecords(sample);
-      setLoading(false);
-      setImportNotice('Se cargaron ~1,500 registros de prueba para todo el año 2026.');
-      setTimeout(() => setImportNotice(null), 5000);
-    }
-  };
-
-  const handleClearData = async () => {
-    if (confirm('¿Está seguro de que desea borrar TODOS los registros importados? Esta acción no se puede deshacer.')) {
-      setLoading(true);
-      await clearHorasMaquinaRecords();
-      setRecords([]);
-      setLoading(false);
-      setImportNotice('Base de datos vaciada correctamente.');
-      setTimeout(() => setImportNotice(null), 4000);
-    }
-  };
-
-  const handleSanitizeEquipments = async () => {
-    if (records.length === 0) return;
-    setLoading(true);
-
-    const noiseKeywords = [
-      'TOTAL', 'SUBTOTAL', 'PROMEDIO', 'SUMA', 'RESUMEN', 'OBSERVAC', 
-      'FECHA', 'EQUIPO', 'OPERADOR', 'DISPONIBLE', 'FIRMA', 'CONSOLIDADO', 
-      'TURNO', 'TOTALES', 'MANTENIMIENTO', 'REPORTE', 'HOJA', 'SEMANA', 
-      'MES', 'CHECKLIST', 'HOROMETRO', 'HORAS', 'NOTAS', 'LEYENDA', 'KILOMETRAJE',
-      'GUARDIA', 'TALLER', 'VALOR', 'SISTEMA', 'MAQUINA'
-    ];
-
-    const cleanedRecords: HorasMaquinaRecord[] = [];
-    let removedCount = 0;
-
-    records.forEach(r => {
-      const rawEq = (r.equipo || '').trim().toUpperCase().replace(/\s+/g, ' ');
-      
-      // Check if it's summary noise
-      const isNoise = noiseKeywords.some(kw => 
-        rawEq.includes(kw) && !rawEq.match(/(EXC|CAEX|CAM|MOT|BUL|PER|CARG|VOLVO|CAT|CAT-|SCANIA|MERCEDES|KOMATSU|SANDVIK|\d{3})/i)
-      ) || rawEq.length < 2 || /^\d{1,2}$/.test(rawEq);
-
-      if (isNoise) {
-        removedCount++;
-        return;
-      }
-
-      // Clean equipment name format
-      let cleanEq = rawEq.replace(/[\:\;]/g, '').replace(/\s*[\-\_]\s*/g, '-');
-
-      cleanedRecords.push({
-        ...r,
-        equipo: cleanEq
-      });
-    });
-
-    await saveAllHorasMaquina(cleanedRecords);
-    setRecords(cleanedRecords);
-    setLoading(false);
-
-    const finalEquiposCount = new Set(cleanedRecords.map(r => r.equipo)).size;
-    setImportNotice(`Estandarización lista: Se eliminaron ${removedCount} filas inválidas/totales. Quedaron ${cleanedRecords.length.toLocaleString()} registros reales y ${finalEquiposCount} equipos.`);
-    setTimeout(() => setImportNotice(null), 8000);
-  };
-
   const handleQuickFilterJulio = () => {
     setDateFilterType('mes');
     setSelectedYear(2026);
@@ -205,22 +137,6 @@ export default function HorasMaquinaPage() {
     setCurrentPage(1);
     setImportNotice('Filtro activado: Mostrando registros e indicadores del mes de Julio 2026.');
     setTimeout(() => setImportNotice(null), 5000);
-  };
-
-  const handleClearAllData = async () => {
-    setLoading(true);
-    try {
-      await clearHorasMaquinaRecords();
-      setRecords([]);
-      setIsClearModalOpen(false);
-      setImportNotice('Se han borrado exitosamente todos los registros del panel. Puedes ingresar tu archivo Excel totalmente limpio.');
-      setTimeout(() => setImportNotice(null), 8000);
-    } catch (err) {
-      console.error('Error al vaciar datos:', err);
-      alert('Ocurrió un error al intentar vaciar la base de datos.');
-    } finally {
-      setLoading(false);
-    }
   };
 
   // Handle Excel Upload
@@ -272,6 +188,18 @@ export default function HorasMaquinaPage() {
     return Array.from(setEq).sort();
   }, [records]);
 
+  // Helper functions for turnos
+  const isTurnoNoche = (t?: string) => {
+    if (!t) return false;
+    const clean = String(t).toLowerCase().trim();
+    return clean === 'a' || clean.includes('noche') || clean.startsWith('a') || clean === '2';
+  };
+
+  const isTurnoDia = (t?: string) => {
+    if (!t) return true;
+    return !isTurnoNoche(t);
+  };
+
   // Filtering for Tab 1
   const filteredRecords = useMemo(() => {
     return records.filter(rec => {
@@ -289,8 +217,8 @@ export default function HorasMaquinaPage() {
 
       // Turno filter
       if (selectedTurno !== 'todos') {
-        if (selectedTurno === 'a' && rec.turno !== 'a') return false;
-        if (selectedTurno === 'b' && rec.turno !== 'b') return false;
+        if (selectedTurno === 'a' && !isTurnoNoche(rec.turno)) return false;
+        if (selectedTurno === 'b' && !isTurnoDia(rec.turno)) return false;
       }
 
       // Date filter type
@@ -324,6 +252,22 @@ export default function HorasMaquinaPage() {
   // Tab 1 KPI Totals
   const totalHorasOperativas = useMemo(() => {
     return filteredRecords.reduce((acc, r) => acc + (r.horasOperativas || 0), 0);
+  }, [filteredRecords]);
+
+  const totalHorasDia = useMemo(() => {
+    return filteredRecords
+      .filter(r => isTurnoDia(r.turno))
+      .reduce((acc, r) => acc + (r.horasOperativas || 0), 0);
+  }, [filteredRecords]);
+
+  const totalHorasNoche = useMemo(() => {
+    return filteredRecords
+      .filter(r => isTurnoNoche(r.turno))
+      .reduce((acc, r) => acc + (r.horasOperativas || 0), 0);
+  }, [filteredRecords]);
+
+  const totalMaquinasFiltradas = useMemo(() => {
+    return new Set(filteredRecords.map(r => r.equipo).filter(Boolean)).size;
   }, [filteredRecords]);
 
   const totalCombustibleL = useMemo(() => {
@@ -649,9 +593,6 @@ export default function HorasMaquinaPage() {
           <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
             Reporte Operacional de Horas Máquina y Disponibilidad
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Importación masiva de Excel (~6,000 registros), ordenamiento por fecha/turno y cálculos de disponibilidad mensual por máquina.
-          </p>
         </div>
 
         {/* Action Buttons */}
@@ -665,32 +606,6 @@ export default function HorasMaquinaPage() {
             <Calendar className="w-4 h-4 text-amber-600 dark:text-amber-400" />
             Ver Mes de Julio
           </Button>
-
-          {records.length > 0 && uniqueEquipos.length > 9 && (
-            <Button
-              onClick={handleSanitizeEquipments}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-1.5 font-bold border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-200 hover:bg-indigo-100"
-              title="Limpiar filas de totales y estandarizar nombres de equipos"
-            >
-              <RefreshCw className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-              Depurar Equipos ({uniqueEquipos.length} detectados)
-            </Button>
-          )}
-
-          {records.length > 0 && (
-            <Button
-              onClick={() => setIsClearModalOpen(true)}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-1.5 font-bold border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/50"
-              title="Borrar todos los registros para iniciar con una base de datos en blanco"
-            >
-              <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
-              Vaciar Módulo ({records.length.toLocaleString()} regs)
-            </Button>
-          )}
 
           <label className="cursor-pointer bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2.5 rounded-lg transition-colors flex items-center gap-2 shadow-sm">
             {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
@@ -790,50 +705,22 @@ export default function HorasMaquinaPage() {
       {/* ========================================================================= */}
       {activeTab === 'registro' && (
         <div className="space-y-6">
-          {/* Excel Shift Legend */}
-          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-xl p-3 px-4 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 font-semibold">
-              <Info className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>Convención de Turnos Excel CMC: <strong>a = Noche</strong> | <strong>b = Día</strong></span>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button
-                onClick={handleGenerateSample}
-                variant="outline"
-                size="sm"
-                className="text-xs h-7 border-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-900 dark:text-amber-200 font-bold"
-              >
-                <RefreshCw className="w-3.5 h-3.5 mr-1" />
-                Cargar Datos de Ejemplo 2026
-              </Button>
-              <Button
-                onClick={handleClearData}
-                variant="outline"
-                size="sm"
-                className="text-xs h-7 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 border-rose-200 font-bold"
-              >
-                <Trash2 className="w-3.5 h-3.5 mr-1" />
-                Vaciar Registros
-              </Button>
-            </div>
-          </div>
-
           {/* KPI Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <Card className="p-4 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-bold text-slate-500 uppercase">Registros Filtrados</p>
+                  <p className="text-xs font-bold text-slate-500 uppercase">Total Máquinas</p>
                   <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">
-                    {filteredRecords.length.toLocaleString()}
+                    {totalMaquinasFiltradas}
                   </p>
                 </div>
                 <div className="p-3 bg-blue-50 dark:bg-blue-950/60 text-blue-600 rounded-xl">
-                  <Database className="w-6 h-6" />
+                  <Truck className="w-6 h-6" />
                 </div>
               </div>
-              <p className="text-xs text-slate-500 mt-2">
-                Total importado: {records.length.toLocaleString()} filas
+              <p className="text-xs font-medium text-slate-500 mt-2">
+                Registros filtrados: <span className="font-extrabold text-slate-800 dark:text-slate-200">{filteredRecords.length.toLocaleString()}</span>
               </p>
             </Card>
 
@@ -857,17 +744,34 @@ export default function HorasMaquinaPage() {
             <Card className="p-4 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-bold text-slate-500 uppercase">Combustible Consumido</p>
-                  <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
-                    {totalCombustibleL.toLocaleString()} L
+                  <p className="text-xs font-bold text-slate-500 uppercase">Horas Totales Día</p>
+                  <p className="text-2xl font-black text-amber-500 dark:text-amber-300 mt-1">
+                    {totalHorasDia.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} hrs
                   </p>
                 </div>
-                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 rounded-xl">
-                  <Droplet className="w-6 h-6" />
+                <div className="p-3 bg-amber-100/70 dark:bg-amber-950/70 text-amber-600 rounded-xl">
+                  <Sun className="w-6 h-6" />
                 </div>
               </div>
               <p className="text-xs text-slate-500 mt-2">
-                {totalHorasOperativas > 0 ? (totalCombustibleL / totalHorasOperativas).toFixed(1) : 0} L/Hora promedio
+                Turno Día (b)
+              </p>
+            </Card>
+
+            <Card className="p-4 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase">Horas Totales Noche</p>
+                  <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">
+                    {totalHorasNoche.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} hrs
+                  </p>
+                </div>
+                <div className="p-3 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 rounded-xl">
+                  <Moon className="w-6 h-6" />
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 mt-2">
+                Turno Noche (a)
               </p>
             </Card>
 
@@ -875,16 +779,16 @@ export default function HorasMaquinaPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-bold text-slate-500 uppercase">Total Vueltas / Pases</p>
-                  <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">
+                  <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
                     {totalVueltas.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-3 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 rounded-xl">
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 rounded-xl">
                   <Truck className="w-6 h-6" />
                 </div>
               </div>
               <p className="text-xs text-slate-500 mt-2">
-                Reportadas en la extracción
+                Reportadas en extracción
               </p>
             </Card>
           </div>
@@ -1118,7 +1022,7 @@ export default function HorasMaquinaPage() {
                     <thead className="bg-slate-100 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 font-extrabold border-b border-slate-200 dark:border-slate-700 uppercase tracking-wider">
                       <tr>
                         <th className="py-3 px-3">Fecha</th>
-                        <th className="py-3 px-2 text-center">Turno2</th>
+                        <th className="py-3 px-2 text-center">Turno</th>
                         <th className="py-3 px-3">Equipo</th>
                         <th className="py-3 px-3 text-right">INICIA</th>
                         <th className="py-3 px-3 text-right">FINAL</th>
@@ -1147,11 +1051,11 @@ export default function HorasMaquinaPage() {
                             </td>
                             <td className="py-2.5 px-2 text-center font-black">
                               <span className={`px-2 py-0.5 rounded text-[11px] ${
-                                rec.turno === 'a' 
+                                isTurnoNoche(rec.turno)
                                   ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300' 
                                   : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
                               }`}>
-                                {rec.turno === 'a' ? 'a (Noche)' : 'b (Día)'}
+                                {isTurnoNoche(rec.turno) ? 'a (Noche)' : 'b (Día)'}
                               </span>
                             </td>
                             <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white whitespace-nowrap">
@@ -1688,49 +1592,6 @@ export default function HorasMaquinaPage() {
         </Modal>
       )}
 
-      {/* Modal de Confirmación para Vaciar Toda la Base de Datos */}
-      {isClearModalOpen && (
-        <Modal
-          isOpen={isClearModalOpen}
-          onClose={() => setIsClearModalOpen(false)}
-          title="⚠️ Confirmar Eliminación Total de Registros"
-        >
-          <div className="space-y-4">
-            <div className="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl flex items-start gap-3">
-              <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-              <div className="text-sm text-red-900 dark:text-red-200 leading-relaxed">
-                <p className="font-bold text-base mb-1">¿Estás seguro de vaciar el módulo?</p>
-                <p>
-                  Esta acción eliminará de forma permanente los <strong>{records.length.toLocaleString()} registros</strong> actualmente almacenados en la base de datos de Horas Máquina ( IndexedDB y Supabase).
-                </p>
-                <p className="mt-2 text-xs font-semibold text-red-700 dark:text-red-300">
-                  Usa esta opción para dejar el panel en blanco antes de importar un archivo Excel completamente nuevo o actualizado.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsClearModalOpen(false)}
-                disabled={loading}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="button"
-                onClick={handleClearAllData}
-                disabled={loading}
-                className="bg-red-600 hover:bg-red-700 text-white font-bold flex items-center gap-2"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                Sí, Vaciar Base de Datos
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
     </div>
   );
 }
