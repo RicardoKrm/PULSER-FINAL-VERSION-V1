@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   ArrowLeft, FileText, CheckCircle, XCircle, Printer, ShoppingCart, 
-  Paperclip, History, Download, AlertCircle, Send
+  Paperclip, History, Download, AlertCircle, Send, Save, Plus, Trash2
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -11,33 +11,47 @@ import Swal from 'sweetalert2';
 interface Props {
   solicitud: any;
   onBack: () => void;
+  onSave?: (solicitud: any) => void;
   isNew?: boolean;
+  nextId?: string;
 }
 
-export default function SolicitudCompraDetalle({ solicitud: initialData, onBack, isNew = false }: Props) {
-  const [solicitud, setSolicitud] = useState(initialData || {
-    id: 'SC-000002', // Correlativo automático mock
+export default function SolicitudCompraDetalle({ solicitud: initialData, onBack, onSave, isNew = false, nextId = 'SC-000001' }: Props) {
+  const [solicitud, setSolicitud] = useState(() => initialData || {
+    id: nextId,
     estado: 'BORRADOR',
     fecha: new Date().toISOString().split('T')[0],
-    solicitante: 'Usuario Actual',
-    departamento: '',
+    solicitante: '',
+    departamento: 'Operaciones',
     centroCosto: '',
     faena: '',
     prioridad: 'MEDIA',
     motivo: '',
     observaciones: '',
+    montoAprox: 0,
     items: [],
     adjuntos: [],
     historial: [
-      { fecha: new Date().toISOString(), usuario: 'Usuario Actual', accion: 'Creó la solicitud en borrador' }
+      { fecha: new Date().toISOString(), usuario: 'Usuario', accion: 'Creó la solicitud en borrador' }
     ]
   });
 
-  const [editMode, setEditMode] = useState(isNew);
+  const [editMode, setEditMode] = useState(isNew || solicitud.estado === 'BORRADOR');
   const [showAprobarModal, setShowAprobarModal] = useState(false);
   const [showRechazarModal, setShowRechazarModal] = useState(false);
   const [showAddItem, setShowAddItem] = useState(false);
   
+  const [newItem, setNewItem] = useState({
+    descripcion: '',
+    cantidad: 1,
+    unidad: 'Un',
+    categoria: 'General',
+    marca: '',
+    modelo: '',
+    codigo: '',
+    montoEstimado: 0
+  });
+
   // State for item approval
   const [itemsAprobacion, setItemsAprobacion] = useState<any[]>(
     solicitud.items.map((i: any) => ({ ...i, cantidadAprobada: i.cantidad }))
@@ -59,7 +73,71 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
     }
   };
 
+  const handleFieldChange = (field: string, value: any) => {
+    setSolicitud((prev: any) => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleAddItem = () => {
+    if (!newItem.descripcion.trim()) {
+      Swal.fire('Atención', 'Por favor ingrese la descripción del ítem.', 'warning');
+      return;
+    }
+    const itemToAdd = {
+      id: Date.now(),
+      ...newItem,
+      cantidadAprobada: newItem.cantidad
+    };
+    const updatedItems = [...solicitud.items, itemToAdd];
+    const calcMonto = updatedItems.reduce((acc, i) => acc + (Number(i.montoEstimado || 0) * Number(i.cantidad || 1)), 0);
+
+    setSolicitud((prev: any) => ({
+      ...prev,
+      items: updatedItems,
+      montoAprox: calcMonto > 0 ? calcMonto : prev.montoAprox
+    }));
+
+    setNewItem({
+      descripcion: '',
+      cantidad: 1,
+      unidad: 'Un',
+      categoria: 'General',
+      marca: '',
+      modelo: '',
+      codigo: '',
+      montoEstimado: 0
+    });
+    setShowAddItem(false);
+  };
+
+  const handleRemoveItem = (index: number) => {
+    const updatedItems = solicitud.items.filter((_: any, idx: number) => idx !== index);
+    const calcMonto = updatedItems.reduce((acc: number, i: any) => acc + (Number(i.montoEstimado || 0) * Number(i.cantidad || 1)), 0);
+    setSolicitud((prev: any) => ({
+      ...prev,
+      items: updatedItems,
+      montoAprox: calcMonto
+    }));
+  };
+
+  const handleGuardarBorrador = () => {
+    if (onSave) {
+      onSave(solicitud);
+    }
+    Swal.fire('Guardado', 'La solicitud ha sido guardada en borrador.', 'success');
+  };
+
   const handleEnviar = () => {
+    if (!solicitud.solicitante.trim()) {
+      Swal.fire('Atención', 'Por favor indique el nombre del solicitante.', 'warning');
+      return;
+    }
+    if (!solicitud.motivo.trim()) {
+      Swal.fire('Atención', 'Por favor indique el motivo de la compra.', 'warning');
+      return;
+    }
     Swal.fire({
       title: '¿Desea enviar la solicitud?',
       text: "Una vez enviada quedará pendiente de aprobación.",
@@ -70,23 +148,26 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
       confirmButtonText: 'Sí, enviar'
     }).then((result) => {
       if (result.isConfirmed) {
-        setSolicitud({ 
+        const updated = { 
           ...solicitud, 
           estado: 'PENDIENTE',
-          historial: [{ fecha: new Date().toISOString(), usuario: 'Usuario Actual', accion: 'Envió la solicitud' }, ...solicitud.historial]
-        });
+          historial: [{ fecha: new Date().toISOString(), usuario: solicitud.solicitante || 'Usuario', accion: 'Envió la solicitud' }, ...solicitud.historial]
+        };
+        setSolicitud(updated);
+        if (onSave) {
+          onSave(updated);
+        }
         setEditMode(false);
-        Swal.fire('Enviada', 'La solicitud ha sido enviada.', 'success');
+        Swal.fire('Enviada', 'La solicitud ha sido enviada exitosamente.', 'success');
       }
     });
   };
 
   const handleAprobarSubmit = () => {
-    // Check if partial
     const isPartial = itemsAprobacion.some(i => i.cantidadAprobada < i.cantidad);
     const newState = isPartial ? 'APROBADA PARCIALMENTE' : 'APROBADA';
     
-    setSolicitud({
+    const updated = {
       ...solicitud,
       estado: newState,
       items: itemsAprobacion,
@@ -98,7 +179,12 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
         }, 
         ...solicitud.historial
       ]
-    });
+    };
+
+    setSolicitud(updated);
+    if (onSave) {
+      onSave(updated);
+    }
     setShowAprobarModal(false);
     Swal.fire('Aprobada', `La solicitud ha sido ${newState.toLowerCase()}.`, 'success');
   };
@@ -108,14 +194,18 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
       Swal.fire('Error', 'Debe indicar un motivo de rechazo.', 'error');
       return;
     }
-    setSolicitud({
+    const updated = {
       ...solicitud,
       estado: 'RECHAZADA',
       historial: [
         { fecha: new Date().toISOString(), usuario: 'Aprobador', accion: `Rechazó la solicitud. Motivo: ${motivoRechazo}` }, 
         ...solicitud.historial
       ]
-    });
+    };
+    setSolicitud(updated);
+    if (onSave) {
+      onSave(updated);
+    }
     setShowRechazarModal(false);
     Swal.fire('Rechazada', 'La solicitud ha sido rechazada.', 'success');
   };
@@ -136,7 +226,7 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
             </span>
           </div>
           <p className="text-slate-500 dark:text-slate-400 font-bold text-sm mt-1">
-            Solicitante: {solicitud.solicitante} • Fecha: {solicitud.fecha}
+            Solicitante: {solicitud.solicitante || 'Por especificar'} • Fecha: {solicitud.fecha}
           </p>
         </div>
         
@@ -150,9 +240,14 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
           </Button>
 
           {solicitud.estado === 'BORRADOR' && (
-            <Button onClick={handleEnviar} className="bg-blue-500 hover:bg-blue-600 text-white font-bold">
-              <Send className="w-4 h-4 mr-2" /> ENVIAR SOLICITUD
-            </Button>
+            <>
+              <Button onClick={handleGuardarBorrador} variant="outline" className="font-bold border-blue-500 text-blue-600 hover:bg-blue-50">
+                <Save className="w-4 h-4 mr-2" /> GUARDAR BORRADOR
+              </Button>
+              <Button onClick={handleEnviar} className="bg-blue-600 hover:bg-blue-700 text-white font-bold">
+                <Send className="w-4 h-4 mr-2" /> ENVIAR SOLICITUD
+              </Button>
+            </>
           )}
 
           {solicitud.estado === 'PENDIENTE' && (
@@ -185,12 +280,32 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
             <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nombre Solicitante *</label>
+                  {isEditable ? (
+                    <input 
+                      type="text"
+                      className="w-full h-9 bg-slate-50 border border-slate-200 rounded-lg text-sm px-3 dark:bg-slate-900 dark:border-slate-700 dark:text-white outline-none focus:border-blue-500 font-bold" 
+                      placeholder="Ej: Juan Pérez"
+                      value={solicitud.solicitante}
+                      onChange={(e) => handleFieldChange('solicitante', e.target.value)}
+                    />
+                  ) : (
+                    <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">{solicitud.solicitante || '-'}</span>
+                  )}
+                </div>
+                <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Departamento</label>
                   {isEditable ? (
-                    <select className="w-full h-9 bg-slate-50 border border-slate-200 rounded-lg text-sm px-3 dark:bg-slate-900 dark:border-slate-700 dark:text-white" defaultValue={solicitud.departamento}>
-                      <option>Operaciones</option>
-                      <option>Mantenimiento</option>
-                      <option>Administración</option>
+                    <select 
+                      className="w-full h-9 bg-slate-50 border border-slate-200 rounded-lg text-sm px-3 dark:bg-slate-900 dark:border-slate-700 dark:text-white font-medium" 
+                      value={solicitud.departamento}
+                      onChange={(e) => handleFieldChange('departamento', e.target.value)}
+                    >
+                      <option value="Operaciones">Operaciones</option>
+                      <option value="Mantenimiento">Mantenimiento</option>
+                      <option value="Administración">Administración</option>
+                      <option value="Prevención de Riesgos">Prevención de Riesgos</option>
+                      <option value="Logística">Logística</option>
                     </select>
                   ) : (
                     <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">{solicitud.departamento || '-'}</span>
@@ -199,7 +314,13 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Centro de Costo</label>
                   {isEditable ? (
-                    <input type="text" className="w-full h-9 bg-slate-50 border border-slate-200 rounded-lg text-sm px-3 dark:bg-slate-900 dark:border-slate-700 dark:text-white" defaultValue={solicitud.centroCosto} />
+                    <input 
+                      type="text" 
+                      className="w-full h-9 bg-slate-50 border border-slate-200 rounded-lg text-sm px-3 dark:bg-slate-900 dark:border-slate-700 dark:text-white outline-none focus:border-blue-500" 
+                      placeholder="Ej: CC-102"
+                      value={solicitud.centroCosto} 
+                      onChange={(e) => handleFieldChange('centroCosto', e.target.value)}
+                    />
                   ) : (
                     <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">{solicitud.centroCosto || '-'}</span>
                   )}
@@ -207,7 +328,13 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Faena / Proyecto</label>
                   {isEditable ? (
-                    <input type="text" className="w-full h-9 bg-slate-50 border border-slate-200 rounded-lg text-sm px-3 dark:bg-slate-900 dark:border-slate-700 dark:text-white" defaultValue={solicitud.faena} />
+                    <input 
+                      type="text" 
+                      className="w-full h-9 bg-slate-50 border border-slate-200 rounded-lg text-sm px-3 dark:bg-slate-900 dark:border-slate-700 dark:text-white outline-none focus:border-blue-500" 
+                      placeholder="Ej: Mina Central"
+                      value={solicitud.faena} 
+                      onChange={(e) => handleFieldChange('faena', e.target.value)}
+                    />
                   ) : (
                     <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">{solicitud.faena || '-'}</span>
                   )}
@@ -215,20 +342,43 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Prioridad</label>
                   {isEditable ? (
-                    <select className="w-full h-9 bg-slate-50 border border-slate-200 rounded-lg text-sm px-3 dark:bg-slate-900 dark:border-slate-700 dark:text-white" defaultValue={solicitud.prioridad}>
-                      <option>BAJA</option>
-                      <option>MEDIA</option>
-                      <option>ALTA</option>
-                      <option>CRÍTICA</option>
+                    <select 
+                      className="w-full h-9 bg-slate-50 border border-slate-200 rounded-lg text-sm px-3 dark:bg-slate-900 dark:border-slate-700 dark:text-white font-medium" 
+                      value={solicitud.prioridad}
+                      onChange={(e) => handleFieldChange('prioridad', e.target.value)}
+                    >
+                      <option value="BAJA">BAJA</option>
+                      <option value="MEDIA">MEDIA</option>
+                      <option value="ALTA">ALTA</option>
+                      <option value="CRÍTICA">CRÍTICA</option>
                     </select>
                   ) : (
                     <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">{solicitud.prioridad}</span>
                   )}
                 </div>
-                <div className="md:col-span-2 lg:col-span-3">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Motivo de la Compra</label>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Monto Estimado ($ CLP)</label>
                   {isEditable ? (
-                    <textarea className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm h-20 resize-none dark:bg-slate-900 dark:border-slate-700 dark:text-white" defaultValue={solicitud.motivo} placeholder="Justifique la necesidad..."></textarea>
+                    <input 
+                      type="number" 
+                      className="w-full h-9 bg-slate-50 border border-slate-200 rounded-lg text-sm px-3 dark:bg-slate-900 dark:border-slate-700 dark:text-white outline-none focus:border-blue-500 font-bold" 
+                      placeholder="0"
+                      value={solicitud.montoAprox || ''} 
+                      onChange={(e) => handleFieldChange('montoAprox', Number(e.target.value))}
+                    />
+                  ) : (
+                    <span className="font-black text-slate-800 dark:text-slate-200 text-sm">${(solicitud.montoAprox || 0).toLocaleString('es-CL')}</span>
+                  )}
+                </div>
+                <div className="md:col-span-2 lg:col-span-3">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Motivo / Requerimiento *</label>
+                  {isEditable ? (
+                    <textarea 
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm h-20 resize-none dark:bg-slate-900 dark:border-slate-700 dark:text-white outline-none focus:border-blue-500 font-medium" 
+                      value={solicitud.motivo} 
+                      onChange={(e) => handleFieldChange('motivo', e.target.value)}
+                      placeholder="Justifique la necesidad de la compra de forma detallada..."
+                    ></textarea>
                   ) : (
                     <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{solicitud.motivo || '-'}</p>
                   )}
@@ -240,9 +390,9 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
           {/* Ítems */}
           <Card className="rounded-2xl border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden bg-white dark:bg-slate-800">
             <CardHeader className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700 py-4 px-6 flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-black text-slate-700 dark:text-slate-200 tracking-wider uppercase">Detalle de Ítems</CardTitle>
+              <CardTitle className="text-sm font-black text-slate-700 dark:text-slate-200 tracking-wider uppercase">Detalle de Ítems Solicitados</CardTitle>
               {isEditable && (
-                <Button onClick={() => setShowAddItem(true)} size="sm" className="bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs h-8">
+                <Button onClick={() => setShowAddItem(true)} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs h-8">
                   + AGREGAR ÍTEM
                 </Button>
               )}
@@ -258,14 +408,15 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
                     <th className="px-4 py-3 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Unidad</th>
                     <th className="px-4 py-3 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Descripción</th>
                     <th className="px-4 py-3 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Categoría</th>
-                    <th className="px-4 py-3 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Marca/Modelo</th>
+                    <th className="px-4 py-3 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Marca / Modelo</th>
+                    {isEditable && <th className="px-4 py-3 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center"></th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                   {solicitud.items.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-sm font-medium text-slate-500">
-                        No hay ítems registrados en esta solicitud.
+                      <td colSpan={7} className="px-4 py-8 text-center text-sm font-medium text-slate-500">
+                        No hay ítems registrados en esta solicitud. Haz clic en <strong>+ AGREGAR ÍTEM</strong> para añadir requerimientos.
                       </td>
                     </tr>
                   ) : (
@@ -288,10 +439,21 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
                           {item.descripcion}
                           {item.codigo && <span className="block text-[10px] text-slate-400 font-normal">Cód: {item.codigo}</span>}
                         </td>
-                        <td className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400 text-xs">{item.categoria}</td>
+                        <td className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400 text-xs">{item.categoria || 'General'}</td>
                         <td className="px-4 py-3 font-medium text-slate-600 dark:text-slate-400 text-xs">
-                          {item.marca} {item.modelo && ` - ${item.modelo}`}
+                          {item.marca || '-'} {item.modelo && `/ ${item.modelo}`}
                         </td>
+                        {isEditable && (
+                          <td className="px-4 py-3 text-center">
+                            <button 
+                              onClick={() => handleRemoveItem(idx)}
+                              className="text-slate-400 hover:text-red-500 p-1"
+                              title="Eliminar ítem"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))
                   )}
@@ -346,17 +508,17 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-slate-100 dark:divide-slate-700 max-h-80 overflow-y-auto">
-                {solicitud.historial.map((ev: any, idx: number) => {
+                {(solicitud.historial || []).map((ev: any, idx: number) => {
                   const d = new Date(ev.fecha);
                   return (
                     <div key={idx} className="p-4 flex gap-3">
                       <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-black text-slate-600 dark:text-slate-400">{ev.usuario.charAt(0).toUpperCase()}</span>
+                        <span className="text-xs font-black text-slate-600 dark:text-slate-400">{(ev.usuario || 'U').charAt(0).toUpperCase()}</span>
                       </div>
                       <div>
-                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{ev.usuario}</p>
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{ev.usuario || 'Usuario'}</p>
                         <p className="text-[11px] font-medium text-slate-600 dark:text-slate-400 mt-0.5">{ev.accion}</p>
-                        <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wider">{d.toLocaleString()}</p>
+                        <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wider">{isNaN(d.getTime()) ? ev.fecha : d.toLocaleString()}</p>
                       </div>
                     </div>
                   );
@@ -367,6 +529,114 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
 
         </div>
       </div>
+
+      {/* Modal Agregar Ítem */}
+      <Modal isOpen={showAddItem} onClose={() => setShowAddItem(false)} title="Agregar Ítem a la Solicitud" size="lg">
+        <div className="space-y-4 pt-2">
+          <div>
+            <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Descripción del Ítem / Repuesto *</label>
+            <input 
+              type="text" 
+              className="w-full h-10 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold outline-none focus:border-blue-500 dark:text-white"
+              placeholder="Ej: Casco de Seguridad Blanco V-Gard"
+              value={newItem.descripcion}
+              onChange={(e) => setNewItem({ ...newItem, descripcion: e.target.value })}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Cantidad *</label>
+              <input 
+                type="number" 
+                min="1"
+                className="w-full h-10 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold outline-none focus:border-blue-500 dark:text-white"
+                value={newItem.cantidad}
+                onChange={(e) => setNewItem({ ...newItem, cantidad: Math.max(1, parseInt(e.target.value) || 1) })}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Unidad</label>
+              <select 
+                className="w-full h-10 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium outline-none focus:border-blue-500 dark:text-white"
+                value={newItem.unidad}
+                onChange={(e) => setNewItem({ ...newItem, unidad: e.target.value })}
+              >
+                <option value="Un">Un (Unidades)</option>
+                <option value="Set">Set / Juego</option>
+                <option value="Kg">Kg (Kilogramos)</option>
+                <option value="Lts">Lts (Litros)</option>
+                <option value="Mt">Mt (Metros)</option>
+                <option value="Caja">Caja</option>
+                <option value="Global">Global</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Categoría</label>
+              <input 
+                type="text" 
+                className="w-full h-10 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium outline-none focus:border-blue-500 dark:text-white"
+                placeholder="Ej: EPP, Herramientas, Repuestos"
+                value={newItem.categoria}
+                onChange={(e) => setNewItem({ ...newItem, categoria: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Precio Unitario Est. ($ CLP)</label>
+              <input 
+                type="number" 
+                className="w-full h-10 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold outline-none focus:border-blue-500 dark:text-white"
+                placeholder="0"
+                value={newItem.montoEstimado || ''}
+                onChange={(e) => setNewItem({ ...newItem, montoEstimado: Number(e.target.value) })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-500 mb-1">Marca</label>
+              <input 
+                type="text" 
+                className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium outline-none dark:text-white"
+                placeholder="Ej: MSA, 3M"
+                value={newItem.marca}
+                onChange={(e) => setNewItem({ ...newItem, marca: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-500 mb-1">Modelo</label>
+              <input 
+                type="text" 
+                className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium outline-none dark:text-white"
+                placeholder="Ej: V-Gard"
+                value={newItem.modelo}
+                onChange={(e) => setNewItem({ ...newItem, modelo: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-500 mb-1">Código / Ref</label>
+              <input 
+                type="text" 
+                className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium outline-none dark:text-white"
+                placeholder="Ej: EPP-001"
+                value={newItem.codigo}
+                onChange={(e) => setNewItem({ ...newItem, codigo: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-700">
+            <Button variant="outline" onClick={() => setShowAddItem(false)}>Cancelar</Button>
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white font-bold" onClick={handleAddItem}>
+              Agregar Ítem
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Modals de Aprobación/Rechazo */}
       <Modal isOpen={showAprobarModal} onClose={() => setShowAprobarModal(false)} title="Aprobar Solicitud" size="3xl">
@@ -442,14 +712,6 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
               Rechazar Definitivamente
             </Button>
           </div>
-        </div>
-      </Modal>
-      
-      {/* Fake add item modal */}
-      <Modal isOpen={showAddItem} onClose={() => setShowAddItem(false)} title="Agregar Ítem" size="md">
-        <div className="p-4 text-center">
-           <p className="text-sm text-slate-500 mb-4">Formulario para agregar un nuevo requerimiento a la lista.</p>
-           <Button variant="outline" onClick={() => setShowAddItem(false)}>Cerrar</Button>
         </div>
       </Modal>
 

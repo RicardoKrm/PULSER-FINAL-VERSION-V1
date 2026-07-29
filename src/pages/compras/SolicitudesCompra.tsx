@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Plus, Search, Filter, CheckCircle, XCircle, Clock, FileText, ShoppingCart, Eye } from 'lucide-react';
+import { Plus, Search, Filter, CheckCircle, XCircle, Clock, FileText, ShoppingCart, Eye, Trash2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import SolicitudCompraDetalle from './SolicitudCompraDetalle';
 
@@ -12,78 +12,72 @@ export default function SolicitudesCompra() {
   const [view, setView] = useState<'list' | 'detail'>('list');
   const [selectedSolicitud, setSelectedSolicitud] = useState<any>(null);
 
-  // Mock data for requests
-  const [solicitudes, setSolicitudes] = useState([
-    {
-      id: 'SC-000001',
-      fecha: '2026-07-26',
-      solicitante: 'Juan Pérez',
-      departamento: 'Operaciones',
-      centroCosto: 'CC-001',
-      faena: 'Proyecto A',
-      prioridad: 'ALTA',
-      motivo: 'Compra de equipos de protección personal urgentes para nuevos ingresos en terreno.',
-      observaciones: 'Entregar en faena principal.',
-      estado: 'PENDIENTE',
-      montoAprox: 4500000,
-      items: [
-        { id: 1, cantidad: 10, unidad: 'Un', descripcion: 'Casco blanco', categoria: 'EPP', marca: 'MSA', modelo: 'V-Gard', codigo: 'EPP-001', observaciones: '', cantidadAprobada: 0 },
-        { id: 2, cantidad: 5, unidad: 'Un', descripcion: 'Lentes de seguridad', categoria: 'EPP', marca: '3M', modelo: 'Virtua', codigo: 'EPP-002', observaciones: '', cantidadAprobada: 0 }
-      ],
-      adjuntos: [
-        { nombre: 'Cotizacion_MSA.pdf', url: '#' }
-      ],
-      historial: [
-        { fecha: '2026-07-26T08:10:00', usuario: 'Juan Pérez', accion: 'Creó la solicitud en borrador' },
-        { fecha: '2026-07-26T08:20:00', usuario: 'Juan Pérez', accion: 'Envió la solicitud' }
-      ]
-    },
-    {
-      id: 'SC-000002',
-      fecha: '2026-07-25',
-      solicitante: 'María Gonzalez',
-      departamento: 'Administración',
-      centroCosto: 'CC-002',
-      faena: 'Oficina Central',
-      prioridad: 'MEDIA',
-      motivo: 'Sillas ergonómicas para oficina',
-      estado: 'APROBADA',
-      montoAprox: 1200000,
-      items: [
-        { id: 1, cantidad: 10, unidad: 'Un', descripcion: 'Silla Ergonomica', categoria: 'Mobiliario', marca: 'Genérica', cantidadAprobada: 10 }
-      ],
-      adjuntos: [],
-      historial: [
-        { fecha: '2026-07-25T10:00:00', usuario: 'María Gonzalez', accion: 'Envió la solicitud' },
-        { fecha: '2026-07-25T14:30:00', usuario: 'Aprobador', accion: 'Aprobó la solicitud' }
-      ]
-    },
-    {
-      id: 'SC-000003',
-      fecha: '2026-07-20',
-      solicitante: 'Carlos Silva',
-      departamento: 'Mantenimiento',
-      centroCosto: 'CC-TALLER',
-      faena: 'Taller Central',
-      prioridad: 'BAJA',
-      motivo: 'Kit de herramientas',
-      estado: 'RECHAZADA',
-      montoAprox: 800000,
-      items: [
-         { id: 1, cantidad: 2, unidad: 'Set', descripcion: 'Juego de llaves', categoria: 'Herramientas', cantidadAprobada: 0 }
-      ],
-      adjuntos: [],
-      historial: [
-        { fecha: '2026-07-20T09:00:00', usuario: 'Carlos Silva', accion: 'Envió la solicitud' },
-        { fecha: '2026-07-21T11:00:00', usuario: 'Aprobador', accion: 'Rechazó la solicitud. Motivo: Presupuesto agotado este mes.' }
-      ]
+  // Persistent requests state, cleaned of mock data
+  const [solicitudes, setSolicitudes] = useState<any[]>(() => {
+    const saved = localStorage.getItem('solicitudes_compra');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Error loading solicitudes from localStorage', e);
+      }
     }
-  ]);
+    return [];
+  });
+
+  React.useEffect(() => {
+    localStorage.setItem('solicitudes_compra', JSON.stringify(solicitudes));
+  }, [solicitudes]);
+
+  // Generate next correlative ID (e.g. SC-000001)
+  const getNextId = () => {
+    if (solicitudes.length === 0) return 'SC-000001';
+    const nums = solicitudes.map(s => {
+      const match = s.id && s.id.match(/SC-(\d+)/);
+      return match ? parseInt(match[1], 10) : 0;
+    });
+    const maxNum = Math.max(0, ...nums);
+    return `SC-${String(maxNum + 1).padStart(6, '0')}`;
+  };
+
+  const handleSaveSolicitud = (solicitudData: any) => {
+    setSolicitudes(prev => {
+      const index = prev.findIndex(s => s.id === solicitudData.id);
+      if (index >= 0) {
+        const updated = [...prev];
+        updated[index] = solicitudData;
+        return updated;
+      } else {
+        return [solicitudData, ...prev];
+      }
+    });
+    setView('list');
+  };
+
+  const handleBorrarSolicitud = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    Swal.fire({
+      title: '¿Eliminar solicitud?',
+      text: `Se eliminará la solicitud ${id} permanentemente.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        setSolicitudes(prev => prev.filter(s => s.id !== id));
+        Swal.fire('Eliminada', 'La solicitud ha sido eliminada.', 'success');
+      }
+    });
+  };
 
   const filtered = solicitudes.filter(s => 
-    s.motivo.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    s.solicitante.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.id.toLowerCase().includes(searchTerm.toLowerCase())
+    (s.motivo || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (s.solicitante || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (s.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (s.departamento || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const getStatusColor = (status: string) => {
@@ -124,6 +118,8 @@ export default function SolicitudesCompra() {
       <SolicitudCompraDetalle 
         solicitud={selectedSolicitud} 
         isNew={!selectedSolicitud}
+        nextId={getNextId()}
+        onSave={handleSaveSolicitud}
         onBack={() => setView('list')} 
       />
     );
@@ -206,7 +202,7 @@ export default function SolicitudesCompra() {
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input 
               type="text" 
-              placeholder="Buscar solicitud..." 
+              placeholder="Buscar solicitud por ID, motivo o solicitante..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-transparent outline-none focus:border-blue-500 dark:text-white"
@@ -232,7 +228,7 @@ export default function SolicitudesCompra() {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
               {filtered.map(s => (
-                <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                <tr key={s.id} onClick={() => handleVerDetalle(s)} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer">
                   <td className="px-6 py-4 font-black text-slate-800 dark:text-white text-sm">{s.id}</td>
                   <td className="px-6 py-4 font-bold text-slate-700 dark:text-slate-300 text-xs">{s.fecha}</td>
                   <td className="px-6 py-4 font-bold text-slate-800 dark:text-slate-200 text-xs">
@@ -240,8 +236,9 @@ export default function SolicitudesCompra() {
                     <span className="block text-[10px] text-slate-500 mt-0.5">{s.departamento}</span>
                   </td>
                   <td className="px-6 py-4 font-medium text-slate-700 dark:text-slate-300 text-sm max-w-[300px] truncate">
-                    {s.motivo}
+                    {s.motivo || 'Sin especificación'}
                     {s.prioridad === 'ALTA' && <span className="ml-2 inline-block px-2 py-0.5 bg-red-100 text-red-600 text-[10px] font-black rounded-full uppercase">ALTA</span>}
+                    {s.prioridad === 'CRÍTICA' && <span className="ml-2 inline-block px-2 py-0.5 bg-purple-100 text-purple-600 text-[10px] font-black rounded-full uppercase">CRÍTICA</span>}
                   </td>
                   <td className="px-6 py-4 text-center">
                     <span className={`inline-flex items-center px-3 py-1 rounded-md text-[10px] font-black tracking-wider uppercase ${getStatusColor(s.estado)}`}>
@@ -249,24 +246,47 @@ export default function SolicitudesCompra() {
                     </span>
                   </td>
                   <td className="px-6 py-4 font-black text-slate-800 dark:text-white text-sm text-right">
-                    ${s.montoAprox.toLocaleString('es-CL')}
+                    ${(s.montoAprox || 0).toLocaleString('es-CL')}
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="h-8 w-8 p-0"
-                      onClick={() => handleVerDetalle(s)}
-                    >
-                      <Eye className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 w-8 p-0"
+                        onClick={() => handleVerDetalle(s)}
+                        title="Ver / Editar"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-500/10 border-slate-200 dark:border-slate-700"
+                        onClick={(e) => handleBorrarSolicitud(s.id, e)}
+                        title="Eliminar"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-slate-500 dark:text-slate-400 font-medium text-sm">
-                    No se encontraron solicitudes.
+                    <div className="max-w-md mx-auto space-y-3">
+                      <p className="text-slate-600 dark:text-slate-300 font-bold text-base">No hay solicitudes registradas</p>
+                      <p className="text-xs text-slate-400">El panel está limpio de datos de prueba. Haz clic a continuación para ingresar la primera solicitud de compra.</p>
+                      <div>
+                        <Button 
+                          onClick={handleNuevaSolicitud}
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-9 px-4 rounded-lg text-xs"
+                        >
+                          <Plus className="w-4 h-4 mr-2" /> CREAR NUEVA SOLICITUD
+                        </Button>
+                      </div>
+                    </div>
                   </td>
                 </tr>
               )}
