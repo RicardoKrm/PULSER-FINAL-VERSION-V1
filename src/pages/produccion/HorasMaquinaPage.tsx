@@ -96,6 +96,7 @@ export default function HorasMaquinaPage() {
     equipo: '',
     horometroInicial: '',
     horometroFinal: '',
+    horas: '',
     operador: '',
     vueltas: '',
     observacion: 'Disponible',
@@ -283,7 +284,21 @@ export default function HorasMaquinaPage() {
     e.preventDefault();
     const inic = parseFloat(form.horometroInicial) || 0;
     const fin = parseFloat(form.horometroFinal) || 0;
-    const horasOp = fin > inic ? Math.round((fin - inic) * 10) / 10 : 0;
+    let horasOp = parseFloat(form.horas) || 0;
+
+    // If horasOp wasn't explicitly entered but fin > inic, compute it
+    if (!horasOp && fin > inic && inic > 0) {
+      horasOp = Math.round((fin - inic) * 10) / 10;
+    } else if (horasOp) {
+      horasOp = Math.round(horasOp * 10) / 10;
+    }
+
+    // If fin is 0 and inic > 0 and horasOp > 0, calculate fin
+    let finalFin = fin;
+    if (finalFin === 0 && inic > 0 && horasOp > 0) {
+      finalFin = Math.round((inic + horasOp) * 10) / 10;
+    }
+
     const vueltas = parseInt(form.vueltas) || 0;
     const combustible = parseFloat(form.combustibleL) || Math.round(horasOp * 22);
 
@@ -294,7 +309,7 @@ export default function HorasMaquinaPage() {
         turno: form.turno,
         equipo: form.equipo,
         horometroInicial: inic,
-        horometroFinal: fin,
+        horometroFinal: finalFin,
         operador: form.operador,
         vueltas,
         observacion: form.observacion,
@@ -313,7 +328,7 @@ export default function HorasMaquinaPage() {
         turno: form.turno,
         equipo: form.equipo,
         horometroInicial: inic,
-        horometroFinal: fin,
+        horometroFinal: finalFin,
         operador: form.operador,
         vueltas,
         observacion: form.observacion,
@@ -335,13 +350,14 @@ export default function HorasMaquinaPage() {
       fecha: rec.fecha,
       turno: rec.turno,
       equipo: rec.equipo,
-      horometroInicial: rec.horometroInicial.toString(),
-      horometroFinal: rec.horometroFinal.toString(),
+      horometroInicial: rec.horometroInicial ? rec.horometroInicial.toString() : '',
+      horometroFinal: rec.horometroFinal ? rec.horometroFinal.toString() : '',
+      horas: rec.horasOperativas ? rec.horasOperativas.toString() : '',
       operador: rec.operador,
-      vueltas: rec.vueltas.toString(),
+      vueltas: rec.vueltas ? rec.vueltas.toString() : '',
       observacion: rec.observacion,
       checklist: rec.checklist,
-      combustibleL: rec.combustibleL.toString()
+      combustibleL: rec.combustibleL ? rec.combustibleL.toString() : ''
     });
     setIsEditModalOpen(true);
   };
@@ -636,6 +652,7 @@ export default function HorasMaquinaPage() {
                 equipo: uniqueEquipos[0] || '',
                 horometroInicial: '',
                 horometroFinal: '',
+                horas: '',
                 operador: '',
                 vueltas: '',
                 observacion: 'Disponible',
@@ -1232,7 +1249,7 @@ export default function HorasMaquinaPage() {
           </Card>
 
           {/* Global Fleet Availability Banner */}
-          <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 rounded-2xl shadow-md border border-slate-700 grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 rounded-2xl shadow-md border border-slate-700 grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <p className="text-xs font-extrabold uppercase tracking-widest text-amber-400">
                 Disponibilidad Promedio Flota (%)
@@ -1265,18 +1282,6 @@ export default function HorasMaquinaPage() {
               </p>
               <p className="text-xs text-slate-400 mt-1">
                 Operación reportada en {globalFleetStats.totalEquipos} equipos
-              </p>
-            </div>
-
-            <div>
-              <p className="text-xs font-extrabold uppercase tracking-widest text-slate-400">
-                Combustible Total Consumido
-              </p>
-              <p className="text-3xl font-black mt-2 text-emerald-400">
-                {globalFleetStats.totalCombustibleFlota.toLocaleString()} <span className="text-base font-semibold text-slate-400">L</span>
-              </p>
-              <p className="text-xs text-slate-400 mt-1">
-                {globalFleetStats.consumoPromFlota} L/Hora promedio global
               </p>
             </div>
 
@@ -1489,16 +1494,24 @@ export default function HorasMaquinaPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Horómetro Inicial (INICIA)</label>
                 <input
                   type="number"
                   step="0.1"
-                  required
                   placeholder="0.0"
                   value={form.horometroInicial}
-                  onChange={(e) => setForm({ ...form, horometroInicial: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const inic = parseFloat(val) || 0;
+                    const fin = parseFloat(form.horometroFinal) || 0;
+                    let newHoras = form.horas;
+                    if (fin > inic && inic > 0) {
+                      newHoras = (Math.round((fin - inic) * 10) / 10).toString();
+                    }
+                    setForm({ ...form, horometroInicial: val, horas: newHoras });
+                  }}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-bold"
                 />
               </div>
@@ -1508,11 +1521,40 @@ export default function HorasMaquinaPage() {
                 <input
                   type="number"
                   step="0.1"
-                  required
                   placeholder="0.0"
                   value={form.horometroFinal}
-                  onChange={(e) => setForm({ ...form, horometroFinal: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const fin = parseFloat(val) || 0;
+                    const inic = parseFloat(form.horometroInicial) || 0;
+                    let newHoras = form.horas;
+                    if (fin > inic && inic > 0) {
+                      newHoras = (Math.round((fin - inic) * 10) / 10).toString();
+                    }
+                    setForm({ ...form, horometroFinal: val, horas: newHoras });
+                  }}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-amber-700 dark:text-amber-400 mb-1">Horas Máquina (Decimal)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  placeholder="0.0 (ej. 10.5)"
+                  value={form.horas}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const hrs = parseFloat(val) || 0;
+                    const inic = parseFloat(form.horometroInicial) || 0;
+                    let newFin = form.horometroFinal;
+                    if (inic > 0 && hrs > 0) {
+                      newFin = (Math.round((inic + hrs) * 10) / 10).toString();
+                    }
+                    setForm({ ...form, horas: val, horometroFinal: newFin });
+                  }}
+                  className="w-full bg-amber-50/60 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 rounded-lg p-2 font-black text-amber-900 dark:text-amber-200"
                 />
               </div>
             </div>
