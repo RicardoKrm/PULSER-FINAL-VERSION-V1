@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FileText, ArrowLeft, FileDown, Info, PackageCheck, List, 
   MessageSquare, Paperclip, FileImage, Download, Printer,
@@ -8,6 +8,10 @@ import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Modal } from '../../components/ui/Modal';
 import Swal from 'sweetalert2';
+import { useCompany } from '../../contexts/CompanyContext';
+import { supabase } from '../../lib/supabase';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface Props {
   orden: any;
@@ -21,7 +25,207 @@ export default function OrdenCompraDetalle({ orden, onBack, onRefresh }: Props) 
   const [showCierreModal, setShowCierreModal] = useState(false);
   const [showFacturaModal, setShowFacturaModal] = useState(false);
   const [showDocumentViewer, setShowDocumentViewer] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
   
+  const { currentCompany, activeCompanyId } = useCompany();
+  const [companyDetails, setCompanyDetails] = useState<{
+    nombre?: string;
+    rut?: string;
+    direccion?: string;
+    comuna?: string;
+    ciudad?: string;
+    telefono?: string;
+    email?: string;
+    website?: string;
+    logo_url?: string;
+  }>({});
+
+  useEffect(() => {
+    async function loadCompanyInfo() {
+      if (!activeCompanyId) return;
+      try {
+        let { data, error } = await supabase
+          .from('empresa')
+          .select('nombre, rut, detalles')
+          .eq('id', activeCompanyId)
+          .single();
+          
+        if (error) {
+          const fallback = await supabase
+            .from('empresa')
+            .select('nombre, rut')
+            .eq('id', activeCompanyId)
+            .single();
+          if (fallback.data) {
+            data = { ...fallback.data, detalles: {} };
+          }
+        }
+        
+        if (data) {
+          const det = data.detalles || {};
+          setCompanyDetails({
+            nombre: data.nombre,
+            rut: data.rut,
+            direccion: det.direccion,
+            comuna: det.comuna,
+            ciudad: det.ciudad,
+            telefono: det.telefono,
+            email: det.email,
+            website: det.website,
+            logo_url: det.logo_url
+          });
+        }
+      } catch (err) {
+        console.warn('Error loading company details for OC view', err);
+      }
+    }
+    loadCompanyInfo();
+  }, [activeCompanyId]);
+
+  const displayCompanyName = companyDetails.nombre || currentCompany?.name || currentCompany?.razonSocial || 'MI EMPRESA';
+  const displayCompanyRut = companyDetails.rut ? `RUT: ${companyDetails.rut}` : 'RUT: No registrado';
+  const displayCompanyAddress = [companyDetails.direccion, companyDetails.comuna, companyDetails.ciudad].filter(Boolean).join(', ');
+  const displayCompanyContact = [
+    companyDetails.telefono ? `Tel: ${companyDetails.telefono}` : '',
+    companyDetails.email ? `Email: ${companyDetails.email}` : ''
+  ].filter(Boolean).join(' • ');
+
+  const handleDescargarOCPDF = () => {
+    try {
+      const doc = new jsPDF();
+
+      // Header Company
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text(displayCompanyName.toUpperCase(), 14, 20);
+
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'normal');
+      let currentY = 26;
+      if (displayCompanyAddress) {
+        doc.text(displayCompanyAddress, 14, currentY);
+        currentY += 5;
+      }
+      doc.text(`${displayCompanyRut} ${displayCompanyContact ? ' | ' + displayCompanyContact : ''}`, 14, currentY);
+      currentY += 6;
+
+      // Divider Line
+      doc.setLineWidth(0.5);
+      doc.line(14, currentY, 196, currentY);
+      currentY += 8;
+
+      // Title & Document Info
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`ORDEN DE COMPRA: ${orden?.folio || 'OC-000'}`, 14, currentY);
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Fecha Emisión: ${orden?.fecha || new Date().toLocaleDateString('es-CL')}`, 14, currentY + 6);
+      doc.text(`Estado: ${(orden?.estado || 'PENDIENTE').toUpperCase()}`, 130, currentY + 6);
+      currentY += 14;
+
+      // Proveedor Box
+      doc.setFillColor(248, 250, 252);
+      doc.rect(14, currentY, 182, 22, 'F');
+      
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Proveedor:`, 18, currentY + 7);
+      doc.setFont('helvetica', 'normal');
+      doc.text(orden?.proveedor || orden?.proveedor_nombre || 'No especificado', 38, currentY + 7);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text(`RUT Proveedor:`, 18, currentY + 15);
+      doc.setFont('helvetica', 'normal');
+      doc.text(orden?.rutProveedor || 'No registrado', 45, currentY + 15);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Condición Pago:`, 110, currentY + 7);
+      doc.setFont('helvetica', 'normal');
+      doc.text(orden?.condicionPago || '30 Días', 138, currentY + 7);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Fecha Entrega:`, 110, currentY + 15);
+      doc.setFont('helvetica', 'normal');
+      doc.text(orden?.fechaEntrega || 'Inmediata', 138, currentY + 15);
+
+      currentY += 28;
+
+      // Observaciones / Notas
+      if (orden?.resumen || orden?.notas) {
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Notas / Observaciones:`, 14, currentY);
+        currentY += 5;
+
+        doc.setFont('helvetica', 'normal');
+        const splitNotas = doc.splitTextToSize(orden?.resumen || orden?.notas || '', 180);
+        doc.text(splitNotas, 14, currentY);
+        currentY += (splitNotas.length * 4.5) + 6;
+      }
+
+      // Table of Items
+      const tableData = (renderItems || []).map((item: any, index: number) => [
+        index + 1,
+        item.repuesto || 'Ítem de compra',
+        `${item.cantidad || 0} UND`,
+        `$${Number(item.precioU || 0).toLocaleString('es-CL')}`,
+        `$${Number(item.total || 0).toLocaleString('es-CL')}`
+      ]);
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [['#', 'Descripción / Repuesto', 'Cantidad', 'Precio Unitario', 'Total Línea']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold', fontSize: 8.5 },
+        styles: { fontSize: 8, cellPadding: 2.5 },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 12 },
+          1: { cellWidth: 85 },
+          2: { halign: 'center', cellWidth: 25 },
+          3: { halign: 'right', cellWidth: 30 },
+          4: { halign: 'right', cellWidth: 30 }
+        }
+      });
+
+      const finalTableY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 8 : currentY + 40;
+
+      // Total
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Monto Total Orden de Compra: $${Number(totalMonto || orden?.monto || 0).toLocaleString('es-CL')} CLP`, 196, finalTableY, { align: 'right' });
+
+      // Signatures
+      const sigY = finalTableY + 25;
+      if (sigY < 270) {
+        doc.setLineWidth(0.2);
+        doc.line(25, sigY, 85, sigY);
+        doc.line(115, sigY, 175, sigY);
+
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Aprobado / Adquisiciones', 55, sigY + 5, { align: 'center' });
+        doc.text(displayCompanyName, 55, sigY + 9, { align: 'center' });
+
+        doc.text('Aceptado / Proveedor', 145, sigY + 5, { align: 'center' });
+        doc.text(orden?.proveedor || 'Firma y Timbre', 145, sigY + 9, { align: 'center' });
+      }
+
+      doc.save(`Orden_Compra_${orden?.folio || 'OC'}.pdf`);
+      Swal.fire({
+        title: '¡Orden de Compra PDF Generada!',
+        text: `Se ha descargado el archivo Orden_Compra_${orden?.folio || 'OC'}.pdf`,
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false
+      });
+    } catch (err) {
+      console.error('Error generando PDF de OC:', err);
+      window.print();
+    }
+  };
+
   // Fake states to simulate the new flows
   const [recepciones, setRecepciones] = useState<any[]>([]);
   const [facturas, setFacturas] = useState<any[]>([]);
@@ -61,6 +265,12 @@ export default function OrdenCompraDetalle({ orden, onBack, onRefresh }: Props) 
             className="bg-[#64748b] hover:bg-slate-600 text-white font-bold h-10 px-5 rounded-lg text-sm tracking-wide"
           >
             <ArrowLeft className="w-4 h-4 mr-2" /> VOLVER
+          </Button>
+          <Button 
+            onClick={handleDescargarOCPDF}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 px-5 rounded-lg text-sm tracking-wide"
+          >
+            <Download className="w-4 h-4 mr-2" /> DESCARGAR PDF
           </Button>
           <Button 
             onClick={() => window.print()}

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, FileText, CheckCircle, XCircle, Printer, ShoppingCart, 
@@ -10,6 +10,10 @@ import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Modal } from '../../components/ui/Modal';
 import Swal from 'sweetalert2';
+import { useCompany } from '../../contexts/CompanyContext';
+import { supabase } from '../../lib/supabase';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface Props {
   solicitud: any;
@@ -105,6 +109,210 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
   const [itemsAprobacion, setItemsAprobacion] = useState<any[]>(
     solicitud.items ? solicitud.items.map((i: any) => ({ ...i, cantidadAprobada: i.cantidadAprobada ?? i.cantidad })) : []
   );
+
+  const { currentCompany, activeCompanyId } = useCompany();
+  const [companyDetails, setCompanyDetails] = useState<{
+    nombre?: string;
+    rut?: string;
+    direccion?: string;
+    comuna?: string;
+    ciudad?: string;
+    telefono?: string;
+    email?: string;
+    website?: string;
+    logo_url?: string;
+  }>({});
+
+  useEffect(() => {
+    async function loadCompanyInfo() {
+      if (!activeCompanyId) return;
+      try {
+        let { data, error } = await supabase
+          .from('empresa')
+          .select('nombre, rut, detalles')
+          .eq('id', activeCompanyId)
+          .single();
+          
+        if (error) {
+          const fallback = await supabase
+            .from('empresa')
+            .select('nombre, rut')
+            .eq('id', activeCompanyId)
+            .single();
+          if (fallback.data) {
+            data = { ...fallback.data, detalles: {} };
+          }
+        }
+        
+        if (data) {
+          const det = data.detalles || {};
+          setCompanyDetails({
+            nombre: data.nombre,
+            rut: data.rut,
+            direccion: det.direccion,
+            comuna: det.comuna,
+            ciudad: det.ciudad,
+            telefono: det.telefono,
+            email: det.email,
+            website: det.website,
+            logo_url: det.logo_url
+          });
+        }
+      } catch (err) {
+        console.warn('Error loading company details for document view', err);
+      }
+    }
+    loadCompanyInfo();
+  }, [activeCompanyId]);
+
+  const displayCompanyName = companyDetails.nombre || currentCompany?.name || currentCompany?.razonSocial || 'MI EMPRESA';
+  const displayCompanyRut = companyDetails.rut ? `RUT: ${companyDetails.rut}` : 'RUT: No registrado';
+  const displayCompanyAddress = [companyDetails.direccion, companyDetails.comuna, companyDetails.ciudad].filter(Boolean).join(', ');
+  const displayCompanyContact = [
+    companyDetails.telefono ? `Tel: ${companyDetails.telefono}` : '',
+    companyDetails.email ? `Email: ${companyDetails.email}` : ''
+  ].filter(Boolean).join(' • ');
+
+  const handleDescargarPDF = () => {
+    try {
+      const doc = new jsPDF();
+      
+      // Header Company
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text(displayCompanyName.toUpperCase(), 14, 20);
+
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'normal');
+      let currentY = 26;
+      if (displayCompanyAddress) {
+        doc.text(displayCompanyAddress, 14, currentY);
+        currentY += 5;
+      }
+      doc.text(`${displayCompanyRut} ${displayCompanyContact ? ' | ' + displayCompanyContact : ''}`, 14, currentY);
+      currentY += 6;
+
+      // Divider Line
+      doc.setLineWidth(0.5);
+      doc.line(14, currentY, 196, currentY);
+      currentY += 8;
+
+      // Title & Document Info
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`SOLICITUD DE COMPRA: ${solicitud.id}`, 14, currentY);
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Fecha: ${solicitud.fecha || new Date().toLocaleDateString('es-CL')}`, 14, currentY + 6);
+      doc.text(`Estado: ${(solicitud.estado || 'BORRADOR').toUpperCase()}`, 130, currentY + 6);
+      currentY += 13;
+
+      // Requerimiento box
+      doc.setFillColor(248, 250, 252);
+      doc.rect(14, currentY, 182, 22, 'F');
+      
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Solicitante:`, 18, currentY + 7);
+      doc.setFont('helvetica', 'normal');
+      doc.text(solicitud.solicitante || 'No especificado', 38, currentY + 7);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Departamento:`, 18, currentY + 15);
+      doc.setFont('helvetica', 'normal');
+      doc.text(solicitud.departamento || 'Operaciones', 42, currentY + 15);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Centro Costo:`, 110, currentY + 7);
+      doc.setFont('helvetica', 'normal');
+      doc.text(solicitud.centroCosto || 'General', 135, currentY + 7);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Prioridad:`, 110, currentY + 15);
+      doc.setFont('helvetica', 'normal');
+      doc.text((solicitud.prioridad || 'MEDIA').toUpperCase(), 135, currentY + 15);
+
+      currentY += 28;
+
+      // Justificacion / Motivo
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Justificación / Motivo del Requerimiento:`, 14, currentY);
+      currentY += 5;
+
+      doc.setFont('helvetica', 'normal');
+      const splitMotivo = doc.splitTextToSize(solicitud.motivo || 'Sin detalle de motivo registrado.', 180);
+      doc.text(splitMotivo, 14, currentY);
+      currentY += (splitMotivo.length * 4.5) + 6;
+
+      // Table of Items
+      const tableData = (solicitud.items || []).map((item: any, index: number) => [
+        index + 1,
+        item.descripcion || '-',
+        `${item.marca || '-'} / ${item.modelo || '-'}`,
+        `${item.cantidad || 0} ${item.unidad || 'UND'}`,
+        `${item.cantidadAprobada ?? item.cantidad ?? 0} ${item.unidad || 'UND'}`,
+        `$${Number(item.montoEstimado || 0).toLocaleString('es-CL')}`
+      ]);
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [['#', 'Descripción / Repuesto', 'Marca / Modelo', 'Cant. Sol.', 'Cant. Aprob.', 'Monto Est.']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold', fontSize: 8.5 },
+        styles: { fontSize: 8, cellPadding: 2.5 },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 10 },
+          1: { cellWidth: 62 },
+          2: { cellWidth: 42 },
+          3: { halign: 'center', cellWidth: 22 },
+          4: { halign: 'center', cellWidth: 22 },
+          5: { halign: 'right', cellWidth: 24 }
+        }
+      });
+
+      const finalTableY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 8 : currentY + 40;
+
+      // Total
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Total Estimado Requerimiento: $${Number(solicitud.montoAprox || 0).toLocaleString('es-CL')} CLP`, 196, finalTableY, { align: 'right' });
+
+      // Signatures
+      const sigY = finalTableY + 22;
+      if (sigY < 270) {
+        doc.setLineWidth(0.2);
+        doc.line(18, sigY, 68, sigY);
+        doc.line(78, sigY, 128, sigY);
+        doc.line(138, sigY, 188, sigY);
+
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'bold');
+        doc.text(solicitud.solicitante || 'Solicitante', 43, sigY + 4, { align: 'center' });
+        doc.text('Solicitado Por', 43, sigY + 8, { align: 'center' });
+
+        doc.text(solicitud.aprobadoPor?.nombre || aprobadorNombre || 'Jefatura Área', 103, sigY + 4, { align: 'center' });
+        doc.text('Aprobado Por', 103, sigY + 8, { align: 'center' });
+
+        doc.text('Adquisiciones / Compras', 163, sigY + 4, { align: 'center' });
+        doc.text('V°B° Control Compras', 163, sigY + 8, { align: 'center' });
+      }
+
+      doc.save(`Solicitud_Compra_${solicitud.id}.pdf`);
+      Swal.fire({
+        title: '¡PDF Descargado!',
+        text: `Se ha generado y descargado el archivo Solicitud_Compra_${solicitud.id}.pdf`,
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false
+      });
+    } catch (err: any) {
+      console.error('Error generando PDF:', err);
+      Swal.fire('Atención', 'Se procede a abrir la vista de impresión.', 'info');
+      window.print();
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -403,7 +611,7 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
       });
     }
     setOcItemsPrices(initialPrices);
-    setOcNotas(`Despachar ítems aprobados correspondientes a Solicitud ${solicitud.id} a Bodega Central Faena Mina El Peñón.`);
+    setOcNotas(`Despachar ítems aprobados correspondientes a Solicitud ${solicitud.id} a Bodega Central de ${displayCompanyName}.`);
     setShowGenerarOCModal(true);
   };
 
@@ -442,6 +650,9 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
       folio: ocFolio,
       fecha: new Date().toLocaleDateString('es-CL'),
       fecha_emision: new Date().toISOString(),
+      empresaNombre: displayCompanyName,
+      empresaRut: companyDetails.rut || '',
+      empresaDireccion: displayCompanyAddress,
       proveedor: ocProveedor,
       proveedor_nombre: ocProveedor,
       rutProveedor: ocRutProveedor,
@@ -538,8 +749,12 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
             <ArrowLeft className="w-4 h-4 mr-2" /> VOLVER
           </Button>
           
+          <Button onClick={handleDescargarPDF} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold">
+            <Download className="w-4 h-4 mr-2" /> DESCARGAR PDF
+          </Button>
+
           <Button onClick={() => setShowPrintModal(true)} variant="outline" className="font-bold border-slate-300 dark:border-slate-700">
-            <Printer className="w-4 h-4 mr-2" /> IMPRIMIR SOLICITUD
+            <Printer className="w-4 h-4 mr-2" /> VISTA PREVIA / IMPRIMIR
           </Button>
 
           {solicitud.estado === 'BORRADOR' && (
@@ -1307,11 +1522,14 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
         <div className="space-y-6">
           <div className="flex justify-between items-center bg-slate-100 dark:bg-slate-800 p-3 rounded-xl no-print">
             <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
-              Vista previa del documento oficial listo para impresión o exportación a PDF.
+              Vista previa del documento oficial de solicitud para impresión o exportación a PDF.
             </span>
             <div className="flex items-center gap-2">
+              <Button onClick={handleDescargarPDF} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 text-xs">
+                <Download className="w-4 h-4 mr-1.5" /> DESCARGAR PDF
+              </Button>
               <Button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-9 text-xs">
-                <Printer className="w-4 h-4 mr-1.5" /> IMPRIMIR / DESCARGAR PDF
+                <Printer className="w-4 h-4 mr-1.5" /> IMPRIMIR DOCUMENTO
               </Button>
               <Button variant="outline" onClick={() => setShowPrintModal(false)} className="h-9 text-xs font-bold">
                 CERRAR
@@ -1323,10 +1541,23 @@ export default function SolicitudCompraDetalle({ solicitud: initialData, onBack,
           <div className="print-area bg-white text-slate-900 p-8 rounded-2xl border border-slate-200 font-sans space-y-6 max-w-4xl mx-auto shadow-lg">
             {/* Header Documento */}
             <div className="flex justify-between items-start border-b-2 border-slate-800 pb-6">
-              <div>
-                <h2 className="text-2xl font-black text-slate-900 tracking-tight">TRANSTRANS S.A.</h2>
-                <p className="text-xs font-bold text-slate-600 uppercase tracking-widest mt-0.5">Operaciones Mineras • Mina El Peñón</p>
-                <p className="text-[11px] text-slate-500 mt-1">RUT: 76.543.210-9 • Tel: +56 55 244 5000</p>
+              <div className="flex items-start gap-4">
+                {companyDetails.logo_url && (
+                  <img 
+                    src={companyDetails.logo_url} 
+                    alt="Logo Empresa" 
+                    className="w-16 h-16 object-contain rounded-lg border border-slate-200 p-1" 
+                  />
+                )}
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900 tracking-tight">{displayCompanyName}</h2>
+                  {displayCompanyAddress && (
+                    <p className="text-xs font-bold text-slate-600 uppercase tracking-widest mt-0.5">{displayCompanyAddress}</p>
+                  )}
+                  <p className="text-[11px] text-slate-500 mt-1 font-bold">
+                    {displayCompanyRut} {displayCompanyContact ? `• ${displayCompanyContact}` : ''}
+                  </p>
+                </div>
               </div>
               <div className="text-right">
                 <span className="inline-block px-3 py-1 bg-blue-100 text-blue-900 rounded font-black text-xs uppercase tracking-wider mb-2">

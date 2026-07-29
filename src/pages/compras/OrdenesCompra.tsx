@@ -166,7 +166,7 @@ export default function OrdenesCompra() {
           {
             id: 'sol-tall-102',
             fecha: '28/07/2026 11:15:00',
-            prioridad: 'CRITICA',
+            prioridad: 'ALTA',
             vehiculo: 'BCDF-44 (OT: OT-2026-092)',
             repuesto: 'Kit Empaquetaduras Cilindro Hidráulico',
             sugerencia: 'Komatsu Cummins Chile',
