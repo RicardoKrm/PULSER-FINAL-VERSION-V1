@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Plus, Search, Filter, CheckCircle, XCircle, Clock, FileText, ShoppingCart, Eye, Trash2 } from 'lucide-react';
+import { Plus, Search, Filter, CheckCircle, XCircle, Clock, FileText, ShoppingCart, Eye, Trash2, AlertTriangle } from 'lucide-react';
 import Swal from 'sweetalert2';
 import SolicitudCompraDetalle from './SolicitudCompraDetalle';
 
@@ -85,6 +85,7 @@ export default function SolicitudesCompra() {
       case 'APROBADA': return 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400';
       case 'APROBADA PARCIALMENTE': return 'text-teal-600 bg-teal-50 dark:bg-teal-500/10 dark:text-teal-400';
       case 'RECHAZADA': return 'text-red-600 bg-red-50 dark:bg-red-500/10 dark:text-red-400';
+      case 'REQUIERE AJUSTE': return 'text-amber-700 bg-amber-50 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-400';
       case 'CONVERTIDA EN OC': return 'text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 dark:text-indigo-400';
       case 'BORRADOR': return 'text-slate-600 bg-slate-50 dark:bg-slate-500/10 dark:text-slate-400';
       default: return 'text-blue-600 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-400'; // Pendiente
@@ -96,6 +97,7 @@ export default function SolicitudesCompra() {
       case 'APROBADA': return <CheckCircle className="w-4 h-4 mr-1" />;
       case 'APROBADA PARCIALMENTE': return <CheckCircle className="w-4 h-4 mr-1" />;
       case 'RECHAZADA': return <XCircle className="w-4 h-4 mr-1" />;
+      case 'REQUIERE AJUSTE': return <AlertTriangle className="w-4 h-4 mr-1 text-amber-600" />;
       case 'CONVERTIDA EN OC': return <ShoppingCart className="w-4 h-4 mr-1" />;
       case 'BORRADOR': return <FileText className="w-4 h-4 mr-1" />;
       default: return <Clock className="w-4 h-4 mr-1" />;
