@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
@@ -27,7 +29,12 @@ import {
   ChevronRight,
   Info,
   Sun,
-  Moon
+  Moon,
+  FileText,
+  CheckSquare,
+  Square,
+  ChevronDown,
+  X
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -83,6 +90,12 @@ export default function HorasMaquinaPage() {
   const [dispoYear, setDispoYear] = useState<number>(2026);
   const [dispoMonth, setDispoMonth] = useState<string>('todos'); // 'todos' or '1'..'12'
   const [baseHorasMes, setBaseHorasMes] = useState<number>(720); // standard 720 hrs
+
+  // Tab 2 Multi-Select Vehicles Filter
+  const [selectedEquiposDispo, setSelectedEquiposDispo] = useState<string[]>([]);
+  const [isVehicleFilterOpen, setIsVehicleFilterOpen] = useState<boolean>(false);
+  const [vehicleSearchTerm, setVehicleSearchTerm] = useState<string>('');
+  const [isFilterInitialized, setIsFilterInitialized] = useState<boolean>(false);
 
   // Modals State
   const [isNewModalOpen, setIsNewModalOpen] = useState<boolean>(false);
@@ -188,6 +201,28 @@ export default function HorasMaquinaPage() {
     });
     return Array.from(setEq).sort();
   }, [records]);
+
+  // Auto-initialize selected vehicles with all uniqueEquipos when loaded
+  useEffect(() => {
+    if (uniqueEquipos.length > 0 && !isFilterInitialized) {
+      setSelectedEquiposDispo(uniqueEquipos);
+      setIsFilterInitialized(true);
+    }
+  }, [uniqueEquipos, isFilterInitialized]);
+
+  const toggleEquipoDispo = (eq: string) => {
+    setSelectedEquiposDispo(prev => 
+      prev.includes(eq) ? prev.filter(item => item !== eq) : [...prev, eq]
+    );
+  };
+
+  const selectAllEquiposDispo = () => {
+    setSelectedEquiposDispo(uniqueEquipos);
+  };
+
+  const deselectAllEquiposDispo = () => {
+    setSelectedEquiposDispo([]);
+  };
 
   // Helper functions for turnos
   const isTurnoNoche = (t?: string) => {
@@ -441,6 +476,9 @@ export default function HorasMaquinaPage() {
       if (y !== dispoYear) return;
       if (dispoMonth !== 'todos' && m !== parseInt(dispoMonth, 10)) return;
 
+      // Filter by selected vehicles/equipos
+      if (selectedEquiposDispo.length > 0 && !selectedEquiposDispo.includes(rec.equipo)) return;
+
       if (!agg[rec.equipo]) {
         agg[rec.equipo] = {};
       }
@@ -492,7 +530,7 @@ export default function HorasMaquinaPage() {
     });
 
     return rows;
-  }, [records, dispoYear, dispoMonth, baseHorasMes]);
+  }, [records, dispoYear, dispoMonth, baseHorasMes, selectedEquiposDispo]);
 
   // Aggregated totals by Machine across selected months
   const aggregatedByMachineTotal = useMemo(() => {
@@ -553,10 +591,12 @@ export default function HorasMaquinaPage() {
   const monthlyFleetTrend = useMemo(() => {
     return monthNames.map((name, idx) => {
       const monthNum = idx + 1;
-      // Find all records for this month
+      // Find all records for this month filtering selected vehicles
       const monthRecs = records.filter(r => {
         const [y, m] = r.fecha.split('-').map(Number);
-        return y === dispoYear && m === monthNum;
+        if (y !== dispoYear || m !== monthNum) return false;
+        if (selectedEquiposDispo.length > 0 && !selectedEquiposDispo.includes(r.equipo)) return false;
+        return true;
       });
 
       const horasMonth = monthRecs.reduce((s, r) => s + (r.horasOperativas || 0), 0);
@@ -576,7 +616,122 @@ export default function HorasMaquinaPage() {
         equiposActivos: activeEqs
       };
     });
-  }, [records, dispoYear, baseHorasMes]);
+  }, [records, dispoYear, baseHorasMes, selectedEquiposDispo]);
+
+  // PDF Export Report Generator
+  const handleExportPDF = () => {
+    if (monthlyStatsPerMachine.length === 0) {
+      alert('No hay datos de disponibilidad para generar el informe PDF.');
+      return;
+    }
+
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+    // Header Banner
+    doc.setFillColor(15, 23, 42); // slate-900
+    doc.rect(0, 0, 297, 24, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('INFORME DE DISPONIBILIDAD Y HORAS MÁQUINA DE FLOTA', 14, 11);
+
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(226, 232, 240);
+    const periodoLabel = dispoMonth === 'todos' ? 'Año Acumulado' : monthNames[parseInt(dispoMonth, 10) - 1];
+    doc.text(`Año: ${dispoYear} | Periodo: ${periodoLabel} | Base Horas Mes: ${baseHorasMes} hrs`, 14, 18);
+
+    doc.text(`Emisión: ${new Date().toLocaleDateString('es-CL')} ${new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`, 220, 18);
+
+    // KPI Summary Box
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(14, 28, 269, 22, 2, 2, 'FD');
+
+    // Stats Headers
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DISPONIBILIDAD FLOTA', 20, 34);
+    doc.text('TOTAL HORAS MÁQUINA', 80, 34);
+    doc.text('COMBUSTIBLE CONSUMIDO', 140, 34);
+    doc.text('CONSUMO PROMEDIO', 200, 34);
+    doc.text('EQUIPOS EVALUADOS', 245, 34);
+
+    // Stats Values
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${globalFleetStats.dispoGlobalPct.toFixed(1)}%`, 20, 43);
+    doc.text(`${globalFleetStats.totalHorasFlota.toLocaleString()} hrs`, 80, 43);
+    doc.text(`${globalFleetStats.totalCombustibleFlota.toLocaleString()} L`, 140, 43);
+    doc.text(`${globalFleetStats.consumoPromFlota} L/h`, 200, 43);
+    doc.text(`${globalFleetStats.totalEquipos} máquinas`, 245, 43);
+
+    // Subtitle note
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(71, 85, 105);
+    doc.text(`* Filtro de Flota Activo: ${selectedEquiposDispo.length} de ${uniqueEquipos.length} vehículos evaluados. Fórmula: (Horas Uso / ${baseHorasMes}h base) × 100`, 14, 55);
+
+    // Table Data
+    const tableData = monthlyStatsPerMachine.map(r => [
+      r.equipo,
+      `${r.mesNombre} ${dispoYear}`,
+      `${r.diasTrabajados} días`,
+      `${r.horasUso.toLocaleString(undefined, { minimumFractionDigits: 1 })} h`,
+      `${r.combustibleL.toLocaleString()} L`,
+      `${r.consumoPromedio} L/h`,
+      `${r.baseHoras} h`,
+      `${r.disponibilidadPct.toFixed(1)}%`,
+      r.vueltas.toLocaleString()
+    ]);
+
+    autoTable(doc, {
+      startY: 58,
+      head: [['Equipo / Máquina', 'Mes / Periodo', 'Días Operados', 'Horas Máquina Uso', 'Combustible (L)', 'Consumo Prom. (L/Hr)', 'Horas Base Mes', 'Disponibilidad (%)', 'Vueltas Totales']],
+      body: tableData,
+      theme: 'grid',
+      styles: {
+        fontSize: 8,
+        cellPadding: 2.5,
+        valign: 'middle'
+      },
+      headStyles: {
+        fillColor: [30, 41, 59],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        halign: 'center'
+      },
+      columnStyles: {
+        0: { fontStyle: 'bold', halign: 'left' },
+        1: { halign: 'center' },
+        2: { halign: 'center' },
+        3: { halign: 'right', fontStyle: 'bold' },
+        4: { halign: 'right' },
+        5: { halign: 'right' },
+        6: { halign: 'right' },
+        7: { halign: 'center', fontStyle: 'bold' },
+        8: { halign: 'center' }
+      },
+      didParseCell: function(data) {
+        if (data.section === 'body' && data.column.index === 7) {
+          const valStr = data.cell.raw as string;
+          const val = parseFloat(valStr.replace('%', ''));
+          if (val >= 80) {
+            data.cell.styles.textColor = [16, 185, 129];
+          } else if (val >= 50) {
+            data.cell.styles.textColor = [217, 119, 6];
+          } else {
+            data.cell.styles.textColor = [225, 29, 72];
+          }
+        }
+      }
+    });
+
+    doc.save(`Informe_Disponibilidad_Horas_Maquina_${dispoYear}_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
 
   const exportMonthlyReportExcel = () => {
     const dataToExport = monthlyStatsPerMachine.map(r => ({
@@ -698,10 +853,7 @@ export default function HorasMaquinaPage() {
           }`}
         >
           <FileSpreadsheet className="w-4 h-4" />
-          Registro Operacional (Horas Máquina / Excel)
-          <span className="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs px-2 py-0.5 rounded-full font-bold ml-1">
-            {records.length.toLocaleString()} datos
-          </span>
+          Registro Operacional
         </button>
 
         <button
@@ -1234,17 +1386,132 @@ export default function HorasMaquinaPage() {
                     className="w-28 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-bold text-slate-800 dark:text-slate-200"
                   />
                 </div>
+
+                {/* Multi-select Vehicle Filter */}
+                <div className="relative">
+                  <label className="block text-slate-500 font-bold mb-1">Equipos en KPI ({selectedEquiposDispo.length}/{uniqueEquipos.length})</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsVehicleFilterOpen(!isVehicleFilterOpen)}
+                    className="bg-amber-50/80 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700/60 rounded-lg p-2 font-extrabold text-amber-900 dark:text-amber-200 flex items-center gap-2 hover:bg-amber-100/80 dark:hover:bg-amber-900/50 transition-colors shadow-xs"
+                  >
+                    <Truck className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span className="truncate max-w-[180px]">
+                      {selectedEquiposDispo.length === uniqueEquipos.length 
+                        ? `Todos (${uniqueEquipos.length} vehíc.)` 
+                        : `${selectedEquiposDispo.length} Seleccionados`}
+                    </span>
+                    <ChevronDown className="w-3.5 h-3.5 ml-1 text-amber-600 dark:text-amber-400 shrink-0" />
+                  </button>
+
+                  {/* Multi-select Popover Dropdown */}
+                  {isVehicleFilterOpen && (
+                    <div className="absolute left-0 top-full mt-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 p-3 animate-in fade-in duration-150">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800 mb-2">
+                        <span className="font-extrabold text-slate-900 dark:text-slate-100 text-xs">
+                          Filtrar Vehículos en KPI
+                        </span>
+                        <button
+                          onClick={() => setIsVehicleFilterOpen(false)}
+                          className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 rounded"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Search box inside popover */}
+                      <div className="relative mb-2">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                        <input
+                          type="text"
+                          placeholder="Buscar vehículo..."
+                          value={vehicleSearchTerm}
+                          onChange={(e) => setVehicleSearchTerm(e.target.value)}
+                          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md pl-8 pr-2 py-1 text-xs font-medium"
+                        />
+                      </div>
+
+                      {/* Quick Select All / Deselect All */}
+                      <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-slate-100 dark:border-slate-800 text-[11px] font-bold">
+                        <button
+                          onClick={selectAllEquiposDispo}
+                          className="text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1"
+                        >
+                          <CheckSquare className="w-3 h-3" /> Seleccionar Todos
+                        </button>
+                        <button
+                          onClick={deselectAllEquiposDispo}
+                          className="text-slate-500 dark:text-slate-400 hover:underline flex items-center gap-1"
+                        >
+                          <Square className="w-3 h-3" /> Deseleccionar Todos
+                        </button>
+                      </div>
+
+                      {/* Equipment List Checkboxes */}
+                      <div className="max-h-52 overflow-y-auto space-y-1 pr-1">
+                        {uniqueEquipos
+                          .filter(eq => eq.toLowerCase().includes(vehicleSearchTerm.toLowerCase()))
+                          .map(eq => {
+                            const isChecked = selectedEquiposDispo.includes(eq);
+                            return (
+                              <label
+                                key={eq}
+                                className="flex items-center gap-2 p-1.5 rounded hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer text-xs font-semibold text-slate-800 dark:text-slate-200"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => toggleEquipoDispo(eq)}
+                                  className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 w-3.5 h-3.5"
+                                />
+                                <span className="truncate">{eq}</span>
+                              </label>
+                            );
+                          })}
+                        {uniqueEquipos.filter(eq => eq.toLowerCase().includes(vehicleSearchTerm.toLowerCase())).length === 0 && (
+                          <div className="text-center py-4 text-xs text-slate-400 italic">
+                            No se encontraron vehículos
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Footer Info */}
+                      <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[10px] font-bold text-slate-500">
+                        <span>{selectedEquiposDispo.length} seleccionados</span>
+                        <Button
+                          size="xs"
+                          onClick={() => setIsVehicleFilterOpen(false)}
+                          className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-2 py-0.5 rounded text-[11px]"
+                        >
+                          Listo
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <Button
-                onClick={exportMonthlyReportExcel}
-                variant="outline"
-                size="sm"
-                className="font-bold flex items-center gap-1.5"
-              >
-                <Download className="w-4 h-4 text-emerald-600" />
-                Exportar Reporte Disponibilidad
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={handleExportPDF}
+                  className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm px-3.5 py-2 rounded-lg"
+                  title="Generar informe profesional en formato PDF"
+                >
+                  <FileText className="w-4 h-4" />
+                  Informe PDF
+                </Button>
+
+                <Button
+                  onClick={exportMonthlyReportExcel}
+                  variant="outline"
+                  size="sm"
+                  className="font-bold flex items-center gap-1.5 border-slate-300 dark:border-slate-700"
+                  title="Exportar reporte de disponibilidad a Excel (.xlsx)"
+                >
+                  <Download className="w-4 h-4 text-emerald-600" />
+                  Exportar Excel
+                </Button>
+              </div>
             </div>
           </Card>
 
