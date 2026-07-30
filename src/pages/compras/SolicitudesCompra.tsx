@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCompany } from '../../contexts/CompanyContext';
+import { supabase } from '../../lib/supabase';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Plus, Search, Filter, CheckCircle, XCircle, Clock, FileText, ShoppingCart, Eye, Trash2, AlertTriangle } from 'lucide-react';
@@ -12,22 +13,46 @@ export default function SolicitudesCompra() {
   const [view, setView] = useState<'list' | 'detail'>('list');
   const [selectedSolicitud, setSelectedSolicitud] = useState<any>(null);
 
-  // Persistent requests state, cleaned of mock data
-  const [solicitudes, setSolicitudes] = useState<any[]>(() => {
-    const saved = localStorage.getItem('solicitudes_compra');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Error loading solicitudes from localStorage', e);
-      }
-    }
-    return [];
-  });
+  const [solicitudes, setSolicitudes] = useState<any[]>([]);
 
-  React.useEffect(() => {
-    localStorage.setItem('solicitudes_compra', JSON.stringify(solicitudes));
-  }, [solicitudes]);
+  // Fetch from Supabase on mount/company change
+  const fetchSolicitudes = async () => {
+    if (!currentCompany) return;
+    try {
+      const { data, error } = await supabase
+        .from('compras_solicitudes')
+        .select('*')
+        .eq('empresa_id', currentCompany.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.warn('Supabase compras_solicitudes notice:', error.message);
+        return;
+      }
+
+      if (data) {
+        const dbMapped = data.map((item: any) => ({
+          id: item.id || item.codigo_solicitud,
+          solicitante: item.solicitante,
+          departamento: item.departamento,
+          fecha: item.fecha,
+          prioridad: item.prioridad,
+          motivo: item.motivo,
+          estado: item.estado,
+          items: item.items || [],
+          ...(item.detalles || {})
+        }));
+
+        setSolicitudes(dbMapped);
+      }
+    } catch (e) {
+      console.warn('Error conectando a Supabase compras_solicitudes:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchSolicitudes();
+  }, [currentCompany]);
 
   // Generate next correlative ID (e.g. SC-000001)
   const getNextId = () => {
@@ -40,35 +65,137 @@ export default function SolicitudesCompra() {
     return `SC-${String(maxNum + 1).padStart(6, '0')}`;
   };
 
-  const handleSaveSolicitud = (solicitudData: any) => {
-    setSolicitudes(prev => {
-      const index = prev.findIndex(s => s.id === solicitudData.id);
-      if (index >= 0) {
-        const updated = [...prev];
-        updated[index] = solicitudData;
-        return updated;
-      } else {
-        return [solicitudData, ...prev];
+  const handleSaveSolicitud = async (solicitudData: any) => {
+    if (!currentCompany) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error de Empresa',
+        text: 'No se ha seleccionado una empresa activa.',
+        confirmButtonColor: '#ef4444'
+      });
+      return;
+    }
+
+    // Mostrar loader bloqueante
+    Swal.fire({
+      title: 'Guardando en la Base de Datos...',
+      text: 'Por favor espere mientras se registra la solicitud.',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
       }
     });
-    setView('list');
+
+    try {
+      // Guardar de forma estrictamente sincrónica/bloqueante en Supabase
+      const { error } = await supabase.from('compras_solicitudes').upsert({
+        id: solicitudData.id,
+        empresa_id: currentCompany.id,
+        codigo_solicitud: solicitudData.id,
+        solicitante: solicitudData.solicitante,
+        departamento: solicitudData.departamento,
+        fecha: solicitudData.fecha,
+        prioridad: solicitudData.prioridad,
+        motivo: solicitudData.motivo,
+        estado: solicitudData.estado,
+        items: solicitudData.items || [],
+        detalles: solicitudData
+      });
+
+      if (error) {
+        console.error('Error al guardar en Supabase compras_solicitudes:', error);
+        // Si falla, mostramos el error de base de datos y mantenemos el formulario abierto
+        Swal.fire({
+          icon: 'error',
+          title: 'No se pudo guardar la solicitud',
+          text: 'La base de datos rechazó el registro de la solicitud. Motivo: ' + (error.message || 'Error desconocido'),
+          confirmButtonColor: '#ef4444'
+        });
+        return; // Retorno preventivo, no cerramos la vista ni actualizamos el listado local
+      }
+
+      // Si fue exitoso, actualizamos el estado local en memoria
+      setSolicitudes(prev => {
+        const index = prev.findIndex(s => s.id === solicitudData.id);
+        if (index >= 0) {
+          const updated = [...prev];
+          updated[index] = solicitudData;
+          return updated;
+        } else {
+          return [solicitudData, ...prev];
+        }
+      });
+
+      Swal.fire({
+        icon: 'success',
+        title: '¡Guardado Exitoso!',
+        text: 'La solicitud se ha registrado correctamente en la base de datos.',
+        timer: 1500,
+        showConfirmButton: false
+      });
+
+      setView('list');
+    } catch (e: any) {
+      console.error('Error al guardar en Supabase compras_solicitudes:', e);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error de Red / Conexión',
+        text: 'No se pudo conectar con el servidor para guardar la solicitud: ' + (e.message || e),
+        confirmButtonColor: '#ef4444'
+      });
+    }
   };
 
-  const handleBorrarSolicitud = (id: string, e: React.MouseEvent) => {
+  const handleBorrarSolicitud = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     Swal.fire({
       title: '¿Eliminar solicitud?',
-      text: `Se eliminará la solicitud ${id} permanentemente.`,
+      text: `Se eliminará la solicitud ${id} permanentemente de la base de datos.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
       cancelButtonColor: '#64748b',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar'
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
+        if (currentCompany) {
+          Swal.fire({
+            title: 'Eliminando...',
+            text: 'Por favor espere mientras se elimina de la base de datos.',
+            allowOutsideClick: false,
+            didOpen: () => {
+              Swal.showLoading();
+            }
+          });
+
+          try {
+            const { error } = await supabase.from('compras_solicitudes').delete().eq('id', id);
+            if (error) {
+              console.error('Error eliminando de Supabase:', error);
+              Swal.fire({
+                icon: 'error',
+                title: 'Error al eliminar',
+                text: 'No se pudo eliminar de la base de datos: ' + error.message,
+                confirmButtonColor: '#ef4444'
+              });
+              return;
+            }
+          } catch (e: any) {
+            console.warn('Error eliminando de Supabase:', e);
+            Swal.fire({
+              icon: 'error',
+              title: 'Error de Conexión',
+              text: 'Ocurrió un error al intentar eliminar la solicitud del servidor.',
+              confirmButtonColor: '#ef4444'
+            });
+            return;
+          }
+        }
+        
+        // Si se eliminó correctamente de Supabase, actualizamos el estado local
         setSolicitudes(prev => prev.filter(s => s.id !== id));
-        Swal.fire('Eliminada', 'La solicitud ha sido eliminada.', 'success');
+        Swal.fire('Eliminada', 'La solicitud ha sido eliminada de la base de datos.', 'success');
       }
     });
   };

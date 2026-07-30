@@ -22,7 +22,8 @@ import {
   PackageCheck,
   MessageSquare,
   List,
-  Trash2
+  Trash2,
+  CheckCircle
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -43,6 +44,8 @@ interface PedidoTaller {
   cantidad: number;
   motivo: string;
   selected?: boolean;
+  estado?: 'PENDIENTE' | 'OC_GENERADA' | 'RECIBIDO';
+  folio_oc?: string;
 }
 
 interface OrdenCompra {
@@ -85,12 +88,66 @@ export default function OrdenesCompra() {
   const [proveedores, setProveedores] = useState<any[]>([]);
   const [searchHistory, setSearchHistory] = useState('');
 
+  // Persistent map for processed workshop requests
+  const [pedidosProcesadosMap, setPedidosProcesadosMap] = useState<Record<string, { estado: string; folio_oc: string; fecha: string }>>(() => {
+    const saved = localStorage.getItem('pedidos_taller_procesados');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Error parsing pedidos_taller_procesados', e);
+      }
+    }
+    return {};
+  });
+
+  const [filtroPedidosTaller, setFiltroPedidosTaller] = useState<'PENDIENTES' | 'OC_GENERADA' | 'TODOS'>('PENDIENTES');
+  const [filtroHistorialState, setFiltroHistorialState] = useState<'TODAS' | 'PENDIENTES' | 'RECIBIDAS' | 'ANULADAS'>('TODAS');
+
+  useEffect(() => {
+    localStorage.setItem('pedidos_taller_procesados', JSON.stringify(pedidosProcesadosMap));
+  }, [pedidosProcesadosMap]);
+
   useEffect(() => {
     if (currentCompany) {
        fetchDatosBase();
        fetchOrdenes();
     }
   }, [currentCompany]);
+
+  // Sequential Correlative Generator
+  const getNextFolioCorrelativo = (): string => {
+    const year = new Date().getFullYear();
+    const existingLocal = JSON.parse(localStorage.getItem('ordenes_compra') || '[]');
+    const all = [...historialOrdenes, ...ordenesPendientes, ...existingLocal];
+    
+    let maxNum = 1000;
+    all.forEach(o => {
+      if (o?.folio) {
+        const matches = o.folio.match(/\d+/g);
+        if (matches) {
+          matches.forEach((m: string) => {
+            const num = parseInt(m, 10);
+            if (num > maxNum && num < 99999) {
+              maxNum = num;
+            }
+          });
+        }
+      }
+    });
+
+    const savedNext = localStorage.getItem('oc_correlativo_next');
+    if (savedNext) {
+      const parsedSaved = parseInt(savedNext, 10);
+      if (!isNaN(parsedSaved) && parsedSaved > maxNum) {
+        maxNum = parsedSaved - 1;
+      }
+    }
+
+    const nextNum = maxNum + 1;
+    localStorage.setItem('oc_correlativo_next', String(nextNum + 1));
+    return `OC-${year}-${String(nextNum).padStart(4, '0')}`;
+  };
 
   const fetchDatosBase = async () => {
      if (!currentCompany) return;
@@ -127,7 +184,7 @@ export default function OrdenesCompra() {
      }
   };
 
-  const pedidosTaller = React.useMemo(() => {
+  const allPedidosTaller = React.useMemo(() => {
      let pedidos: PedidoTaller[] = [];
      ordenesTrabajo.forEach(ot => {
          const vehiculo = vehiculos.find(v => v.id === ot.vehiculo_id)?.patente || 'Desconocido';
@@ -142,8 +199,7 @@ export default function OrdenesCompra() {
                          repuesto: sol.repuesto_nombre || sol.descripcion || 'Sin nombre',
                          sugerencia: 'Sin sugerencia',
                          cantidad: sol.cantidad,
-                         motivo: ot.observacion || ot.diagnostico || 'Repuesto para OT',
-                         selected: selectedPedidos.includes(sol.id)
+                         motivo: ot.observacion || ot.diagnostico || 'Repuesto para OT'
                      });
                  }
              });
@@ -160,8 +216,7 @@ export default function OrdenesCompra() {
             repuesto: 'Filtro Aceite Caterpillar D8T (1R-1808)',
             sugerencia: 'Finning Chile S.A.',
             cantidad: 4,
-            motivo: 'Mantención preventiva 500 hrs camión aljibe',
-            selected: selectedPedidos.includes('sol-tall-101')
+            motivo: 'Mantención preventiva 500 hrs camión aljibe'
           },
           {
             id: 'sol-tall-102',
@@ -171,8 +226,7 @@ export default function OrdenesCompra() {
             repuesto: 'Kit Empaquetaduras Cilindro Hidráulico',
             sugerencia: 'Komatsu Cummins Chile',
             cantidad: 2,
-            motivo: 'Fuga crítica en cilindro levantamiento',
-            selected: selectedPedidos.includes('sol-tall-102')
+            motivo: 'Fuga crítica en cilindro levantamiento'
           },
           {
             id: 'sol-tall-103',
@@ -182,13 +236,31 @@ export default function OrdenesCompra() {
             repuesto: 'Pastillas de Freno Delanteras Heavy Duty',
             sugerencia: 'Ferretería Industrial Berschand',
             cantidad: 6,
-            motivo: 'Desgaste por uso en faena mina',
-            selected: selectedPedidos.includes('sol-tall-103')
+            motivo: 'Desgaste por uso en faena mina'
           }
         ];
      }
-     return pedidos;
-  }, [ordenesTrabajo, vehiculos, selectedPedidos]);
+
+     return pedidos.map(p => {
+       const proc = pedidosProcesadosMap[p.id];
+       return {
+         ...p,
+         estado: proc ? (proc.estado as any) : 'PENDIENTE',
+         folio_oc: proc ? proc.folio_oc : undefined,
+         selected: selectedPedidos.includes(p.id)
+       };
+     });
+  }, [ordenesTrabajo, vehiculos, selectedPedidos, pedidosProcesadosMap]);
+
+  const pedidosTaller = React.useMemo(() => {
+    if (filtroPedidosTaller === 'PENDIENTES') {
+      return allPedidosTaller.filter(p => p.estado === 'PENDIENTE');
+    }
+    if (filtroPedidosTaller === 'OC_GENERADA') {
+      return allPedidosTaller.filter(p => p.estado === 'OC_GENERADA' || p.estado === 'RECIBIDO');
+    }
+    return allPedidosTaller;
+  }, [allPedidosTaller, filtroPedidosTaller]);
 
   const [ordenesPendientes, setOrdenesPendientes] = useState<OrdenCompra[]>([]);
   const [historialOrdenes, setHistorialOrdenes] = useState<HistorialOrden[]>([]);
@@ -219,7 +291,7 @@ export default function OrdenesCompra() {
       return;
     }
     const montoTotal = nuevaOCLineas.reduce((acc, l) => acc + (l.cantidad * (l.precioUnitario || 0)), 0);
-    const folioStr = `OC-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const folioStr = getNextFolioCorrelativo();
 
     const nuevaOCLocal = {
       id: 'oc-' + Date.now(),
@@ -294,7 +366,7 @@ export default function OrdenesCompra() {
     }
 
     const prov = proveedorSeleccionadoTaller || 'Finning Chile S.A.';
-    const folioStr = `OC-TALLER-${Math.floor(1000 + Math.random() * 9000)}`;
+    const folioStr = getNextFolioCorrelativo();
     const resumen = `OC Taller para ${pedidosSeleccionados.length} repuestos: ${pedidosSeleccionados.map(p => p.repuesto).join(', ')}`;
     
     if (currentCompany) {
@@ -352,12 +424,122 @@ export default function OrdenesCompra() {
     const existingOCs = JSON.parse(localStorage.getItem('ordenes_compra') || '[]');
     localStorage.setItem('ordenes_compra', JSON.stringify([nuevaOC, ...existingOCs]));
 
+    // Mark selected workshop requests as OC_GENERADA in map so they leave active pending list
+    const updatedMap = { ...pedidosProcesadosMap };
+    pedidosSeleccionados.forEach(p => {
+      updatedMap[p.id] = {
+        estado: 'OC_GENERADA',
+        folio_oc: folioStr,
+        fecha: new Date().toLocaleDateString('es-CL')
+      };
+    });
+    setPedidosProcesadosMap(updatedMap);
+
     Swal.fire({
       title: '¡Orden de Compra Generada!',
-      text: `Se ha creado exitosamente la Orden de Compra ${folioStr} asignada a ${prov} por ${pedidosSeleccionados.length} repuestos de taller.`,
+      text: `Se ha creado la Orden de Compra ${folioStr} asignada a ${prov}. Los repuestos han sido marcados como 'OC Generada' y pasaron a la sección de Órdenes en Tránsito.`,
       icon: 'success'
     });
     setSelectedPedidos([]);
+    fetchOrdenes();
+  };
+
+  const handleAnularOC = async (folio: string) => {
+    const existingLocal = JSON.parse(localStorage.getItem('ordenes_compra') || '[]');
+    const ordenObj = 
+      ordenesPendientes.find(o => o.folio === folio) || 
+      historialOrdenes.find(o => o.folio === folio) ||
+      existingLocal.find((o: any) => o.folio === folio);
+
+    if (!ordenObj) {
+      Swal.fire('Error', `No se encontró la Orden de Compra ${folio}.`, 'error');
+      return;
+    }
+
+    if (ordenObj.estado === 'ANULADA') {
+      Swal.fire('Atención', `La Orden de Compra ${folio} ya se encuentra anulada.`, 'info');
+      return;
+    }
+
+    const { value: motivo, isConfirmed } = await Swal.fire({
+      title: `Anular Orden de Compra ${folio}`,
+      text: 'Se requiere ingresar el motivo de anulación para mantener el respaldo auditable de correlativos.',
+      input: 'textarea',
+      inputLabel: 'Motivo de Anulación / Eliminación (Obligatorio)',
+      inputPlaceholder: 'Ej: Error de valores, duplicación de requerimiento, cambio de especificaciones...',
+      inputValidator: (value) => {
+        if (!value || !value.trim()) {
+          return 'Debe ingresar obligatoriamente un motivo de anulación.';
+        }
+      },
+      showCancelButton: true,
+      confirmButtonText: 'Sí, Anular Orden',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b'
+    });
+
+    if (!isConfirmed || !motivo) return;
+
+    const fechaAnulacion = new Date().toLocaleString('es-CL');
+    const usuarioAnulacion = 'Administrador Compras';
+
+    // 1. Update in Supabase
+    try {
+      await supabase.from('compras_ordenes').update({
+        estado: 'ANULADA',
+        notas: `${ordenObj.resumen || ''}\n[ANULADA ${fechaAnulacion}]: ${motivo}`
+      }).eq('folio', folio);
+    } catch (e) {
+      console.warn('Supabase update on cancel', e);
+    }
+
+    // 2. Update in localStorage
+    let foundInLocal = false;
+    const updatedLocal = existingLocal.map((o: any) => {
+      if (o.folio === folio || o.id === ordenObj.id) {
+        foundInLocal = true;
+        return {
+          ...o,
+          estado: 'ANULADA',
+          motivo_anulacion: motivo,
+          fecha_anulacion: fechaAnulacion,
+          usuario_anulacion: usuarioAnulacion
+        };
+      }
+      return o;
+    });
+
+    if (!foundInLocal) {
+      updatedLocal.unshift({
+        ...ordenObj,
+        estado: 'ANULADA',
+        motivo_anulacion: motivo,
+        fecha_anulacion: fechaAnulacion,
+        usuario_anulacion: usuarioAnulacion
+      });
+    }
+    localStorage.setItem('ordenes_compra', JSON.stringify(updatedLocal));
+
+    // 3. Release associated workshop items if any
+    const updatedMap = { ...pedidosProcesadosMap };
+    let releasedCount = 0;
+    Object.keys(updatedMap).forEach(k => {
+      if (updatedMap[k]?.folio_oc === folio) {
+        delete updatedMap[k];
+        releasedCount++;
+      }
+    });
+    if (releasedCount > 0) {
+      setPedidosProcesadosMap(updatedMap);
+    }
+
+    Swal.fire({
+      title: '¡Orden Anulada Exitosamente!',
+      text: `La Orden ${folio} fue marcada como ANULADA y preservada en el registro de correlativos. ${releasedCount > 0 ? `${releasedCount} repuesto(s) de taller fueron liberados.` : ''}`,
+      icon: 'success'
+    });
+
     fetchOrdenes();
   };
 
@@ -391,10 +573,25 @@ export default function OrdenesCompra() {
     }
   };
 
-  const filteredHistory = historialOrdenes.filter(h => 
-     h.folio.toLowerCase().includes(searchHistory.toLowerCase()) || 
-     h.proveedor.toLowerCase().includes(searchHistory.toLowerCase())
-  );
+  const filteredHistory = historialOrdenes.filter(h => {
+     const matchesSearch = 
+       h.folio.toLowerCase().includes(searchHistory.toLowerCase()) || 
+       h.proveedor.toLowerCase().includes(searchHistory.toLowerCase()) ||
+       (h.resumen && h.resumen.toLowerCase().includes(searchHistory.toLowerCase()));
+
+     if (!matchesSearch) return false;
+
+     if (filtroHistorialState === 'PENDIENTES') {
+       return h.estado === 'PENDIENTE' || h.estado === 'EN_TRANSITO' || h.estado === 'ENVIADA';
+     }
+     if (filtroHistorialState === 'RECIBIDAS') {
+       return h.estado === 'RECIBIDA' || h.estado === 'CERRADA';
+     }
+     if (filtroHistorialState === 'ANULADAS') {
+       return h.estado === 'ANULADA';
+     }
+     return true;
+  });
   
   if (view === 'detalle') {
     const ordenObj = 
@@ -406,6 +603,7 @@ export default function OrdenesCompra() {
         orden={ordenObj} 
         onBack={() => setView('panel')} 
         onRefresh={fetchOrdenes} 
+        onAnular={handleAnularOC}
       />
     );
   }
@@ -434,7 +632,50 @@ export default function OrdenesCompra() {
         </div>
 
         {/* Filters */}
-        <Card className="rounded-2xl border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden p-6 bg-white dark:bg-slate-800">
+        <Card className="rounded-2xl border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden p-6 bg-white dark:bg-slate-800 space-y-4">
+          <div className="flex flex-wrap gap-2 pb-2 border-b border-slate-100 dark:border-slate-700">
+            <button
+              onClick={() => setFiltroHistorialState('TODAS')}
+              className={`px-4 py-2 rounded-lg text-xs font-black tracking-wider transition-all ${
+                filtroHistorialState === 'TODAS'
+                  ? 'bg-slate-800 text-white shadow-sm'
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+              }`}
+            >
+              📋 TODAS
+            </button>
+            <button
+              onClick={() => setFiltroHistorialState('PENDIENTES')}
+              className={`px-4 py-2 rounded-lg text-xs font-black tracking-wider transition-all ${
+                filtroHistorialState === 'PENDIENTES'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300 hover:bg-blue-100'
+              }`}
+            >
+              🔵 EN TRÁNSITO / PENDIENTES
+            </button>
+            <button
+              onClick={() => setFiltroHistorialState('RECIBIDAS')}
+              className={`px-4 py-2 rounded-lg text-xs font-black tracking-wider transition-all ${
+                filtroHistorialState === 'RECIBIDAS'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100'
+              }`}
+            >
+              🟢 RECIBIDAS
+            </button>
+            <button
+              onClick={() => setFiltroHistorialState('ANULADAS')}
+              className={`px-4 py-2 rounded-lg text-xs font-black tracking-wider transition-all ${
+                filtroHistorialState === 'ANULADAS'
+                  ? 'bg-red-600 text-white shadow-sm'
+                  : 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-300 hover:bg-red-100'
+              }`}
+            >
+              🔴 ANULADAS (Respaldo Correlativo)
+            </button>
+          </div>
+
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Buscador Inteligente</label>
@@ -443,7 +684,7 @@ export default function OrdenesCompra() {
                   type="text" 
                   value={searchHistory}
                   onChange={(e) => setSearchHistory(e.target.value)}
-                  placeholder="Folio, Proveedor o Ítem..." 
+                  placeholder="Folio, Proveedor, Ítem o Motivo Anulación..." 
                   className="w-full h-11 px-4 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-200 bg-transparent outline-none focus:border-blue-500 transition-colors placeholder:text-slate-400"
                 />
               </div>
@@ -454,77 +695,92 @@ export default function OrdenesCompra() {
                 <option value="Todos">Todos</option>
               </select>
             </div>
-            <div className="w-full md:w-40">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Desde</label>
-              <div className="relative">
-                <input type="text" placeholder="mm / dd / yyyy" className="w-full h-11 px-4 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-200 bg-transparent outline-none focus:border-blue-500 placeholder:text-slate-400" />
-                <CalendarIcon className="w-4 h-4 text-slate-400 absolute right-3 top-3.5" />
-              </div>
-            </div>
-            <div className="w-full md:w-40">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Hasta</label>
-              <div className="relative">
-                <input type="text" placeholder="mm / dd / yyyy" className="w-full h-11 px-4 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-200 bg-transparent outline-none focus:border-blue-500 placeholder:text-slate-400" />
-                <CalendarIcon className="w-4 h-4 text-slate-400 absolute right-3 top-3.5" />
-              </div>
-            </div>
           </div>
         </Card>
 
         {/* Table */}
         <Card className="rounded-2xl border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden bg-white dark:bg-slate-800">
-          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center text-sm font-bold text-slate-600 dark:text-slate-400">
-            Show 
-            <select className="mx-2 h-8 px-2 border border-slate-200 dark:border-slate-700 bg-transparent rounded text-sm outline-none">
-              <option value="25">25</option>
-            </select>
-            entries
+          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between text-sm font-bold text-slate-600 dark:text-slate-400">
+            <span>Listado de Registro de Órdenes y Correlativos</span>
+            <span className="text-xs text-slate-400">{filteredHistory.length} registros</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[800px]">
               <thead>
                 <tr className="bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700">
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Folio OC</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Folio OC (Correlativo)</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Proveedor</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">Estado</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">Recepción</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">Factura</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">Detalle / Motivo</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right">Total</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700 bg-white dark:bg-slate-800">
-                {filteredHistory.map((orden, idx) => {
-                  const stateColor = orden.estado === 'CERRADA' ? 'text-slate-600 dark:text-slate-300' :
-                                     orden.estado === 'RECIBIDA' ? 'text-emerald-500' : 
+                {filteredHistory.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-8 text-center text-xs font-bold text-slate-400 italic">
+                      No se encontraron Órdenes de Compra en este filtro.
+                    </td>
+                  </tr>
+                ) : filteredHistory.map((orden, idx) => {
+                  const isAnulada = orden.estado === 'ANULADA';
+                  const stateColor = isAnulada ? 'text-red-600 dark:text-red-400' :
+                                     orden.estado === 'CERRADA' ? 'text-slate-600 dark:text-slate-300' :
+                                     orden.estado === 'RECIBIDA' ? 'text-emerald-600 dark:text-emerald-400' : 
                                      orden.estado === 'PARCIAL' ? 'text-amber-500' : 'text-blue-500';
                   
-                  const stateDot = orden.estado === 'CERRADA' ? '⚫' :
+                  const stateDot = isAnulada ? '🔴' :
+                                   orden.estado === 'CERRADA' ? '⚫' :
                                    orden.estado === 'RECIBIDA' ? '🟢' : 
                                    orden.estado === 'PARCIAL' ? '🟡' : '🔵';
-                                   
-                  const isFacturada = Math.random() > 0.5; // Placeholder
-                  const recepPct = orden.estado === 'PENDIENTE' ? '0%' : orden.estado === 'PARCIAL' ? '60%' : '100%'; // Placeholder
                   
                   return (
-                  <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                    <td className="px-6 py-4 font-black text-slate-800 dark:text-white text-sm">{orden.folio}</td>
+                  <tr key={idx} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${isAnulada ? 'bg-red-50/30 dark:bg-red-950/20' : ''}`}>
+                    <td className="px-6 py-4 font-black text-slate-800 dark:text-white text-sm">
+                      <span className={isAnulada ? 'line-through opacity-70 text-red-700 dark:text-red-400' : ''}>
+                        {orden.folio}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 font-bold text-slate-800 dark:text-slate-200 text-xs">{orden.proveedor}</td>
                     <td className="px-6 py-4 text-center">
-                      <span className={`text-xs font-black flex items-center justify-center gap-1.5 ${stateColor}`}>
+                      <span className={`text-xs font-black inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md ${
+                        isAnulada ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300 border border-red-200' : stateColor
+                      }`}>
                         {stateDot} {orden.estado}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-center font-bold text-slate-600 dark:text-slate-300 text-xs">{recepPct}</td>
-                    <td className="px-6 py-4 text-center font-bold text-slate-600 dark:text-slate-300 text-xs">{isFacturada ? '✔ Adjunta' : '✖ Sin factura'}</td>
-                    <td className="px-6 py-4 text-right font-black text-slate-800 dark:text-white text-sm">${orden.monto.toLocaleString('es-CL')}</td>
+                    <td className="px-6 py-4 text-center font-bold text-slate-600 dark:text-slate-300 text-xs max-w-xs truncate">
+                      {isAnulada ? (
+                        <span className="text-red-600 dark:text-red-400 text-[11px] font-semibold italic block truncate" title={orden.motivo_anulacion || 'Anulada'}>
+                          Motivo: {orden.motivo_anulacion || orden.resumen || 'Sin especificación'}
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 text-xs">{orden.resumen || 'Compra general'}</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right font-black text-slate-800 dark:text-white text-sm">
+                      ${Number(orden.monto || 0).toLocaleString('es-CL')}
+                    </td>
                     <td className="px-6 py-4 text-center">
-                      <button 
-                        onClick={() => handleViewDetail(orden.folio)}
-                        className="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 text-blue-500 transition-colors"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-center gap-2">
+                        <button 
+                          onClick={() => handleViewDetail(orden.folio)}
+                          className="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 text-blue-500 transition-colors"
+                          title="Ver Detalle"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        {!isAnulada && (
+                          <button 
+                            onClick={() => handleAnularOC(orden.folio)}
+                            className="h-8 w-8 inline-flex items-center justify-center rounded-lg bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 transition-colors"
+                            title="Anular esta Orden (Preserva Correlativo)"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )})}
@@ -571,13 +827,58 @@ export default function OrdenesCompra() {
         </div>
       </div>
 
-      {/* SECTION 1: Pedidos pendientes de taller */}
+      {/* SECTION 1: Pedidos de repuestos de taller */}
       <Card className="rounded-2xl border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden bg-white dark:bg-slate-800">
-        <CardHeader className="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 py-4 px-6 flex flex-row items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Wrench className="w-5 h-5 text-orange-500" />
-            <CardTitle className="text-sm font-black text-slate-700 dark:text-slate-200 tracking-wider uppercase">Pedidos pendientes de taller</CardTitle>
+        <CardHeader className="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 py-4 px-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Wrench className="w-5 h-5 text-orange-500" />
+              <CardTitle className="text-sm font-black text-slate-700 dark:text-slate-200 tracking-wider uppercase">
+                Pedidos de Repuestos de Taller
+              </CardTitle>
+            </div>
+            
+            {/* Filter Tabs for Workshop Requests */}
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setFiltroPedidosTaller('PENDIENTES')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  filtroPedidosTaller === 'PENDIENTES'
+                    ? 'bg-amber-500 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 hover:bg-slate-200'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                🟠 Sin OC / Por Hacer ({allPedidosTaller.filter(p => p.estado === 'PENDIENTE').length})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFiltroPedidosTaller('OC_GENERADA')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  filtroPedidosTaller === 'OC_GENERADA'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 hover:bg-slate-200'
+                }`}
+              >
+                🔵 Con OC Generada ({allPedidosTaller.filter(p => p.estado === 'OC_GENERADA' || p.estado === 'RECIBIDO').length})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFiltroPedidosTaller('TODOS')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  filtroPedidosTaller === 'TODOS'
+                    ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900 shadow-sm'
+                    : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 hover:bg-slate-200'
+                }`}
+              >
+                Todos ({allPedidosTaller.length})
+              </button>
+            </div>
           </div>
+
           <div className="flex items-center gap-3">
             <select 
               className="h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 outline-none w-64 bg-transparent"
@@ -591,7 +892,7 @@ export default function OrdenesCompra() {
             </select>
             <Button 
               onClick={handleGenerarOCTaller}
-              className="bg-orange-500 hover:bg-orange-600 text-white font-bold h-9 px-4 rounded-lg text-xs tracking-wider"
+              className="bg-orange-500 hover:bg-orange-600 text-white font-bold h-9 px-4 rounded-lg text-xs tracking-wider shadow-sm"
             >
               <Plus className="w-3.5 h-3.5 mr-2" /> GENERAR O.C. DE TALLER
             </Button>
@@ -601,13 +902,20 @@ export default function OrdenesCompra() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 dark:bg-slate-900/50">
-                <th className="px-6 py-4 w-12"><input type="checkbox" className="rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800" onChange={(e) => {
-                  if (e.target.checked) {
-                    setSelectedPedidos(pedidosTaller.map(p => p.id));
-                  } else {
-                    setSelectedPedidos([]);
-                  }
-                }} /></th>
+                <th className="px-6 py-4 w-12">
+                  <input 
+                    type="checkbox" 
+                    className="rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 cursor-pointer" 
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedPedidos(pedidosTaller.filter(p => p.estado === 'PENDIENTE').map(p => p.id));
+                      } else {
+                        setSelectedPedidos([]);
+                      }
+                    }} 
+                  />
+                </th>
+                <th className="px-4 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Estado Pedido</th>
                 <th className="px-4 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Fecha</th>
                 <th className="px-4 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Prioridad</th>
                 <th className="px-4 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Vehículo / OT</th>
@@ -619,10 +927,45 @@ export default function OrdenesCompra() {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700 bg-white dark:bg-slate-800">
               {pedidosTaller.length === 0 ? (
-                <tr><td colSpan={8} className="px-6 py-8 text-center text-xs font-bold text-slate-500 dark:text-slate-400 italic">No hay pedidos pendientes de taller.</td></tr>
+                <tr>
+                  <td colSpan={9} className="px-6 py-10 text-center text-xs font-bold text-slate-500 dark:text-slate-400 italic">
+                    {filtroPedidosTaller === 'PENDIENTES' 
+                      ? '¡Excelente! No hay repuestos de taller pendientes de generar Orden de Compra.'
+                      : 'No hay pedidos en esta vista.'}
+                  </td>
+                </tr>
               ) : pedidosTaller.map((pedido, idx) => (
                 <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                  <td className="px-6 py-4"><input type="checkbox" checked={pedido.selected} onChange={() => togglePedidoTallerSelection(pedido.id)} className="rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800" /></td>
+                  <td className="px-6 py-4">
+                    {pedido.estado === 'PENDIENTE' ? (
+                      <input 
+                        type="checkbox" 
+                        checked={pedido.selected} 
+                        onChange={() => togglePedidoTallerSelection(pedido.id)} 
+                        className="rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 cursor-pointer" 
+                      />
+                    ) : (
+                      <span className="text-slate-300 dark:text-slate-600">•</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-4">
+                    {pedido.estado === 'PENDIENTE' ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-black tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-ping" />
+                        🟠 SIN OC (POR HACER)
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => pedido.folio_oc && handleViewDetail(pedido.folio_oc)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-black tracking-wider bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-500/20 dark:hover:bg-blue-500/30 dark:text-blue-300 border border-blue-300 dark:border-blue-500/40 transition-colors"
+                        title="Ver Orden de Compra relacionada"
+                      >
+                        <CheckCircle className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                        🔵 OC: {pedido.folio_oc || 'GENERADA'}
+                      </button>
+                    )}
+                  </td>
                   <td className="px-4 py-4">
                     <div className="flex flex-col">
                       <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">{pedido.fecha.split(' ')[0]}</span>
@@ -630,7 +973,13 @@ export default function OrdenesCompra() {
                     </div>
                   </td>
                   <td className="px-4 py-4">
-                    <span className="bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400 px-2.5 py-1 rounded-md text-[10px] font-black tracking-wider">
+                    <span className={`px-2.5 py-1 rounded-md text-[10px] font-black tracking-wider border ${
+                      pedido.prioridad === 'ALTA' 
+                        ? 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400 border-red-200' 
+                        : pedido.prioridad === 'MEDIA'
+                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border-amber-200'
+                        : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300 border-slate-200'
+                    }`}>
                       {pedido.prioridad}
                     </span>
                   </td>
@@ -672,7 +1021,7 @@ export default function OrdenesCompra() {
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Fecha</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Proveedor</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Monto Estimado</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Estado</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Estado Documento</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right">Acciones</th>
               </tr>
             </thead>
@@ -682,10 +1031,16 @@ export default function OrdenesCompra() {
                   <td className="px-6 py-5 font-black text-slate-800 dark:text-white text-sm">{oc.folio}</td>
                   <td className="px-6 py-5 font-bold text-slate-700 dark:text-slate-300 text-xs">{oc.fecha}</td>
                   <td className="px-6 py-5 font-bold text-slate-800 dark:text-slate-200 text-xs">{oc.proveedor}</td>
-                  <td className="px-6 py-5 font-black text-slate-800 dark:text-white text-sm">${oc.monto}</td>
+                  <td className="px-6 py-5 font-black text-slate-800 dark:text-white text-sm">${Number(oc.monto || 0).toLocaleString('es-CL')}</td>
                   <td className="px-6 py-5">
-                    <span className={`${oc.estado === 'RECIBIDA' ? 'bg-emerald-500' : 'bg-blue-500'} text-white px-3 py-1 rounded-md text-[10px] font-black tracking-wider`}>
-                      {oc.estado}
+                    <span className={`px-3 py-1.5 rounded-md text-[10px] font-black tracking-wider border ${
+                      oc.estado === 'RECIBIDA' 
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300' 
+                        : oc.estado === 'EN_TRANSITO' || oc.estado === 'ENVIADA'
+                        ? 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-500/20 dark:text-blue-300'
+                        : 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300'
+                    }`}>
+                      {oc.estado === 'PENDIENTE' ? '🟠 PENDIENTE / EN TRÁNSITO' : oc.estado === 'RECIBIDA' ? '🟢 RECIBIDA EN BODEGA' : oc.estado}
                     </span>
                   </td>
                   <td className="px-6 py-5 text-right">
@@ -697,11 +1052,18 @@ export default function OrdenesCompra() {
                          GESTIONAR
                        </button>
                        <button 
+                         onClick={() => handleAnularOC(oc.folio)}
+                         className="h-8 w-8 flex items-center justify-center rounded-lg bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 transition-colors"
+                         title="Anular Orden de Compra (Preserva Correlativo)"
+                       >
+                          <Trash2 className="w-4 h-4" />
+                       </button>
+                       <button 
                          onClick={() => window.print()}
-                         className="h-8 w-8 flex items-center justify-center rounded-lg bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-500 transition-colors"
+                         className="h-8 w-8 flex items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 transition-colors"
                          title="Exportar PDF"
                        >
-                          <FileDown className="w-5 h-5" />
+                          <FileDown className="w-4 h-4" />
                        </button>
                     </div>
                   </td>

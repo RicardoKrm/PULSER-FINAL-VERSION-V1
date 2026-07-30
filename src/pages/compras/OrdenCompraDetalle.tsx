@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   FileText, ArrowLeft, FileDown, Info, PackageCheck, List, 
   MessageSquare, Paperclip, FileImage, Download, Printer,
-  Maximize2, Clock, CheckCircle2, XCircle, AlertCircle, RefreshCw
+  Maximize2, Clock, CheckCircle2, XCircle, AlertCircle, RefreshCw,
+  Trash2
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -17,9 +18,10 @@ interface Props {
   orden: any;
   onBack: () => void;
   onRefresh: () => void;
+  onAnular?: (folio: string) => void;
 }
 
-export default function OrdenCompraDetalle({ orden, onBack, onRefresh }: Props) {
+export default function OrdenCompraDetalle({ orden, onBack, onRefresh, onAnular }: Props) {
   const [activeTab, setActiveTab] = useState<'GENERAL' | 'ITEMS' | 'ADJUNTOS' | 'RECEPCIONES' | 'FACTURAS' | 'HISTORIAL'>('GENERAL');
   const [showRecepcionModal, setShowRecepcionModal] = useState(false);
   const [showCierreModal, setShowCierreModal] = useState(false);
@@ -253,8 +255,11 @@ export default function OrdenCompraDetalle({ orden, onBack, onRefresh }: Props) 
             <FileText className="w-6 h-6 text-blue-500" /> Detalle de Orden de Compra {orden?.folio}
           </h1>
           <div className="flex items-center gap-3 mt-2">
-            <span className={`px-3 py-1 rounded-md text-[10px] font-black tracking-wider uppercase inline-flex text-white ${orden?.estado === 'PENDIENTE' ? 'bg-blue-500' : 'bg-emerald-500'}`}>
-              {orden?.estado || "PENDIENTE"}
+            <span className={`px-3 py-1 rounded-md text-[10px] font-black tracking-wider uppercase inline-flex text-white ${
+              orden?.estado === 'ANULADA' ? 'bg-red-600' :
+              orden?.estado === 'PENDIENTE' ? 'bg-blue-500' : 'bg-emerald-500'
+            }`}>
+              {orden?.estado === 'ANULADA' ? '🚫 ANULADA' : (orden?.estado || "PENDIENTE")}
             </span>
             <span className="text-slate-500 dark:text-slate-400 font-bold text-sm">Proveedor: {orden?.proveedor}</span>
           </div>
@@ -278,7 +283,7 @@ export default function OrdenCompraDetalle({ orden, onBack, onRefresh }: Props) 
           >
             <Printer className="w-4 h-4 mr-2" /> IMPRIMIR OC
           </Button>
-          {!isReceived && (
+          {!isReceived && orden?.estado !== 'ANULADA' && (
             <Button 
               onClick={() => setShowRecepcionModal(true)}
               className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold h-10 px-5 rounded-lg text-sm tracking-wide"
@@ -286,14 +291,40 @@ export default function OrdenCompraDetalle({ orden, onBack, onRefresh }: Props) 
               <PackageCheck className="w-4 h-4 mr-2" /> RECEPCIONAR COMPRA
             </Button>
           )}
-          <Button 
-            onClick={() => setShowCierreModal(true)}
-            className="bg-[#1e293b] hover:bg-slate-800 text-white font-bold h-10 px-5 rounded-lg text-sm tracking-wide"
-          >
-            <CheckCircle2 className="w-4 h-4 mr-2" /> CERRAR OC
-          </Button>
+          {orden?.estado !== 'ANULADA' && (
+            <Button 
+              onClick={() => onAnular && orden?.folio && onAnular(orden.folio)}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold h-10 px-5 rounded-lg text-sm tracking-wide shadow-sm"
+              title="Anular esta Orden de Compra requiriendo motivo de anulación"
+            >
+              <Trash2 className="w-4 h-4 mr-2" /> ANULAR ORDEN
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Cancellation Audit Banner if ANULADA */}
+      {orden?.estado === 'ANULADA' && (
+        <div className="bg-red-50 border-2 border-red-300 dark:bg-red-950/40 dark:border-red-800 rounded-2xl p-5 flex items-start gap-4 text-red-900 dark:text-red-200 shadow-sm">
+          <AlertCircle className="w-7 h-7 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h3 className="font-black text-sm uppercase tracking-wider text-red-700 dark:text-red-300 flex items-center gap-2">
+              🚫 ORDEN DE COMPRA ANULADA — REGISTRO AUDITABLE DE CORRELATIVO
+            </h3>
+            <p className="text-xs font-semibold text-red-800 dark:text-red-200">
+              <span className="font-black uppercase tracking-wider text-[11px] bg-red-200/80 dark:bg-red-900/60 text-red-900 dark:text-red-100 px-2 py-0.5 rounded mr-2">
+                Motivo de Anulación:
+              </span> 
+              {orden?.motivo_anulacion || orden?.notas || 'Sin motivo ingresado'}
+            </p>
+            <div className="flex items-center gap-4 text-[11px] text-red-600 dark:text-red-400 pt-1 font-bold">
+              <span>📅 Fecha de Anulación: {orden?.fecha_anulacion || 'Registrada'}</span>
+              <span>👤 Usuario: {orden?.usuario_anulacion || 'Administrador Compras'}</span>
+              <span>🔢 Folio Preservado: {orden?.folio}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="bg-white dark:bg-slate-800 rounded-xl p-2 flex flex-wrap gap-2 border border-slate-200 dark:border-slate-700">

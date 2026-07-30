@@ -50,48 +50,116 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     const fetchCompanies = async () => {
       // Si es super admin, cargar todas las empresas. Si no, solo la suya (o quizás no necesite cargar la lista completa, pero la cargamos por consistencia)
       if (isSuperAdmin) {
-        const { data } = await supabase.from('empresa').select('*').order('nombre', { ascending: true });
-        if (data) {
-          const mapped: Company[] = data.map(e => ({
-            id: e.id,
-            name: e.nombre,
-            razonSocial: e.razon_social,
-            status: e.estado as any,
-            joinDate: e.created_at,
-            fleetSize: 0,
-            usersCount: 0
-          }));
-          setCompanies(mapped);
-          
-          if (!activeCompanyId && mapped.length > 0) {
-            // Check if there is a saved tenant id in local storage
-            const savedTenant = localStorage.getItem('superAdminTenantId');
-            if (savedTenant && mapped.find(c => c.id === savedTenant)) {
-              setActiveCompanyId(savedTenant);
-            } else {
-              setActiveCompanyId(mapped[0].id);
+        try {
+          const { data, error } = await supabase.from('empresa').select('*').order('nombre', { ascending: true });
+          if (data && data.length > 0 && !error) {
+            const mapped: Company[] = data.map(e => ({
+              id: e.id,
+              name: e.nombre,
+              razonSocial: e.razon_social,
+              status: e.estado as any,
+              joinDate: e.created_at,
+              fleetSize: 0,
+              usersCount: 0
+            }));
+            setCompanies(mapped);
+            
+            if (!activeCompanyId && mapped.length > 0) {
+              // Check if there is a saved tenant id in local storage
+              const savedTenant = localStorage.getItem('superAdminTenantId');
+              if (savedTenant && mapped.find(c => c.id === savedTenant)) {
+                setActiveCompanyId(savedTenant);
+              } else {
+                setActiveCompanyId(mapped[0].id);
+              }
             }
+          } else {
+            // Fallback para super admin si no hay empresas en la base de datos
+            const defaultId = 'emp-001';
+            const fallbackComp: Company = {
+              id: defaultId,
+              name: 'Empresa Principal (Demo)',
+              razonSocial: 'Empresa Principal S.A.',
+              status: 'Activo',
+              joinDate: new Date().toISOString(),
+              fleetSize: 0,
+              usersCount: 0
+            };
+            setCompanies([fallbackComp]);
+            setActiveCompanyId(defaultId);
           }
-        }
-      } else if (profile?.empresa_id) {
-        // Cargar solo su empresa
-        const { data } = await supabase.from('empresa').select('*').eq('id', profile.empresa_id).single();
-        if (data) {
-          const comp: Company = {
-            id: data.id,
-            name: data.nombre,
-            razonSocial: data.razon_social,
-            status: data.estado as any,
-            joinDate: data.created_at,
+        } catch (err) {
+          console.warn('Error fetching companies, using fallback:', err);
+          const defaultId = 'emp-001';
+          const fallbackComp: Company = {
+            id: defaultId,
+            name: 'Empresa Principal (Demo)',
+            razonSocial: 'Empresa Principal S.A.',
+            status: 'Activo',
+            joinDate: new Date().toISOString(),
             fleetSize: 0,
             usersCount: 0
           };
-          setCompanies([comp]);
-          setActiveCompanyId(comp.id);
+          setCompanies([fallbackComp]);
+          setActiveCompanyId(defaultId);
+        }
+      } else if (profile?.empresa_id) {
+        // Cargar solo su empresa o usar fallback si no existe
+        try {
+          const { data, error } = await supabase.from('empresa').select('*').eq('id', profile.empresa_id).single();
+          if (data && !error) {
+            const comp: Company = {
+              id: data.id,
+              name: data.nombre,
+              razonSocial: data.razon_social,
+              status: data.estado as any,
+              joinDate: data.created_at,
+              fleetSize: 0,
+              usersCount: 0
+            };
+            setCompanies([comp]);
+            setActiveCompanyId(comp.id);
+          } else {
+            // Fallback si la empresa no existe en la base de datos
+            const fallbackComp: Company = {
+              id: profile.empresa_id,
+              name: profile.empresa?.nombre || 'Empresa Principal',
+              razonSocial: profile.empresa?.rut || 'Empresa Principal S.A.',
+              status: 'Activo',
+              joinDate: new Date().toISOString(),
+              fleetSize: 0,
+              usersCount: 0
+            };
+            setCompanies([fallbackComp]);
+            setActiveCompanyId(fallbackComp.id);
+          }
+        } catch (err) {
+          console.warn('Error fetching single company, using fallback:', err);
+          const fallbackComp: Company = {
+            id: profile.empresa_id,
+            name: profile.empresa?.nombre || 'Empresa Principal',
+            razonSocial: profile.empresa?.rut || 'Empresa Principal S.A.',
+            status: 'Activo',
+            joinDate: new Date().toISOString(),
+            fleetSize: 0,
+            usersCount: 0
+          };
+          setCompanies([fallbackComp]);
+          setActiveCompanyId(fallbackComp.id);
         }
       } else {
-        setCompanies([]);
-        setActiveCompanyId('');
+        // Fallback cuando no hay perfil o no tiene empresa_id
+        const defaultId = 'emp-001';
+        const fallbackComp: Company = {
+          id: defaultId,
+          name: 'Empresa Principal',
+          status: 'Activo',
+          joinDate: new Date().toISOString(),
+          fleetSize: 0,
+          usersCount: 0
+        };
+        setCompanies([fallbackComp]);
+        setActiveCompanyId(defaultId);
       }
     };
 
