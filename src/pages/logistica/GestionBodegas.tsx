@@ -65,8 +65,8 @@ export default function GestionBodegas() {
   });
 
   const filteredBodegas = bodegas.filter(b => 
-    b.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.responsable.toLowerCase().includes(searchTerm.toLowerCase())
+    (b.nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (b.responsable || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleSubmit = async (e: React.FormEvent) => {

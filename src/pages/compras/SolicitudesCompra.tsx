@@ -3,7 +3,7 @@ import { useCompany } from '../../contexts/CompanyContext';
 import { supabase } from '../../lib/supabase';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Plus, Search, Filter, CheckCircle, XCircle, Clock, FileText, ShoppingCart, Eye, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Filter, CheckCircle, XCircle, Clock, FileText, ShoppingCart, Eye, Trash2, AlertTriangle, RotateCcw } from 'lucide-react';
 import Swal from 'sweetalert2';
 import SolicitudCompraDetalle from './SolicitudCompraDetalle';
 
@@ -14,6 +14,38 @@ export default function SolicitudesCompra() {
   const [selectedSolicitud, setSelectedSolicitud] = useState<any>(null);
 
   const [solicitudes, setSolicitudes] = useState<any[]>([]);
+
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    fechaInicio: '',
+    fechaFin: '',
+    solicitante: '',
+    motivo: '',
+    estado: '',
+    id: '',
+    prioridad: '',
+    departamento: ''
+  });
+
+  const handleFilterChange = (key: string, value: string) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleLimpiarFiltros = () => {
+    setFilters({
+      fechaInicio: '',
+      fechaFin: '',
+      solicitante: '',
+      motivo: '',
+      estado: '',
+      id: '',
+      prioridad: '',
+      departamento: ''
+    });
+    setSearchTerm('');
+  };
+
+  const activeFiltersCount = Object.values(filters).filter(value => value !== '').length;
 
   // Fetch from Supabase on mount/company change
   const fetchSolicitudes = async () => {
@@ -200,12 +232,74 @@ export default function SolicitudesCompra() {
     });
   };
 
-  const filtered = solicitudes.filter(s => 
-    (s.motivo || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (s.solicitante || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (s.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (s.departamento || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filtered = solicitudes.filter(s => {
+    // 1. Search term (matches across multiple fields)
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      const matchSearch = 
+        (s.id || '').toLowerCase().includes(term) ||
+        (s.solicitante || '').toLowerCase().includes(term) ||
+        (s.motivo || '').toLowerCase().includes(term) ||
+        (s.departamento || '').toLowerCase().includes(term);
+      if (!matchSearch) return false;
+    }
+
+    // 2. Filter by ID / Código
+    if (filters.id) {
+      if (!(s.id || '').toLowerCase().includes(filters.id.toLowerCase())) {
+        return false;
+      }
+    }
+
+    // 3. Filter by Date range
+    if (filters.fechaInicio) {
+      if (s.fecha && s.fecha < filters.fechaInicio) {
+        return false;
+      }
+    }
+    if (filters.fechaFin) {
+      if (s.fecha && s.fecha > filters.fechaFin) {
+        return false;
+      }
+    }
+
+    // 4. Filter by Solicitante
+    if (filters.solicitante) {
+      if (!(s.solicitante || '').toLowerCase().includes(filters.solicitante.toLowerCase())) {
+        return false;
+      }
+    }
+
+    // 5. Filter by Motivo
+    if (filters.motivo) {
+      if (!(s.motivo || '').toLowerCase().includes(filters.motivo.toLowerCase())) {
+        return false;
+      }
+    }
+
+    // 6. Filter by Estado
+    if (filters.estado) {
+      if (s.estado !== filters.estado) {
+        return false;
+      }
+    }
+
+    // 7. Filter by Prioridad
+    if (filters.prioridad) {
+      if (s.prioridad !== filters.prioridad) {
+        return false;
+      }
+    }
+
+    // 8. Filter by Departamento
+    if (filters.departamento) {
+      if (!(s.departamento || '').toLowerCase().includes(filters.departamento.toLowerCase())) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -337,10 +431,141 @@ export default function SolicitudesCompra() {
               className="w-full pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-transparent outline-none focus:border-blue-500 dark:text-white"
             />
           </div>
-          <Button variant="outline" className="text-sm font-bold w-full sm:w-auto h-10 border-slate-200 dark:border-slate-700">
-            <Filter className="w-4 h-4 mr-2" /> FILTROS
+          <Button 
+            variant="outline" 
+            onClick={() => setShowFilters(!showFilters)}
+            className={`text-sm font-bold w-full sm:w-auto h-10 border-slate-200 dark:border-slate-700 flex items-center justify-center gap-2 ${showFilters ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800' : ''}`}
+          >
+            <Filter className="w-4 h-4" /> 
+            FILTROS
+            {activeFiltersCount > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 text-xs font-black bg-blue-500 text-white rounded-full">
+                {activeFiltersCount}
+              </span>
+            )}
           </Button>
         </div>
+
+        {/* Collapsible Filters Panel */}
+        {showFilters && (
+          <div className="p-6 bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-100 dark:border-slate-700 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in">
+            {/* ID Filter */}
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">ID / Código</label>
+              <input 
+                type="text" 
+                placeholder="Ej: SC-000001"
+                value={filters.id}
+                onChange={(e) => handleFilterChange('id', e.target.value)}
+                className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* Fecha Desde Filter */}
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">Fecha Desde</label>
+              <input 
+                type="date" 
+                value={filters.fechaInicio}
+                onChange={(e) => handleFilterChange('fechaInicio', e.target.value)}
+                className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* Fecha Hasta Filter */}
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">Fecha Hasta</label>
+              <input 
+                type="date" 
+                value={filters.fechaFin}
+                onChange={(e) => handleFilterChange('fechaFin', e.target.value)}
+                className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* Estado Filter */}
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">Estado</label>
+              <select 
+                value={filters.estado}
+                onChange={(e) => handleFilterChange('estado', e.target.value)}
+                className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500 font-medium"
+              >
+                <option value="">Todos los estados</option>
+                <option value="PENDIENTE">PENDIENTE</option>
+                <option value="APROBADA">APROBADA</option>
+                <option value="APROBADA PARCIALMENTE">APROBADA PARCIALMENTE</option>
+                <option value="RECHAZADA">RECHAZADA</option>
+                <option value="REQUIERE AJUSTE">REQUIERE AJUSTE</option>
+                <option value="CONVERTIDA EN OC">CONVERTIDA EN OC</option>
+                <option value="BORRADOR">BORRADOR</option>
+              </select>
+            </div>
+
+            {/* Solicitante Filter */}
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">Solicitante</label>
+              <input 
+                type="text" 
+                placeholder="Nombre del solicitante..."
+                value={filters.solicitante}
+                onChange={(e) => handleFilterChange('solicitante', e.target.value)}
+                className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* Motivo Filter */}
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">Motivo / Requerimiento</label>
+              <input 
+                type="text" 
+                placeholder="Palabra clave en motivo..."
+                value={filters.motivo}
+                onChange={(e) => handleFilterChange('motivo', e.target.value)}
+                className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* Prioridad Filter */}
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">Prioridad</label>
+              <select 
+                value={filters.prioridad}
+                onChange={(e) => handleFilterChange('prioridad', e.target.value)}
+                className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500 font-medium"
+              >
+                <option value="">Todas las prioridades</option>
+                <option value="BAJA">BAJA</option>
+                <option value="MEDIA">MEDIA</option>
+                <option value="ALTA">ALTA</option>
+                <option value="CRÍTICA">CRÍTICA</option>
+              </select>
+            </div>
+
+            {/* Departamento Filter */}
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5">Departamento</label>
+              <input 
+                type="text" 
+                placeholder="Ej: Operaciones"
+                value={filters.departamento}
+                onChange={(e) => handleFilterChange('departamento', e.target.value)}
+                className="w-full h-9 px-3 border border-slate-200 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* Buttons for Clear Filters */}
+            <div className="md:col-span-2 lg:col-span-4 flex justify-end gap-2 mt-2">
+              <Button 
+                variant="outline" 
+                onClick={handleLimpiarFiltros}
+                className="text-xs font-bold h-9 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> LIMPIAR FILTROS
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">

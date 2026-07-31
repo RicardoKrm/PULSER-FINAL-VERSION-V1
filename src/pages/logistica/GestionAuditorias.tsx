@@ -134,9 +134,9 @@ export default function GestionAuditorias() {
   };
 
   const filteredAuditorias = auditorias.filter(a => 
-    a.bodega.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.responsable.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.id.toString().includes(searchTerm)
+    (a.bodega?.nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (a.responsable || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (a.id || '').toString().includes(searchTerm)
   );
 
   return (
