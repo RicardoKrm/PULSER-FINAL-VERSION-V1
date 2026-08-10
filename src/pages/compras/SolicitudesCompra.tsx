@@ -15,7 +15,7 @@ export default function SolicitudesCompra() {
 
   const [solicitudes, setSolicitudes] = useState<any[]>([]);
 
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const [filters, setFilters] = useState({
     fechaInicio: '',
     fechaFin: '',
@@ -576,7 +576,6 @@ export default function SolicitudesCompra() {
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Solicitante</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Motivo / Requerimiento</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">Estado</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right">Monto Estimado</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">Acciones</th>
               </tr>
             </thead>
@@ -598,9 +597,6 @@ export default function SolicitudesCompra() {
                     <span className={`inline-flex items-center px-3 py-1 rounded-md text-[10px] font-black tracking-wider uppercase ${getStatusColor(s.estado)}`}>
                       {getStatusIcon(s.estado)} {s.estado}
                     </span>
-                  </td>
-                  <td className="px-6 py-4 font-black text-slate-800 dark:text-white text-sm text-right">
-                    ${(s.montoAprox || 0).toLocaleString('es-CL')}
                   </td>
                   <td className="px-6 py-4 text-center">
                     <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -628,7 +624,7 @@ export default function SolicitudesCompra() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500 dark:text-slate-400 font-medium text-sm">
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500 dark:text-slate-400 font-medium text-sm">
                     <div className="max-w-md mx-auto space-y-3">
                       <p className="text-slate-600 dark:text-slate-300 font-bold text-base">No hay solicitudes registradas</p>
                       <p className="text-xs text-slate-400">El panel está limpio de datos de prueba. Haz clic a continuación para ingresar la primera solicitud de compra.</p>

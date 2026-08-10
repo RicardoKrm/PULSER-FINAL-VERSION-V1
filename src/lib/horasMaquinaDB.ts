@@ -192,10 +192,10 @@ export async function deleteHorasMaquinaRecord(id: string): Promise<void> {
     console.error(e);
   }
 
-  try {
-    await supabase.from('horas_maquina').delete().eq('id', id);
-  } catch (err) {
-    console.warn('Error eliminando en Supabase:', err);
+  const { error } = await supabase.from('horas_maquina').delete().eq('id', id);
+  if (error) {
+    console.error('Error eliminando en Supabase:', error);
+    throw new Error(error.message || 'Error al eliminar registro de horas_maquina en el servidor');
   }
 }
 
@@ -209,10 +209,10 @@ export async function clearHorasMaquinaRecords(): Promise<void> {
     console.error(e);
   }
 
-  try {
-    await supabase.from('horas_maquina').delete().neq('id', '0');
-  } catch (err) {
-    console.warn('Error limpiando tabla en Supabase:', err);
+  const { error } = await supabase.from('horas_maquina').delete().neq('id', '0');
+  if (error) {
+    console.error('Error limpiando tabla en Supabase:', error);
+    throw new Error(error.message || 'Error al limpiar la tabla de horas_maquina en el servidor');
   }
 }
 

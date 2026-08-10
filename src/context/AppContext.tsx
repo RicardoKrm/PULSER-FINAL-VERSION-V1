@@ -154,15 +154,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       let allRepuestosData: any[] = [];
       let startR = 0;
       let hasMoreRepuestos = true;
-      while (hasMoreRepuestos) {
-        const { data } = await supabase.from('logistica_repuestos').select('*').eq('empresa_id', activeCompanyId).range(startR, startR + pageSize - 1);
-        if (data && data.length > 0) {
-          allRepuestosData = [...allRepuestosData, ...data];
-          startR += pageSize;
-        } else {
-          hasMoreRepuestos = false;
+      if (activeCompanyId && activeCompanyId !== 'emp-001') {
+        while (hasMoreRepuestos) {
+          const { data } = await supabase.from('logistica_repuestos').select('*').eq('empresa_id', activeCompanyId).range(startR, startR + pageSize - 1);
+          if (data && data.length > 0) {
+            allRepuestosData = [...allRepuestosData, ...data];
+            startR += pageSize;
+          } else {
+            hasMoreRepuestos = false;
+          }
         }
       }
+
+      if (allRepuestosData.length === 0) {
+        let startR2 = 0;
+        let hasMore2 = true;
+        while (hasMore2) {
+          const { data } = await supabase.from('logistica_repuestos').select('*').range(startR2, startR2 + pageSize - 1);
+          if (data && data.length > 0) {
+            allRepuestosData = [...allRepuestosData, ...data];
+            startR2 += pageSize;
+          } else {
+            hasMore2 = false;
+          }
+        }
+      }
+
       setRepuestos(allRepuestosData.map(r => ({ 
           id: r.id, 
           sku: r.sku || r.referencia || '', 

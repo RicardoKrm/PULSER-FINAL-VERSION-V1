@@ -65,7 +65,6 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
             setCompanies(mapped);
             
             if (!activeCompanyId && mapped.length > 0) {
-              // Check if there is a saved tenant id in local storage
               const savedTenant = localStorage.getItem('superAdminTenantId');
               if (savedTenant && mapped.find(c => c.id === savedTenant)) {
                 setActiveCompanyId(savedTenant);
@@ -74,12 +73,11 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
               }
             }
           } else {
-            // Fallback para super admin si no hay empresas en la base de datos
-            const defaultId = 'emp-001';
+            const defaultId = '57fa41da-645d-48ba-a671-65a35312d0e9';
             const fallbackComp: Company = {
               id: defaultId,
-              name: 'Empresa Principal (Demo)',
-              razonSocial: 'Empresa Principal S.A.',
+              name: 'Imperia',
+              razonSocial: 'Transportes Imperia',
               status: 'Activo',
               joinDate: new Date().toISOString(),
               fleetSize: 0,
@@ -90,11 +88,11 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
           }
         } catch (err) {
           console.warn('Error fetching companies, using fallback:', err);
-          const defaultId = 'emp-001';
+          const defaultId = '57fa41da-645d-48ba-a671-65a35312d0e9';
           const fallbackComp: Company = {
             id: defaultId,
-            name: 'Empresa Principal (Demo)',
-            razonSocial: 'Empresa Principal S.A.',
+            name: 'Imperia',
+            razonSocial: 'Transportes Imperia',
             status: 'Activo',
             joinDate: new Date().toISOString(),
             fleetSize: 0,
@@ -103,8 +101,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
           setCompanies([fallbackComp]);
           setActiveCompanyId(defaultId);
         }
-      } else if (profile?.empresa_id) {
-        // Cargar solo su empresa o usar fallback si no existe
+      } else if (profile?.empresa_id && profile.empresa_id !== 'emp-001') {
         try {
           const { data, error } = await supabase.from('empresa').select('*').eq('id', profile.empresa_id).single();
           if (data && !error) {
@@ -120,11 +117,10 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
             setCompanies([comp]);
             setActiveCompanyId(comp.id);
           } else {
-            // Fallback si la empresa no existe en la base de datos
             const fallbackComp: Company = {
               id: profile.empresa_id,
-              name: profile.empresa?.nombre || 'Empresa Principal',
-              razonSocial: profile.empresa?.rut || 'Empresa Principal S.A.',
+              name: profile.empresa?.nombre || 'Imperia',
+              razonSocial: profile.empresa?.rut || 'Transportes Imperia',
               status: 'Activo',
               joinDate: new Date().toISOString(),
               fleetSize: 0,
@@ -137,8 +133,8 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
           console.warn('Error fetching single company, using fallback:', err);
           const fallbackComp: Company = {
             id: profile.empresa_id,
-            name: profile.empresa?.nombre || 'Empresa Principal',
-            razonSocial: profile.empresa?.rut || 'Empresa Principal S.A.',
+            name: profile.empresa?.nombre || 'Imperia',
+            razonSocial: profile.empresa?.rut || 'Transportes Imperia',
             status: 'Activo',
             joinDate: new Date().toISOString(),
             fleetSize: 0,
@@ -148,11 +144,30 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
           setActiveCompanyId(fallbackComp.id);
         }
       } else {
-        // Fallback cuando no hay perfil o no tiene empresa_id
-        const defaultId = 'emp-001';
+        try {
+          const { data, error } = await supabase.from('empresa').select('*').order('nombre', { ascending: true });
+          if (data && data.length > 0 && !error) {
+            const mapped: Company[] = data.map(e => ({
+              id: e.id,
+              name: e.nombre,
+              razonSocial: e.razon_social,
+              status: e.estado as any,
+              joinDate: e.created_at,
+              fleetSize: 0,
+              usersCount: 0
+            }));
+            setCompanies(mapped);
+            const imperia = mapped.find(m => m.name.toLowerCase().includes('imperia'));
+            setActiveCompanyId(imperia ? imperia.id : mapped[0].id);
+            return;
+          }
+        } catch (e) {
+          console.warn('Error fetching default companies:', e);
+        }
+        const defaultId = '57fa41da-645d-48ba-a671-65a35312d0e9';
         const fallbackComp: Company = {
           id: defaultId,
-          name: 'Empresa Principal',
+          name: 'Imperia',
           status: 'Activo',
           joinDate: new Date().toISOString(),
           fleetSize: 0,
@@ -163,10 +178,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // Load initially or when profile changes
-    if (profile) {
-      fetchCompanies();
-    }
+    fetchCompanies();
   }, [profile, isSuperAdmin]); // activeCompanyId removed from deps to prevent reset
 
   const switchTenant = (id: string) => {

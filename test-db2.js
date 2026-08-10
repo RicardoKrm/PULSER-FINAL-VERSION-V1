@@ -7,8 +7,7 @@ const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || 'public-anon-key';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function check() {
-  const { data, error } = await supabase.from('produccion_registro_diario_mina').select('*').limit(1);
+  const { data, error } = await supabase.from('produccion_registro_diario').select('*').limit(3);
   console.log("Data:", data);
-  console.log("Error:", error);
 }
 check();

@@ -106,21 +106,33 @@ export default function GestionSuministros() {
         return allData;
       };
 
-      const bData = await fetchAllRows(supabase.from('logistica_bodegas').select('*').eq('empresa_id', currentCompany.id));
-      if (bData && bData.length > 0) {
-        setBodegasList(bData);
-      } else {
-        // Fallback or empty
-        setBodegasList([]);
+      let bData: any[] = [];
+      if (currentCompany?.id && currentCompany.id !== 'emp-001') {
+        bData = await fetchAllRows(supabase.from('logistica_bodegas').select('*').eq('empresa_id', currentCompany.id));
+      }
+      if (!bData || bData.length === 0) {
+        bData = await fetchAllRows(supabase.from('logistica_bodegas').select('*'));
+      }
+      setBodegasList(bData || []);
+
+      let rData: any[] = [];
+      if (currentCompany?.id && currentCompany.id !== 'emp-001') {
+        rData = await fetchAllRows(supabase.from('logistica_repuestos').select(`
+          *,
+          logistica_bodegas (
+            nombre
+          )
+        `).eq('empresa_id', currentCompany.id));
+      }
+      if (!rData || rData.length === 0) {
+        rData = await fetchAllRows(supabase.from('logistica_repuestos').select(`
+          *,
+          logistica_bodegas (
+            nombre
+          )
+        `));
       }
 
-      const rData = await fetchAllRows(supabase.from('logistica_repuestos').select(`
-        *,
-        logistica_bodegas (
-          nombre
-        )
-      `).eq('empresa_id', currentCompany.id));
-      
       if (rData && rData.length > 0) {
         setSumInsumosData(rData.map((r: any) => {
           const parsedPrecio = parseFloat(r.precio) || 0;
@@ -137,7 +149,7 @@ export default function GestionSuministros() {
           };
         }));
       } else {
-         setSumInsumosData([]);
+        setSumInsumosData([]);
       }
 
       const mvData = await fetchAllRows(supabase.from('logistica_movimientos').select(`

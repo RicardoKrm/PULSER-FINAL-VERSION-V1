@@ -37,6 +37,7 @@ import {
   X
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import Swal from 'sweetalert2';
 import { 
   HorasMaquinaRecord, 
   getAllHorasMaquina, 
@@ -101,6 +102,10 @@ export default function HorasMaquinaPage() {
   const [isNewModalOpen, setIsNewModalOpen] = useState<boolean>(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
   const [editingRecord, setEditingRecord] = useState<HorasMaquinaRecord | null>(null);
+
+  // Multi-selection states
+  const [selectedRecordIds, setSelectedRecordIds] = useState<string[]>([]);
+  const [selectedDispoKeys, setSelectedDispoKeys] = useState<string[]>([]);
 
   // Form State
   const [form, setForm] = useState({
@@ -314,6 +319,111 @@ export default function HorasMaquinaPage() {
     return filteredRecords.reduce((acc, r) => acc + (r.vueltas || 0), 0);
   }, [filteredRecords]);
 
+  // Bulk Selection and Deletion Handlers
+  const toggleSelectAllRegistro = () => {
+    const filteredIds = filteredRecords.map(r => r.id);
+    const allSelected = filteredIds.every(id => selectedRecordIds.includes(id));
+    if (allSelected) {
+      setSelectedRecordIds(prev => prev.filter(id => !filteredIds.includes(id)));
+    } else {
+      setSelectedRecordIds(prev => {
+        const otherIds = prev.filter(id => !filteredIds.includes(id));
+        return [...otherIds, ...filteredIds];
+      });
+    }
+  };
+
+  const handleDeleteSelectedRecords = async () => {
+    if (selectedRecordIds.length === 0) return;
+    
+    const result = await Swal.fire({
+      title: '¿Confirmar eliminación?',
+      text: `¿Desea eliminar los ${selectedRecordIds.length} registros seleccionados de hora máquina de la base de datos?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        for (const id of selectedRecordIds) {
+          await deleteHorasMaquinaRecord(id);
+        }
+        setRecords(prev => prev.filter(r => !selectedRecordIds.includes(r.id)));
+        setSelectedRecordIds([]);
+        Swal.fire('Eliminado', 'Los registros han sido eliminados con éxito.', 'success');
+      } catch (err: any) {
+        Swal.fire('Error', `Hubo un problema al eliminar: ${err.message}`, 'error');
+      }
+    }
+  };
+
+  const toggleSelectDispoRow = (equipo: string, mesNum: number) => {
+    const key = `${equipo}|${mesNum}`;
+    setSelectedDispoKeys(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+  };
+
+  const toggleSelectAllDispo = () => {
+    const allKeys = monthlyStatsPerMachine.map(r => `${r.equipo}|${r.mesNum}`);
+    const allSelected = allKeys.every(k => selectedDispoKeys.includes(k));
+    if (allSelected) {
+      setSelectedDispoKeys(prev => prev.filter(k => !allKeys.includes(k)));
+    } else {
+      setSelectedDispoKeys(prev => {
+        const otherKeys = prev.filter(k => !allKeys.includes(k));
+        return [...otherKeys, ...allKeys];
+      });
+    }
+  };
+
+  const handleDeleteSelectedDispoRecords = async () => {
+    if (selectedDispoKeys.length === 0) return;
+    
+    const result = await Swal.fire({
+      title: '¿Confirmar eliminación permanente?',
+      text: `¿Desea eliminar de forma permanente TODOS los registros de horas máquina subyacentes que corresponden a las ${selectedDispoKeys.length} combinaciones de máquina y mes seleccionadas? Esto afectará los cálculos de disponibilidad.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar todo',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      const idsToDelete: string[] = [];
+      records.forEach(rec => {
+        const [y, m] = rec.fecha.split('-').map(Number);
+        if (y !== dispoYear) return;
+        const key = `${rec.equipo}|${m}`;
+        if (selectedDispoKeys.includes(key)) {
+          idsToDelete.push(rec.id);
+        }
+      });
+
+      if (idsToDelete.length === 0) {
+        Swal.fire('Aviso', 'No se encontraron registros subyacentes para eliminar.', 'info');
+        return;
+      }
+
+      try {
+        for (const id of idsToDelete) {
+          await deleteHorasMaquinaRecord(id);
+        }
+        setRecords(prev => prev.filter(r => !idsToDelete.includes(r.id)));
+        setSelectedDispoKeys([]);
+        Swal.fire('Eliminado', `Se eliminaron correctamente ${idsToDelete.length} registros de horas máquina.`, 'success');
+      } catch (err: any) {
+        Swal.fire('Error', `Hubo un problema al eliminar: ${err.message}`, 'error');
+      }
+    }
+  };
+
   // Form submit for Save / Edit
   const handleSaveForm = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -398,9 +508,25 @@ export default function HorasMaquinaPage() {
   };
 
   const handleDeleteClick = async (id: string) => {
-    if (confirm('¿Desea eliminar este registro de hora máquina?')) {
-      await deleteHorasMaquinaRecord(id);
-      setRecords(prev => prev.filter(r => r.id !== id));
+    const result = await Swal.fire({
+      title: '¿Confirmar eliminación?',
+      text: '¿Desea eliminar este registro de hora máquina?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await deleteHorasMaquinaRecord(id);
+        setRecords(prev => prev.filter(r => r.id !== id));
+        Swal.fire('Eliminado', 'El registro ha sido eliminado con éxito.', 'success');
+      } catch (err: any) {
+        Swal.fire('Error', `Hubo un problema al eliminar: ${err.message}`, 'error');
+      }
     }
   };
 
@@ -446,7 +572,6 @@ export default function HorasMaquinaPage() {
       'Días Operados': r.diasTrabajados,
       'Horas Máquina (Uso)': r.horasUso,
       'Combustible Consumido (L)': r.combustibleL,
-      'Consumo Promedio (L/Hr)': r.consumoPromedio,
       'Base Horas Mes': r.baseHoras,
       'Disponibilidad Mensual (%)': `${r.disponibilidadPct}%`,
       'Vueltas Totales': r.vueltas
@@ -653,21 +778,19 @@ export default function HorasMaquinaPage() {
     doc.setTextColor(100, 116, 139);
     doc.setFontSize(7.5);
     doc.setFont('helvetica', 'bold');
-    doc.text('DISPONIBILIDAD FLOTA', 20, 34);
-    doc.text('TOTAL HORAS MÁQUINA', 80, 34);
-    doc.text('COMBUSTIBLE CONSUMIDO', 140, 34);
-    doc.text('CONSUMO PROMEDIO', 200, 34);
-    doc.text('EQUIPOS EVALUADOS', 245, 34);
+    doc.text('DISPONIBILIDAD FLOTA', 25, 34);
+    doc.text('TOTAL HORAS MÁQUINA', 95, 34);
+    doc.text('COMBUSTIBLE CONSUMIDO', 165, 34);
+    doc.text('EQUIPOS EVALUADOS', 230, 34);
 
     // Stats Values
     doc.setTextColor(15, 23, 42);
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text(`${globalFleetStats.dispoGlobalPct.toFixed(1)}%`, 20, 43);
-    doc.text(`${globalFleetStats.totalHorasFlota.toLocaleString()} hrs`, 80, 43);
-    doc.text(`${globalFleetStats.totalCombustibleFlota.toLocaleString()} L`, 140, 43);
-    doc.text(`${globalFleetStats.consumoPromFlota} L/h`, 200, 43);
-    doc.text(`${globalFleetStats.totalEquipos} máquinas`, 245, 43);
+    doc.text(`${globalFleetStats.dispoGlobalPct.toFixed(1)}%`, 25, 43);
+    doc.text(`${globalFleetStats.totalHorasFlota.toLocaleString()} hrs`, 95, 43);
+    doc.text(`${globalFleetStats.totalCombustibleFlota.toLocaleString()} L`, 165, 43);
+    doc.text(`${globalFleetStats.totalEquipos} máquinas`, 230, 43);
 
     // Subtitle note
     doc.setFontSize(8);
@@ -682,7 +805,6 @@ export default function HorasMaquinaPage() {
       `${r.diasTrabajados} días`,
       `${r.horasUso.toLocaleString(undefined, { minimumFractionDigits: 1 })} h`,
       `${r.combustibleL.toLocaleString()} L`,
-      `${r.consumoPromedio} L/h`,
       `${r.baseHoras} h`,
       `${r.disponibilidadPct.toFixed(1)}%`,
       r.vueltas.toLocaleString()
@@ -690,7 +812,7 @@ export default function HorasMaquinaPage() {
 
     autoTable(doc, {
       startY: 58,
-      head: [['Equipo / Máquina', 'Mes / Periodo', 'Días Operados', 'Horas Máquina Uso', 'Combustible (L)', 'Consumo Prom. (L/Hr)', 'Horas Base Mes', 'Disponibilidad (%)', 'Vueltas Totales']],
+      head: [['Equipo / Máquina', 'Mes / Periodo', 'Días Operados', 'Horas Máquina Uso', 'Combustible (L)', 'Horas Base Mes', 'Disponibilidad (%)', 'Vueltas Totales']],
       body: tableData,
       theme: 'grid',
       styles: {
@@ -711,12 +833,11 @@ export default function HorasMaquinaPage() {
         3: { halign: 'right', fontStyle: 'bold' },
         4: { halign: 'right' },
         5: { halign: 'right' },
-        6: { halign: 'right' },
-        7: { halign: 'center', fontStyle: 'bold' },
-        8: { halign: 'center' }
+        6: { halign: 'center', fontStyle: 'bold' },
+        7: { halign: 'center' }
       },
       didParseCell: function(data) {
-        if (data.section === 'body' && data.column.index === 7) {
+        if (data.section === 'body' && data.column.index === 6) {
           const valStr = data.cell.raw as string;
           const val = parseFloat(valStr.replace('%', ''));
           if (val >= 80) {
@@ -739,7 +860,6 @@ export default function HorasMaquinaPage() {
       'Mes': r.mesNombre,
       'Horas Máquina (Uso)': r.horasUso,
       'Combustible (L)': r.combustibleL,
-      'Consumo Prom. (L/Hr)': r.consumoPromedio,
       'Horas Base Mes': r.baseHoras,
       'Disponibilidad (%)': `${r.disponibilidadPct}%`,
       'Vueltas / Pases': r.vueltas,
@@ -1175,21 +1295,57 @@ export default function HorasMaquinaPage() {
                       Exporta únicamente los datos resultantes del filtro activo de fecha, equipo o turno.
                     </p>
                   </div>
-                  <Button
-                    onClick={handleExportExcel}
-                    size="sm"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 shadow-sm"
-                    title="Descargar tabla filtrada en formato Excel (.xlsx)"
-                  >
-                    <Download className="w-4 h-4" />
-                    Descargar Excel Filtrado ({filteredRecords.length.toLocaleString()})
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {selectedRecordIds.length > 0 && (
+                      <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-lg px-3 py-1.5 text-xs">
+                        <span className="font-bold text-amber-800 dark:text-amber-200">
+                          {selectedRecordIds.length} seleccionados
+                        </span>
+                        <Button
+                          onClick={handleDeleteSelectedRecords}
+                          variant="destructive"
+                          size="xs"
+                          className="bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold h-7 px-2.5"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 mr-1" />
+                          Eliminar Seleccionados
+                        </Button>
+                        <button
+                          onClick={() => setSelectedRecordIds([])}
+                          className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-semibold text-[11px] ml-1"
+                        >
+                          Deseleccionar
+                        </button>
+                      </div>
+                    )}
+
+                    <Button
+                      onClick={toggleSelectAllRegistro}
+                      variant="outline"
+                      size="sm"
+                      className="border-slate-300 dark:border-slate-700 font-bold text-xs"
+                    >
+                      <CheckSquare className="w-4 h-4 text-slate-500 mr-1.5" />
+                      {filteredRecords.length > 0 && filteredRecords.every(r => selectedRecordIds.includes(r.id)) ? 'Deseleccionar Todos' : 'Seleccionar Todos'}
+                    </Button>
+
+                    <Button
+                      onClick={handleExportExcel}
+                      size="sm"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 shadow-sm"
+                      title="Descargar tabla filtrada en formato Excel (.xlsx)"
+                    >
+                      <Download className="w-4 h-4" />
+                      Descargar Excel Filtrado ({filteredRecords.length.toLocaleString()})
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left text-slate-700 dark:text-slate-300 border-collapse">
                     <thead className="bg-slate-100 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 font-extrabold border-b border-slate-200 dark:border-slate-700 uppercase tracking-wider">
                       <tr>
+                        <th className="py-3 px-3 text-center w-10">Sel.</th>
                         <th className="py-3 px-3">Fecha</th>
                         <th className="py-3 px-2 text-center">Turno</th>
                         <th className="py-3 px-3">Equipo</th>
@@ -1215,6 +1371,18 @@ export default function HorasMaquinaPage() {
                               isFS ? 'bg-rose-50/40 dark:bg-rose-950/20' : ''
                             }`}
                           >
+                            <td className="py-2.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={selectedRecordIds.includes(rec.id)}
+                                onChange={() => {
+                                  setSelectedRecordIds(prev =>
+                                    prev.includes(rec.id) ? prev.filter(id => id !== rec.id) : [...prev, rec.id]
+                                  );
+                                }}
+                                className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer"
+                              />
+                            </td>
                             <td className="py-2.5 px-3 font-semibold whitespace-nowrap">
                               {rec.fecha}
                             </td>
@@ -1612,7 +1780,7 @@ export default function HorasMaquinaPage() {
 
           {/* Detailed Monthly Availability Table per Machine */}
           <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-800/40">
               <div>
                 <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
                   <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
@@ -1622,10 +1790,40 @@ export default function HorasMaquinaPage() {
                   Fórmula de Disponibilidad = (Horas Operativas Reportadas / {baseHorasMes} hrs base mes) × 100
                 </p>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
-                  {monthlyStatsPerMachine.length} registros
-                </span>
+              <div className="flex flex-wrap items-center gap-2">
+                {selectedDispoKeys.length > 0 && (
+                  <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-lg px-3 py-1.5 text-xs">
+                    <span className="font-bold text-amber-800 dark:text-amber-200">
+                      {selectedDispoKeys.length} seleccionados
+                    </span>
+                    <Button
+                      onClick={handleDeleteSelectedDispoRecords}
+                      variant="destructive"
+                      size="xs"
+                      className="bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold h-7 px-2.5"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 mr-1" />
+                      Eliminar Registros Subyacentes
+                    </Button>
+                    <button
+                      onClick={() => setSelectedDispoKeys([])}
+                      className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-semibold text-[11px] ml-1"
+                    >
+                      Deseleccionar
+                    </button>
+                  </div>
+                )}
+
+                <Button
+                  onClick={toggleSelectAllDispo}
+                  variant="outline"
+                  size="sm"
+                  className="border-slate-300 dark:border-slate-700 font-bold text-xs"
+                >
+                  <CheckSquare className="w-4 h-4 text-slate-500 mr-1.5" />
+                  {monthlyStatsPerMachine.length > 0 && monthlyStatsPerMachine.every(r => selectedDispoKeys.includes(`${r.equipo}|${r.mesNum}`)) ? 'Deseleccionar Todos' : 'Seleccionar Todos'}
+                </Button>
+
                 <Button
                   onClick={handleExportDisponibilidadExcel}
                   size="sm"
@@ -1642,12 +1840,12 @@ export default function HorasMaquinaPage() {
               <table className="w-full text-xs text-left text-slate-700 dark:text-slate-300 border-collapse">
                 <thead className="bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-black uppercase tracking-wider">
                   <tr>
+                    <th className="py-3 px-3 text-center w-10">Sel.</th>
                     <th className="py-3 px-4">Equipo / Máquina</th>
                     <th className="py-3 px-3">Mes / Periodo</th>
                     <th className="py-3 px-3 text-center">Días Operados</th>
                     <th className="py-3 px-3 text-right bg-amber-100/60 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200">Horas Máquina (Uso)</th>
                     <th className="py-3 px-3 text-right">Combustible (L)</th>
-                    <th className="py-3 px-3 text-right">Consumo Prom. (L/Hr)</th>
                     <th className="py-3 px-3 text-right">Base Horas Mes</th>
                     <th className="py-3 px-4 text-center bg-slate-200/60 dark:bg-slate-700/60">Disponibilidad Mensual (%)</th>
                     <th className="py-3 px-3 text-center">Vueltas Totales</th>
@@ -1656,8 +1854,17 @@ export default function HorasMaquinaPage() {
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                   {monthlyStatsPerMachine.map((row, idx) => {
                     const dispo = row.disponibilidadPct;
+                    const dispoKey = `${row.equipo}|${row.mesNum}`;
                     return (
                       <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedDispoKeys.includes(dispoKey)}
+                            onChange={() => toggleSelectDispoRow(row.equipo, row.mesNum)}
+                            className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer"
+                          />
+                        </td>
                         <td className="py-3 px-4 font-extrabold text-slate-900 dark:text-white whitespace-nowrap">
                           {row.equipo}
                         </td>
@@ -1672,9 +1879,6 @@ export default function HorasMaquinaPage() {
                         </td>
                         <td className="py-3 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
                           {row.combustibleL.toLocaleString()} L
-                        </td>
-                        <td className="py-3 px-3 text-right font-mono">
-                          {row.consumoPromedio} L/h
                         </td>
                         <td className="py-3 px-3 text-right font-mono text-slate-500">
                           {row.baseHoras} hrs

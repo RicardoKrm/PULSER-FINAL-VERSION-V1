@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Card } from '../../components/ui/Card';
-import { Calendar, Truck, TrendingUp, AlertCircle, Droplet, FileSpreadsheet, Loader2, Plus, MessageSquarePlus, Edit2, Trash2 } from 'lucide-react';
+import { Calendar, Truck, TrendingUp, AlertCircle, Droplet, FileSpreadsheet, Loader2, Plus, MessageSquarePlus, Edit2, Trash2, CheckSquare, Square } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import * as XLSX from 'xlsx';
+import Swal from 'sweetalert2';
 import { Modal } from '../../components/ui/Modal';
 
 type TurnoDetalle = {
@@ -39,6 +40,7 @@ export default function ReporteDiarioMinaPanel() {
   const [uploading, setUploading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [expandedDetalle, setExpandedDetalle] = useState<string | null>(null);
+  const [selectedDetalleIds, setSelectedDetalleIds] = useState<string[]>([]);
 
   const [isProduccionModalOpen, setIsProduccionModalOpen] = useState(false);
   const [isNovedadModalOpen, setIsNovedadModalOpen] = useState(false);
@@ -285,6 +287,90 @@ export default function ReporteDiarioMinaPanel() {
       console.error(err);
       console.log(`Error al eliminar: ${err.message}`);
       setLoading(false);
+    }
+  };
+
+  const toggleSelectDetalle = (id: string) => {
+    setSelectedDetalleIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllTurno = (turno: Turno) => {
+    const turnoIds = turno.detalles.map(d => d.id).filter((id): id is string => !!id);
+    const allSelected = turnoIds.every(id => selectedDetalleIds.includes(id));
+    if (allSelected) {
+      setSelectedDetalleIds(prev => prev.filter(id => !turnoIds.includes(id)));
+    } else {
+      setSelectedDetalleIds(prev => {
+        const otherIds = prev.filter(id => !turnoIds.includes(id));
+        return [...otherIds, ...turnoIds];
+      });
+    }
+  };
+
+  const handleDeleteSelectedDetalles = async (turno: Turno) => {
+    const turnoIds = turno.detalles.map(d => d.id).filter((id): id is string => !!id && selectedDetalleIds.includes(id));
+    if (turnoIds.length === 0) return;
+    
+    const result = await Swal.fire({
+      title: '¿Confirmar eliminación?',
+      text: `¿Está seguro de que desea eliminar los ${turnoIds.length} registros seleccionados de producción de este turno?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      setLoading(true);
+      try {
+        const { error } = await supabase
+          .from('produccion_registro_diario_mina')
+          .delete()
+          .in('id', turnoIds);
+        if (error) throw error;
+        setSelectedDetalleIds(prev => prev.filter(id => !turnoIds.includes(id)));
+        await fetchReportes();
+        Swal.fire('Eliminado', 'Los registros han sido eliminados con éxito.', 'success');
+      } catch (err: any) {
+        console.error(err);
+        Swal.fire('Error', `Error al eliminar: ${err.message}`, 'error');
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleDeleteDetalle = async (id: string) => {
+    const result = await Swal.fire({
+      title: '¿Confirmar eliminación?',
+      text: '¿Está seguro de que desea eliminar este registro de producción?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      setLoading(true);
+      try {
+        const { error } = await supabase
+          .from('produccion_registro_diario_mina')
+          .delete()
+          .eq('id', id);
+        if (error) throw error;
+        setSelectedDetalleIds(prev => prev.filter(x => x !== id));
+        await fetchReportes();
+        Swal.fire('Eliminado', 'El registro ha sido eliminado con éxito.', 'success');
+      } catch (err: any) {
+        console.error(err);
+        Swal.fire('Error', `Error al eliminar: ${err.message}`, 'error');
+        setLoading(false);
+      }
     }
   };
 
@@ -1122,11 +1208,32 @@ export default function ReporteDiarioMinaPanel() {
               })()}
 
               <div>
-                <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Detalle por Equipo y Operador:</h4>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-2">
+                  <h4 className="text-sm font-bold text-gray-900 dark:text-white">Detalle por Equipo y Operador:</h4>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => handleSelectAllTurno(turno)}
+                      className="text-xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded font-semibold transition-colors flex items-center gap-1.5"
+                    >
+                      <CheckSquare className="w-3.5 h-3.5 text-slate-500" />
+                      {turno.detalles.length > 0 && turno.detalles.map(d => d.id).filter(id => !!id).every(id => selectedDetalleIds.includes(id!)) ? 'Deseleccionar Todos' : 'Seleccionar Todos'}
+                    </button>
+                    {turno.detalles.some(d => d.id && selectedDetalleIds.includes(d.id)) && (
+                      <button
+                        onClick={() => handleDeleteSelectedDetalles(turno)}
+                        className="text-xs bg-red-100 hover:bg-red-200 dark:bg-red-950/40 dark:hover:bg-red-900/40 text-red-700 dark:text-red-400 px-2.5 py-1 rounded font-semibold transition-colors flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Eliminar Seleccionados ({turno.detalles.filter(d => d.id && selectedDetalleIds.includes(d.id)).length})
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                     <thead className="bg-gray-50 dark:bg-slate-800">
                       <tr>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider w-10">Sel.</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Equipo</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Operador</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Primario</th>
@@ -1143,6 +1250,14 @@ export default function ReporteDiarioMinaPanel() {
                         return turno.detalles.map((detalle, dIdx) => (
                           <React.Fragment key={dIdx}>
                           <tr className={`hover:bg-gray-50 dark:hover:bg-slate-800 cursor-pointer ${expandedDetalle === detalle.id ? 'bg-blue-50/30 dark:bg-blue-900/20' : ''}`} onClick={() => setExpandedDetalle(expandedDetalle === detalle.id ? null : (detalle.id || null))}>
+                            <td className="px-4 py-3 whitespace-nowrap text-center" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={detalle.id ? selectedDetalleIds.includes(detalle.id) : false}
+                                onChange={() => { if (detalle.id) toggleSelectDetalle(detalle.id); }}
+                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                              />
+                            </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white flex items-center">
                               <Truck className="w-4 h-4 mr-2 text-gray-400" />
                               {detalle.equipo}
@@ -1170,18 +1285,29 @@ export default function ReporteDiarioMinaPanel() {
                               </div>
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-slate-400 text-right">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleOpenProduccionModal(detalle, activeReport.id, turno.nombre); }}
-                                className="text-blue-600 hover:text-blue-900 p-1"
-                                title="Editar fila"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
+                              <div className="flex items-center justify-end space-x-1" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  onClick={() => handleOpenProduccionModal(detalle, activeReport.id, turno.nombre)}
+                                  className="text-blue-600 hover:text-blue-900 p-1"
+                                  title="Editar fila"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                {detalle.id && (
+                                  <button
+                                    onClick={() => handleDeleteDetalle(detalle.id!)}
+                                    className="text-red-600 hover:text-red-900 p-1"
+                                    title="Eliminar fila"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                           {expandedDetalle === detalle.id && (
                             <tr>
-                              <td colSpan={8} className="px-4 py-4 bg-gray-50 dark:bg-slate-800/80 border-b border-gray-100">
+                              <td colSpan={9} className="px-4 py-4 bg-gray-50 dark:bg-slate-800/80 border-b border-gray-100">
                                 <div className="text-sm text-gray-700 dark:text-slate-300">
                                    <span className="font-semibold block mb-2 text-gray-900 dark:text-white">Detalle de Vueltas (Toneladas):</span>
                                    {detalle.vueltas_detalle && detalle.vueltas_detalle.length > 0 ? (

@@ -40,15 +40,28 @@ export default function GestionBodegas() {
   }, [currentCompany]);
 
   const fetchBodegas = async () => {
-    if (!currentCompany?.id) return;
     try {
-      const { data, error } = await supabase
-        .from('logistica_bodegas')
-        .select('*')
-        .eq('empresa_id', currentCompany.id);
-      if (!error && data) {
-         setBodegas(data);
+      let dataToSet: any[] = [];
+      if (currentCompany?.id && currentCompany.id !== 'emp-001') {
+        const { data, error } = await supabase
+          .from('logistica_bodegas')
+          .select('*')
+          .eq('empresa_id', currentCompany.id);
+        if (!error && data && data.length > 0) {
+          dataToSet = data;
+        }
       }
+
+      if (dataToSet.length === 0) {
+        const { data: allData, error: allErr } = await supabase
+          .from('logistica_bodegas')
+          .select('*');
+        if (!allErr && allData) {
+          dataToSet = allData;
+        }
+      }
+
+      setBodegas(dataToSet);
     } catch (e) {
       console.error(e);
     }

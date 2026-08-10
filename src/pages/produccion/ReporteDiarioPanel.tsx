@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Card } from '../../components/ui/Card';
-import { Calendar, Truck, TrendingUp, AlertCircle, Droplet, FileSpreadsheet, Loader2, Plus, MessageSquarePlus, Edit2 } from 'lucide-react';
+import { Calendar, Truck, TrendingUp, AlertCircle, Droplet, FileSpreadsheet, Loader2, Plus, MessageSquarePlus, Edit2, Trash2, CheckSquare, Square } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import * as XLSX from 'xlsx';
+import Swal from 'sweetalert2';
 import { Modal } from '../../components/ui/Modal';
 
 type TurnoDetalle = {
@@ -33,11 +34,13 @@ type ReporteDia = {
 
 export default function ReporteDiarioPanel() {
   const [selectedDateId, setSelectedDateId] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [reportes, setReportes] = useState<ReporteDia[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [expandedDetalle, setExpandedDetalle] = useState<string | null>(null);
+  const [selectedDetalleIds, setSelectedDetalleIds] = useState<string[]>([]);
 
   const [isProduccionModalOpen, setIsProduccionModalOpen] = useState(false);
   const [isNovedadModalOpen, setIsNovedadModalOpen] = useState(false);
@@ -262,11 +265,100 @@ export default function ReporteDiarioPanel() {
       if (parsedReportes.length > 0 && !selectedDateId) {
         setSelectedDateId(parsedReportes[0].id);
       }
+      
+      const allMonths = Array.from(new Set(parsedReportes.map(r => r.id.substring(0, 7)))).sort((a, b) => b.localeCompare(a));
+      if (allMonths.length > 0 && !selectedMonth) {
+         setSelectedMonth(allMonths[0]);
+      }
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleSelectDetalle = (id: string) => {
+    setSelectedDetalleIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllTurno = (turno: Turno) => {
+    const turnoIds = turno.detalles.map(d => d.id).filter((id): id is string => !!id);
+    const allSelected = turnoIds.every(id => selectedDetalleIds.includes(id));
+    if (allSelected) {
+      setSelectedDetalleIds(prev => prev.filter(id => !turnoIds.includes(id)));
+    } else {
+      setSelectedDetalleIds(prev => {
+        const otherIds = prev.filter(id => !turnoIds.includes(id));
+        return [...otherIds, ...turnoIds];
+      });
+    }
+  };
+
+  const handleDeleteSelectedDetalles = async (turno: Turno) => {
+    const turnoIds = turno.detalles.map(d => d.id).filter((id): id is string => !!id && selectedDetalleIds.includes(id));
+    if (turnoIds.length === 0) return;
+    
+    const result = await Swal.fire({
+      title: '¿Confirmar eliminación?',
+      text: `¿Está seguro de que desea eliminar los ${turnoIds.length} registros seleccionados de producción de este turno?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      setLoading(true);
+      try {
+        const { error } = await supabase
+          .from('produccion_registro_diario')
+          .delete()
+          .in('id', turnoIds);
+        if (error) throw error;
+        setSelectedDetalleIds(prev => prev.filter(id => !turnoIds.includes(id)));
+        await fetchReportes();
+        Swal.fire('Eliminado', 'Los registros han sido eliminados con éxito.', 'success');
+      } catch (err: any) {
+        console.error(err);
+        Swal.fire('Error', `Error al eliminar: ${err.message}`, 'error');
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleDeleteDetalle = async (id: string) => {
+    const result = await Swal.fire({
+      title: '¿Confirmar eliminación?',
+      text: '¿Está seguro de que desea eliminar este registro de producción?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      setLoading(true);
+      try {
+        const { error } = await supabase
+          .from('produccion_registro_diario')
+          .delete()
+          .eq('id', id);
+        if (error) throw error;
+        setSelectedDetalleIds(prev => prev.filter(x => x !== id));
+        await fetchReportes();
+        Swal.fire('Eliminado', 'El registro ha sido eliminado con éxito.', 'success');
+      } catch (err: any) {
+        console.error(err);
+        Swal.fire('Error', `Error al eliminar: ${err.message}`, 'error');
+        setLoading(false);
+      }
     }
   };
 
@@ -280,12 +372,39 @@ export default function ReporteDiarioPanel() {
 
   const activeReport = useMemo(() => reportes.find(r => r.id === selectedDateId), [reportes, selectedDateId]);
 
+  const availableMonths = useMemo(() => {
+    const months = new Set(reportes.map(r => r.id.substring(0, 7)));
+    return Array.from(months).sort((a, b) => b.localeCompare(a));
+  }, [reportes]);
+
+  const filteredReportes = useMemo(() => {
+    if (!selectedMonth) return reportes;
+    return reportes.filter(r => r.id.startsWith(selectedMonth));
+  }, [reportes, selectedMonth]);
+
+  useEffect(() => {
+    if (availableMonths.length > 0 && (!selectedMonth || !availableMonths.includes(selectedMonth))) {
+      setSelectedMonth(availableMonths[0]);
+    }
+  }, [availableMonths, selectedMonth]);
+
+  // Update selectedDateId if it's not in the currently filtered month
+  useEffect(() => {
+    if (filteredReportes.length > 0) {
+      if (!selectedDateId || !filteredReportes.find(r => r.id === selectedDateId)) {
+        setSelectedDateId(filteredReportes[0].id);
+      }
+    } else {
+      setSelectedDateId(null);
+    }
+  }, [filteredReportes, selectedDateId]);
+
   // Total accumulators
   const monthlyTotals = useMemo(() => {
     let totalVueltas = 0;
     let totalToneladas = 0;
     
-    reportes.forEach(reporte => {
+    filteredReportes.forEach(reporte => {
       reporte.turnos.forEach(turno => {
         totalVueltas += turno.totalVueltas;
         totalToneladas += turno.totalToneladas;
@@ -293,7 +412,7 @@ export default function ReporteDiarioPanel() {
     });
 
     return { totalVueltas, totalToneladas };
-  }, [reportes]);
+  }, [filteredReportes]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -662,13 +781,40 @@ export default function ReporteDiarioPanel() {
       ) : (
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Date Selector Sidebar */}
-          <Card className="p-4 lg:w-64 shrink-0">
+          <Card className="p-4 lg:w-64 shrink-0 flex flex-col">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center">
               <Calendar className="w-4 h-4 mr-2" />
-              Seleccionar Día
+              Filtro y Selección
             </h3>
-            <div className="space-y-2">
-              {reportes.map(reporte => (
+            
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">
+                Mes del Reporte
+              </label>
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="w-full text-sm rounded-md border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-3 py-1.5 focus:border-blue-500 focus:ring-blue-500 shadow-sm"
+              >
+                {availableMonths.length === 0 && <option value="">Sin datos</option>}
+                {availableMonths.map(month => {
+                  const [year, m] = month.split('-');
+                  const date = new Date(parseInt(year), parseInt(m) - 1, 1);
+                  const monthName = date.toLocaleString('es-CL', { month: 'long', year: 'numeric' });
+                  return (
+                    <option key={month} value={month}>
+                      {monthName.charAt(0).toUpperCase() + monthName.slice(1)}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            <div className="text-xs font-medium text-gray-500 dark:text-slate-400 mb-2">
+              Días disponibles:
+            </div>
+            <div className="space-y-2 overflow-y-auto flex-1 max-h-[600px] pr-1">
+              {filteredReportes.map(reporte => (
                 <button
                   key={reporte.id}
                   onClick={() => setSelectedDateId(reporte.id)}
@@ -681,6 +827,9 @@ export default function ReporteDiarioPanel() {
                   {reporte.fechaStr}
                 </button>
               ))}
+              {filteredReportes.length === 0 && (
+                <div className="text-sm text-gray-500 italic text-center py-4">No hay días en este mes</div>
+              )}
             </div>
           </Card>
 
@@ -730,11 +879,32 @@ export default function ReporteDiarioPanel() {
               )}
 
               <div>
-                <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Detalle por Camión y Chofer:</h4>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-2">
+                  <h4 className="text-sm font-bold text-gray-900 dark:text-white">Detalle por Camión y Chofer:</h4>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => handleSelectAllTurno(turno)}
+                      className="text-xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded font-semibold transition-colors flex items-center gap-1.5"
+                    >
+                      <CheckSquare className="w-3.5 h-3.5 text-slate-500" />
+                      {turno.detalles.length > 0 && turno.detalles.map(d => d.id).filter(id => !!id).every(id => selectedDetalleIds.includes(id!)) ? 'Deseleccionar Todos' : 'Seleccionar Todos'}
+                    </button>
+                    {turno.detalles.some(d => d.id && selectedDetalleIds.includes(d.id)) && (
+                      <button
+                        onClick={() => handleDeleteSelectedDetalles(turno)}
+                        className="text-xs bg-red-100 hover:bg-red-200 dark:bg-red-950/40 dark:hover:bg-red-900/40 text-red-700 dark:text-red-400 px-2.5 py-1 rounded font-semibold transition-colors flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Eliminar Seleccionados ({turno.detalles.filter(d => d.id && selectedDetalleIds.includes(d.id)).length})
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                     <thead className="bg-gray-50 dark:bg-slate-800">
                       <tr>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider w-10">Sel.</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Camión</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Chofer</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Tonelaje</th>
@@ -749,6 +919,16 @@ export default function ReporteDiarioPanel() {
                         return turno.detalles.map((detalle, dIdx) => (
                           <React.Fragment key={dIdx}>
                           <tr className={`hover:bg-gray-50 dark:hover:bg-slate-800 cursor-pointer ${expandedDetalle === detalle.id ? 'bg-blue-50/30 dark:bg-blue-900/20' : ''}`} onClick={() => setExpandedDetalle(expandedDetalle === detalle.id ? null : (detalle.id || null))}>
+                            <td className="py-2.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                              {detalle.id ? (
+                                <input
+                                  type="checkbox"
+                                  checked={selectedDetalleIds.includes(detalle.id)}
+                                  onChange={() => toggleSelectDetalle(detalle.id!)}
+                                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                                />
+                              ) : null}
+                            </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white flex items-center">
                               <Truck className="w-4 h-4 mr-2 text-gray-400" />
                               {detalle.camion}
@@ -775,18 +955,29 @@ export default function ReporteDiarioPanel() {
                               ) : '-'}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-slate-400 text-right">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleOpenProduccionModal(detalle, activeReport.id, turno.nombre); }}
-                                className="text-blue-600 hover:text-blue-900 p-1"
-                                title="Editar fila"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
+                              <div className="flex items-center justify-end space-x-1" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  onClick={() => handleOpenProduccionModal(detalle, activeReport.id, turno.nombre)}
+                                  className="text-blue-600 hover:text-blue-900 p-1"
+                                  title="Editar fila"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                {detalle.id && (
+                                  <button
+                                    onClick={() => handleDeleteDetalle(detalle.id!)}
+                                    className="text-red-600 hover:text-red-900 p-1"
+                                    title="Eliminar fila"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                           {expandedDetalle === detalle.id && (
                             <tr>
-                              <td colSpan={6} className="px-4 py-4 bg-gray-50 dark:bg-slate-800/80 border-b border-gray-100">
+                              <td colSpan={7} className="px-4 py-4 bg-gray-50 dark:bg-slate-800/80 border-b border-gray-100">
                                 <div className="text-sm text-gray-700 dark:text-slate-300">
                                    <span className="font-semibold block mb-2 text-gray-900 dark:text-white">Detalle de Vueltas (Toneladas):</span>
                                    {detalle.vueltas_detalle && detalle.vueltas_detalle.length > 0 ? (
