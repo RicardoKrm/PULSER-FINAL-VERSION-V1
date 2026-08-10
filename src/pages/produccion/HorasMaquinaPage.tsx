@@ -77,9 +77,9 @@ export default function HorasMaquinaPage() {
 
   // Tab 1 Filters
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [dateFilterType, setDateFilterType] = useState<'todos' | 'dia' | 'semana' | 'mes' | 'rango'>('todos');
+  const [dateFilterType, setDateFilterType] = useState<'todos' | 'dia' | 'semana' | 'mes' | 'rango'>('mes');
   const [selectedDate, setSelectedDate] = useState<string>('');
-  const [selectedYear, setSelectedYear] = useState<number>(2026);
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1); // 1-12
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
   const [startDate, setStartDate] = useState<string>('');
@@ -88,8 +88,8 @@ export default function HorasMaquinaPage() {
   const [selectedTurno, setSelectedTurno] = useState<string>('todos');
 
   // Tab 2 Filters
-  const [dispoYear, setDispoYear] = useState<number>(2026);
-  const [dispoMonth, setDispoMonth] = useState<string>('todos'); // 'todos' or '1'..'12'
+  const [dispoYear, setDispoYear] = useState<number>(new Date().getFullYear());
+  const [dispoMonth, setDispoMonth] = useState<string>(String(new Date().getMonth() + 1)); // 'todos' or '1'..'12'
   const [baseHorasMes, setBaseHorasMes] = useState<number>(720); // standard 720 hrs
 
   // Tab 2 Multi-Select Vehicles Filter
