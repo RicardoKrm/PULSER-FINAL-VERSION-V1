@@ -1,61 +1,108 @@
+import { supabase } from '../../lib/supabase';
 import React, { useState, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Upload, FileSpreadsheet, Sun, Moon, LayoutGrid, Download, Search, AlertCircle } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { useAuth } from '../../context/AuthContext';
+import { useCompany } from '../../contexts/CompanyContext';
 
 interface ProcessedRow {
   dia: number;
-  pozo: string;
-  subPozo: string;
+  supervisor: string;
+  dia_mes: string;
   
   // Turno Día
-  cantidadCaexDia: number;
-  caexDia: number;
-  operadoresDia: number;
-  acopioDia: number;
-  caexAcopioDia: number;
-  plantaDia: number;
-  caexPlantaDia: number;
-  vueltasDia: number;
-  pasesCfDia: number;
-  pasesTotalesDia: number;
-  horasCfDia: number;
-  produccionDia: number; // Q
-  produccionCmcDia: number; // R
-  traspasosDia: number;
+  cantidad_caex_dia: number;
+  caex_dia: number;
+  operadores_dia: number;
+  acopio_dia: number;
+  caex_acopio_dia: number;
+  planta_dia: number;
+  caex_planta_dia: number;
+  vueltas_dia: number;
+  pases_cf_dia: number;
+  pases_totales_dia: number;
+  toneladas_caex_dia: number;
+  equipo_cf_dia: string;
+  produccion_dia: number;
+  produccion_cmc_dia: number;
+  traspasos_dia: number;
 
   // Turno Noche
-  cantidadCaexNoche: number;
-  caexNoche: number;
-  operadoresNoche: number;
-  acopioNoche: number;
-  caexAcopioNoche: number;
-  plantaNoche: number;
-  caexPlantaNoche: number;
-  vueltasNoche: number;
-  pasesCfNoche: number;
-  pasesTotalesNoche: number;
-  horasCfNoche: number;
-  produccionNoche: number; // AF
-  produccionCmcNoche: number; // AG
-  traspasosNoche: number;
+  cantidad_caex_noche: number;
+  caex_noche: number;
+  operadores_noche: number;
+  acopio_noche: number;
+  caex_acopio_noche: number;
+  planta_noche: number;
+  caex_planta_noche: number;
+  vueltas_noche: number;
+  pases_cf_noche: number;
+  pases_totales_noche: number;
+  toneladas_caex_noche: number;
+  equipo_cf_noche: string;
+  produccion_caex_noche: number;
+  produccion_noche: number;
+  traspasos_noche: number;
 
   // Totales
-  totalImperia: number;
-  totalCmc: number;
+  total_imperia: number;
+  total_cmc: number;
   diferencia: number;
   
-  raw: any[]; // Store the full 39 columns for raw view
+  raw: any[]; 
 }
 
 export default function PruebaMina() {
   const [data, setData] = useState<ProcessedRow[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState('2026-07');
+  const availableMonths = ['2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12'];
+
+  React.useEffect(() => {
+    if (selectedMonth && currentCompany) {
+      loadMonthData(selectedMonth);
+    }
+  }, [selectedMonth, currentCompany]);
+
+  const loadMonthData = async (mes: string) => {
+    try {
+      setLoading(true);
+      const { data: records, error } = await supabase
+        .from('produccion_mina_mensual')
+        .select('*')
+        .eq('empresa_id', currentCompany?.id)
+        .eq('mes', mes)
+        .order('dia', { ascending: true });
+
+      if (error) throw error;
+
+      if (records && records.length > 0) {
+        const loaded: ProcessedRow[] = records.map(r => ({
+          ...r.raw_data,
+          total_imperia: r.total_imperia,
+          total_cmc: r.total_cmc,
+          diferencia: r.diferencia
+        }));
+        setData(loaded);
+      } else {
+        setData([]);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError("Error cargando datos de la base de datos.");
+    } finally {
+      setLoading(false);
+    }
+  };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'resumen' | 'dia' | 'noche' | 'matriz'>('resumen');
   const [searchTerm, setSearchTerm] = useState('');
   
+  const { currentCompany } = useCompany();
+  const { user } = useAuth();
+  const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,72 +162,72 @@ export default function PruebaMina() {
         let lastSubPozo = '';
 
         const processed: ProcessedRow[] = targetRows.map((row, index) => {
-          // Fill down logic for Pozo and Sub-pozo
-          let pozo = row[1] !== null && row[1] !== undefined ? String(row[1]).trim() : lastPozo;
-          let subPozo = row[2] !== null && row[2] !== undefined ? String(row[2]).trim() : lastSubPozo;
+          let supervisor = row[1] !== null && row[1] !== undefined ? String(row[1]).trim() : lastPozo;
+          let dia_mes = row[2] !== null && row[2] !== undefined ? String(row[2]).trim() : lastSubPozo;
           
-          if (row[1] !== null && row[1] !== undefined) lastPozo = pozo;
-          if (row[2] !== null && row[2] !== undefined) lastSubPozo = subPozo;
+          if (row[1] !== null && row[1] !== undefined) lastPozo = supervisor;
+          if (row[2] !== null && row[2] !== undefined) lastSubPozo = dia_mes;
 
-          // Helper to get number
           const getNum = (val: any) => {
-            const num = Number(val);
-            return isNaN(num) ? 0 : num;
+            if (val === null || val === undefined) return 0;
+            if (typeof val === 'number') return isNaN(val) ? 0 : val;
+            if (typeof val === 'string') {
+               const parsed = Number(val.replace(/,/g, ''));
+               return isNaN(parsed) ? 0 : parsed;
+            }
+            if (typeof val === 'object' && val !== null) {
+                // If it's a formula object from xlsx cell
+                if (val.v !== undefined) {
+                    const parsed = Number(val.v);
+                    return isNaN(parsed) ? 0 : parsed;
+                }
+            }
+            return 0;
           };
-
-          const pasesCfDia = getNum(row[11]); // Col L
-          const pasesCfNoche = getNum(row[26]); // Col AA (approx)
-
-          const prodDia = getNum(row[16]); // Col Q
-          const prodCmcDia = getNum(row[17]); // Col R
-          
-          const prodNoche = getNum(row[31]); // Col AF
-          const prodCmcNoche = getNum(row[32]); // Col AG
-
-          const totalImperia = prodDia + prodNoche;
-          const totalCmc = prodCmcDia + prodCmcNoche;
 
           return {
             dia: index + 1, // 1 to 31
-            pozo,
-            subPozo,
+            supervisor,
+            dia_mes,
 
             // Turno Día
-            cantidadCaexDia: getNum(row[3]), // D
-            caexDia: getNum(row[4]),
-            operadoresDia: getNum(row[5]),
-            acopioDia: getNum(row[6]),
-            caexAcopioDia: getNum(row[7]),
-            plantaDia: getNum(row[8]),
-            caexPlantaDia: getNum(row[9]),
-            vueltasDia: getNum(row[10]),
-            pasesCfDia,
-            pasesTotalesDia: pasesCfDia * 9,
-            horasCfDia: getNum(row[12]),
-            produccionDia: prodDia,
-            produccionCmcDia: prodCmcDia,
-            traspasosDia: getNum(row[18]), // S
+            cantidad_caex_dia: getNum(row[3]), // Col 4
+            caex_dia: getNum(row[4]), // Col 5
+            operadores_dia: getNum(row[5]), // Col 6
+            acopio_dia: getNum(row[6]), // Col 7
+            caex_acopio_dia: getNum(row[7]), // Col 8
+            planta_dia: getNum(row[8]), // Col 9
+            caex_planta_dia: getNum(row[9]), // Col 10
+            vueltas_dia: getNum(row[10]), // Col 11
+            pases_cf_dia: getNum(row[11]), // Col 12
+            pases_totales_dia: getNum(row[12]), // Col 13
+            toneladas_caex_dia: getNum(row[13]), // Col 14
+            equipo_cf_dia: row[14] ? String(row[14]) : '', // Col 15
+            produccion_dia: getNum(row[15]), // Col 16
+            produccion_cmc_dia: getNum(row[16]), // Col 17
+            traspasos_dia: getNum(row[17]), // Col 18
 
-            // Turno Noche (Assuming cols T to AH)
-            cantidadCaexNoche: getNum(row[19]), // T
-            caexNoche: getNum(row[20]),
-            operadoresNoche: getNum(row[21]),
-            acopioNoche: getNum(row[22]),
-            caexAcopioNoche: getNum(row[23]),
-            plantaNoche: getNum(row[24]),
-            caexPlantaNoche: getNum(row[25]),
-            vueltasNoche: getNum(row[26]),
-            pasesCfNoche,
-            pasesTotalesNoche: pasesCfNoche * 9,
-            horasCfNoche: getNum(row[27]), // AB
-            produccionNoche: prodNoche,
-            produccionCmcNoche: prodCmcNoche,
-            traspasosNoche: getNum(row[33]), // AH
+            // Turno Noche
+            cantidad_caex_noche: getNum(row[19]), // Col 20
+            caex_noche: getNum(row[20]), // Col 21
+            operadores_noche: getNum(row[21]), // Col 22
+            acopio_noche: getNum(row[22]), // Col 23
+            caex_acopio_noche: getNum(row[23]), // Col 24
+            planta_noche: getNum(row[24]), // Col 25
+            caex_planta_noche: getNum(row[25]), // Col 26
+            vueltas_noche: 0, // Not mentioned
+            pases_cf_noche: getNum(row[26]), // Col 27
+            pases_totales_noche: getNum(row[27]), // Col 28
+            toneladas_caex_noche: getNum(row[28]), // Col 29
+            equipo_cf_noche: row[29] ? String(row[29]) : '', // Col 30
+            produccion_caex_noche: getNum(row[30]), // Col 31
+            produccion_noche: getNum(row[31]), // Col 32
+            traspasos_noche: getNum(row[32]), // Col 33
 
             // Totales
-            totalImperia,
-            totalCmc,
-            diferencia: totalCmc - totalImperia,
+            total_imperia: getNum(row[15]) + getNum(row[31]), // Suma Producción Día + Producción Noche
+            total_cmc: getNum(row[35]), // Col 36
+            diferencia: (getNum(row[15]) + getNum(row[31])) - getNum(row[35]), // total_imperia - total_cmc
 
             raw: row
           };
@@ -200,32 +247,64 @@ export default function PruebaMina() {
     reader.readAsBinaryString(file);
   };
 
+
+
   const filteredData = useMemo(() => {
     if (!searchTerm) return data;
     const lower = searchTerm.toLowerCase();
     return data.filter(r => 
       r.dia.toString().includes(lower) || 
-      r.pozo.toLowerCase().includes(lower) || 
-      r.subPozo.toLowerCase().includes(lower)
+      r.supervisor.toLowerCase().includes(lower) || r.dia_mes.toLowerCase().includes(lower)
     );
   }, [data, searchTerm]);
 
   const totals = useMemo(() => {
     return filteredData.reduce((acc, curr) => ({
-      produccionDia: acc.produccionDia + curr.produccionDia,
-      produccionNoche: acc.produccionNoche + curr.produccionNoche,
-      totalImperia: acc.totalImperia + curr.totalImperia,
-      totalCmc: acc.totalCmc + curr.totalCmc,
+      produccion_dia: acc.produccion_dia + curr.produccion_dia,
+      produccion_noche: acc.produccion_noche + curr.produccion_noche,
+      total_imperia: acc.total_imperia + curr.total_imperia,
+      total_cmc: acc.total_cmc + curr.total_cmc,
       diferencia: acc.diferencia + curr.diferencia,
-    }), { produccionDia: 0, produccionNoche: 0, totalImperia: 0, totalCmc: 0, diferencia: 0 });
+    }), { produccion_dia: 0, produccion_noche: 0, total_imperia: 0, total_cmc: 0, diferencia: 0 });
   }, [filteredData]);
 
-  const handleExportJSON = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(filteredData, null, 2));
-    const dlAnchorElem = document.createElement('a');
-    dlAnchorElem.setAttribute("href", dataStr);
-    dlAnchorElem.setAttribute("download", "produccion_mina.json");
-    dlAnchorElem.click();
+  const handleSaveToDB = async () => {
+    if (!currentCompany || data.length === 0) return;
+    try {
+      setSaving(true);
+      
+      // Delete existing records for this month
+      await supabase
+        .from('produccion_mina_mensual')
+        .delete()
+        .eq('empresa_id', currentCompany.id)
+        .eq('mes', selectedMonth);
+
+      // Insert new records
+      const insertData = data.map(r => ({
+        empresa_id: currentCompany.id,
+        mes: selectedMonth,
+        dia: r.dia,
+        supervisor: r.supervisor,
+        dia_mes: r.dia_mes,
+        produccion_dia: r.produccion_dia,
+        produccion_noche: r.produccion_noche,
+        total_imperia: r.total_imperia,
+        total_cmc: r.total_cmc,
+        diferencia: r.diferencia,
+        raw_data: r
+      }));
+
+      const { error } = await supabase.from('produccion_mina_mensual').insert(insertData);
+      if (error) throw error;
+      
+      alert("Datos guardados exitosamente");
+    } catch (err: any) {
+      console.error(err);
+      alert("Error al guardar en base de datos: " + err.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleExportExcel = () => {
@@ -252,24 +331,36 @@ export default function PruebaMina() {
           </p>
         </div>
         
-        {data.length > 0 && (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleExportJSON}>
-              <Download className="h-4 w-4 mr-2" />
-              JSON
-            </Button>
-            <Button variant="outline" onClick={handleExportExcel}>
-              <Download className="h-4 w-4 mr-2" />
-              Excel
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={() => { setData([]); if(fileInputRef.current) fileInputRef.current.value = ''; }}
+        <div className="flex gap-2">
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
-              Limpiar
-            </Button>
+              <option value="" disabled>Seleccione Mes</option>
+              {availableMonths.map(m => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+            {data.length > 0 && (
+              <>
+                <Button variant="outline" onClick={handleExportExcel}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Excel
+                </Button>
+                <Button onClick={handleSaveToDB} disabled={saving || data.length === 0} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                  {saving ? 'Guardando...' : 'Guardar en Base de Datos'}
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  onClick={() => { setData([]); if(fileInputRef.current) fileInputRef.current.value = ''; }}
+                >
+                  Limpiar
+                </Button>
+              </>
+            )}
+            
           </div>
-        )}
       </div>
 
       {data.length === 0 ? (
@@ -325,33 +416,33 @@ export default function PruebaMina() {
             <Card className="bg-white dark:bg-slate-900">
               <CardContent className="p-4">
                 <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Imperia Mes</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{formatNum(totals.totalImperia)}</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{formatNum(totals.total_imperia)}</p>
               </CardContent>
             </Card>
             <Card className="bg-white dark:bg-slate-900">
               <CardContent className="p-4">
                 <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total CMC Mes</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{formatNum(totals.totalCmc)}</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{formatNum(totals.total_cmc)}</p>
               </CardContent>
             </Card>
-            <Card className={`bg-white dark:bg-slate-900 border-l-4 ${totals.diferencia < 0 ? 'border-l-red-500' : 'border-l-emerald-500'}`}>
+            <Card className={`bg-white dark:bg-slate-900 border-l-4 ${totals.diferencia < 0 ? 'border-l-red-500' : 'border-l-slate-500'}`}>
               <CardContent className="p-4">
                 <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Desviación Acumulada</p>
-                <p className={`text-2xl font-bold mt-1 ${totals.diferencia < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                  {totals.diferencia > 0 ? '+' : ''}{formatNum(totals.diferencia)}
+                <p className={`text-2xl font-bold mt-1 ${totals.diferencia < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'}`}>
+                  {formatNum(totals.diferencia)}
                 </p>
               </CardContent>
             </Card>
             <Card className="bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800">
               <CardContent className="p-4">
                 <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Producción Día</p>
-                <p className="text-2xl font-bold text-amber-900 dark:text-amber-300 mt-1">{formatNum(totals.produccionDia)}</p>
+                <p className="text-2xl font-bold text-amber-900 dark:text-amber-300 mt-1">{formatNum(totals.produccion_dia)}</p>
               </CardContent>
             </Card>
             <Card className="bg-indigo-50 dark:bg-indigo-900/10 border-indigo-200 dark:border-indigo-800">
               <CardContent className="p-4">
                 <p className="text-sm font-medium text-indigo-700 dark:text-indigo-400">Producción Noche</p>
-                <p className="text-2xl font-bold text-indigo-900 dark:text-indigo-300 mt-1">{formatNum(totals.produccionNoche)}</p>
+                <p className="text-2xl font-bold text-indigo-900 dark:text-indigo-300 mt-1">{formatNum(totals.produccion_noche)}</p>
               </CardContent>
             </Card>
           </div>
@@ -407,7 +498,7 @@ export default function PruebaMina() {
                   {activeTab === 'resumen' && (
                     <tr>
                       <th className="px-6 py-4 font-semibold">Día</th>
-                      <th className="px-6 py-4 font-semibold">Pozo / Sub-Pozo</th>
+                      <th className="px-6 py-4 font-semibold">Supervisor / Día del Mes</th>
                       <th className="px-6 py-4 font-semibold text-right">Prod. Día</th>
                       <th className="px-6 py-4 font-semibold text-right">Prod. Noche</th>
                       <th className="px-6 py-4 font-semibold text-right text-slate-900 dark:text-white">Total Imperia</th>
@@ -418,7 +509,7 @@ export default function PruebaMina() {
                   {activeTab === 'dia' && (
                     <tr>
                       <th className="px-6 py-4 font-semibold">Día</th>
-                      <th className="px-6 py-4 font-semibold">Pozo</th>
+                      <th className="px-6 py-4 font-semibold">Supervisor</th>
                       <th className="px-6 py-4 font-semibold text-right">Cant CAEX</th>
                       <th className="px-6 py-4 font-semibold text-right">Operadores</th>
                       <th className="px-6 py-4 font-semibold text-right">Acopio</th>
@@ -431,7 +522,7 @@ export default function PruebaMina() {
                   {activeTab === 'noche' && (
                     <tr>
                       <th className="px-6 py-4 font-semibold">Día</th>
-                      <th className="px-6 py-4 font-semibold">Pozo</th>
+                      <th className="px-6 py-4 font-semibold">Supervisor</th>
                       <th className="px-6 py-4 font-semibold text-right">Cant CAEX</th>
                       <th className="px-6 py-4 font-semibold text-right">Operadores</th>
                       <th className="px-6 py-4 font-semibold text-right">Acopio</th>
@@ -444,11 +535,49 @@ export default function PruebaMina() {
                   {activeTab === 'matriz' && (
                     <tr>
                       <th className="px-4 py-3 font-semibold">Día</th>
-                      <th className="px-4 py-3 font-semibold">Pozo</th>
-                      <th className="px-4 py-3 font-semibold">Sub-Pozo</th>
-                      {Array.from({length: 36}).map((_, i) => (
-                        <th key={i} className="px-4 py-3 font-semibold">Col {i + 4}</th>
-                      ))}
+                      <th className="px-4 py-3 font-semibold">Supervisor</th>
+                      <th className="px-4 py-3 font-semibold">Día del Mes</th>
+                      {Array.from({length: 36}).map((_, i) => {
+                        const originalColIndex = i + 3;
+                        if ([18, 33, 37, 38].includes(originalColIndex)) return null;
+                        
+                        const headerMap: Record<number, string> = {
+                          3: 'CAEX',
+                          4: 'Nº CAEX',
+                          5: 'Operadores',
+                          6: 'Acopio',
+                          7: 'CAEX Acopio',
+                          8: 'Primario',
+                          9: 'CAEX Primario',
+                          10: 'Vueltas',
+                          11: 'Pases CF',
+                          12: 'Pases Totales CF',
+                          13: 'Toneladas CAEX',
+                          14: 'CF',
+                          15: 'Prod. Total Día',
+                          16: 'Prod. CMC',
+                          17: 'Traspasos',
+                          19: 'Nº de CAEX',
+                          20: 'Nº CAEX',
+                          21: 'Operador',
+                          22: 'Acopio',
+                          23: 'CAEX',
+                          24: 'Primario',
+                          25: 'CAEX',
+                          26: 'Pases CF',
+                          27: 'Pases Totales',
+                          28: 'Prod. CAEX',
+                          29: 'Equipo CF',
+                          30: 'Prod. CAEX',
+                          31: 'Prod. Total Noche',
+                          32: 'Traspasos',
+                          34: 'T. IMPERIA',
+                          35: 'T. CMC',
+                          36: 'Diferencias'
+                        };
+                        const title = headerMap[originalColIndex] || `Col ${originalColIndex + 1}`;
+                        return <th key={i} className="px-4 py-3 font-semibold">{title}</th>;
+                      })}
                     </tr>
                   )}
                 </thead>
@@ -461,16 +590,16 @@ export default function PruebaMina() {
                           <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{row.dia}</td>
                           <td className="px-6 py-4">
                             <div className="flex flex-col">
-                              <span className="font-medium">{row.pozo}</span>
-                              <span className="text-xs text-slate-500">{row.subPozo}</span>
+                              <span className="font-medium">{row.supervisor}</span>
+                              <span className="text-xs text-slate-500">{row.dia_mes}</span>
                             </div>
                           </td>
-                          <td className="px-6 py-4 text-right">{formatNum(row.produccionDia)}</td>
-                          <td className="px-6 py-4 text-right">{formatNum(row.produccionNoche)}</td>
-                          <td className="px-6 py-4 text-right font-medium">{formatNum(row.totalImperia)}</td>
-                          <td className="px-6 py-4 text-right font-medium">{formatNum(row.totalCmc)}</td>
-                          <td className={`px-6 py-4 text-right font-semibold ${row.diferencia < 0 ? 'text-red-600' : row.diferencia > 0 ? 'text-emerald-600' : 'text-slate-500'}`}>
-                            {row.diferencia > 0 ? '+' : ''}{formatNum(row.diferencia)}
+                          <td className="px-6 py-4 text-right">{formatNum(row.produccion_dia)}</td>
+                          <td className="px-6 py-4 text-right">{formatNum(row.produccion_noche)}</td>
+                          <td className="px-6 py-4 text-right font-medium">{formatNum(row.total_imperia)}</td>
+                          <td className="px-6 py-4 text-right font-medium">{formatNum(row.total_cmc)}</td>
+                          <td className={`px-6 py-4 text-right font-semibold ${row.diferencia < 0 ? 'text-red-600' : 'text-slate-900 dark:text-white'}`}>
+                            {formatNum(row.diferencia)}
                           </td>
                         </>
                       )}
@@ -478,40 +607,52 @@ export default function PruebaMina() {
                       {activeTab === 'dia' && (
                         <>
                           <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{row.dia}</td>
-                          <td className="px-6 py-4">{row.pozo}</td>
-                          <td className="px-6 py-4 text-right">{row.cantidadCaexDia}</td>
-                          <td className="px-6 py-4 text-right">{row.operadoresDia}</td>
-                          <td className="px-6 py-4 text-right">{row.acopioDia}</td>
-                          <td className="px-6 py-4 text-right">{row.plantaDia}</td>
-                          <td className="px-6 py-4 text-right">{row.pasesCfDia}</td>
-                          <td className="px-6 py-4 text-right font-medium bg-slate-50 dark:bg-slate-800/50">{row.pasesTotalesDia}</td>
-                          <td className="px-6 py-4 text-right font-bold text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/10">{formatNum(row.produccionDia)}</td>
+                          <td className="px-6 py-4">{row.supervisor}</td>
+                          <td className="px-6 py-4 text-right">{row.cantidad_caex_dia}</td>
+                          <td className="px-6 py-4 text-right">{row.operadores_dia}</td>
+                          <td className="px-6 py-4 text-right">{row.acopio_dia}</td>
+                          <td className="px-6 py-4 text-right">{row.planta_dia}</td>
+                          <td className="px-6 py-4 text-right">{row.pases_cf_dia}</td>
+                          <td className="px-6 py-4 text-right font-medium bg-slate-50 dark:bg-slate-800/50">{row.pases_totales_dia}</td>
+                          <td className="px-6 py-4 text-right font-bold text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/10">{formatNum(row.produccion_dia)}</td>
                         </>
                       )}
 
                       {activeTab === 'noche' && (
                         <>
                           <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{row.dia}</td>
-                          <td className="px-6 py-4">{row.pozo}</td>
-                          <td className="px-6 py-4 text-right">{row.cantidadCaexNoche}</td>
-                          <td className="px-6 py-4 text-right">{row.operadoresNoche}</td>
-                          <td className="px-6 py-4 text-right">{row.acopioNoche}</td>
-                          <td className="px-6 py-4 text-right">{row.plantaNoche}</td>
-                          <td className="px-6 py-4 text-right">{row.pasesCfNoche}</td>
-                          <td className="px-6 py-4 text-right font-medium bg-slate-50 dark:bg-slate-800/50">{row.pasesTotalesNoche}</td>
-                          <td className="px-6 py-4 text-right font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/10">{formatNum(row.produccionNoche)}</td>
+                          <td className="px-6 py-4">{row.supervisor}</td>
+                          <td className="px-6 py-4 text-right">{row.cantidad_caex_noche}</td>
+                          <td className="px-6 py-4 text-right">{row.operadores_noche}</td>
+                          <td className="px-6 py-4 text-right">{row.acopio_noche}</td>
+                          <td className="px-6 py-4 text-right">{row.planta_noche}</td>
+                          <td className="px-6 py-4 text-right">{row.pases_cf_noche}</td>
+                          <td className="px-6 py-4 text-right font-medium bg-slate-50 dark:bg-slate-800/50">{row.pases_totales_noche}</td>
+                          <td className="px-6 py-4 text-right font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/10">{formatNum(row.produccion_noche)}</td>
                         </>
                       )}
 
                       {activeTab === 'matriz' && (
                         <>
                           <td className="px-4 py-2 font-medium bg-slate-50 dark:bg-slate-800 sticky left-0">{row.dia}</td>
-                          <td className="px-4 py-2 truncate max-w-[150px]" title={row.pozo}>{row.pozo}</td>
-                          <td className="px-4 py-2 truncate max-w-[150px]" title={row.subPozo}>{row.subPozo}</td>
+                          <td className="px-4 py-2 truncate max-w-[150px]" title={row.supervisor}>{row.supervisor}</td>
+                          <td className="px-4 py-2 truncate max-w-[150px]" title={row.dia_mes}>{row.dia_mes}</td>
                           {Array.from({length: 36}).map((_, colIdx) => {
-                            const val = row.raw[colIdx + 3];
+                            const originalColIndex = colIdx + 3;
+                            if ([18, 33, 37, 38].includes(originalColIndex)) return null;
+                            const val = row.raw[originalColIndex];
+                            
+                            let valClass = "px-4 py-2 text-right";
+                            if (originalColIndex === 36 && typeof val === 'number') {
+                              if (val < 0) {
+                                valClass += " font-semibold text-red-600 dark:text-red-400";
+                              } else {
+                                valClass += " font-semibold text-slate-900 dark:text-white";
+                              }
+                            }
+                            
                             return (
-                              <td key={colIdx} className="px-4 py-2 text-right">
+                              <td key={colIdx} className={valClass}>
                                 {typeof val === 'number' ? formatNum(val) : val?.toString() || '-'}
                               </td>
                             )
