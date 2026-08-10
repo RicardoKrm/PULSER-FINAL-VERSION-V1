@@ -93,6 +93,7 @@ export const navigation = [
       { title: 'Reportes Diarios Transporte', icon: Truck, href: '/produccion/reportes-transporte' },
       { title: 'Reportes Diarios Mina', icon: PenTool, href: '/produccion/reportes-mina' },
       { title: 'Planificador Transporte', icon: CalendarClock, href: '/produccion/planificador' },
+      { title: 'Prueba Mina', icon: FileSpreadsheet, href: '/produccion/prueba-mina' },
       { title: 'Trazabilidad', icon: History, href: '/produccion/trazabilidad' },
     ],
   },

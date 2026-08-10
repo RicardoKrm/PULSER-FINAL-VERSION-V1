@@ -374,7 +374,7 @@ export default function ReporteDiarioPanel() {
 
   const availableMonths = useMemo(() => {
     const months = new Set(reportes.map(r => r.id.substring(0, 7)));
-    return Array.from(months).sort((a, b) => b.localeCompare(a));
+    return Array.from(months).sort((a, b) => String(b).localeCompare(String(a)));
   }, [reportes]);
 
   const filteredReportes = useMemo(() => {

@@ -26,6 +26,7 @@ import ReportesDiariosMinaPage from './pages/produccion/ReportesDiariosMinaPage'
 import PlanificadorTransportePage from './pages/produccion/PlanificadorTransportePage';
 import TrazabilidadPage from './pages/produccion/TrazabilidadPage';
 import HorasMaquinaPage from './pages/produccion/HorasMaquinaPage';
+import PruebaMina from './pages/produccion/PruebaMina';
 import GPS from './pages/operaciones/GPS';
 import PortalConductor from './pages/operaciones/PortalConductor';
 import ControlDocumental from './pages/operaciones/ControlDocumental';
@@ -114,6 +115,7 @@ const router = createBrowserRouter([
         { path: "reportes-transporte", element: <ReportesDiariosPage /> },
         { path: "reportes-mina", element: <ReportesDiariosMinaPage /> },
         { path: "planificador", element: <PlanificadorTransportePage /> },
+        { path: "prueba-mina", element: <PruebaMina /> },
         { path: "trazabilidad", element: <TrazabilidadPage /> }
       ]},
 
