@@ -55,9 +55,18 @@ interface ProcessedRow {
 }
 
 export default function PruebaMina() {
+  const { currentCompany } = useCompany();
+  const { user } = useAuth();
+
   const [data, setData] = useState<ProcessedRow[]>([]);
   const [selectedMonth, setSelectedMonth] = useState('2026-07');
   const availableMonths = ['2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12'];
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'resumen' | 'dia' | 'noche' | 'matriz'>('resumen');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (selectedMonth && currentCompany) {
@@ -95,15 +104,7 @@ export default function PruebaMina() {
       setLoading(false);
     }
   };
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'resumen' | 'dia' | 'noche' | 'matriz'>('resumen');
-  const [searchTerm, setSearchTerm] = useState('');
-  
-  const { currentCompany } = useCompany();
-  const { user } = useAuth();
-  const [saving, setSaving] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
