@@ -66,6 +66,7 @@ export default function PruebaMina() {
   const [activeTab, setActiveTab] = useState<'resumen' | 'dia' | 'noche' | 'matriz'>('resumen');
   const [searchTerm, setSearchTerm] = useState('');
   const [saving, setSaving] = useState(false);
+  const [schemaError, setSchemaError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
@@ -77,6 +78,7 @@ export default function PruebaMina() {
   const loadMonthData = async (mes: string) => {
     try {
       setLoading(true);
+      setSchemaError(false);
       const { data: records, error } = await supabase
         .from('produccion_mina_mensual')
         .select('*')
@@ -84,7 +86,12 @@ export default function PruebaMina() {
         .eq('mes', mes)
         .order('dia', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === 'PGRST205') {
+          setSchemaError(true);
+        }
+        throw error;
+      }
 
       if (records && records.length > 0) {
         const loaded: ProcessedRow[] = records.map(r => ({
@@ -246,6 +253,7 @@ export default function PruebaMina() {
       setLoading(false);
     };
     reader.readAsBinaryString(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
 
@@ -302,7 +310,11 @@ export default function PruebaMina() {
       alert("Datos guardados exitosamente");
     } catch (err: any) {
       console.error(err);
-      alert("Error al guardar en base de datos: " + err.message);
+      if (err?.code === 'PGRST205' || err?.message?.includes('schema') || err?.message?.includes('does not exist')) {
+        setSchemaError(true);
+      } else {
+        alert("Error al guardar en base de datos: " + err.message);
+      }
     } finally {
       setSaving(false);
     }
@@ -324,7 +336,43 @@ export default function PruebaMina() {
     <div className="space-y-6 animate-in fade-in zoom-in duration-300">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+          
+      
+      {schemaError && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-md flex items-start mb-6 w-full col-span-full">
+          <AlertCircle className="w-6 h-6 text-red-500 mr-3 shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-red-800 font-semibold mb-1">Requiere Actualización de Base de Datos</h3>
+            <p className="text-red-700 text-sm mb-3">
+              Para guardar los datos, es necesario crear la tabla "produccion_mina_mensual" en Supabase. 
+              Por favor, ejecuta el siguiente código en el SQL Editor de Supabase:
+            </p>
+            <pre className="bg-red-900 text-red-100 p-3 rounded text-xs overflow-x-auto whitespace-pre-wrap">
+              {`CREATE TABLE IF NOT EXISTS public.produccion_mina_mensual (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    empresa_id UUID REFERENCES public.empresa(id),
+    mes TEXT NOT NULL,
+    dia INTEGER,
+    supervisor TEXT,
+    dia_mes TEXT,
+    produccion_dia NUMERIC,
+    produccion_noche NUMERIC,
+    total_imperia NUMERIC,
+    total_cmc NUMERIC,
+    diferencia NUMERIC,
+    raw_data JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.produccion_mina_mensual ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Permitir todo a usuarios autenticados" ON public.produccion_mina_mensual FOR ALL USING (true);
+`}
+            </pre>
+          </div>
+        </div>
+      )}
+      <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
             Revisión Producción Mina
           </h1>
           <p className="text-slate-500 dark:text-slate-400">

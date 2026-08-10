@@ -182,6 +182,15 @@ export default function HorasMaquinaPage() {
         await saveAllHorasMaquina(result.records);
         setRecords(result.records);
 
+        if (result.records.length > 0) {
+          const sampleDate = new Date(result.records[0].fecha + 'T12:00:00');
+          if (!isNaN(sampleDate.getTime())) {
+            setSelectedYear(sampleDate.getFullYear());
+            setSelectedMonth(sampleDate.getMonth() + 1);
+            setDateFilterType('mes');
+          }
+        }
+
         const sheetsMsg = result.sheetsProcessed.length > 0 ? ` de ${result.sheetsProcessed.length} hoja(s) [${result.sheetsProcessed.join(', ')}]` : '';
         setImportNotice(`¡Importación Completa! Se cargaron exitosamente ${result.parsedCount.toLocaleString()} registros${sheetsMsg}.`);
         setTimeout(() => setImportNotice(null), 10000);

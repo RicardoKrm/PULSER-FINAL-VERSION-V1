@@ -233,9 +233,16 @@ export function parseHorasMaquinaExcel(fileData: ArrayBuffer): ParseResult {
       const equipoCleaned = cleanEquipmentName(String(equipoRaw || ''));
 
       // Skip invalid equipment / summary noise rows
+      let _inic = parseNumber(inicRaw, 0);
+      let _fin = parseNumber(finRaw, 0);
+      let _horas = colIndices['horas'] !== undefined && row[colIndices['horas']] !== undefined ? parseNumber(row[colIndices['horas']], 0) : 0;
       if (isInvalidEquipment(equipoCleaned)) {
         skipped++;
-        continue;
+        if (_fin > _inic || _horas > 0) {
+           // Valid row!
+        } else {
+           continue;
+        }
       }
 
       const equipoName = equipoCleaned || 'Equipo Sin Nombre';
