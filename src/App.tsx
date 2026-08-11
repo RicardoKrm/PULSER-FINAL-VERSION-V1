@@ -82,6 +82,10 @@ import RegistrosFinancieros from './pages/finanzas/RegistrosFinancieros';
 import GestionOperativa from './pages/finanzas/GestionOperativa';
 import CostosOperacionales from './pages/finanzas/CostosOperacionales';
 import Presupuestos from './pages/finanzas/Presupuestos';
+import ControlExtintores from './pages/seguridad/ControlExtintores';
+import ControlVelocidades from './pages/seguridad/ControlVelocidades';
+import ControlEventos from './pages/seguridad/ControlEventos';
+import ControlDocumentalSeguridad from './pages/seguridad/ControlDocumental';
 import { ThemeProvider } from './components/ThemeProvider';
 import { CompanyProvider } from './contexts/CompanyContext';
 import { AppProvider } from './context/AppContext';
@@ -181,6 +185,10 @@ const router = createBrowserRouter([
       { path: "soporte/integraciones", element: <Integraciones /> },
       { path: "soporte/tickets", element: <CentroAyuda /> },
       { path: "soporte/manual", element: <ManualUso /> },
+      { path: "seguridad/extintores", element: <ControlExtintores /> },
+      { path: "seguridad/velocidades", element: <ControlVelocidades /> },
+      { path: "seguridad/eventos", element: <ControlEventos /> },
+      { path: "seguridad/documental", element: <ControlDocumentalSeguridad /> },
           { path: "*", element: <GenericPage /> },
         ]
       }

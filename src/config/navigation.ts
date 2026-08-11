@@ -38,7 +38,9 @@ import {
   Map as MapIcon,
   Factory,
   PenTool,
-  History
+  History,
+  Shield,
+  ShieldCheck
 } from 'lucide-react';
 
 export const navigation = [
@@ -170,6 +172,17 @@ export const navigation = [
       { title: 'Subir Documento', icon: FileCheck, href: '/biblioteca/subir' },
     ],
   }, */
+  {
+    title: 'Seguridad y Salud Ocupacional',
+    icon: ShieldCheck,
+    href: '/seguridad',
+    submodules: [
+      { title: 'Control Extintores', icon: Shield, href: '/seguridad/extintores' },
+      { title: 'Control Velocidades', icon: Activity, href: '/seguridad/velocidades' },
+      { title: 'Control Eventos', icon: AlertCircle, href: '/seguridad/eventos' },
+      { title: 'Control Documental Mina', icon: FileCheck, href: '/seguridad/documental' },
+    ],
+  },
   {
     title: 'Configuración y Herramientas',
     icon: Settings,
