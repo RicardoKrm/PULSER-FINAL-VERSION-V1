@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../context/AuthContext';
-import { useProduccion } from '../../../contexts/ProduccionContext';
 import { 
   TrendingUp, Calendar, BarChart3, 
   Activity, Users, Map, CheckCircle2, ChevronRight, Calculator
@@ -40,7 +39,10 @@ export default function ReporteYAnaliticaMina() {
   }, [currentCompany]);
 
   const fetchData = async () => {
-    if (!currentCompany) return;
+    if (!currentCompany) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const { data: records, error } = await supabase
