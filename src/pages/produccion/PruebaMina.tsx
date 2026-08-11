@@ -10,7 +10,7 @@ import { useCompany } from '../../contexts/CompanyContext';
 interface ProcessedRow {
   dia: number;
   supervisor: string;
-  dia_mes: string;
+  supervisor_noche: string;
   
   // Turno Día
   cantidad_caex_dia: number;
@@ -96,6 +96,7 @@ export default function PruebaMina() {
       if (records && records.length > 0) {
         const loaded: ProcessedRow[] = records.map(r => ({
           ...r.raw_data,
+          supervisor_noche: r.raw_data?.supervisor_noche || r.raw_data?.dia_mes || r.dia_mes || '',
           total_imperia: r.total_imperia,
           total_cmc: r.total_cmc,
           diferencia: r.diferencia
@@ -126,65 +127,163 @@ export default function PruebaMina() {
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: 'binary', cellFormula: true, cellDates: true, cellStyles: true });
         
-        // Prefer sheet "JULIO 2026", else first sheet
-        const sheetName = wb.SheetNames.includes("JULIO 2026") ? "JULIO 2026" : wb.SheetNames[0];
-        const ws = wb.Sheets[sheetName];
-
-        if (!ws) {
-          throw new Error("No se pudo leer la hoja de datos.");
-        }
-
-        // Handle merged cells by filling them down/across
-        if (ws['!merges']) {
-          ws['!merges'].forEach(merge => {
-            const startCol = merge.s.c;
-            const endCol = merge.e.c;
-            const startRow = merge.s.r;
-            const endRow = merge.e.r;
-            const refCell = XLSX.utils.encode_cell({ r: startRow, c: startCol });
-            const val = ws[refCell] ? ws[refCell].v : undefined;
-
-            for (let R = startRow; R <= endRow; ++R) {
-              for (let C = startCol; C <= endCol; ++C) {
-                const cell = XLSX.utils.encode_cell({ r: R, c: C });
-                if (!ws[cell]) {
-                  ws[cell] = { t: 's', v: val };
-                } else if (ws[cell].v === undefined) {
-                  ws[cell].v = val;
-                }
-              }
-            }
-          });
-        }
-
-        const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null }) as any[][];
+        let targetSheetData: any[][] | null = null;
+        let headerRowIdx = -1;
+        let headers: string[] = [];
         
-        // We need rows 8 to 38 (0-indexed: 7 to 37)
-        const targetRows = jsonData.slice(7, 38);
+        for (const sName of wb.SheetNames) {
+            const ws = wb.Sheets[sName];
+            if (!ws) continue;
+            
+            if (ws['!merges']) {
+              ws['!merges'].forEach(merge => {
+                const startCol = merge.s.c;
+                const endCol = merge.e.c;
+                const startRow = merge.s.r;
+                const endRow = merge.e.r;
+                const refCell = XLSX.utils.encode_cell({ r: startRow, c: startCol });
+                const val = ws[refCell] ? ws[refCell].v : undefined;
+                for (let R = startRow; R <= endRow; ++R) {
+                  for (let C = startCol; C <= endCol; ++C) {
+                    const cell = XLSX.utils.encode_cell({ r: R, c: C });
+                    if (!ws[cell]) {
+                      ws[cell] = { t: 's', v: val };
+                    } else if (ws[cell].v === undefined) {
+                      ws[cell].v = val;
+                    }
+                  }
+                }
+              });
+            }
+
+            const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null }) as any[][];
+            
+            for (let i = 0; i < Math.min(20, jsonData.length); i++) {
+                const rowStr = jsonData[i].map(c => String(c||'')).join(' ').toUpperCase();
+                if (rowStr.includes('PRODUCCION_IMPERIA') || rowStr.includes('SUPERVISOR')) {
+                    headerRowIdx = i;
+                    headers = jsonData[i].map(h => String(h || '').toUpperCase().trim());
+                    targetSheetData = jsonData;
+                    break;
+                }
+            }
+            if (targetSheetData) break;
+        }
+
+        if (!targetSheetData) {
+            throw new Error("No se encontró una hoja válida con las columnas 'PRODUCCION_IMPERIA' o 'SUPERVISOR'. Hojas: " + wb.SheetNames.join(', '));
+        }
+
+        const findCol = (keywords: string[], defaultIdx: number) => {
+          if (!headers || headers.length === 0) return defaultIdx;
+          if (keywords.length === 1) {
+             const exactIdx = headers.findIndex(h => h === keywords[0] || h === keywords[0].replace(/_/g, ' '));
+             if (exactIdx !== -1) return exactIdx;
+          }
+          const combined = keywords.join('_');
+          const exactCombIdx = headers.findIndex(h => h === combined || h === combined.replace(/_/g, ' '));
+          if (exactCombIdx !== -1) return exactCombIdx;
+          
+          const subIdx = headers.findIndex(h => keywords.every(kw => h.includes(kw)));
+          if (subIdx !== -1) return subIdx;
+          
+          if (keywords.length === 2 && (keywords[0].includes('DIA') || keywords[0].includes('NOCHE'))) {
+              const baseKw = keywords[1];
+              const matches = headers.map((h, i) => h.includes(baseKw) ? i : -1).filter(i => i !== -1);
+              if (matches.length > 0) {
+                 if (keywords[0].includes('NOCHE') && matches.length > 1) {
+                    return matches[1]; 
+                 }
+                 return matches[0]; 
+              }
+          }
+          return defaultIdx;
+        };
+
+        const colDia = findCol(['DIA'], 0);
+        const colSup = findCol(['SUPERVISOR', 'DIA'], 1);
+        const colDiaMes = findCol(['SUPERVISOR', 'NOCHE'], 2);
+
+        const d_cant_caex = findCol(['TURNO_DIA', 'CANTIDAD_CAEX'], 3);
+        const d_caex = findCol(['TURNO_DIA', 'CAEX'], 4);
+        const d_operadores = findCol(['TURNO_DIA', 'OPERADORES'], 5);
+        const d_acopio = findCol(['TURNO_DIA', 'ACOPIO'], 6);
+        const d_caex_acopio = findCol(['TURNO_DIA', 'CAEX_ACOPIO'], 7);
+        const d_planta = findCol(['TURNO_DIA', 'PLANTA'], 8);
+        const d_caex_planta = findCol(['TURNO_DIA', 'CAEX_PLANTA'], 9);
+        const d_vueltas = findCol(['TURNO_DIA', 'VUELTAS'], 10);
+        const d_pases_cf = findCol(['TURNO_DIA', 'PASES_CF'], 11);
+        const d_pases_totales = findCol(['TURNO_DIA', 'PASES_TOTALES'], 12);
+        const d_toneladas = findCol(['TURNO_DIA', 'TONELADAS'], 13);
+        const d_equipo_cf = findCol(['TURNO_DIA', 'EQUIPO_CF'], 14);
+        const d_prod_imperia = findCol(['TURNO_DIA', 'PRODUCCION_IMPERIA'], 15);
+        const d_prod_ajustada = findCol(['TURNO_DIA', 'PRODUCCION_AJUSTADA'], 16);
+        const d_prod_cmc = findCol(['TURNO_DIA', 'PRODUCCION_CMC'], 17);
+        const d_traspasos = findCol(['TURNO_DIA', 'TRASPASOS'], 18);
+
+        const n_cant_caex = findCol(['TURNO_NOCHE', 'CANTIDAD_CAEX'], 19);
+        const n_caex = findCol(['TURNO_NOCHE', 'CAEX'], 20);
+        const n_operadores = findCol(['TURNO_NOCHE', 'OPERADORES'], 21);
+        const n_acopio = findCol(['TURNO_NOCHE', 'ACOPIO'], 22);
+        const n_caex_acopio = findCol(['TURNO_NOCHE', 'CAEX_ACOPIO'], 23);
+        const n_planta = findCol(['TURNO_NOCHE', 'PLANTA'], 24);
+        const n_caex_planta = findCol(['TURNO_NOCHE', 'CAEX_PLANTA'], 25);
+        const n_vueltas = findCol(['TURNO_NOCHE', 'VUELTAS'], 26);
+        const n_pases_cf = findCol(['TURNO_NOCHE', 'PASES_CF'], 26); // fallback
+        const n_pases_totales = findCol(['TURNO_NOCHE', 'PASES_TOTALES'], 27);
+        const n_toneladas = findCol(['TURNO_NOCHE', 'TONELADAS'], 28);
+        const n_equipo_cf = findCol(['TURNO_NOCHE', 'EQUIPO_CF'], 28); // fallback
+        const n_prod_ajustada = findCol(['TURNO_NOCHE', 'PRODUCCION_AJUSTADA'], 29);
+        const n_prod_cmc = findCol(['TURNO_NOCHE', 'PRODUCCION_CMC'], 30);
+        const n_traspasos = findCol(['TURNO_NOCHE', 'TRASPASOS'], 31);
+        const n_prod_imperia = findCol(['TURNO_NOCHE', 'PRODUCCION_IMPERIA'], 27);
+
+        const t_imperia = findCol(['TOTAL_PRODUCCION_IMPERIA'], 32);
+        const t_cmc = findCol(['TOTAL_PRODUCCION_CMC'], 33);
+        const t_dif = findCol(['DIFERENCIA_CMC_IMPERIA'], 34);
+
+        let dataStartRow = headerRowIdx + 1;
+        for (let i = headerRowIdx + 1; i < Math.min(headerRowIdx + 15, targetSheetData.length); i++) {
+           if (targetSheetData[i][colDia] == 1 || String(targetSheetData[i][colDia]).trim() === '1' || targetSheetData[i][colDia] === 1) {
+             dataStartRow = i;
+             break;
+           }
+        }
+        
+        const targetRows = targetSheetData.slice(dataStartRow, dataStartRow + 31);
         
         if (targetRows.length === 0) {
-          throw new Error("La hoja no contiene datos en las filas esperadas (8 a 38).");
+          throw new Error("La hoja no contiene datos en las filas esperadas (Día 1 al 31).");
         }
 
         let lastPozo = '';
         let lastSubPozo = '';
 
         const processed: ProcessedRow[] = targetRows.map((row, index) => {
-          let supervisor = row[1] !== null && row[1] !== undefined ? String(row[1]).trim() : lastPozo;
-          let dia_mes = row[2] !== null && row[2] !== undefined ? String(row[2]).trim() : lastSubPozo;
+          let supervisor = row[colSup] !== null && row[colSup] !== undefined ? String(row[colSup]).trim() : lastPozo;
+          let supervisor_noche = row[colDiaMes] !== null && row[colDiaMes] !== undefined ? String(row[colDiaMes]).trim() : lastSubPozo;
           
-          if (row[1] !== null && row[1] !== undefined) lastPozo = supervisor;
-          if (row[2] !== null && row[2] !== undefined) lastSubPozo = dia_mes;
+          if (row[colSup] !== null && row[colSup] !== undefined && String(row[colSup]).trim() !== '') lastPozo = supervisor;
+          if (row[colDiaMes] !== null && row[colDiaMes] !== undefined && String(row[colDiaMes]).trim() !== '') lastSubPozo = supervisor_noche;
 
           const getNum = (val: any) => {
-            if (val === null || val === undefined) return 0;
+            if (val === null || val === undefined || val === '') return 0;
             if (typeof val === 'number') return isNaN(val) ? 0 : val;
             if (typeof val === 'string') {
-               const parsed = Number(val.replace(/,/g, ''));
+               let cleanStr = val.trim();
+               if (cleanStr.includes(',') && cleanStr.includes('.')) {
+                  if (cleanStr.lastIndexOf(',') > cleanStr.lastIndexOf('.')) {
+                     cleanStr = cleanStr.replace(/\./g, '').replace(/,/g, '.');
+                  } else {
+                     cleanStr = cleanStr.replace(/,/g, '');
+                  }
+               } else if (cleanStr.includes(',')) {
+                  cleanStr = cleanStr.replace(/,/g, '.');
+               }
+               const parsed = Number(cleanStr);
                return isNaN(parsed) ? 0 : parsed;
             }
             if (typeof val === 'object' && val !== null) {
-                // If it's a formula object from xlsx cell
                 if (val.v !== undefined) {
                     const parsed = Number(val.v);
                     return isNaN(parsed) ? 0 : parsed;
@@ -194,49 +293,42 @@ export default function PruebaMina() {
           };
 
           return {
-            dia: index + 1, // 1 to 31
+            dia: index + 1,
             supervisor,
-            dia_mes,
-
-            // Turno Día
-            cantidad_caex_dia: getNum(row[3]), // Col 4
-            caex_dia: getNum(row[4]), // Col 5
-            operadores_dia: getNum(row[5]), // Col 6
-            acopio_dia: getNum(row[6]), // Col 7
-            caex_acopio_dia: getNum(row[7]), // Col 8
-            planta_dia: getNum(row[8]), // Col 9
-            caex_planta_dia: getNum(row[9]), // Col 10
-            vueltas_dia: getNum(row[10]), // Col 11
-            pases_cf_dia: getNum(row[11]), // Col 12
-            pases_totales_dia: getNum(row[12]), // Col 13
-            toneladas_caex_dia: getNum(row[13]), // Col 14
-            equipo_cf_dia: row[14] ? String(row[14]) : '', // Col 15
-            produccion_dia: getNum(row[15]), // Col 16
-            produccion_cmc_dia: getNum(row[16]), // Col 17
-            traspasos_dia: getNum(row[17]), // Col 18
-
-            // Turno Noche
-            cantidad_caex_noche: getNum(row[19]), // Col 20
-            caex_noche: getNum(row[20]), // Col 21
-            operadores_noche: getNum(row[21]), // Col 22
-            acopio_noche: getNum(row[22]), // Col 23
-            caex_acopio_noche: getNum(row[23]), // Col 24
-            planta_noche: getNum(row[24]), // Col 25
-            caex_planta_noche: getNum(row[25]), // Col 26
-            vueltas_noche: 0, // Not mentioned
-            pases_cf_noche: getNum(row[26]), // Col 27
-            pases_totales_noche: getNum(row[27]), // Col 28
-            toneladas_caex_noche: getNum(row[28]), // Col 29
-            equipo_cf_noche: row[29] ? String(row[29]) : '', // Col 30
-            produccion_caex_noche: getNum(row[30]), // Col 31
-            produccion_noche: getNum(row[31]), // Col 32
-            traspasos_noche: getNum(row[32]), // Col 33
-
-            // Totales
-            total_imperia: getNum(row[15]) + getNum(row[31]), // Suma Producción Día + Producción Noche
-            total_cmc: getNum(row[35]), // Col 36
-            diferencia: (getNum(row[15]) + getNum(row[31])) - getNum(row[35]), // total_imperia - total_cmc
-
+            supervisor_noche,
+            cantidad_caex_dia: getNum(row[d_cant_caex]),
+            caex_dia: getNum(row[d_caex]),
+            operadores_dia: getNum(row[d_operadores]),
+            acopio_dia: getNum(row[d_acopio]),
+            caex_acopio_dia: getNum(row[d_caex_acopio]),
+            planta_dia: getNum(row[d_planta]),
+            caex_planta_dia: getNum(row[d_caex_planta]),
+            vueltas_dia: getNum(row[d_vueltas]),
+            pases_cf_dia: getNum(row[d_pases_cf]),
+            pases_totales_dia: getNum(row[d_pases_totales]),
+            toneladas_caex_dia: getNum(row[d_toneladas]),
+            equipo_cf_dia: row[d_equipo_cf] ? String(row[d_equipo_cf]) : '',
+            produccion_dia: getNum(row[d_prod_imperia]),
+            produccion_cmc_dia: getNum(row[d_prod_cmc]),
+            traspasos_dia: getNum(row[d_traspasos]),
+            cantidad_caex_noche: getNum(row[n_cant_caex]),
+            caex_noche: getNum(row[n_caex]),
+            operadores_noche: getNum(row[n_operadores]),
+            acopio_noche: getNum(row[n_acopio]),
+            caex_acopio_noche: getNum(row[n_caex_acopio]),
+            planta_noche: getNum(row[n_planta]),
+            caex_planta_noche: getNum(row[n_caex_planta]),
+            vueltas_noche: getNum(row[n_vueltas]),
+            pases_cf_noche: getNum(row[n_pases_cf]),
+            pases_totales_noche: getNum(row[n_pases_totales]),
+            toneladas_caex_noche: getNum(row[n_toneladas]),
+            equipo_cf_noche: row[n_equipo_cf] ? String(row[n_equipo_cf]) : '',
+            produccion_caex_noche: getNum(row[n_prod_ajustada]),
+            produccion_noche: getNum(row[n_prod_imperia]),
+            traspasos_noche: getNum(row[n_traspasos]),
+            total_imperia: getNum(row[t_imperia]),
+            total_cmc: getNum(row[t_cmc]),
+            diferencia: getNum(row[t_dif]),
             raw: row
           };
         });
@@ -244,7 +336,9 @@ export default function PruebaMina() {
         setData(processed);
         setLoading(false);
       } catch (err: any) {
+        console.error(err);
         setError(err.message || "Error procesando el archivo.");
+        alert("Error: " + (err.message || "Error procesando el archivo."));
         setLoading(false);
       }
     };
@@ -263,7 +357,7 @@ export default function PruebaMina() {
     const lower = searchTerm.toLowerCase();
     return data.filter(r => 
       r.dia.toString().includes(lower) || 
-      r.supervisor.toLowerCase().includes(lower) || r.dia_mes.toLowerCase().includes(lower)
+      r.supervisor.toLowerCase().includes(lower) || r.supervisor_noche.toLowerCase().includes(lower)
     );
   }, [data, searchTerm]);
 
@@ -295,7 +389,7 @@ export default function PruebaMina() {
         mes: selectedMonth,
         dia: r.dia,
         supervisor: r.supervisor,
-        dia_mes: r.dia_mes,
+        dia_mes: r.supervisor_noche,
         produccion_dia: r.produccion_dia,
         produccion_noche: r.produccion_noche,
         total_imperia: r.total_imperia,
@@ -391,8 +485,12 @@ CREATE POLICY "Permitir todo a usuarios autenticados" ON public.produccion_mina_
                 <option key={m} value={m}>{m}</option>
               ))}
             </select>
-            {data.length > 0 && (
+                        {data.length > 0 && (
               <>
+                <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Cargar Nuevo Excel
+                </Button>
                 <Button variant="outline" onClick={handleExportExcel}>
                   <Download className="h-4 w-4 mr-2" />
                   Excel
@@ -547,7 +645,7 @@ CREATE POLICY "Permitir todo a usuarios autenticados" ON public.produccion_mina_
                   {activeTab === 'resumen' && (
                     <tr>
                       <th className="px-6 py-4 font-semibold">Día</th>
-                      <th className="px-6 py-4 font-semibold">Supervisor / Día del Mes</th>
+                      <th className="px-6 py-4 font-semibold">Supervisor Día / Supervisor Noche</th>
                       <th className="px-6 py-4 font-semibold text-right">Prod. Día</th>
                       <th className="px-6 py-4 font-semibold text-right">Prod. Noche</th>
                       <th className="px-6 py-4 font-semibold text-right text-slate-900 dark:text-white">Total Imperia</th>
@@ -585,7 +683,7 @@ CREATE POLICY "Permitir todo a usuarios autenticados" ON public.produccion_mina_
                     <tr>
                       <th className="px-4 py-3 font-semibold">Día</th>
                       <th className="px-4 py-3 font-semibold">Supervisor</th>
-                      <th className="px-4 py-3 font-semibold">Día del Mes</th>
+                      <th className="px-4 py-3 font-semibold">Supervisor Noche</th>
                       {Array.from({length: 36}).map((_, i) => {
                         const originalColIndex = i + 3;
                         if ([18, 33, 37, 38].includes(originalColIndex)) return null;
@@ -640,7 +738,7 @@ CREATE POLICY "Permitir todo a usuarios autenticados" ON public.produccion_mina_
                           <td className="px-6 py-4">
                             <div className="flex flex-col">
                               <span className="font-medium">{row.supervisor}</span>
-                              <span className="text-xs text-slate-500">{row.dia_mes}</span>
+                              <span className="text-xs text-slate-500">{row.supervisor_noche}</span>
                             </div>
                           </td>
                           <td className="px-6 py-4 text-right">{formatNum(row.produccion_dia)}</td>
@@ -685,7 +783,7 @@ CREATE POLICY "Permitir todo a usuarios autenticados" ON public.produccion_mina_
                         <>
                           <td className="px-4 py-2 font-medium bg-slate-50 dark:bg-slate-800 sticky left-0">{row.dia}</td>
                           <td className="px-4 py-2 truncate max-w-[150px]" title={row.supervisor}>{row.supervisor}</td>
-                          <td className="px-4 py-2 truncate max-w-[150px]" title={row.dia_mes}>{row.dia_mes}</td>
+                          <td className="px-4 py-2 truncate max-w-[150px]" title={row.supervisor_noche}>{row.supervisor_noche}</td>
                           {Array.from({length: 36}).map((_, colIdx) => {
                             const originalColIndex = colIdx + 3;
                             if ([18, 33, 37, 38].includes(originalColIndex)) return null;
