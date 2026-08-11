@@ -89,11 +89,11 @@ export const navigation = [
     href: '/produccion',
     submodules: [
       { title: 'Dashboard de Producción', icon: BarChart3, href: '/produccion/dashboard' },
-      { title: 'Horas Máquina y Disponibilidad', icon: Clock, href: '/produccion/horas-maquina' },
       { title: 'Reportes Diarios Transporte', icon: Truck, href: '/produccion/reportes-transporte' },
       { title: 'Reportes Diarios Mina', icon: PenTool, href: '/produccion/reportes-mina' },
+      { title: 'Resumen Mensual Mina', icon: FileSpreadsheet, href: '/produccion/resumen-mensual-mina' },
+      { title: 'Horas Máquina y Disponibilidad', icon: Clock, href: '/produccion/horas-maquina' },
       { title: 'Planificador Transporte', icon: CalendarClock, href: '/produccion/planificador' },
-      { title: 'Prueba Mina', icon: FileSpreadsheet, href: '/produccion/prueba-mina' },
       { title: 'Trazabilidad', icon: History, href: '/produccion/trazabilidad' },
     ],
   },

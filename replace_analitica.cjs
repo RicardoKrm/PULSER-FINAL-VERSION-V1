@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+const fs = require('fs');
+
+const newCode = `import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { useAuth } from '../../../context/AuthContext';
-import { useProduccion } from '../../../contexts/ProduccionContext';
+import { useAuth } from '../../../contexts/AuthContext';
 import { 
   TrendingUp, Calendar, BarChart3, 
   Activity, Users, Map, CheckCircle2, ChevronRight, Calculator
@@ -100,7 +101,7 @@ export default function ReporteYAnaliticaMina() {
 
       // Chart
       cData.push({
-        name: `Día ${d.dia}`,
+        name: \`Día \${d.dia}\`,
         Imperia: d.total_imperia,
         CMC: d.total_cmc,
         Diferencia: d.diferencia
@@ -170,12 +171,12 @@ export default function ReporteYAnaliticaMina() {
         <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Diferencia</p>
-            <p className={`text-2xl font-bold mt-1 ${totalDiferencia >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+            <p className={\`text-2xl font-bold mt-1 \${totalDiferencia >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}\`}>
               {totalDiferencia > 0 ? '+' : ''}{formatNumber(totalDiferencia)} <span className="text-sm font-normal opacity-70">Ton</span>
             </p>
           </div>
-          <div className={`h-12 w-12 rounded-full flex items-center justify-center ${totalDiferencia >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
-            <Calculator className={`h-6 w-6 ${totalDiferencia >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`} />
+          <div className={\`h-12 w-12 rounded-full flex items-center justify-center \${totalDiferencia >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-red-50 dark:bg-red-900/20'}\`}>
+            <Calculator className={\`h-6 w-6 \${totalDiferencia >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}\`} />
           </div>
         </div>
       </div>
@@ -218,7 +219,7 @@ export default function ReporteYAnaliticaMina() {
                     <span className="font-bold text-slate-900 dark:text-white">{formatNumber(sup.ton)} T</span>
                   </div>
                   <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2">
-                    <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${pct}%` }}></div>
+                    <div className="bg-indigo-500 h-2 rounded-full" style={{ width: \`\${pct}%\` }}></div>
                   </div>
                 </div>
               )
@@ -258,11 +259,11 @@ export default function ReporteYAnaliticaMina() {
                   <td className="px-4 py-3 text-sm text-right font-medium text-indigo-600 dark:text-indigo-400">{formatNumber(row.total_imperia)}</td>
                   <td className="px-4 py-3 text-sm text-right font-medium text-slate-600 dark:text-slate-400">{formatNumber(row.total_cmc)}</td>
                   <td className="px-4 py-3 text-sm text-right">
-                    <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-bold ${
+                    <span className={\`inline-flex items-center px-2 py-1 rounded text-xs font-bold \${
                       row.diferencia > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 
                       row.diferencia < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 
                       'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                    }`}>
+                    }\`}>
                       {row.diferencia > 0 ? '+' : ''}{formatNumber(row.diferencia)}
                     </span>
                   </td>
@@ -282,3 +283,6 @@ export default function ReporteYAnaliticaMina() {
     </div>
   );
 }
+`;
+
+fs.writeFileSync('src/pages/operaciones/produccion/ReporteYAnaliticaMina.tsx', newCode);

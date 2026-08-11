@@ -54,7 +54,7 @@ interface ProcessedRow {
   raw: any[]; 
 }
 
-export default function PruebaMina() {
+export default function ResumenMensualMina() {
   const { currentCompany } = useCompany();
   const { user } = useAuth();
 
