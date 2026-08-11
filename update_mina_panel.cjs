@@ -1,193 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
-import { useCompany } from '../../contexts/CompanyContext';
-import { Calendar, Database, CheckSquare, Search } from 'lucide-react';
-import { Card, CardContent } from '../../components/ui/Card';
+const fs = require('fs');
 
-interface ProcessedRow {
-  dia: number;
-  supervisor: string;
-  supervisor_noche: string;
-  
-  // Turno Día
-  cantidad_caex_dia: string | number;
-  caex_dia: string | number;
-  operadores_dia: string | number;
-  acopio_dia: string | number;
-  caex_acopio_dia: string | number;
-  planta_dia: string | number;
-  caex_planta_dia: string | number;
-  vueltas_dia: number;
-  pases_cf_dia: number;
-  pases_totales_dia: number;
-  toneladas_caex_dia: string | number;
-  equipo_cf_dia: string;
-  produccion_dia: number;
-  produccion_cmc_dia: number;
-  traspasos_dia: number;
+let content = fs.readFileSync('src/pages/produccion/ReporteDiarioMinaPanel.tsx', 'utf-8');
 
-  // Turno Noche
-  cantidad_caex_noche: string | number;
-  caex_noche: string | number;
-  operadores_noche: string | number;
-  acopio_noche: string | number;
-  caex_acopio_noche: string | number;
-  planta_noche: string | number;
-  caex_planta_noche: string | number;
-  vueltas_noche: number;
-  pases_cf_noche: number;
-  pases_totales_noche: number;
-  toneladas_caex_noche: string | number;
-  equipo_cf_noche: string;
-  produccion_caex_noche: string | number;
-  produccion_noche: number;
-  traspasos_noche: number;
-
-  // Totales
-  total_imperia: number;
-  total_cmc: number;
-  diferencia: number;
-}
-
-export default function ReporteDiarioMinaPanel() {
-  const { currentCompany } = useCompany();
-  const [data, setData] = useState<ProcessedRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState<string>('');
-  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
-  const [selectedDate, setSelectedDate] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (currentCompany) {
-      fetchMonths();
-    }
-  }, [currentCompany]);
-
-  useEffect(() => {
-    if (selectedMonth && currentCompany) {
-      loadMonthData(selectedMonth);
-    }
-  }, [selectedMonth, currentCompany]);
-
-  const fetchMonths = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('produccion_mina_mensual')
-        .select('mes')
-        .eq('empresa_id', currentCompany?.id);
-      
-      if (error) {
-        if (error.code !== '42P01') console.error(error);
-        return;
-      }
-      
-      const months = Array.from(new Set(data.map(r => r.mes))).sort((a, b) => b.localeCompare(a));
-      setAvailableMonths(months);
-      if (months.length > 0) {
-        setSelectedMonth(months[0]);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const loadMonthData = async (mes: string) => {
-    try {
-      setLoading(true);
-      const { data: records, error } = await supabase
-        .from('produccion_mina_mensual')
-        .select('*')
-        .eq('empresa_id', currentCompany?.id)
-        .eq('mes', mes)
-        .order('dia', { ascending: true });
-
-      if (error) throw error;
-
-      if (records && records.length > 0) {
-        const loaded: ProcessedRow[] = records.map(r => ({
-          ...r.raw_data,
-          supervisor_noche: r.raw_data?.supervisor_noche || r.raw_data?.dia_mes || r.dia_mes || '',
-          total_imperia: r.total_imperia,
-          total_cmc: r.total_cmc,
-          diferencia: r.diferencia
-        }));
-        setData(loaded);
-        if (loaded.length > 0) {
-          setSelectedDate(loaded[0].dia);
-        } else {
-          setSelectedDate(null);
-        }
-      } else {
-        setData([]);
-        setSelectedDate(null);
-      }
-    } catch (err: any) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const formatNum = (num: number) => new Intl.NumberFormat('es-CL').format(num);
-
-  const activeRow = data.find(r => r.dia === selectedDate);
-  const globalImperia = data.reduce((acc, curr) => acc + (curr.produccion_dia + curr.produccion_noche), 0);
-  const globalCMC = data.reduce((acc, curr) => acc + (curr.produccion_cmc_dia + curr.total_cmc), 0); // Wait, CMC is just curr.total_cmc ? Usually it's in raw_data, wait, we can just sum producciones or take the max?
-  // In PruebaMina, the sum is: 
-  const sumImperia = data.reduce((acc, curr) => acc + (curr.total_imperia || 0), 0);
-  const sumCMC = data.reduce((acc, curr) => acc + (curr.total_cmc || 0), 0);
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-gradient-to-r from-slate-800 to-indigo-900 rounded-xl p-6 text-white shadow-lg">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <div>
-            <h2 className="text-2xl font-bold">Producción Mina Diario</h2>
-            <p className="text-slate-300 opacity-90 mt-1">Resumen diario de operaciones Mina</p>
-          </div>
-          <div className="flex flex-col md:flex-row gap-4 items-center">
-            {availableMonths.length > 0 && (
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="rounded-md border-slate-600 bg-slate-800 text-white px-4 py-2 border shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              >
-                {availableMonths.map(m => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            )}
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white/5 rounded-lg p-5 border border-white/10 backdrop-blur-sm">
-            <p className="text-sm text-indigo-200 mb-1 font-medium flex items-center">
-              <CheckSquare className="w-4 h-4 mr-2 opacity-70" />
-              Total Mes Imperia
-            </p>
-            <p className="text-3xl font-bold text-white">{formatNum(sumImperia)} <span className="text-sm text-indigo-300 font-normal">Ton</span></p>
-          </div>
-          <div className="bg-white/5 rounded-lg p-5 border border-white/10 backdrop-blur-sm">
-             <p className="text-sm text-blue-200 mb-1 font-medium flex items-center">
-              <CheckSquare className="w-4 h-4 mr-2 opacity-70" />
-              Total Mes CMC
-            </p>
-            <p className="text-3xl font-bold text-white">{formatNum(sumCMC)} <span className="text-sm text-blue-300 font-normal">Ton</span></p>
-          </div>
-          <div className="bg-white/5 rounded-lg p-5 border border-white/10 backdrop-blur-sm">
-            <p className="text-sm text-amber-200 mb-1 font-medium flex items-center">
-              <CheckSquare className="w-4 h-4 mr-2 opacity-70" />
-              Diferencia (CMC - Imperia)
-            </p>
-            <p className={`text-3xl font-bold ${sumCMC - sumImperia > 0 ? 'text-green-400' : 'text-red-400'}`}> 
-               {sumCMC - sumImperia > 0 ? '+' : ''}{formatNum(sumCMC - sumImperia)} <span className="text-sm opacity-70 font-normal">Ton</span>
-            </p>
-          </div>
-        </div>
-      </div>
-
-      
+const newLayout = `
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Date Selector Sidebar */}
         <Card className="p-4 lg:w-64 shrink-0 flex flex-col">
@@ -227,16 +42,16 @@ export default function ReporteDiarioMinaPanel() {
               <div className="text-sm text-gray-500 italic text-center py-4">No hay días en este mes</div>
             ) : (
               data.map(row => {
-                const formattedDate = `Día ${row.dia.toString().padStart(2, '0')} `;
+                const formattedDate = \`Día \${row.dia.toString().padStart(2, '0')} \`;
                 return (
                   <button
                     key={row.dia}
                     onClick={() => setSelectedDate(row.dia)}
-                    className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                    className={\`w-full text-left px-3 py-2 rounded-md text-sm transition-colors \${
                       selectedDate === row.dia
                         ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium border border-blue-200 dark:border-blue-800/50'
                         : 'text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 border border-transparent'
-                    }`}
+                    }\`}
                   >
                     {formattedDate}
                   </button>
@@ -282,26 +97,20 @@ export default function ReporteDiarioMinaPanel() {
                    <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                      <thead className="bg-gray-50 dark:bg-slate-800">
                        <tr>
-                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">CAEX (Nº)</th>
+                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Cant. CAEX</th>
                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Operadores</th>
-                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Acopio / Primario</th>
+                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Acopio / Planta</th>
                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Pases CF / Totales</th>
                          <th className="px-4 py-3 text-right text-xs font-medium text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Prod. Imperia</th>
                        </tr>
                      </thead>
                      <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-200 dark:divide-slate-800">
                        <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                         <td className="px-4 py-3 text-sm text-gray-900 dark:text-white max-w-[200px] truncate" title={String(activeRow.caex_dia)}>
-    <span className="font-semibold">{activeRow.cantidad_caex_dia}</span>
-    {activeRow.caex_dia && <span className="text-slate-500 text-xs ml-1">({activeRow.caex_dia})</span>}
-  </td>
-                         <td className="px-4 py-3 text-sm text-gray-500 dark:text-slate-400 max-w-[250px] truncate" title={String(activeRow.operadores_dia)}>{activeRow.operadores_dia}</td>
-                         <td className="px-4 py-3 text-sm text-gray-500 dark:text-slate-400">
-    <div className="flex flex-col">
-      <div><span className="text-emerald-600 dark:text-emerald-400 font-medium">{activeRow.acopio_dia}</span> <span className="text-xs">Acopio</span></div>
-      <div><span className="text-blue-600 dark:text-blue-400 font-medium">{activeRow.planta_dia}</span> <span className="text-xs">Primario</span></div>
-    </div>
-  </td>
+                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">{activeRow.cantidad_caex_dia}</td>
+                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{activeRow.operadores_dia}</td>
+                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">
+                           <span className="text-emerald-600 dark:text-emerald-400">{activeRow.acopio_dia}</span> / <span className="text-blue-600 dark:text-blue-400">{activeRow.planta_dia}</span>
+                         </td>
                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400 font-medium">
                            {activeRow.pases_cf_dia} / {activeRow.pases_totales_dia}
                          </td>
@@ -346,26 +155,20 @@ export default function ReporteDiarioMinaPanel() {
                    <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                      <thead className="bg-gray-50 dark:bg-slate-800">
                        <tr>
-                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">CAEX (Nº)</th>
+                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Cant. CAEX</th>
                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Operadores</th>
-                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Acopio / Primario</th>
+                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Acopio / Planta</th>
                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-500 uppercase tracking-wider">Pases CF / Totales</th>
                          <th className="px-4 py-3 text-right text-xs font-medium text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Prod. Imperia</th>
                        </tr>
                      </thead>
                      <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-200 dark:divide-slate-800">
                        <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                         <td className="px-4 py-3 text-sm text-gray-900 dark:text-white max-w-[200px] truncate" title={String(activeRow.caex_noche)}>
-    <span className="font-semibold">{activeRow.cantidad_caex_noche}</span>
-    {activeRow.caex_noche && <span className="text-slate-500 text-xs ml-1">({activeRow.caex_noche})</span>}
-  </td>
-                         <td className="px-4 py-3 text-sm text-gray-500 dark:text-slate-400 max-w-[250px] truncate" title={String(activeRow.operadores_noche)}>{activeRow.operadores_noche}</td>
-                         <td className="px-4 py-3 text-sm text-gray-500 dark:text-slate-400">
-    <div className="flex flex-col">
-      <div><span className="text-emerald-600 dark:text-emerald-400 font-medium">{activeRow.acopio_noche}</span> <span className="text-xs">Acopio</span></div>
-      <div><span className="text-blue-600 dark:text-blue-400 font-medium">{activeRow.planta_noche}</span> <span className="text-xs">Primario</span></div>
-    </div>
-  </td>
+                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">{activeRow.cantidad_caex_noche}</td>
+                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{activeRow.operadores_noche}</td>
+                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">
+                           <span className="text-emerald-600 dark:text-emerald-400">{activeRow.acopio_noche}</span> / <span className="text-blue-600 dark:text-blue-400">{activeRow.planta_noche}</span>
+                         </td>
                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400 font-medium">
                            {activeRow.pases_cf_noche} / {activeRow.pases_totales_noche}
                          </td>
@@ -390,3 +193,11 @@ export default function ReporteDiarioMinaPanel() {
     </div>
   );
 }
+`;
+
+const startIndex = content.indexOf('<div className="flex flex-col lg:flex-row gap-6">');
+if (startIndex !== -1) {
+  content = content.substring(0, startIndex) + newLayout;
+}
+
+fs.writeFileSync('src/pages/produccion/ReporteDiarioMinaPanel.tsx', content);

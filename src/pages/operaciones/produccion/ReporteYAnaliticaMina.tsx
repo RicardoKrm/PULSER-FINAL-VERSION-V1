@@ -393,7 +393,7 @@ function TabEquipos({ data, formatNumber, COLORS }: { data: any[], formatNumber:
         <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase mb-4">Promedio Ton/Vuelta por Equipo</h3>
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={equiposData.sort((a,b) => b.promedio - a.promedio)} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
+            <ComposedChart data={[...equiposData].sort((a,b) => b.promedio - a.promedio)} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
               <XAxis type="number" domain={[0, 70]} stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
               <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} width={80} />

@@ -13,36 +13,36 @@ interface ProcessedRow {
   supervisor_noche: string;
   
   // Turno Día
-  cantidad_caex_dia: number;
-  caex_dia: number;
-  operadores_dia: number;
-  acopio_dia: number;
-  caex_acopio_dia: number;
-  planta_dia: number;
-  caex_planta_dia: number;
+  cantidad_caex_dia: string | number;
+  caex_dia: string | number;
+  operadores_dia: string | number;
+  acopio_dia: string | number;
+  caex_acopio_dia: string | number;
+  planta_dia: string | number;
+  caex_planta_dia: string | number;
   vueltas_dia: number;
   pases_cf_dia: number;
   pases_totales_dia: number;
-  toneladas_caex_dia: number;
+  toneladas_caex_dia: string | number;
   equipo_cf_dia: string;
   produccion_dia: number;
   produccion_cmc_dia: number;
   traspasos_dia: number;
 
   // Turno Noche
-  cantidad_caex_noche: number;
-  caex_noche: number;
-  operadores_noche: number;
-  acopio_noche: number;
-  caex_acopio_noche: number;
-  planta_noche: number;
-  caex_planta_noche: number;
+  cantidad_caex_noche: string | number;
+  caex_noche: string | number;
+  operadores_noche: string | number;
+  acopio_noche: string | number;
+  caex_acopio_noche: string | number;
+  planta_noche: string | number;
+  caex_planta_noche: string | number;
   vueltas_noche: number;
   pases_cf_noche: number;
   pases_totales_noche: number;
-  toneladas_caex_noche: number;
+  toneladas_caex_noche: string | number;
   equipo_cf_noche: string;
-  produccion_caex_noche: number;
+  produccion_caex_noche: string | number;
   produccion_noche: number;
   traspasos_noche: number;
 
@@ -209,7 +209,7 @@ export default function PruebaMina() {
         const d_operadores = findCol(['TURNO_DIA', 'OPERADORES'], 5);
         const d_acopio = findCol(['TURNO_DIA', 'ACOPIO'], 6);
         const d_caex_acopio = findCol(['TURNO_DIA', 'CAEX_ACOPIO'], 7);
-        const d_planta = findCol(['TURNO_DIA', 'PLANTA'], 8);
+        const d_planta = findCol(['TURNO_DIA', 'PLANTA', 'PRIMARIO'], 8);
         const d_caex_planta = findCol(['TURNO_DIA', 'CAEX_PLANTA'], 9);
         const d_vueltas = findCol(['TURNO_DIA', 'VUELTAS'], 10);
         const d_pases_cf = findCol(['TURNO_DIA', 'PASES_CF'], 11);
@@ -226,7 +226,7 @@ export default function PruebaMina() {
         const n_operadores = findCol(['TURNO_NOCHE', 'OPERADORES'], 21);
         const n_acopio = findCol(['TURNO_NOCHE', 'ACOPIO'], 22);
         const n_caex_acopio = findCol(['TURNO_NOCHE', 'CAEX_ACOPIO'], 23);
-        const n_planta = findCol(['TURNO_NOCHE', 'PLANTA'], 24);
+        const n_planta = findCol(['TURNO_NOCHE', 'PLANTA', 'PRIMARIO'], 24);
         const n_caex_planta = findCol(['TURNO_NOCHE', 'CAEX_PLANTA'], 25);
         const n_vueltas = findCol(['TURNO_NOCHE', 'VUELTAS'], 26);
         const n_pases_cf = findCol(['TURNO_NOCHE', 'PASES_CF'], 26); // fallback
@@ -292,17 +292,23 @@ export default function PruebaMina() {
             return 0;
           };
 
+          const getString = (val: any) => {
+            if (val === null || val === undefined || val === '') return '';
+            if (typeof val === 'object' && val !== null && val.v !== undefined) return String(val.v).trim();
+            return String(val).trim();
+          };
+
           return {
             dia: index + 1,
             supervisor,
             supervisor_noche,
             cantidad_caex_dia: getNum(row[d_cant_caex]),
-            caex_dia: getNum(row[d_caex]),
-            operadores_dia: getNum(row[d_operadores]),
-            acopio_dia: getNum(row[d_acopio]),
-            caex_acopio_dia: getNum(row[d_caex_acopio]),
-            planta_dia: getNum(row[d_planta]),
-            caex_planta_dia: getNum(row[d_caex_planta]),
+            caex_dia: getString(row[d_caex]),
+            operadores_dia: getString(row[d_operadores]),
+            acopio_dia: getString(row[d_acopio]),
+            caex_acopio_dia: getString(row[d_caex_acopio]),
+            planta_dia: getString(row[d_planta]),
+            caex_planta_dia: getString(row[d_caex_planta]),
             vueltas_dia: getNum(row[d_vueltas]),
             pases_cf_dia: getNum(row[d_pases_cf]),
             pases_totales_dia: getNum(row[d_pases_totales]),
@@ -312,12 +318,12 @@ export default function PruebaMina() {
             produccion_cmc_dia: getNum(row[d_prod_cmc]),
             traspasos_dia: getNum(row[d_traspasos]),
             cantidad_caex_noche: getNum(row[n_cant_caex]),
-            caex_noche: getNum(row[n_caex]),
-            operadores_noche: getNum(row[n_operadores]),
-            acopio_noche: getNum(row[n_acopio]),
-            caex_acopio_noche: getNum(row[n_caex_acopio]),
-            planta_noche: getNum(row[n_planta]),
-            caex_planta_noche: getNum(row[n_caex_planta]),
+            caex_noche: getString(row[n_caex]),
+            operadores_noche: getString(row[n_operadores]),
+            acopio_noche: getString(row[n_acopio]),
+            caex_acopio_noche: getString(row[n_caex_acopio]),
+            planta_noche: getString(row[n_planta]),
+            caex_planta_noche: getString(row[n_caex_planta]),
             vueltas_noche: getNum(row[n_vueltas]),
             pases_cf_noche: getNum(row[n_pases_cf]),
             pases_totales_noche: getNum(row[n_pases_totales]),
