@@ -663,12 +663,12 @@ CREATE POLICY "Permitir todo a usuarios autenticados" ON public.produccion_mina_
                     <tr>
                       <th className="px-6 py-4 font-semibold">Día</th>
                       <th className="px-6 py-4 font-semibold">Supervisor</th>
-                      <th className="px-6 py-4 font-semibold text-right">Cant CAEX</th>
+                      <th className="px-6 py-4 font-semibold text-right">Equipos CAEX</th>
                       <th className="px-6 py-4 font-semibold text-right">Operadores</th>
                       <th className="px-6 py-4 font-semibold text-right">Acopio</th>
-                      <th className="px-6 py-4 font-semibold text-right">Planta</th>
+                      <th className="px-6 py-4 font-semibold text-right">Primario</th>
                       <th className="px-6 py-4 font-semibold text-right">Pases CF</th>
-                      <th className="px-6 py-4 font-semibold text-right">Pases Tot</th>
+                      <th className="px-6 py-4 font-semibold text-right">Total Pases</th>
                       <th className="px-6 py-4 font-semibold text-right text-amber-600">Prod Día</th>
                     </tr>
                   )}
@@ -676,12 +676,12 @@ CREATE POLICY "Permitir todo a usuarios autenticados" ON public.produccion_mina_
                     <tr>
                       <th className="px-6 py-4 font-semibold">Día</th>
                       <th className="px-6 py-4 font-semibold">Supervisor</th>
-                      <th className="px-6 py-4 font-semibold text-right">Cant CAEX</th>
+                      <th className="px-6 py-4 font-semibold text-right">Equipos CAEX</th>
                       <th className="px-6 py-4 font-semibold text-right">Operadores</th>
                       <th className="px-6 py-4 font-semibold text-right">Acopio</th>
-                      <th className="px-6 py-4 font-semibold text-right">Planta</th>
+                      <th className="px-6 py-4 font-semibold text-right">Primario</th>
                       <th className="px-6 py-4 font-semibold text-right">Pases CF</th>
-                      <th className="px-6 py-4 font-semibold text-right">Pases Tot</th>
+                      <th className="px-6 py-4 font-semibold text-right">Total Pases</th>
                       <th className="px-6 py-4 font-semibold text-right text-indigo-600">Prod Noche</th>
                     </tr>
                   )}
@@ -690,46 +690,45 @@ CREATE POLICY "Permitir todo a usuarios autenticados" ON public.produccion_mina_
                       <th className="px-4 py-3 font-semibold">Día</th>
                       <th className="px-4 py-3 font-semibold">Supervisor</th>
                       <th className="px-4 py-3 font-semibold">Supervisor Noche</th>
-                      {Array.from({length: 36}).map((_, i) => {
+                                                                  {Array.from({length: 32}).map((_, i) => {
                         const originalColIndex = i + 3;
-                        if ([18, 33, 37, 38].includes(originalColIndex)) return null;
                         
                         const headerMap: Record<number, string> = {
-                          3: 'CAEX',
-                          4: 'Nº CAEX',
+                          3: 'Cant. CAEX',
+                          4: 'Equipos CAEX',
                           5: 'Operadores',
                           6: 'Acopio',
-                          7: 'CAEX Acopio',
+                          7: 'Equipos CAEX',
                           8: 'Primario',
-                          9: 'CAEX Primario',
+                          9: 'Equipos CAEX',
                           10: 'Vueltas',
                           11: 'Pases CF',
-                          12: 'Pases Totales CF',
+                          12: 'Total Pases',
                           13: 'Toneladas CAEX',
-                          14: 'CF',
+                          14: 'Equipo CF',
                           15: 'Prod. Total Día',
                           16: 'Prod. CMC',
                           17: 'Traspasos',
-                          19: 'Nº de CAEX',
-                          20: 'Nº CAEX',
-                          21: 'Operador',
-                          22: 'Acopio',
-                          23: 'CAEX',
-                          24: 'Primario',
-                          25: 'CAEX',
-                          26: 'Pases CF',
-                          27: 'Pases Totales',
-                          28: 'Prod. CAEX',
-                          29: 'Equipo CF',
-                          30: 'Prod. CAEX',
-                          31: 'Prod. Total Noche',
-                          32: 'Traspasos',
-                          34: 'T. IMPERIA',
-                          35: 'T. CMC',
-                          36: 'Diferencias'
+                          18: 'Cant. CAEX',
+                          19: 'Equipos CAEX',
+                          20: 'Operadores',
+                          21: 'Acopio',
+                          22: 'Equipos CAEX',
+                          23: 'Primario',
+                          24: 'Equipos CAEX',
+                          25: 'Pases CF',
+                          26: 'Total Pases',
+                          27: 'Toneladas CAEX',
+                          28: 'Equipo CF',
+                          29: 'Prod. CAEX',
+                          30: 'Prod. Total Noche',
+                          31: 'Traspasos',
+                          32: 'T. Imperia',
+                          33: 'CMC',
+                          34: 'Diferencia'
                         };
-                        const title = headerMap[originalColIndex] || `Col ${originalColIndex + 1}`;
-                        return <th key={i} className="px-4 py-3 font-semibold">{title}</th>;
+                        const title = headerMap[originalColIndex] || `Col ${originalColIndex}`;
+                        return <th key={i} className="px-4 py-3 font-semibold text-xs text-slate-500 uppercase tracking-wider">{title}</th>;
                       })}
                     </tr>
                   )}
@@ -790,13 +789,15 @@ CREATE POLICY "Permitir todo a usuarios autenticados" ON public.produccion_mina_
                           <td className="px-4 py-2 font-medium bg-slate-50 dark:bg-slate-800 sticky left-0">{row.dia}</td>
                           <td className="px-4 py-2 truncate max-w-[150px]" title={row.supervisor}>{row.supervisor}</td>
                           <td className="px-4 py-2 truncate max-w-[150px]" title={row.supervisor_noche}>{row.supervisor_noche}</td>
-                          {Array.from({length: 36}).map((_, colIdx) => {
+                          {Array.from({length: 32}).map((_, colIdx) => {
                             const originalColIndex = colIdx + 3;
-                            if ([18, 33, 37, 38].includes(originalColIndex)) return null;
                             const val = row.raw[originalColIndex];
                             
-                            let valClass = "px-4 py-2 text-right";
-                            if (originalColIndex === 36 && typeof val === 'number') {
+                            let valClass = "px-4 py-2 text-right text-sm";
+                            if ([4, 5, 7, 9, 14, 19, 20, 22, 24, 28].includes(originalColIndex)) {
+                              valClass = "px-4 py-2 text-left text-sm whitespace-normal min-w-[150px]";
+                            }
+                            if (originalColIndex === 34 && typeof val === 'number') {
                               if (val < 0) {
                                 valClass += " font-semibold text-red-600 dark:text-red-400";
                               } else {

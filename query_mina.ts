@@ -5,5 +5,5 @@ const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SU
 (async () => {
    const { data, error } = await supabase.from('produccion_mina_mensual').select('raw_data').limit(1);
    if (error) console.error(error);
-   console.log(JSON.stringify(data?.[0], null, 2));
+   console.log(data?.[0]?.raw_data?.raw);
 })();
