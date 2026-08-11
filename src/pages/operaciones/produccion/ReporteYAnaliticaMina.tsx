@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { useAuth } from '../../../context/AuthContext';
+import { useCompany } from '../../../contexts/CompanyContext';
 import { 
   TrendingUp, Calendar, BarChart3, 
   Activity, Users, Map, CheckCircle2, ChevronRight, Calculator
@@ -23,16 +23,22 @@ interface ProcessedRow {
 }
 
 export default function ReporteYAnaliticaMina() {
-  const { currentCompany } = useAuth();
+  const { currentCompany } = useCompany();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ProcessedRow[]>([]);
 
   // Filters
-  const [filtroMes, setFiltroMes] = useState<string>('todos');
+  const [filtroMes, setFiltroMes] = useState<string>('');
 
   const availableMonths = useMemo(() => {
-    return Array.from(new Set(data.map(d => d.mes))).sort();
+    return Array.from(new Set(data.map(d => d.mes))).sort((a, b) => b.localeCompare(a));
   }, [data]);
+
+  useEffect(() => {
+    if (availableMonths.length > 0 && !filtroMes) {
+      setFiltroMes(availableMonths[0]);
+    }
+  }, [availableMonths, filtroMes]);
 
   useEffect(() => {
     fetchData();
@@ -56,6 +62,7 @@ export default function ReporteYAnaliticaMina() {
       }
       
       if (records) {
+        console.log("Records fetched:", records.length);
         const loaded: ProcessedRow[] = records.map(r => ({
           dia: r.dia,
           mes: r.mes,
@@ -81,9 +88,11 @@ export default function ReporteYAnaliticaMina() {
   };
 
   const filteredData = useMemo(() => {
-    return data.filter(d => filtroMes === 'todos' || d.mes === filtroMes);
+    if (!filtroMes) return [];
+    return data.filter(d => d.mes === filtroMes);
   }, [data, filtroMes]);
 
+  console.log("Filtered Data:", filteredData.length, "filtroMes:", filtroMes, "total data:", data.length);
   const { supervisorData, chartData, totalImperia, totalCMC, totalDiferencia } = useMemo(() => {
     let tImperia = 0;
     let tCMC = 0;
@@ -113,6 +122,7 @@ export default function ReporteYAnaliticaMina() {
       .map(([name, ton]) => ({ name, ton }))
       .sort((a, b) => b.ton - a.ton);
 
+    console.log("FilteredData length:", filteredData.length, "tImperia:", tImperia);
     return { 
       supervisorData: sData, 
       chartData: cData,
@@ -140,10 +150,16 @@ export default function ReporteYAnaliticaMina() {
             value={filtroMes}
             onChange={(e) => setFiltroMes(e.target.value)}
           >
-            <option value="todos">Todos los Meses</option>
-            {availableMonths.map(m => (
-              <option key={m} value={m}>{m}</option>
-            ))}
+            {availableMonths.map(month => {
+              const [year, m] = month.split('-');
+              const date = new Date(parseInt(year), parseInt(m) - 1, 1);
+              const monthName = date.toLocaleString('es-CL', { month: 'long', year: 'numeric' });
+              return (
+                <option key={month} value={month}>
+                  {monthName.charAt(0).toUpperCase() + monthName.slice(1)}
+                </option>
+              );
+            })}
           </select>
         </div>
       </div>
