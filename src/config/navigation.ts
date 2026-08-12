@@ -91,6 +91,7 @@ export const navigation = [
     href: '/produccion',
     submodules: [
       { title: 'Dashboard de Producción', icon: BarChart3, href: '/produccion/dashboard' },
+      { title: 'Control Sanny', icon: FileSpreadsheet, href: '/produccion/control-sanny' },
       { title: 'Reportes Diarios Transporte', icon: Truck, href: '/produccion/reportes-transporte' },
       { title: 'Reportes Diarios Mina', icon: PenTool, href: '/produccion/reportes-mina' },
       { title: 'Resumen Mensual Mina', icon: FileSpreadsheet, href: '/produccion/resumen-mensual-mina' },

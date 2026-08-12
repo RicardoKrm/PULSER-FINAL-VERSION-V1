@@ -31,7 +31,7 @@ export default function ReporteYAnaliticaMina() {
   const [filtroMes, setFiltroMes] = useState<string>('');
 
   const availableMonths = useMemo(() => {
-    return Array.from(new Set(data.map(d => d.mes))).sort((a, b) => b.localeCompare(a));
+    return Array.from(new Set(data.map(d => d.mes))).sort((a: string, b: string) => b.localeCompare(a));
   }, [data]);
 
   useEffect(() => {
