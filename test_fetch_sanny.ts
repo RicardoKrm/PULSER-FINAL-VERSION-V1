@@ -1,0 +1,22 @@
+import { createClient } from '@supabase/supabase-js';
+import * as dotenv from 'dotenv';
+dotenv.config();
+
+const url = process.env.VITE_SUPABASE_URL!;
+const key = process.env.VITE_SUPABASE_ANON_KEY!;
+const supabase = createClient(url, key);
+
+async function run() {
+  const { data: authData } = await supabase.auth.signInWithPassword({
+    email: 'superadministrador@gaval.cl',
+    password: 'admin123'
+  });
+  
+  if (authData?.session) {
+    const { data, count, error } = await supabase
+      .from('produccion_sanny')
+      .select('*', { count: 'exact' });
+    console.log("Total records:", count, "Fetched records:", data?.length);
+  }
+}
+run();

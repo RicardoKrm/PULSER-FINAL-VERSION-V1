@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
 import Swal from 'sweetalert2';
@@ -55,39 +56,55 @@ export default function ControlSanny() {
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Fetch data from DB
   const fetchTrips = async () => {
     if (!currentCompany?.id) return;
     setLoading(true);
     try {
-      const { data: dbData, error } = await supabase
-        .from('produccion_sanny')
-        .select('*')
-        .eq('empresa_id', currentCompany.id)
-        .order('fecha', { ascending: true })
-        .order('hora', { ascending: true });
+      let allData: any[] = [];
+      let fetchMore = true;
+      let from = 0;
+      const step = 1000;
 
-      if (error) throw error;
+      while (fetchMore) {
+        const { data: dbData, error } = await supabase
+          .from('produccion_sanny')
+          .select('*')
+          .eq('empresa_id', currentCompany.id)
+          .order('fecha', { ascending: true })
+          .order('hora', { ascending: true })
+          .range(from, from + step - 1);
 
-      if (dbData) {
-        const s6Trips: Trip[] = [];
-        const s7Trips: Trip[] = [];
+        if (error) throw error;
         
-        dbData.forEach(row => {
-          const trip: Trip = {
-            id: row.numero_serie,
-            capacity: Number(row.capacidad),
-            time: row.hora,
-            date: row.fecha,
-            shift: row.turno as 'Día' | 'Noche'
-          };
-          if (row.equipo === 's6') s6Trips.push(trip);
-          else if (row.equipo === 's7') s7Trips.push(trip);
-        });
-
-        setData({ s6: s6Trips, s7: s7Trips });
+        if (dbData && dbData.length > 0) {
+          allData = [...allData, ...dbData];
+          from += step;
+        }
+        
+        if (!dbData || dbData.length < step) {
+          fetchMore = false;
+        }
       }
+
+      const s6Trips: Trip[] = [];
+      const s7Trips: Trip[] = [];
+      
+      allData.forEach(row => {
+        const trip: Trip = {
+          id: row.numero_serie,
+          capacity: Number(row.capacidad),
+          time: row.hora,
+          date: row.fecha,
+          shift: row.turno as 'Día' | 'Noche'
+        };
+        if (row.equipo === 's6') s6Trips.push(trip);
+        else if (row.equipo === 's7') s7Trips.push(trip);
+      });
+
+      setData({ s6: s6Trips, s7: s7Trips });
     } catch (err: any) {
       console.error('Error fetching sanny trips', err);
     } finally {
@@ -284,68 +301,78 @@ export default function ControlSanny() {
           <h1 className="text-2xl font-bold text-gray-900">Control Sanny</h1>
           <p className="text-gray-500">Reporte operacional y rendimiento por turno de equipos Sanny</p>
         </div>
+        <Button onClick={() => setShowImportModal(true)} className="flex items-center gap-2">
+          <Upload className="w-4 h-4" /> Importar Excel
+        </Button>
       </div>
 
-      {/* Uploaders */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer relative">
-              <input 
-                type="file" 
-                accept=".xlsx, .xls"
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                onChange={(e) => handleFileUpload(e, 's6')}
-                disabled={loading}
-              />
-              {loading ? (
-                <Loader2 className="w-10 h-10 text-blue-600 mb-3 animate-spin" />
-              ) : (
-                <FileSpreadsheet className="w-10 h-10 text-blue-600 mb-3" />
-              )}
-              <h3 className="text-lg font-medium text-gray-900">{loading ? 'Procesando...' : 'Cargar Sanny 06'}</h3>
-              <p className="text-sm text-gray-500 text-center mt-1">
-                Sube el archivo Excel extraído del equipo
-              </p>
-              {data.s6.length > 0 && !loading && (
-                <div className="mt-3 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium flex items-center">
-                  <CheckIcon className="w-4 h-4 mr-1" />
-                  {data.s6.length} registros en base de datos
+      <Modal isOpen={showImportModal} onClose={() => setShowImportModal(false)} title="Importar Datos Sanny">
+        <div className="p-4 space-y-4">
+          <p className="text-sm text-gray-600 mb-4">Sube los archivos Excel extraídos directamente de los equipos Sanny. Los datos se procesarán y guardarán automáticamente en la base de datos.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer relative">
+                  <input 
+                    type="file" 
+                    accept=".xlsx, .xls"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    onChange={(e) => handleFileUpload(e, 's6')}
+                    disabled={loading}
+                  />
+                  {loading ? (
+                    <Loader2 className="w-10 h-10 text-blue-600 mb-3 animate-spin" />
+                  ) : (
+                    <FileSpreadsheet className="w-10 h-10 text-blue-600 mb-3" />
+                  )}
+                  <h3 className="text-lg font-medium text-gray-900">{loading ? 'Procesando...' : 'Cargar Sanny 06'}</h3>
+                  <p className="text-sm text-gray-500 text-center mt-1">
+                    Sube el archivo Excel extraído del equipo
+                  </p>
+                  {data.s6.length > 0 && !loading && (
+                    <div className="mt-3 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium flex items-center">
+                      <CheckIcon className="w-4 h-4 mr-1" />
+                      {data.s6.length} registros en base de datos
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer relative">
-              <input 
-                type="file" 
-                accept=".xlsx, .xls"
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                onChange={(e) => handleFileUpload(e, 's7')}
-                disabled={loading}
-              />
-              {loading ? (
-                <Loader2 className="w-10 h-10 text-indigo-600 mb-3 animate-spin" />
-              ) : (
-                <FileSpreadsheet className="w-10 h-10 text-indigo-600 mb-3" />
-              )}
-              <h3 className="text-lg font-medium text-gray-900">{loading ? 'Procesando...' : 'Cargar Sanny 07'}</h3>
-              <p className="text-sm text-gray-500 text-center mt-1">
-                Sube el archivo Excel extraído del equipo
-              </p>
-              {data.s7.length > 0 && !loading && (
-                <div className="mt-3 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium flex items-center">
-                  <CheckIcon className="w-4 h-4 mr-1" />
-                  {data.s7.length} registros en base de datos
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer relative">
+                  <input 
+                    type="file" 
+                    accept=".xlsx, .xls"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    onChange={(e) => handleFileUpload(e, 's7')}
+                    disabled={loading}
+                  />
+                  {loading ? (
+                    <Loader2 className="w-10 h-10 text-indigo-600 mb-3 animate-spin" />
+                  ) : (
+                    <FileSpreadsheet className="w-10 h-10 text-indigo-600 mb-3" />
+                  )}
+                  <h3 className="text-lg font-medium text-gray-900">{loading ? 'Procesando...' : 'Cargar Sanny 07'}</h3>
+                  <p className="text-sm text-gray-500 text-center mt-1">
+                    Sube el archivo Excel extraído del equipo
+                  </p>
+                  {data.s7.length > 0 && !loading && (
+                    <div className="mt-3 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium flex items-center">
+                      <CheckIcon className="w-4 h-4 mr-1" />
+                      {data.s7.length} registros en base de datos
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="flex justify-end pt-4 border-t border-gray-200">
+            <Button variant="outline" onClick={() => setShowImportModal(false)}>Cerrar</Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Tabs */}
       {(data.s6.length > 0 || data.s7.length > 0) && (
