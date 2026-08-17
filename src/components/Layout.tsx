@@ -142,8 +142,7 @@ export default function Layout() {
       });
     }
 
-    const userRole =
-      currentUser?.cargo || profile?.rol?.nombre || "Súper Administrador";
+    const userRole = profile ? profile.rol?.nombre : (currentUser?.cargo || "Súper Administrador");
 
     return list
       .filter(
@@ -259,10 +258,12 @@ export default function Layout() {
 
   // Filter navigation based on user permissions
   const filteredNavigation = React.useMemo(() => {
-    const roleName = profile?.rol?.nombre || currentUser?.cargo;
+    // Determine the role name based on the authenticated profile
+    // If Supabase profile exists but has no role, it shouldn't default to Super Admin
+    let roleName = profile ? profile.rol?.nombre : currentUser?.cargo;
 
-    // If no role at all, default to full nav
-    if (!roleName) return navigation;
+    // If no role at all, they shouldn't see full nav, just empty or basic
+    if (!roleName) return [];
 
     const perms = profile?.rol?.permisos || [];
 
@@ -271,8 +272,6 @@ export default function Layout() {
       [
         "Súper Administrador",
         "Super Administrador",
-        "Administrador",
-        "Admin",
       ].includes(roleName)
     ) {
       return navigation.map((item) => {
@@ -501,7 +500,7 @@ export default function Layout() {
                   {profile?.nombre || user?.email}
                 </span>
                 <span className="text-xs text-blue-400 dark:text-slate-400">
-                  {profile?.rol?.nombre || "Súper Administrador"}
+                  {profile?.rol?.nombre || currentUser?.cargo || "Sin asignar"}
                 </span>
                 <span className="text-[10px] text-slate-500">
                   {profile?.empresa?.nombre || ""}
@@ -715,7 +714,7 @@ export default function Layout() {
                       {profile?.nombre || user?.email}
                     </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                      {profile?.rol?.nombre || "Súper Administrador"}
+                      {profile?.rol?.nombre || currentUser?.cargo || "Sin asignar"}
                     </p>
                     <p className="text-[10px] text-slate-400 truncate">
                       {profile?.empresa?.nombre || ""}

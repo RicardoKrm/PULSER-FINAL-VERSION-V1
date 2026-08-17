@@ -87,6 +87,25 @@ import ControlExtintores from './pages/seguridad/ControlExtintores';
 import ControlVelocidades from './pages/seguridad/ControlVelocidades';
 import ControlEventos from './pages/seguridad/ControlEventos';
 import ControlDocumentalSeguridad from './pages/seguridad/ControlDocumental';
+import DashboardSSO from './pages/seguridad/DashboardSSO';
+import TrabajadoresSSO from './pages/seguridad/TrabajadoresSSO';
+import EmpresasContratistasSSO from './pages/seguridad/EmpresasContratistasSSO';
+import EppSSO from './pages/seguridad/EppSSO';
+import CharlasSSO from './pages/seguridad/CharlasSSO';
+import CapacitacionesSSO from './pages/seguridad/CapacitacionesSSO';
+import GestionRiesgosSSO from './pages/seguridad/GestionRiesgosSSO';
+import InspeccionesSSO from './pages/seguridad/InspeccionesSSO';
+import EquiposEmergenciaSSO from './pages/seguridad/EquiposEmergenciaSSO';
+import ReporteFlashSSO from './pages/seguridad/ReporteFlashSSO';
+import IncidentesSSO from './pages/seguridad/IncidentesSSO';
+import ObservacionesSSO from './pages/seguridad/ObservacionesSSO';
+import HallazgosSSO from './pages/seguridad/HallazgosSSO';
+import AccionesCorrectivasSSO from './pages/seguridad/AccionesCorrectivasSSO';
+import EmergenciasSSO from './pages/seguridad/EmergenciasSSO';
+import AuditoriasSSO from './pages/seguridad/AuditoriasSSO';
+import CumplimientoNormativoSSO from './pages/seguridad/CumplimientoNormativoSSO';
+import IndicadoresSSO from './pages/seguridad/IndicadoresSSO';
+import ReportesSSO from './pages/seguridad/ReportesSSO';
 import { ThemeProvider } from './components/ThemeProvider';
 import { CompanyProvider } from './contexts/CompanyContext';
 import { AppProvider } from './context/AppContext';
@@ -191,6 +210,25 @@ const router = createBrowserRouter([
       { path: "seguridad/velocidades", element: <ControlVelocidades /> },
       { path: "seguridad/eventos", element: <ControlEventos /> },
       { path: "seguridad/documental", element: <ControlDocumentalSeguridad /> },
+      { path: "seguridad/dashboard", element: <DashboardSSO /> },
+      { path: "seguridad/trabajadores", element: <TrabajadoresSSO /> },
+      { path: "seguridad/contratistas", element: <EmpresasContratistasSSO /> },
+      { path: "seguridad/epp", element: <EppSSO /> },
+      { path: "seguridad/charlas", element: <CharlasSSO /> },
+      { path: "seguridad/capacitaciones", element: <CapacitacionesSSO /> },
+      { path: "seguridad/riesgos", element: <GestionRiesgosSSO /> },
+      { path: "seguridad/inspecciones", element: <InspeccionesSSO /> },
+      { path: "seguridad/equipos-emergencia", element: <EquiposEmergenciaSSO /> },
+      { path: "seguridad/reporte-flash", element: <ReporteFlashSSO /> },
+      { path: "seguridad/incidentes", element: <IncidentesSSO /> },
+      { path: "seguridad/observaciones", element: <ObservacionesSSO /> },
+      { path: "seguridad/hallazgos", element: <HallazgosSSO /> },
+      { path: "seguridad/acciones-correctivas", element: <AccionesCorrectivasSSO /> },
+      { path: "seguridad/emergencias", element: <EmergenciasSSO /> },
+      { path: "seguridad/auditorias", element: <AuditoriasSSO /> },
+      { path: "seguridad/normativo", element: <CumplimientoNormativoSSO /> },
+      { path: "seguridad/indicadores", element: <IndicadoresSSO /> },
+      { path: "seguridad/reportes", element: <ReportesSSO /> },
           { path: "*", element: <GenericPage /> },
         ]
       }

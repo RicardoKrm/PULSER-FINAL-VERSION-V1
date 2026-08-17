@@ -40,7 +40,8 @@ import {
   PenTool,
   History,
   Shield,
-  ShieldCheck
+  ShieldCheck,
+  Eye
 } from 'lucide-react';
 
 export const navigation = [
@@ -174,14 +175,31 @@ export const navigation = [
     ],
   }, */
   {
-    title: 'Seguridad y Salud Ocupacional',
+    title: 'SSO / Prevención',
     icon: ShieldCheck,
     href: '/seguridad',
     submodules: [
-      { title: 'Control Extintores', icon: Shield, href: '/seguridad/extintores' },
-      { title: 'Control Velocidades', icon: Activity, href: '/seguridad/velocidades' },
-      { title: 'Control Eventos', icon: AlertCircle, href: '/seguridad/eventos' },
-      { title: 'Control Documental Mina', icon: FileCheck, href: '/seguridad/documental' },
+      { title: 'Dashboard', icon: BarChart3, href: '/seguridad/dashboard' },
+      { title: 'Trabajadores', icon: Users, href: '/seguridad/trabajadores' },
+      { title: 'Empresas Contratistas', icon: Briefcase, href: '/seguridad/contratistas' },
+      { title: 'Control Documental', icon: FileCheck, href: '/seguridad/documental' },
+      { title: 'EPP', icon: Shield, href: '/seguridad/epp' },
+      { title: 'Control Extintores', icon: Activity, href: '/seguridad/extintores' },
+      { title: 'Equipos de Emergencia', icon: AlertCircle, href: '/seguridad/equipos-emergencia' },
+      { title: 'Charlas', icon: MessageSquare, href: '/seguridad/charlas' },
+      { title: 'Capacitaciones', icon: BookOpen, href: '/seguridad/capacitaciones' },
+      { title: 'Gestión de Riesgos', icon: AlertCircle, href: '/seguridad/riesgos' },
+      { title: 'Inspecciones', icon: CheckSquare, href: '/seguridad/inspecciones' },
+      { title: 'Reporte Flash', icon: Zap, href: '/seguridad/reporte-flash' },
+      { title: 'Incidentes / Accidentes', icon: AlertCircle, href: '/seguridad/incidentes' },
+      { title: 'Observaciones', icon: Eye, href: '/seguridad/observaciones' },
+      { title: 'Hallazgos', icon: Search, href: '/seguridad/hallazgos' },
+      { title: 'Acciones Correctivas', icon: Wrench, href: '/seguridad/acciones-correctivas' },
+      { title: 'Emergencias', icon: AlertCircle, href: '/seguridad/emergencias' },
+      { title: 'Auditorías', icon: ClipboardList, href: '/seguridad/auditorias' },
+      { title: 'Cumplimiento Normativo', icon: FileText, href: '/seguridad/normativo' },
+      { title: 'Indicadores SSO', icon: TrendingUp, href: '/seguridad/indicadores' },
+      { title: 'Reportes', icon: FileSpreadsheet, href: '/seguridad/reportes' },
     ],
   },
   {
