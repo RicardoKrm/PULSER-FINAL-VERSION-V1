@@ -106,32 +106,19 @@ export default function GestionSuministros() {
         return allData;
       };
 
-      let bData: any[] = [];
-      if (currentCompany?.id && currentCompany.id !== 'emp-001') {
-        bData = await fetchAllRows(supabase.from('logistica_bodegas').select('*').eq('empresa_id', currentCompany.id));
-      }
-      if (!bData || bData.length === 0) {
-        bData = await fetchAllRows(supabase.from('logistica_bodegas').select('*'));
-      }
+      let bQuery = supabase.from('logistica_bodegas').select('*');
+      if (currentCompany.id !== 'emp-001') bQuery = bQuery.eq('empresa_id', currentCompany.id);
+      let bData = await fetchAllRows(bQuery);
       setBodegasList(bData || []);
 
-      let rData: any[] = [];
-      if (currentCompany?.id && currentCompany.id !== 'emp-001') {
-        rData = await fetchAllRows(supabase.from('logistica_repuestos').select(`
+      let rQuery = supabase.from('logistica_repuestos').select(`
           *,
           logistica_bodegas (
             nombre
           )
-        `).eq('empresa_id', currentCompany.id));
-      }
-      if (!rData || rData.length === 0) {
-        rData = await fetchAllRows(supabase.from('logistica_repuestos').select(`
-          *,
-          logistica_bodegas (
-            nombre
-          )
-        `));
-      }
+        `);
+      if (currentCompany.id !== 'emp-001') rQuery = rQuery.eq('empresa_id', currentCompany.id);
+      let rData = await fetchAllRows(rQuery);
 
       if (rData && rData.length > 0) {
         setSumInsumosData(rData.map((r: any) => {
