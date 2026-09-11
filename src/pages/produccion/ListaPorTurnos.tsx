@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Loader2, Download } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
 
 interface Trabajador {
   id: string;
@@ -21,6 +22,7 @@ interface TurnoInfo {
 }
 
 export default function ListaPorTurnos() {
+  const { currentCompany } = useCompany();
   const [turnos, setTurnos] = useState<TurnoInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [rawData, setRawData] = useState<any[]>([]);
@@ -28,11 +30,11 @@ export default function ListaPorTurnos() {
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
 
   useEffect(() => {
+    if(!currentCompany?.id) return;
     const fetchData = async () => {
       try {
         const { data, error } = await supabase
-          .from('produccion_registro_diario')
-          .select('*');
+          .from('produccion_registro_diario').select('*').eq('empresa_id', currentCompany?.id || '');
 
         if (error) {
           console.error("Error fetching data:", error);
@@ -62,7 +64,7 @@ export default function ListaPorTurnos() {
     };
 
     fetchData();
-  }, []);
+  }, [currentCompany]);
 
   useEffect(() => {
     if (!rawData.length) {

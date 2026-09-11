@@ -1,0 +1,10 @@
+
+> react-example@0.0.0 lint
+> tsc --noEmit
+
+src/pages/Login.tsx(80,114): error TS2339: Property 'estado' does not exist on type '{ estado: any; }[]'.
+src/pages/Login.tsx(105,11): error TS2739: Type '{ id: any; nombre: any; empresa_id: any; panel_inicio: any; }' is missing the following properties from type '{ id: any; nombre: any; empresa_id: any; panel_inicio: any; estado: any; empresa: { estado: any; }[]; }': estado, empresa
+test-env-keys.ts(1,35): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+test-env-keys.ts(2,36): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+test-env-keys.ts(3,39): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
+test-vite-node.ts(1,25): error TS2339: Property 'env' does not exist on type 'ImportMeta'.

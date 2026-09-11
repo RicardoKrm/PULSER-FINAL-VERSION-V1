@@ -4,10 +4,12 @@ import { Loader2 } from 'lucide-react';
 import KPIsResumen from '../operaciones/produccion/KPIsResumen';
 import ConfiguracionMetas from '../operaciones/produccion/ConfiguracionMetas';
 import { GlobalStats, MetasObjetivos, useProduccion } from '../../contexts/ProduccionContext';
+import { useCompany } from '../../contexts/CompanyContext';
 
 export default function DashboardProduccion() {
   const [loading, setLoading] = useState(true);
   const { metas, setMetas } = useProduccion();
+  const { currentCompany } = useCompany();
   
   const [stats, setStats] = useState<GlobalStats>({
     rajoTotal: 0,
@@ -22,8 +24,8 @@ export default function DashboardProduccion() {
   });
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (currentCompany?.id) fetchData();
+  }, [currentCompany]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -35,12 +37,14 @@ export default function DashboardProduccion() {
       // Fetch Mina
       const { data: minaData } = await supabase
         .from('produccion_registro_diario_mina')
-        .select('fecha, tonelaje');
+        .select('fecha, tonelaje')
+        .eq('empresa_id', currentCompany?.id || '');
 
       // Fetch Transporte
       const { data: transporteData, error: transporteError } = await supabase
         .from('produccion_registro_diario')
-        .select('fecha, tonelaje');
+        .select('fecha, tonelaje')
+        .eq('empresa_id', currentCompany?.id || '');
 
       let minaHoy = 0;
       let minaMes = 0;

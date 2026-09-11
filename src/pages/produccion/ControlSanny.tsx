@@ -35,6 +35,7 @@ interface Trip {
 interface TruckData {
   s6: Trip[];
   s7: Trip[];
+  s8: Trip[];
 }
 
 interface DailySummary {
@@ -47,11 +48,15 @@ interface DailySummary {
   s7DiaVueltas: number;
   s7NocheTons: number;
   s7NocheVueltas: number;
+  s8DiaTons: number;
+  s8DiaVueltas: number;
+  s8NocheTons: number;
+  s8NocheVueltas: number;
 }
 
 export default function ControlSanny() {
   const { currentCompany } = useCompany();
-  const [data, setData] = useState<TruckData>({ s6: [], s7: [] });
+  const [data, setData] = useState<TruckData>({ s6: [], s7: [], s8: [] });
   const [activeTab, setActiveTab] = useState<'resumen' | 'diario'>('resumen');
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>('');
@@ -91,6 +96,7 @@ export default function ControlSanny() {
 
       const s6Trips: Trip[] = [];
       const s7Trips: Trip[] = [];
+      const s8Trips: Trip[] = [];
       
       allData.forEach(row => {
         const trip: Trip = {
@@ -102,9 +108,10 @@ export default function ControlSanny() {
         };
         if (row.equipo === 's6') s6Trips.push(trip);
         else if (row.equipo === 's7') s7Trips.push(trip);
+        else if (row.equipo === 's8') s8Trips.push(trip);
       });
 
-      setData({ s6: s6Trips, s7: s7Trips });
+      setData({ s6: s6Trips, s7: s7Trips, s8: s8Trips });
     } catch (err: any) {
       console.error('Error fetching sanny trips', err);
     } finally {
@@ -112,12 +119,26 @@ export default function ControlSanny() {
     }
   };
 
+  
+  // Temporary Migration Hook
+  useEffect(() => {
+    if (currentCompany?.id) {
+      supabase.from('produccion_sanny')
+        .update({ empresa_id: currentCompany.id })
+        .is('empresa_id', null)
+        .then(() => {
+           console.log("Migration produccion_sanny completed");
+           fetchTrips();
+        });
+    }
+  }, [currentCompany?.id]);
+
   useEffect(() => {
     fetchTrips();
   }, [currentCompany?.id]);
 
   const availableMonths = useMemo(() => {
-    const allDates = [...data.s6, ...data.s7].map(t => t.date.substring(0, 7));
+    const allDates = [...data.s6, ...data.s7, ...data.s8].map(t => t.date.substring(0, 7));
     return Array.from(new Set(allDates)).sort().reverse();
   }, [data]);
 
@@ -138,7 +159,7 @@ export default function ControlSanny() {
   }, [availableMonths, selectedMonth]);
 
   // Handle file upload
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, truck: 's6' | 's7') => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, truck: 's6' | 's7' | 's8') => {
     if (!currentCompany?.id) {
       Swal.fire('Error', 'No se ha seleccionado una empresa', 'error');
       return;
@@ -246,6 +267,7 @@ export default function ControlSanny() {
         dailyMap.set(date, {
           date,
           s6DiaTons: 0, s6DiaVueltas: 0, s6NocheTons: 0, s6NocheVueltas: 0,
+            s8DiaTons: 0, s8DiaVueltas: 0, s8NocheTons: 0, s8NocheVueltas: 0,
           s7DiaTons: 0, s7DiaVueltas: 0, s7NocheTons: 0, s7NocheVueltas: 0
         });
       }
@@ -280,6 +302,19 @@ export default function ControlSanny() {
           }
         }
       });
+      data.s8.forEach(trip => {
+        let day = dailyMap.get(trip.date);
+        if (day) {
+          if (trip.shift === 'Día') {
+            day.s8DiaTons += trip.capacity;
+            day.s8DiaVueltas += 1;
+          } else {
+            day.s8NocheTons += trip.capacity;
+            day.s8NocheVueltas += 1;
+          }
+        }
+      });
+
     }
 
     return Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date));
@@ -309,7 +344,7 @@ export default function ControlSanny() {
       <Modal isOpen={showImportModal} onClose={() => setShowImportModal(false)} title="Importar Datos Sanny">
         <div className="p-4 space-y-4">
           <p className="text-sm text-gray-600 mb-4">Sube los archivos Excel extraídos directamente de los equipos Sanny. Los datos se procesarán y guardarán automáticamente en la base de datos.</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
               <CardContent className="p-6">
                 <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer relative">
@@ -367,6 +402,36 @@ export default function ControlSanny() {
                 </div>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer relative">
+                  <input 
+                    type="file" 
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                    accept=".xlsx,.xls" 
+                    onChange={(e) => handleFileUpload(e, 's8')}
+                    disabled={loading}
+                  />
+                  {loading ? (
+                    <Loader2 className="w-10 h-10 text-emerald-600 mb-3 animate-spin" />
+                  ) : (
+                    <FileSpreadsheet className="w-10 h-10 text-emerald-600 mb-3" />
+                  )}
+                  <h3 className="text-lg font-medium text-gray-900">{loading ? 'Procesando...' : 'Cargar Sanny 08'}</h3>
+                  <p className="text-sm text-gray-500 text-center mt-1">
+                    Sube el archivo Excel extraído del equipo
+                  </p>
+                  {data.s8 && data.s8.length > 0 && !loading && (
+                    <div className="mt-3 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium flex items-center">
+                      <CheckIcon className="w-4 h-4 mr-1" />
+                      {data.s8.length} registros en base de datos
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
           </div>
           <div className="flex justify-end pt-4 border-t border-gray-200">
             <Button variant="outline" onClick={() => setShowImportModal(false)}>Cerrar</Button>
@@ -374,8 +439,8 @@ export default function ControlSanny() {
         </div>
       </Modal>
 
-      {/* Tabs */}
-      {(data.s6.length > 0 || data.s7.length > 0) && (
+      
+      {(data.s6.length > 0 || data.s7.length > 0 || data.s8.length > 0) && (
         <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-2 rounded-lg border gap-4">
           <div className="flex space-x-1">
             <button
@@ -434,6 +499,7 @@ export default function ControlSanny() {
               date={selectedDate} 
               s6Trips={data.s6.filter(t => t.date === selectedDate)}
               s7Trips={data.s7.filter(t => t.date === selectedDate)}
+              s8Trips={data.s8.filter(t => t.date === selectedDate)}
               summary={summaries.find(s => s.date === selectedDate)!}
             />
           )}
@@ -455,24 +521,26 @@ function ResumenMensual({ summaries, monthName }: { summaries: DailySummary[], m
   const totalS6NocheT = summaries.reduce((acc, curr) => acc + curr.s6NocheTons, 0);
   const totalS7DiaT = summaries.reduce((acc, curr) => acc + curr.s7DiaTons, 0);
   const totalS7NocheT = summaries.reduce((acc, curr) => acc + curr.s7NocheTons, 0);
+  const totalS8DiaT = summaries.reduce((acc, curr) => acc + curr.s8DiaTons, 0);
+  const totalS8NocheT = summaries.reduce((acc, curr) => acc + curr.s8NocheTons, 0);
   
-  const totalMes = totalS6DiaT + totalS6NocheT + totalS7DiaT + totalS7NocheT;
+  const totalMes = totalS6DiaT + totalS6NocheT + totalS7DiaT + totalS7NocheT + totalS8DiaT + totalS8NocheT;
   const diasTrabajados = summaries.length;
   const promToneladasDia = diasTrabajados > 0 ? totalMes / diasTrabajados : 0;
   const promDiaEquipo = promToneladasDia / 2;
   
-  const totalViajes = summaries.reduce((acc, curr) => acc + curr.s6DiaVueltas + curr.s6NocheVueltas + curr.s7DiaVueltas + curr.s7NocheVueltas, 0);
+  const totalViajes = summaries.reduce((acc, curr) => acc + curr.s6DiaVueltas + curr.s6NocheVueltas + curr.s7DiaVueltas + curr.s7NocheVueltas + curr.s8DiaVueltas + curr.s8NocheVueltas, 0);
   
-  const promVHDia = summaries.reduce((acc, curr) => acc + ((curr.s6DiaVueltas/12 + curr.s7DiaVueltas/12)/2), 0) / (diasTrabajados || 1);
-  const promVHNoche = summaries.reduce((acc, curr) => acc + ((curr.s6NocheVueltas/12 + curr.s7NocheVueltas/12)/2), 0) / (diasTrabajados || 1);
+  const promVHDia = summaries.reduce((acc, curr) => acc + ((curr.s6DiaVueltas/12 + curr.s7DiaVueltas/12 + curr.s8DiaVueltas/12)/3), 0) / (diasTrabajados || 1);
+  const promVHNoche = summaries.reduce((acc, curr) => acc + ((curr.s6NocheVueltas/12 + curr.s7NocheVueltas/12 + curr.s8NocheVueltas/12)/3), 0) / (diasTrabajados || 1);
 
   return (
     <div className="space-y-6">
       {/* Monthly KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <MetricCard title="Total Toneladas Mes" value={totalMes.toFixed(1)} />
-        <MetricCard title="Turno Día (8 - 20)" value={(totalS6DiaT + totalS7DiaT).toFixed(1)} />
-        <MetricCard title="Turno Noche (20 - 8)" value={(totalS6NocheT + totalS7NocheT).toFixed(1)} />
+        <MetricCard title="Turno Día (8 - 20)" value={(totalS6DiaT + totalS7DiaT + totalS8DiaT).toFixed(1)} />
+        <MetricCard title="Turno Noche (20 - 8)" value={(totalS6NocheT + totalS7NocheT + totalS8NocheT).toFixed(1)} />
         <MetricCard title="Prom. Toneladas / Día" value={promToneladasDia.toFixed(1)} />
         <MetricCard title="Prom. Día / Equipo" value={promDiaEquipo.toFixed(1)} />
         <MetricCard title="Total Viajes Mes" value={totalViajes.toString()} />
@@ -497,6 +565,11 @@ function ResumenMensual({ summaries, monthName }: { summaries: DailySummary[], m
                 <th className="p-2 border">S7 - Total (t)</th>
                 <th className="p-2 border">S7 - Vueltas/H Día</th>
                 <th className="p-2 border">S7 - Vueltas/H Noche</th>
+                <th className="p-2 border">S8 - Día (t)</th>
+                <th className="p-2 border">S8 - Noche (t)</th>
+                <th className="p-2 border">S8 - Total (t)</th>
+                <th className="p-2 border">S8 - Vueltas/H Día</th>
+                <th className="p-2 border">S8 - Vueltas/H Noche</th>
                 <th className="p-2 border">Total Día (8-20)</th>
                 <th className="p-2 border">Total Noche (20-8)</th>
                 <th className="p-2 border">Toneladas Diarias</th>
@@ -507,8 +580,8 @@ function ResumenMensual({ summaries, monthName }: { summaries: DailySummary[], m
               {summaries.map(s => {
                 const s6Tot = s.s6DiaTons + s.s6NocheTons;
                 const s7Tot = s.s7DiaTons + s.s7NocheTons;
-                const totalD = s.s6DiaTons + s.s7DiaTons;
-                const totalN = s.s6NocheTons + s.s7NocheTons;
+                const totalD = s.s6DiaTons + s.s7DiaTons + s.s8DiaTons;
+                const totalN = s.s6NocheTons + s.s7NocheTons + s.s8NocheTons;
                 return (
                   <tr key={s.date} className="border-b hover:bg-slate-50">
                     <td className="p-2 font-medium border-r">{s.date}</td>
@@ -522,10 +595,15 @@ function ResumenMensual({ summaries, monthName }: { summaries: DailySummary[], m
                     <td className="p-2 font-semibold bg-slate-50 border-r">{s7Tot.toFixed(1)}</td>
                     <td className="p-2 border-r">{(s.s7DiaVueltas/12).toFixed(2)}</td>
                     <td className="p-2 border-r">{(s.s7NocheVueltas/12).toFixed(2)}</td>
+                    <td className="p-2 border-r">{s.s8DiaTons.toFixed(1)}</td>
+                    <td className="p-2 border-r">{s.s8NocheTons.toFixed(1)}</td>
+                    <td className="p-2 font-semibold bg-slate-50 border-r">{(s.s8DiaTons + s.s8NocheTons).toFixed(1)}</td>
+                    <td className="p-2 border-r">{(s.s8DiaVueltas/12).toFixed(2)}</td>
+                    <td className="p-2 border-r">{(s.s8NocheVueltas/12).toFixed(2)}</td>
                     <td className="p-2 font-semibold bg-blue-50 border-r">{totalD.toFixed(1)}</td>
                     <td className="p-2 font-semibold bg-indigo-50 border-r">{totalN.toFixed(1)}</td>
                     <td className="p-2 font-bold bg-green-50 border-r">{(totalD + totalN).toFixed(1)}</td>
-                    <td className="p-2 font-semibold">{s.s6DiaVueltas + s.s6NocheVueltas + s.s7DiaVueltas + s.s7NocheVueltas}</td>
+                    <td className="p-2 font-semibold">{s.s6DiaVueltas + s.s6NocheVueltas + s.s7DiaVueltas + s.s7NocheVueltas + s.s8DiaVueltas + s.s8NocheVueltas}</td>
                   </tr>
                 )
               })}
@@ -543,8 +621,8 @@ function ResumenMensual({ summaries, monthName }: { summaries: DailySummary[], m
                 <td className="p-2">{(totalS7DiaT + totalS7NocheT).toFixed(1)}</td>
                 <td className="p-2">-</td>
                 <td className="p-2">-</td>
-                <td className="p-2">{(totalS6DiaT + totalS7DiaT).toFixed(1)}</td>
-                <td className="p-2">{(totalS6NocheT + totalS7NocheT).toFixed(1)}</td>
+                <td className="p-2">{(totalS6DiaT + totalS7DiaT + totalS8DiaT).toFixed(1)}</td>
+                <td className="p-2">{(totalS6NocheT + totalS7NocheT + totalS8NocheT).toFixed(1)}</td>
                 <td className="p-2">{totalMes.toFixed(1)}</td>
                 <td className="p-2">{totalViajes}</td>
               </tr>
@@ -591,12 +669,14 @@ function MetricCard({ title, value }: { title: string, value: string }) {
   )
 }
 
-function DetalleDiario({ date, s6Trips, s7Trips, summary }: { date: string, s6Trips: Trip[], s7Trips: Trip[], summary: DailySummary }) {
+function DetalleDiario({ date, s6Trips, s7Trips, s8Trips, summary }: { date: string, s6Trips: Trip[], s7Trips: Trip[], s8Trips: Trip[], summary: DailySummary }) {
   
   const s6Dia = s6Trips.filter(t => t.shift === 'Día').sort((a,b) => a.time.localeCompare(b.time));
   const s6Noche = s6Trips.filter(t => t.shift === 'Noche').sort((a,b) => a.time.localeCompare(b.time));
   const s7Dia = s7Trips.filter(t => t.shift === 'Día').sort((a,b) => a.time.localeCompare(b.time));
   const s7Noche = s7Trips.filter(t => t.shift === 'Noche').sort((a,b) => a.time.localeCompare(b.time));
+  const s8Dia = s8Trips.filter(t => t.shift === 'Día').sort((a,b) => a.time.localeCompare(b.time));
+  const s8Noche = s8Trips.filter(t => t.shift === 'Noche').sort((a,b) => a.time.localeCompare(b.time));
 
   return (
     <div className="space-y-6">
@@ -615,6 +695,9 @@ function DetalleDiario({ date, s6Trips, s7Trips, summary }: { date: string, s6Tr
                 <th className="p-2 border">S7 TURNO DÍA</th>
                 <th className="p-2 border">S7 TURNO NOCHE</th>
                 <th className="p-2 border bg-indigo-50">S7 TOTAL</th>
+                <th className="p-2 border">S8 TURNO DÍA</th>
+                <th className="p-2 border">S8 TURNO NOCHE</th>
+                <th className="p-2 border bg-emerald-50">S8 TOTAL</th>
                 <th className="p-2 border bg-slate-200">TOTAL DÍA (8-20)</th>
                 <th className="p-2 border bg-slate-200">TOTAL NOCHE (20-8)</th>
                 <th className="p-2 border bg-slate-300">TOTAL DÍA (t)</th>
@@ -630,10 +713,10 @@ function DetalleDiario({ date, s6Trips, s7Trips, summary }: { date: string, s6Tr
                 <td className="p-2 border">{summary.s7DiaTons.toFixed(1)}</td>
                 <td className="p-2 border">{summary.s7NocheTons.toFixed(1)}</td>
                 <td className="p-2 border font-bold bg-indigo-50">{(summary.s7DiaTons + summary.s7NocheTons).toFixed(1)}</td>
-                <td className="p-2 border font-bold bg-slate-200">{(summary.s6DiaTons + summary.s7DiaTons).toFixed(1)}</td>
-                <td className="p-2 border font-bold bg-slate-200">{(summary.s6NocheTons + summary.s7NocheTons).toFixed(1)}</td>
-                <td className="p-2 border font-bold bg-slate-300 text-lg">{(summary.s6DiaTons + summary.s6NocheTons + summary.s7DiaTons + summary.s7NocheTons).toFixed(1)}</td>
-                <td className="p-2 border font-bold">{((summary.s6DiaTons + summary.s6NocheTons + summary.s7DiaTons + summary.s7NocheTons)/2).toFixed(1)}</td>
+                <td className="p-2 border font-bold bg-slate-200">{(summary.s6DiaTons + summary.s7DiaTons + summary.s8DiaTons).toFixed(1)}</td>
+                <td className="p-2 border font-bold bg-slate-200">{(summary.s6NocheTons + summary.s7NocheTons + summary.s8NocheTons).toFixed(1)}</td>
+                <td className="p-2 border font-bold bg-slate-300 text-lg">{(summary.s6DiaTons + summary.s6NocheTons + summary.s7DiaTons + summary.s7NocheTons + summary.s8DiaTons + summary.s8NocheTons).toFixed(1)}</td>
+                <td className="p-2 border font-bold">{((summary.s6DiaTons + summary.s6NocheTons + summary.s7DiaTons + summary.s7NocheTons + summary.s8DiaTons + summary.s8NocheTons)/2).toFixed(1)}</td>
               </tr>
             </tbody>
           </table>
@@ -656,20 +739,32 @@ function DetalleDiario({ date, s6Trips, s7Trips, summary }: { date: string, s6Tr
                 <div className="bg-[#15803d] text-white text-xs text-center py-1 font-semibold">SANNY 07 - TURNO DÍA</div>
                 <TripTable trips={s7Dia} />
               </div>
+              
+              <div className="flex-1">
+                <div className="bg-[#059669] text-white text-xs text-center py-1 font-semibold">SANNY 08 - TURNO DÍA</div>
+                <TripTable trips={s8Dia} />
+              </div>
+
             </div>
             {/* Resumen Footer */}
             <div className="bg-slate-100 p-2 text-xs flex justify-between">
-              <div className="w-1/2 pr-2 space-y-1">
+              <div className="w-1/3 pr-2 space-y-1">
                 <div className="flex justify-between font-bold border-b pb-1"><span>TOTAL S6 DÍA</span> <span>{summary.s6DiaTons.toFixed(1)}</span></div>
                 <div className="flex justify-between"><span>VUELTAS S6 DÍA</span> <span>{summary.s6DiaVueltas}</span></div>
                 <div className="flex justify-between"><span>PROM. S6 DÍA (t/vj)</span> <span>{summary.s6DiaVueltas ? (summary.s6DiaTons/summary.s6DiaVueltas).toFixed(2) : 0}</span></div>
                 <div className="flex justify-between bg-purple-100 p-1 font-semibold"><span>VUELTAS / HORA S6 DÍA</span> <span>{(summary.s6DiaVueltas/12).toFixed(2)}</span></div>
               </div>
-              <div className="w-1/2 pl-2 space-y-1 border-l">
+              <div className="w-1/3 pl-2 space-y-1 border-l">
                 <div className="flex justify-between font-bold border-b pb-1"><span>TOTAL S7 DÍA</span> <span>{summary.s7DiaTons.toFixed(1)}</span></div>
                 <div className="flex justify-between"><span>VUELTAS S7 DÍA</span> <span>{summary.s7DiaVueltas}</span></div>
                 <div className="flex justify-between"><span>PROM. S7 DÍA (t/vj)</span> <span>{summary.s7DiaVueltas ? (summary.s7DiaTons/summary.s7DiaVueltas).toFixed(2) : 0}</span></div>
                 <div className="flex justify-between bg-purple-100 p-1 font-semibold"><span>VUELTAS / HORA S7 DÍA</span> <span>{(summary.s7DiaVueltas/12).toFixed(2)}</span></div>
+              </div>
+              <div className="w-1/3 pl-2 space-y-1 border-l">
+                <div className="flex justify-between font-bold border-b pb-1"><span>TOTAL S8 NOCHE</span> <span>{summary.s8NocheTons.toFixed(1)}</span></div>
+                <div className="flex justify-between"><span>VUELTAS S8 NOCHE</span> <span>{summary.s8NocheVueltas}</span></div>
+                <div className="flex justify-between"><span>PROM. S8 NOCHE (t/vj)</span> <span>{summary.s8NocheVueltas ? (summary.s8NocheTons/summary.s8NocheVueltas).toFixed(2) : 0}</span></div>
+                <div className="flex justify-between bg-emerald-100 p-1 font-semibold"><span>VUELTAS / HORA S8 NOCHE</span> <span>{(summary.s8NocheVueltas/12).toFixed(2)}</span></div>
               </div>
             </div>
           </CardContent>
@@ -690,20 +785,32 @@ function DetalleDiario({ date, s6Trips, s7Trips, summary }: { date: string, s6Tr
                 <div className="bg-[#15803d] text-white text-xs text-center py-1 font-semibold">SANNY 07 - TURNO NOCHE</div>
                 <TripTable trips={s7Noche} />
               </div>
+              
+              <div className="flex-1">
+                <div className="bg-[#059669] text-white text-xs text-center py-1 font-semibold">SANNY 08 - TURNO NOCHE</div>
+                <TripTable trips={s8Noche} />
+              </div>
+
             </div>
             {/* Resumen Footer */}
             <div className="bg-slate-100 p-2 text-xs flex justify-between">
-              <div className="w-1/2 pr-2 space-y-1">
+              <div className="w-1/3 pr-2 space-y-1">
                 <div className="flex justify-between font-bold border-b pb-1"><span>TOTAL S6 NOCHE</span> <span>{summary.s6NocheTons.toFixed(1)}</span></div>
                 <div className="flex justify-between"><span>VUELTAS S6 NOCHE</span> <span>{summary.s6NocheVueltas}</span></div>
                 <div className="flex justify-between"><span>PROM. S6 NOCHE (t/vj)</span> <span>{summary.s6NocheVueltas ? (summary.s6NocheTons/summary.s6NocheVueltas).toFixed(2) : 0}</span></div>
                 <div className="flex justify-between bg-purple-100 p-1 font-semibold"><span>VUELTAS / HORA S6 NOCHE</span> <span>{(summary.s6NocheVueltas/12).toFixed(2)}</span></div>
               </div>
-              <div className="w-1/2 pl-2 space-y-1 border-l">
+              <div className="w-1/3 pl-2 space-y-1 border-l">
                 <div className="flex justify-between font-bold border-b pb-1"><span>TOTAL S7 NOCHE</span> <span>{summary.s7NocheTons.toFixed(1)}</span></div>
                 <div className="flex justify-between"><span>VUELTAS S7 NOCHE</span> <span>{summary.s7NocheVueltas}</span></div>
                 <div className="flex justify-between"><span>PROM. S7 NOCHE (t/vj)</span> <span>{summary.s7NocheVueltas ? (summary.s7NocheTons/summary.s7NocheVueltas).toFixed(2) : 0}</span></div>
                 <div className="flex justify-between bg-purple-100 p-1 font-semibold"><span>VUELTAS / HORA S7 NOCHE</span> <span>{(summary.s7NocheVueltas/12).toFixed(2)}</span></div>
+              </div>
+              <div className="w-1/3 pl-2 space-y-1 border-l">
+                <div className="flex justify-between font-bold border-b pb-1"><span>TOTAL S8 NOCHE</span> <span>{summary.s8NocheTons.toFixed(1)}</span></div>
+                <div className="flex justify-between"><span>VUELTAS S8 NOCHE</span> <span>{summary.s8NocheVueltas}</span></div>
+                <div className="flex justify-between"><span>PROM. S8 NOCHE (t/vj)</span> <span>{summary.s8NocheVueltas ? (summary.s8NocheTons/summary.s8NocheVueltas).toFixed(2) : 0}</span></div>
+                <div className="flex justify-between bg-emerald-100 p-1 font-semibold"><span>VUELTAS / HORA S8 NOCHE</span> <span>{(summary.s8NocheVueltas/12).toFixed(2)}</span></div>
               </div>
             </div>
           </CardContent>

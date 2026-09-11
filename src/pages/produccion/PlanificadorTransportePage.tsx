@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
 import { useProduccion } from '../../contexts/ProduccionContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -40,6 +41,7 @@ interface EscenarioGuardado {
 }
 
 export default function PlanificadorTransportePage() {
+  const { currentCompany } = useCompany();
   const { metas } = useProduccion();
   const [loading, setLoading] = useState(true);
   const [mesSeleccionado, setMesSeleccionado] = useState(
@@ -99,8 +101,7 @@ export default function PlanificadorTransportePage() {
 
       const { data, error } = await supabase
         .from('produccion_registro_diario')
-        .select('*')
-        .gte('fecha', startDateStr)
+        .select('*').eq('empresa_id', currentCompany?.id || '').gte('fecha', startDateStr)
         .lte('fecha', endDateStr);
 
       if (error) throw error;

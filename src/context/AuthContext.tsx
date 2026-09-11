@@ -117,7 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .select(`
           *,
           rol:rol_id(nombre, tipo, permisos),
-          empresa:empresa_id(nombre, rut)
+          empresa:empresa_id(nombre, rut, estado)
         `);
 
       if (email) {
@@ -132,6 +132,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data) {
         if (Array.isArray(data.rol)) data.rol = data.rol[0];
         if (Array.isArray(data.empresa)) data.empresa = data.empresa[0];
+        
+        // Block inactive users or users belonging to inactive companies
+        if (data.estado?.toLowerCase() === 'inactivo' || (data.empresa && data.empresa.estado?.toLowerCase() === 'inactivo')) {
+          console.warn('Usuario o empresa inactiva. Bloqueando acceso.');
+          supabase.auth.signOut();
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+          return;
+        }
+
         setProfile(data);
       }
     } catch (error) {

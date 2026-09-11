@@ -71,9 +71,28 @@ export default function Login() {
         sessionUser = data.session.user;
         let { data: profile } = await supabase
           .from('usuario_aplicacion')
-          .select('id, nombre, empresa_id, panel_inicio')
+          .select('id, nombre, empresa_id, panel_inicio, estado, empresa:empresa_id(estado)')
           .eq('auth_user_id', sessionUser.id)
           .maybeSingle();
+
+
+        if (profile) {
+          
+          let isInactive = profile.estado?.toLowerCase() === 'inactivo';
+          if (profile.empresa) {
+            const emp = Array.isArray(profile.empresa) ? profile.empresa[0] : profile.empresa;
+            if (emp && emp.estado?.toLowerCase() === 'inactivo') {
+              isInactive = true;
+            }
+          }
+
+          if (isInactive) {
+            await supabase.auth.signOut();
+            setErrorMsg('Cuenta suspendida. Por favor contacte con soporte.');
+            setIsLoading(false);
+            return;
+          }
+        }
 
         if (!profile) {
           const namePart = email.split('@')[0] || 'Usuario';
@@ -91,7 +110,7 @@ export default function Login() {
             .select('id, nombre, empresa_id, panel_inicio')
             .maybeSingle();
 
-          profile = newProfile;
+          profile = newProfile as any;
         }
           
         if (profile) {

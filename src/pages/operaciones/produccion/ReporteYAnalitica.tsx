@@ -3,6 +3,7 @@ import { PenTool, Send, CheckCircle2, TrendingUp, X, Filter, Calendar as Calenda
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { GlobalStats } from '../../../contexts/ProduccionContext';
 import { supabase } from '../../../lib/supabase';
+import { useCompany } from '../../../contexts/CompanyContext';
 
 interface Props {
   onReporteProduccion: (ext: number, mol: number, stock: number, fecha: string, hora: string) => void;
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransporte, stats }: Props) {
+  const { currentCompany } = useCompany();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [vista, setVista] = useState<'chofer' | 'camion'>('chofer');
   const [selectedDataIndex, setSelectedDataIndex] = useState<number | null>(null);
@@ -102,8 +104,7 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
   const fetchData = async () => {
     try {
       const { data, error } = await supabase
-        .from('produccion_registro_diario')
-        .select('*');
+        .from('produccion_registro_diario').select('*').eq('empresa_id', currentCompany?.id || '');
         
       if (error || !data) return;
       setRawData(data);
@@ -279,7 +280,7 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
         
         // Optionally store to a different table for production if needed, but for now we just update charts.
         // Or we can save to the same table but without camion.
-        await supabase.from('produccion_registro_diario').insert({
+        await supabase.from('produccion_registro_diario').insert({ empresa_id: currentCompany?.id,
            fecha: fecha,
            turno: parseInt(hora.split(':')[0]) >= 12 ? 'Noche' : 'Día',
            camion: '-',
@@ -296,7 +297,7 @@ export default function ReporteYAnalitica({ onReporteProduccion, onReporteTransp
         const vuelta = parseInt(transVuelta) || 1;
         onReporteTransporte(transCamion || 'TR-X', transChofer || 'Operario', vuelta, ton, transTipo, transSuceso, notas, fecha, hora);
         
-        await supabase.from('produccion_registro_diario').insert({
+        await supabase.from('produccion_registro_diario').insert({ empresa_id: currentCompany?.id,
            fecha: fecha,
            turno: parseInt(hora.split(':')[0]) >= 12 ? 'Noche' : 'Día',
            camion: transCamion || 'TR-X',
