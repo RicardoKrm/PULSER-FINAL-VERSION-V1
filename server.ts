@@ -238,6 +238,61 @@ async function startServer() {
     }
   });
 
+  // API Routes for Ordenes de Trabajo
+  let serverOrdenesTrabajo: any[] = [];
+
+  app.get("/api/flota/ordenes", (req, res) => {
+    const { empresa_id } = req.query;
+    if (empresa_id && empresa_id !== 'emp-001') {
+      return res.json(serverOrdenesTrabajo.filter(o => !o.empresa_id || o.empresa_id === empresa_id));
+    }
+    res.json(serverOrdenesTrabajo);
+  });
+
+  app.post("/api/flota/ordenes", (req, res) => {
+    const ot = req.body;
+    if (!ot) return res.status(400).json({ message: "No data provided" });
+    
+    // Auto-resolve folio collisions in server memory
+    let folio = ot.folio || 'OT-0001';
+    const existingFolios = serverOrdenesTrabajo.map(o => o.folio);
+    if (existingFolios.includes(folio)) {
+      const numbers = existingFolios.map(f => {
+        const m = f?.match(/OT-(\d+)/);
+        return m ? parseInt(m[1], 10) : 0;
+      }).filter((n: number) => !isNaN(n));
+      const maxN = numbers.length > 0 ? Math.max(...numbers) : 0;
+      folio = `OT-${String(maxN + 1).padStart(4, '0')}`;
+      ot.folio = folio;
+    }
+
+    const idx = serverOrdenesTrabajo.findIndex(o => o.id === ot.id);
+    if (idx !== -1) {
+      serverOrdenesTrabajo[idx] = ot;
+    } else {
+      serverOrdenesTrabajo.push(ot);
+    }
+    res.json(ot);
+  });
+
+  app.put("/api/flota/ordenes/:id", (req, res) => {
+    const { id } = req.params;
+    const idx = serverOrdenesTrabajo.findIndex(o => o.id === id);
+    if (idx !== -1) {
+      serverOrdenesTrabajo[idx] = { ...serverOrdenesTrabajo[idx], ...req.body };
+      res.json(serverOrdenesTrabajo[idx]);
+    } else {
+      serverOrdenesTrabajo.push({ id, ...req.body });
+      res.json({ id, ...req.body });
+    }
+  });
+
+  app.delete("/api/flota/ordenes/:id", (req, res) => {
+    const { id } = req.params;
+    serverOrdenesTrabajo = serverOrdenesTrabajo.filter(o => o.id !== id);
+    res.json({ success: true });
+  });
+
   const mockPendientesAprobacion: any[] = [];
 
   // API Route for scanning

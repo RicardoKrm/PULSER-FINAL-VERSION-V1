@@ -4,6 +4,7 @@ import { Button } from '../ui/Button';
 import { useAppContext } from '../../context/AppContext';
 import { OrdenDeTrabajo } from '../../types';
 import { logActividad } from '../../lib/supabase';
+import Swal from 'sweetalert2';
 
 export interface CrearOTModalProps {
   isOpen: boolean;
@@ -86,6 +87,16 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.vehiculoId) {
+      Swal.fire({
+        title: "Vehículo Obligatorio",
+        text: "Debes seleccionar un vehículo de la flota para poder crear la Orden de Trabajo.",
+        icon: "warning",
+        confirmButtonColor: "#0891b2"
+      });
+      return;
+    }
+
     let autoInstruccion = '';
     switch(formData.tipo) {
       case 'PREVENTIVA':
@@ -134,7 +145,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
       const selectedKit = kitsRepuesto.find(k => k.nombre === formData.kitRepuestos);
       if (selectedKit && selectedKit.detalles) {
         insumosDesdeKit = selectedKit.detalles.map(det => ({
-          id: Math.random().toString(36).substr(2, 9),
+          id: typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : Math.random().toString(36).substr(2, 9),
           nombre: det.repuesto,
           cantidad: det.cantidad,
           precioUnitario: 0 // Placeholder, as in standard the app sets this manually or fetched
@@ -142,24 +153,51 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
       }
     }
 
-    const folioNumbers = ordenesTrabajo
-      .map(ot => {
-        const match = ot.folio?.match(/OT-(\d+)/);
-        return match ? parseInt(match[1], 10) : 0;
-      })
-      .filter(n => !isNaN(n));
-      
-    const lastNum = folioNumbers.length > 0 ? Math.max(...folioNumbers) : 0;
-    const nextFolio = `OT-${String(lastNum + 1).padStart(4, '0')}`;
+    // Collect all existing folios from in-memory state and localStorage cache
+    const allKnownFolios = new Set<string>();
+    (ordenesTrabajo || []).forEach(ot => {
+      if (ot?.folio) allKnownFolios.add(ot.folio);
+    });
+    try {
+      const cached = localStorage.getItem('pulser_ordenes_trabajo');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((o: any) => { if (o?.folio) allKnownFolios.add(o.folio); });
+        }
+      }
+    } catch(e) {}
+
+    let maxNum = 0;
+    allKnownFolios.forEach(folioStr => {
+      const match = folioStr?.match(/OT-(\d+)/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxNum) maxNum = num;
+      }
+    });
+    const nextFolio = `OT-${String(maxNum + 1).padStart(4, '0')}`;
+
+    const finalId = typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID
+      ? window.crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+          const r = Math.random() * 16 | 0;
+          return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+
+    const selectedPautaObj = pautas.find(p => p.nombre === formData.pauta);
+    const selectedFallaObj = tiposFalla.find(tf => tf.nombre === formData.tipoFalla);
 
     const nuevaOT: OrdenDeTrabajo = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: finalId,
       folio: nextFolio,
       vehiculoId: formData.vehiculoId || '',
+      vehiculo_id: formData.vehiculoId || '',
       tipo: formData.tipo as any,
       estado: 'ABIERTA',
       prioridad: formData.prioridad as any,
-      kilometrajeApertura: Number(formData.kilometrajeApertura),
+      kilometrajeApertura: Number(formData.kilometrajeApertura || 0),
+      kilometraje_apertura: Number(formData.kilometrajeApertura || 0),
       fechaCreacion: formData.fechaCreacion || new Date().toISOString(),
       fechaProgramada: fechaProgramadaOnly,
       horaInicioProgramada: horaInicioOnly,
@@ -168,8 +206,10 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
       insumos: insumosDesdeKit,
       observacionInicial: autoInstruccion,
       pauta: formData.pauta,
+      pauta_mantenimiento_id: selectedPautaObj?.id,
       kitRepuestos: formData.kitRepuestos,
       tipoFalla: formData.tipoFalla,
+      tipo_falla_id: selectedFallaObj?.id,
       sintomas: formData.sintomas,
       inspeccionTrenMotriz: formData.inspeccionTrenMotriz,
       eje: formData.eje,
@@ -182,9 +222,13 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
       valorHH: formData.valorHH ? Number(formData.valorHH) : undefined,
       presupuestoAprobado: formData.presupuestoAprobado ? Number(formData.presupuestoAprobado) : undefined,
       observaciones: formData.observaciones,
+      tecnico_tipo: formData.tecnico_tipo || 'INTERNO',
+      externo_nombre: formData.externo_nombre,
+      externo_especialidad: formData.externo_especialidad,
+      externo_intervencion: formData.externo_intervencion,
       historial: [{ 
-        id: Math.random().toString(36).substring(7), 
-        orden_id: '',
+        id: typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : Math.random().toString(36).substring(7), 
+        orden_id: finalId,
         comentario: 'OT Creada', 
         created_at: new Date().toISOString(), 
         usuario_nombre: 'Sistema',
@@ -203,9 +247,6 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
       'Mantenimiento',
       'Creó OT',
       `OT ${nuevaOT.folio} generada para patente ${vehiculo ? vehiculo.patente : 'desconocida'}`,
-      // we would use currentUser and currentCompany from Auth context but this is a demo, 
-      // so if we don't have them handy in the local state, we'll let supabase triggers handle it later or omit for now
-      // Actually we have personal and active companies, let's keep ids null to not break constraints if IDs don't match exactly.
     );
 
     onClose();

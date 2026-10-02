@@ -324,8 +324,10 @@ export default function ControlSanny() {
   
   // Set initial selected date if not set
   React.useEffect(() => {
-    if (uniqueDates.length > 0 && !selectedDate) {
+    if (uniqueDates.length > 0 && (!selectedDate || !uniqueDates.includes(selectedDate))) {
       setSelectedDate(uniqueDates[0]);
+    } else if (uniqueDates.length === 0) {
+      setSelectedDate('');
     }
   }, [uniqueDates, selectedDate]);
 
@@ -494,7 +496,7 @@ export default function ControlSanny() {
               ))}
             </select>
           </div>
-          {selectedDate && (
+          {selectedDate && summaries.find(s => s.date === selectedDate) && (
             <DetalleDiario 
               date={selectedDate} 
               s6Trips={data.s6.filter(t => t.date === selectedDate)}
