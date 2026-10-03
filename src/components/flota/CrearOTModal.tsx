@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { useAppContext } from '../../context/AppContext';
+import { useCompany } from '../../contexts/CompanyContext';
 import { OrdenDeTrabajo } from '../../types';
 import { logActividad } from '../../lib/supabase';
 import Swal from 'sweetalert2';
@@ -15,6 +16,7 @@ export interface CrearOTModalProps {
 
 export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, vehiculoPreseleccionadoId, otToEdit }) => {
   const { ordenesTrabajo, crearOrdenTrabajo, actualizarOrdenTrabajo, vehiculos, tiposFalla, pautas, kitsRepuesto, personal } = useAppContext();
+  const { activeCompanyId } = useCompany();
   const excludedRoles = ['super administrador', 'súper administrador', 'super admin', 'súper admin', 'administrador', 'gerente', 'administrativo'];
   
   const personalOperativoList = personal.filter(u => {
@@ -153,13 +155,14 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
       }
     }
 
-    // Collect all existing folios from in-memory state and localStorage cache
+    // Collect all existing folios from in-memory state and localStorage cache for this company
     const allKnownFolios = new Set<string>();
     (ordenesTrabajo || []).forEach(ot => {
-      if (ot?.folio) allKnownFolios.add(ot.folio);
+      if (ot?.folio && (!activeCompanyId || !ot.empresa_id || ot.empresa_id === activeCompanyId)) allKnownFolios.add(ot.folio);
     });
     try {
-      const cached = localStorage.getItem('pulser_ordenes_trabajo');
+      const storageKey = activeCompanyId ? `pulser_ordenes_trabajo_${activeCompanyId}` : 'pulser_ordenes_trabajo';
+      const cached = localStorage.getItem(storageKey);
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed)) {

@@ -243,19 +243,20 @@ async function startServer() {
 
   app.get("/api/flota/ordenes", (req, res) => {
     const { empresa_id } = req.query;
-    if (empresa_id && empresa_id !== 'emp-001') {
-      return res.json(serverOrdenesTrabajo.filter(o => !o.empresa_id || o.empresa_id === empresa_id));
+    if (empresa_id) {
+      return res.json(serverOrdenesTrabajo.filter(o => o.empresa_id === empresa_id));
     }
-    res.json(serverOrdenesTrabajo);
+    res.json([]);
   });
 
   app.post("/api/flota/ordenes", (req, res) => {
     const ot = req.body;
     if (!ot) return res.status(400).json({ message: "No data provided" });
     
-    // Auto-resolve folio collisions in server memory
+    const empId = ot.empresa_id || '57fa41da-645d-48ba-a671-65a35312d0e9';
+    // Auto-resolve folio collisions in server memory for this specific company
     let folio = ot.folio || 'OT-0001';
-    const existingFolios = serverOrdenesTrabajo.map(o => o.folio);
+    const existingFolios = serverOrdenesTrabajo.filter(o => o.empresa_id === empId).map(o => o.folio);
     if (existingFolios.includes(folio)) {
       const numbers = existingFolios.map(f => {
         const m = f?.match(/OT-(\d+)/);

@@ -372,7 +372,7 @@ export default function PizarraMantenimiento() {
   const kpis = {
     vehiculosFiltrados: vehiculosFiltrados.length,
     porcentajeFlota: dataFlota.length > 0 ? Math.round((vehiculosFiltrados.length / dataFlota.length) * 100) : 0,
-    nivelCumplimiento: dataFlota.length > 0 ? Math.round(100 - (dataFlota.filter(v => v.estatus === 'VENCIDO').length / dataFlota.length) * 100) : 100,
+    nivelCumplimiento: dataFlota.length > 0 ? Math.max(0, Math.round(100 - (dataFlota.filter(v => v.estatus === 'VENCIDO').length / dataFlota.length) * 100)) : 0,
     costoTotal: 0,
     costoKm: 0
   };

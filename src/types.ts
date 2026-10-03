@@ -186,6 +186,8 @@ export interface SolicitudRepuesto {
 export interface OrdenDeTrabajo {
   id: string;
   folio: string;
+  empresa_id?: string;
+  empresaId?: string;
   vehiculoId: string;
   vehiculo_id?: string;
   tecnicoResponsable?: string;

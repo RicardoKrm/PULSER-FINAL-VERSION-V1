@@ -39,24 +39,24 @@ export default function KpiFlota() {
     const corrCount = correctivas.length;
     
     const distribucionOTs = [
-      { name: 'Preventivas', value: prevCount || 1 }, // Ensure pie doesn't crash on 0
-      { name: 'Correctivas', value: corrCount || 0 }
+      { name: 'Preventivas', value: prevCount },
+      { name: 'Correctivas', value: corrCount }
     ];
 
     // Avance Preventivas
     const prevCompletadas = preventivas.filter(ot => ot.estado === 'FINALIZADA' || ot.estado === 'CERRADA_MECANICO' || ot.estado === 'CERRADA_POR_MECANICO').length;
-    const prevPendientes = prevCount - prevCompletadas;
+    const prevPendientes = Math.max(0, prevCount - prevCompletadas);
     const avancePreventivas = [
-      { name: 'Completadas', value: prevCompletadas || 0 },
-      { name: 'Pendientes', value: prevPendientes || (prevCompletadas === 0 ? 1 : 0) } // use 1 if all 0 to show grey/amber instead of vanishing
+      { name: 'Completadas', value: prevCompletadas },
+      { name: 'Pendientes', value: prevPendientes }
     ];
 
     // Avance Correctivas
     const corrCompletadas = correctivas.filter(ot => ot.estado === 'FINALIZADA' || ot.estado === 'CERRADA_MECANICO' || ot.estado === 'CERRADA_POR_MECANICO').length;
-    const corrPendientes = corrCount - corrCompletadas;
+    const corrPendientes = Math.max(0, corrCount - corrCompletadas);
     const avanceCorrectivas = [
-      { name: 'Completadas', value: corrCompletadas || 0 },
-      { name: 'Pendientes', value: corrPendientes || (corrCompletadas === 0 ? 1 : 0) }
+      { name: 'Completadas', value: corrCompletadas },
+      { name: 'Pendientes', value: corrPendientes }
     ];
 
     // Vehículos Cost Map

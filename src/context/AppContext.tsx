@@ -37,11 +37,20 @@ interface AppContextType {
   agregarTareaEstandar?: (tarea: TareaEstandar) => void;
 }
 
-const STORAGE_KEY_OTS = 'pulser_ordenes_trabajo';
+const getStorageKeyOTs = (empresaId?: string | null) =>
+  empresaId ? `pulser_ordenes_trabajo_${empresaId}` : 'pulser_ordenes_trabajo';
 
-const loadLocalOTs = (): OrdenDeTrabajo[] => {
+const loadLocalOTs = (empresaId?: string | null): OrdenDeTrabajo[] => {
   try {
-    const cached = localStorage.getItem(STORAGE_KEY_OTS);
+    if (empresaId) {
+      const cached = localStorage.getItem(getStorageKeyOTs(empresaId));
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) return parsed.filter((o: any) => !o.empresa_id || o.empresa_id === empresaId);
+      }
+      return [];
+    }
+    const cached = localStorage.getItem('pulser_ordenes_trabajo');
     if (cached) {
       const parsed = JSON.parse(cached);
       if (Array.isArray(parsed)) return parsed;
@@ -50,17 +59,23 @@ const loadLocalOTs = (): OrdenDeTrabajo[] => {
   return [];
 };
 
-const saveLocalOTs = (ots: OrdenDeTrabajo[]) => {
+const saveLocalOTs = (ots: OrdenDeTrabajo[], empresaId?: string | null) => {
   try {
-    localStorage.setItem(STORAGE_KEY_OTS, JSON.stringify(ots));
+    if (empresaId) {
+      localStorage.setItem(getStorageKeyOTs(empresaId), JSON.stringify(ots));
+    } else {
+      localStorage.setItem('pulser_ordenes_trabajo', JSON.stringify(ots));
+    }
   } catch (e) {}
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const { profile } = useAuth();
+  const { activeCompanyId } = useCompany();
   const [reservasTurismo] = useState<ReservaTurismo[]>([]);
-  const [ordenesTrabajo, setOrdenesTrabajo] = useState<OrdenDeTrabajo[]>(() => loadLocalOTs());
+  const [ordenesTrabajo, setOrdenesTrabajo] = useState<OrdenDeTrabajo[]>(() => loadLocalOTs(activeCompanyId));
   const [conductores] = useState<Conductor[]>([]);
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
   const [pautas, setPautas] = useState<PautaMantenimiento[]>([]);
@@ -73,16 +88,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [personal, setPersonal] = useState<Collaborator[]>([]);
 
   const [repuestos, setRepuestos] = useState<Repuesto[]>([]);
-  const { profile } = useAuth();
-  const { activeCompanyId } = useCompany();
 
   // Activa la sincronización del GPS en background cada vez que exista una compañía activa
   useSyncOdometers(activeCompanyId, setVehiculos);
 
   const fetchAllData = React.useCallback(async () => {
-    if (!activeCompanyId) return;
+    if (!activeCompanyId) {
+      setOrdenesTrabajo([]);
+      setVehiculos([]);
+      setPautas([]);
+      setTareasEstandar([]);
+      setTiposFalla([]);
+      setKitsRepuesto([]);
+      setProveedores([]);
+      setPersonal([]);
+      setRepuestos([]);
+      return;
+    }
 
     const loadData = async () => {
+      // Immediately reset previous company's data to ensure clean isolation
+      setVehiculos([]);
+      setPautas([]);
+      setTareasEstandar([]);
+      setTiposFalla([]);
+      setKitsRepuesto([]);
+      setProveedores([]);
+      setPersonal([]);
+      setRepuestos([]);
+      setOrdenesTrabajo(loadLocalOTs(activeCompanyId));
+
       const pageSize = 1000;
       // Fetch Tareas
       let allTareasData: any[] = [];
@@ -144,7 +179,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       // Fetch Vehiculos
       const { data: vehiculosData } = await supabase.from('vehiculo').select('*').eq('empresa_id', activeCompanyId);
-      if (vehiculosData) {
+      if (vehiculosData && Array.isArray(vehiculosData)) {
         setVehiculos(vehiculosData.map(v => {
           const detalles = v.detalles || {};
           return {
@@ -156,24 +191,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             vin: v.vin || v.chasis || detalles.vin || detalles.chasis || ''
           };
         }));
+      } else {
+        setVehiculos([]);
       }
 
       // Fetch Pautas
       const { data: pautasData } = await supabase.from('mantenimiento_pauta').select('*, modelo:mantenimiento_modelo_vehiculo(nombre)').eq('empresa_id', activeCompanyId);
-      if (pautasData) {
+      if (pautasData && Array.isArray(pautasData)) {
         setPautas(pautasData.map(p => ({
           id: p.id,
           nombre: p.nombre,
           kmRecomendado: p.kilometraje_inicial || 0,
           modeloVehiculo: p.modelo?.nombre || ''
         } as any)));
+      } else {
+        setPautas([]);
       }
 
-      // Fetch Repuestos
+      // Fetch Repuestos (strictly scoped to active company)
       let allRepuestosData: any[] = [];
       let startR = 0;
       let hasMoreRepuestos = true;
-      if (activeCompanyId && activeCompanyId !== 'emp-001') {
+      if (activeCompanyId) {
         while (hasMoreRepuestos) {
           const { data } = await supabase.from('logistica_repuestos').select('*').eq('empresa_id', activeCompanyId).range(startR, startR + pageSize - 1);
           if (data && data.length > 0) {
@@ -181,20 +220,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             startR += pageSize;
           } else {
             hasMoreRepuestos = false;
-          }
-        }
-      }
-
-      if (allRepuestosData.length === 0) {
-        let startR2 = 0;
-        let hasMore2 = true;
-        while (hasMore2) {
-          const { data } = await supabase.from('logistica_repuestos').select('*').range(startR2, startR2 + pageSize - 1);
-          if (data && data.length > 0) {
-            allRepuestosData = [...allRepuestosData, ...data];
-            startR2 += pageSize;
-          } else {
-            hasMore2 = false;
           }
         }
       }
@@ -358,6 +383,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return {
             id: row.id,
             folio: row.folio,
+            empresa_id: row.empresa_id,
+            empresaId: row.empresa_id,
             vehiculoId: row.vehiculo_id,
             tecnicoResponsable: row.tecnico_responsable || undefined,
             responsable_id: row.responsable_id || undefined,
@@ -403,21 +430,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           } as OrdenDeTrabajo;
         });
 
-        // Merge with local storage cache to guarantee nothing is lost
-        const localOTs = loadLocalOTs();
+        // Merge with local storage cache for this company to guarantee nothing is lost
+        const localOTs = loadLocalOTs(activeCompanyId);
         const merged: OrdenDeTrabajo[] = [...mappedDbOts];
         localOTs.forEach(lot => {
-          if (!merged.some(m => m.id === lot.id || (lot.folio && m.folio === lot.folio))) {
+          if ((!lot.empresa_id || lot.empresa_id === activeCompanyId) && !merged.some(m => m.id === lot.id || (lot.folio && m.folio === lot.folio))) {
             merged.push(lot);
           }
         });
         setOrdenesTrabajo(merged);
-        saveLocalOTs(merged);
+        saveLocalOTs(merged, activeCompanyId);
       } else {
-        const localOTs = loadLocalOTs();
-        if (localOTs.length > 0) {
-          setOrdenesTrabajo(localOTs);
-        }
+        const localOTs = loadLocalOTs(activeCompanyId);
+        setOrdenesTrabajo(localOTs);
       }
 
       // Also sync with server-side persistent endpoint
@@ -429,11 +454,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setOrdenesTrabajo(prev => {
               const updated = [...prev];
               serverOts.forEach((s: any) => {
-                if (!updated.some(u => u.id === s.id || (s.folio && u.folio === s.folio))) {
+                if (s.empresa_id === activeCompanyId && !updated.some(u => u.id === s.id || (s.folio && u.folio === s.folio))) {
                   updated.push(s);
                 }
               });
-              saveLocalOTs(updated);
+              saveLocalOTs(updated, activeCompanyId);
               return updated;
             });
           }
@@ -470,12 +495,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!isUuid) {
       finalId = generateUUID();
     }
-    const finalOT = { ...ot, id: finalId };
+    const targetCompanyId = activeCompanyId || profile?.empresa_id || '57fa41da-645d-48ba-a671-65a35312d0e9';
+    const finalOT = { ...ot, id: finalId, empresa_id: targetCompanyId };
     
     // 1. Immediately persist locally so the work order is NEVER lost or discarded
     setOrdenesTrabajo(prev => {
       const nextList = [...prev.filter(o => o.id !== finalId && o.folio !== finalOT.folio), finalOT];
-      saveLocalOTs(nextList);
+      saveLocalOTs(nextList, targetCompanyId);
       return nextList;
     });
 
@@ -558,7 +584,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           finalOT.folio = currentFolio;
           setOrdenesTrabajo(prev => {
             const updated = prev.map(o => o.id === finalId ? { ...o, folio: currentFolio } : o);
-            saveLocalOTs(updated);
+            saveLocalOTs(updated, targetCompanyId);
             return updated;
           });
           break;
@@ -704,7 +730,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (result.isConfirmed) {
       setOrdenesTrabajo(prev => {
         const nextList = prev.filter(ot => ot.id !== id);
-        saveLocalOTs(nextList);
+        saveLocalOTs(nextList, activeCompanyId);
         return nextList;
       });
       try {
@@ -725,7 +751,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const actualizarOrdenTrabajo = async (otActualizada: OrdenDeTrabajo) => {
     setOrdenesTrabajo(prev => {
       const nextList = prev.map(ot => ot.id === otActualizada.id ? otActualizada : ot);
-      saveLocalOTs(nextList);
+      saveLocalOTs(nextList, activeCompanyId);
       return nextList;
     });
 

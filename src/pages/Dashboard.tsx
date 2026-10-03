@@ -132,9 +132,11 @@ export default function Dashboard() {
     saludFlota
   } = React.useMemo(() => {
     
-    // 1. Preventivas vs Correctivas
-    const preventivas = (ordenesTrabajo || []).filter((ot: any) => ot.tipo === 'PREVENTIVA' || ot.tipo?.includes('PREVENTIVA'));
-    const correctivas = (ordenesTrabajo || []).filter((ot: any) => ot.tipo === 'CORRECTIVA' || ot.tipo?.includes('CORRECTIVA') || ot.tipo?.includes('FALLA'));
+    // 1. Preventivas vs Correctivas - strictly for this company
+    const currentEmpresaId = currentCompany?.id;
+    const otsEmpresa = (ordenesTrabajo || []).filter((ot: any) => !currentEmpresaId || ot.empresa_id === currentEmpresaId);
+    const preventivas = otsEmpresa.filter((ot: any) => ot.tipo === 'PREVENTIVA' || ot.tipo?.includes('PREVENTIVA'));
+    const correctivas = otsEmpresa.filter((ot: any) => ot.tipo === 'CORRECTIVA' || ot.tipo?.includes('CORRECTIVA') || ot.tipo?.includes('FALLA'));
     const prevCount = preventivas.length;
     const corrCount = correctivas.length;
 
@@ -160,27 +162,22 @@ export default function Dashboard() {
          } else {
            alDia++;
          }
-         
-         // Disp: Si no está en un estado que implique indisponibilidad (esto depende del negocio, pero por defecto asumimos todos menos los que están en taller crítico)
-         // Para simplificar, asumimos disponible si no tiene OT abierta bloqueante. Aqui solo sumaremos.
-         // Un proxy mas real: Asumir que vencidos o con estado "TALLER" o fallados no están disponibles.
-         // Para este dashboard, todo esta disponible menos si tiene OT en curso.
        } catch (err) {
          alDia++; // Fallback
        }
     });
 
-    const otsEnCurso = (ordenesTrabajo || []).filter((ot: any) => ['CREADA', 'EN_PROGRESO', 'PAUSADA'].includes(ot.estado)).map((ot: any) => ot.vehiculoId);
+    const otsEnCurso = otsEmpresa.filter((ot: any) => ['CREADA', 'EN_PROGRESO', 'PAUSADA'].includes(ot.estado)).map((ot: any) => ot.vehiculoId);
     let indisponibles = new Set(otsEnCurso).size;
 
-    vehiculosDisponibles = totalDb > 0 ? totalDb - indisponibles : 0;
+    vehiculosDisponibles = totalDb > 0 ? Math.max(0, totalDb - indisponibles) : 0;
     const dispActual = totalDb > 0 ? (vehiculosDisponibles / totalDb) * 100 : 0;
     
-    // Tendencia de disponibilidad real por meses (Simplified, just flat if no history)
+    // Tendencia de disponibilidad real por meses
     const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'];
     const tendencia = meses.map(m => ({
       name: m,
-      value: dispActual // Sin historico real, devolvemos la misma linea
+      value: dispActual
     }));
 
     // 3. Costos mensuales reales
@@ -191,7 +188,7 @@ export default function Dashboard() {
     let currPrev = 0, currCorr = 0;
     let pastPrev = 0, pastCorr = 0;
 
-    (ordenesTrabajo || []).forEach((ot: any) => {
+    otsEmpresa.forEach((ot: any) => {
         const d = new Date(ot.fechaCreacion || new Date());
         const mon = d.getMonth();
         const cost = (Number(ot.costoManoObraTareas) || 0) + (Number(ot.costoInsumos) || 0) + (Number(ot.costoManoObraHH) || 0);
@@ -214,11 +211,10 @@ export default function Dashboard() {
 
     // 4. Cuellos de botella reales
     const cuellosMap: Record<string, number> = {};
-    (ordenesTrabajo || []).forEach((ot: any) => {
+    otsEmpresa.forEach((ot: any) => {
       if (ot.historial && Array.isArray(ot.historial)) {
         ot.historial.forEach((h: any) => {
           if (h.comentario && h.comentario.toLowerCase().includes('pausa')) {
-             // Example extraction logic or just generic reason
              cuellosMap['Pausa en OT'] = (cuellosMap['Pausa en OT'] || 0) + 1;
           }
         });
@@ -229,10 +225,7 @@ export default function Dashboard() {
     cuellosArr.sort((a, b) => b.value - a.value);
 
     // 5. Cumplimiento Prev (Cumplimiento de Cronograma)
-    let cumpPrev = 100;
-    if (totalDb > 0) {
-      cumpPrev = 100 - ((vencidos / totalDb) * 100);
-    }
+    let cumpPrev = totalDb > 0 ? Math.max(0, 100 - ((vencidos / totalDb) * 100)) : 0;
 
     return {
       tendenciaData: tendencia,

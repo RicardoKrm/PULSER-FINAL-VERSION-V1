@@ -82,15 +82,14 @@ export default function KpiRRHH() {
        }
     });
 
-    const numTech = Object.keys(techMap).filter(k => k !== 'Sin Asignar').length || 1;
-    const tecnicos_activos = Object.keys(techMap).filter(k => k !== 'Sin Asignar').length;
+    const numTech = Object.keys(techMap).filter(k => k !== 'Sin Asignar').length;
+    const tecnicos_activos = numTech;
 
     const productividad = horas_registradas > 0 ? Math.min((horas_estandar / horas_registradas) * 100, 999) : 0;
     const cumplimiento = ots_finalizadas > 0 ? (ots_finalizadas / (ots_finalizadas + ots_atraso)) * 100 : 0;
     
-    // DispTotal = total potential hour capacity for these techs (assumed 180 hours/month * 12 months?)
-    // This is for entire period. Let's simplify to 180 * active.
-    const dispTotal = Math.max(1, tecnicos_activos * 180 * 2); // multiplied roughly
+    // DispTotal = total potential hour capacity for these techs
+    const dispTotal = Math.max(1, tecnicos_activos * 180 * 2);
     const utilizacion = horas_registradas > 0 ? (horas_registradas / dispTotal) * 100 : 0;
 
     let prodTech: any[] = [];
@@ -114,14 +113,14 @@ export default function KpiRRHH() {
         month: m.name,
         reales: Number(m.reales.toFixed(1)),
         estandar: Number(m.estandar.toFixed(1)),
-        disponibles: 180 * numTech
+        disponibles: tecnicos_activos > 0 ? 180 * numTech : 0
       };
     });
 
     return {
       kpisObj: {
         productividad: Math.round(productividad),
-        cumplimiento: ots_finalizadas === 0 && ots_atraso === 0 ? 100 : Math.round(cumplimiento),
+        cumplimiento: ots_finalizadas > 0 ? Math.round(cumplimiento) : 0,
         utilizacion: Math.min(100, Math.round(utilizacion)),
         tecnicos_activos,
         horas_registradas: Number(horas_registradas.toFixed(1)),
