@@ -18,6 +18,7 @@ import { Modal } from '../../components/ui/Modal';
 import { calcularDatosPizarra, FilaPizarraMantenimiento, generarSecuenciaParaPauta, HitoSecuencia, obtenerPautasSecuenciaParaVehiculo, formatearDiaMesAno } from '../../lib/mantenimientoLogica';
 import { useAppContext } from '../../context/AppContext';
 import { usePermissions } from '../../hooks/usePermissions';
+import { exportToExcel } from '../../lib/excelExport';
 
 export const obtenerSoloModelo = (modeloRaw?: string, marcaRaw?: string): string => {
   if (!modeloRaw || !modeloRaw.trim()) return '--';
@@ -577,6 +578,42 @@ export default function PizarraMantenimiento() {
     }
   };
 
+  const handleExportarExcel = () => {
+    if (!vehiculosFiltrados || vehiculosFiltrados.length === 0) {
+      Swal.fire({
+        title: 'Sin datos para exportar',
+        text: 'No hay vehículos en la pizarra con los filtros seleccionados.',
+        icon: 'info',
+        confirmButtonColor: '#3b82f6'
+      });
+      return;
+    }
+
+    const dataToExport = vehiculosFiltrados.map((v) => ({
+      'N° Int.': v.numeroInterno || '—',
+      'PPU': v.ppu || '—',
+      'Marca': v.marca || '—',
+      'Modelo': v.modelo || '—',
+      'KM Últ. Mant.': v.kmUltimoMantencion || 0,
+      'F. Últ. Mant.': v.fechaUltimoMantencion || '—',
+      'Tipo Mant.': v.tipoUltimoMantencion || '—',
+      'Cumplimiento': v.cumplimiento || '—',
+      'Estatus': v.estatus || '—',
+      'KM Vencido': v.kmVencido !== null && v.kmVencido !== undefined ? v.kmVencido : '—',
+      'Pauta Vencida': v.pautaVencida || '—',
+      'KM Actual': v.kmActual || 0,
+      'Fecha KM Actual': v.fechaKmActual || '—',
+      'KM Próx. Mant.': v.kmProximoMantencion || '—',
+      'Tipo Próx. Mant.': v.tipoProximoMantencion || '—',
+      'Fecha Próx. Mant.': v.fechaProximaMantencion || '—',
+      'Intervalo KM': v.intervaloMantencionKm || 10000,
+      'KM Promedio Día': v.kmPromedioDia || 0
+    }));
+
+    const fechaStr = new Date().toISOString().split('T')[0];
+    exportToExcel(dataToExport, `Pizarra_Mantenimiento_${fechaStr}`, 'PizarraMantenimiento');
+  };
+
   const handleSaveFicha = async () => {
     if (!fichaTecnicaVehiculo) return;
     try {
@@ -1076,6 +1113,15 @@ export default function PizarraMantenimiento() {
           </div>
         </div>
         <div className="flex space-x-2">
+          <Button 
+            variant="outline" 
+            className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:border-emerald-300 shadow-sm"
+            onClick={handleExportarExcel}
+            title="Exportar pizarra de mantenimiento a Excel (.xlsx)"
+          >
+            <FileSpreadsheet className="w-4 h-4 mr-2 text-emerald-600 dark:text-emerald-400" />
+            Exportar Excel
+          </Button>
           <Button 
             variant="outline" 
             className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
