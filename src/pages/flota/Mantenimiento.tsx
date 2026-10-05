@@ -170,17 +170,55 @@ export default function PizarraMantenimiento() {
         const vehiculosDb = vehiculosData.map(v => {
           const detalles = v.detalles || {};
             // Parse correct types
-            const kmsActuales = typeof v.kilometraje_actual === 'number' ? v.kilometraje_actual : parseFloat(String(v.kilometraje_actual).replace(/[^0-9.-]+/g, '')) || 0;
+            let kmsActuales = typeof v.kilometraje_actual === 'number' ? v.kilometraje_actual : parseFloat(String(v.kilometraje_actual).replace(/[^0-9.-]+/g, '')) || 0;
             
             // Look at root first, then detalles as fallback
-            const rawKmUlt = v.km_ultima_mantencion !== undefined ? v.km_ultima_mantencion : (detalles.km_ultima_mantencion !== undefined ? detalles.km_ultima_mantencion : 0);
-            const kmUltMant = typeof rawKmUlt === 'number' ? rawKmUlt : parseFloat(String(rawKmUlt).replace(/[^0-9.-]+/g, '')) || 0;
+            const rawKmUlt = (v.km_ultima_mantencion !== undefined && v.km_ultima_mantencion !== null && v.km_ultima_mantencion !== '')
+              ? v.km_ultima_mantencion
+              : (detalles.km_ultima_mantencion !== undefined && detalles.km_ultima_mantencion !== null ? detalles.km_ultima_mantencion : 0);
+            let kmUltMant = typeof rawKmUlt === 'number' ? rawKmUlt : parseFloat(String(rawKmUlt).replace(/[^0-9.-]+/g, '')) || 0;
             
-            const rawInterval = v.intervalo_km !== undefined ? v.intervalo_km : (detalles.intervalo_km !== undefined ? detalles.intervalo_km : 10000);
+            const rawInterval = (v.intervalo_km !== undefined && v.intervalo_km !== null)
+              ? v.intervalo_km
+              : (detalles.intervalo_km !== undefined && detalles.intervalo_km !== null ? detalles.intervalo_km : 10000);
             const kmInterv = typeof rawInterval === 'number' ? rawInterval : parseFloat(String(rawInterval).replace(/[^0-9.-]+/g, '')) || 10000;
             
-            const pautasSecuenciaStr = v.tipo_ultimo_mant || v.tipo_ult_pauta || detalles.tipo_ultimo_mant || detalles.tipo_ult_pauta || '';
-            const fechaUltMant = v.fecha_ultima_mantencion || v.fecha_ult_mantencion || detalles.fecha_ultima_mantencion || null;
+            let pautasSecuenciaStr = v.tipo_ultimo_mant || v.tipo_ult_pauta || detalles.tipo_ultimo_mant || detalles.tipo_ult_pauta || '';
+            let fechaUltMant = v.fecha_ultima_mantencion || v.fecha_ult_mantencion || detalles.fecha_ultima_mantencion || null;
+
+            // Sincronización Inteligente en Tiempo Real con OTs Preventivas Finalizadas:
+            // Si existen OTs preventivas finalizadas para este vehículo (en context o BD) con un KM de cierre mayor o más reciente,
+            // la pizarra de mantenimiento SIEMPRE toma la última OT preventiva finalizada como fuente de verdad suprema.
+            const otsFinalizadas = (ordenesTrabajo || []).filter(o =>
+              (String(o.vehiculoId) === String(v.id) || String(o.vehiculo_id) === String(v.id) || (v.patente && (o as any).patente === v.patente)) &&
+              (o.estado === 'FINALIZADA' || o.estado === 'CERRADA_POR_MECANICO') &&
+              String(o.tipo || '').toUpperCase().includes('PREVENTIV')
+            );
+
+            if (otsFinalizadas.length > 0) {
+              const sortedOts = [...otsFinalizadas].sort((a, b) => {
+                const kmB = Number(b.kilometrajeCierre || b.kilometraje_cierre || b.kilometrajeApertura || 0);
+                const kmA = Number(a.kilometrajeCierre || a.kilometraje_cierre || a.kilometrajeApertura || 0);
+                if (kmB !== kmA) return kmB - kmA;
+                const timeB = new Date(b.termino_proceso || b.fechaProgramada || b.fechaCreacion || 0).getTime();
+                const timeA = new Date(a.termino_proceso || a.fechaProgramada || a.fechaCreacion || 0).getTime();
+                return timeB - timeA;
+              });
+
+              const topOt = sortedOts[0];
+              const otKm = Number(topOt.kilometrajeCierre || topOt.kilometraje_cierre || topOt.kilometrajeApertura || 0);
+              if (otKm >= kmUltMant) {
+                kmUltMant = otKm;
+                const f = topOt.termino_proceso || topOt.fechaProgramada || topOt.fechaCreacion;
+                if (f) fechaUltMant = f;
+                if (topOt.pauta && topOt.pauta !== 'Mantenimiento Preventivo') {
+                  pautasSecuenciaStr = topOt.pauta;
+                }
+              }
+            }
+
+            // El odómetro efectivo del vehículo nunca puede ser inferior al de su última mantención cerrada
+            kmsActuales = Math.max(kmsActuales, kmUltMant);
 
             const vehOil = v.tipo_aceite || detalles.tipo_aceite || '';
             const pautasSecuencia: HitoSecuencia[] = pautasData
@@ -240,9 +278,29 @@ export default function PizarraMantenimiento() {
     const intervalId = setInterval(() => {
       fetchVehiculos();
     }, 60000);
+
+    const handleSync = () => {
+      fetchVehiculos();
+    };
+
+    window.addEventListener('vehiculo-actualizado', handleSync);
+    window.addEventListener('ot-actualizada', handleSync);
+    window.addEventListener('focus', handleSync);
     
-    return () => clearInterval(intervalId);
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('vehiculo-actualizado', handleSync);
+      window.removeEventListener('ot-actualizada', handleSync);
+      window.removeEventListener('focus', handleSync);
+    };
   }, [currentCompany?.id]);
+
+  // Actualización reactiva inmediata de la Pizarra cuando cambian las órdenes de trabajo
+  useEffect(() => {
+    if (currentCompany?.id) {
+      fetchVehiculos();
+    }
+  }, [ordenesTrabajo]);
 
   const handleGuardarKM = async () => {
     if (!vehiculoSeleccionadoKM || !nuevoKM || !fechaRegistroKM) return;
@@ -1156,7 +1214,10 @@ export default function PizarraMantenimiento() {
       {modalOTOpen && (
         <CrearOTModal 
           isOpen={modalOTOpen} 
-          onClose={() => setModalOTOpen(false)} 
+          onClose={() => {
+            setModalOTOpen(false);
+            fetchVehiculos();
+          }} 
           vehiculoPreseleccionadoId={vehiculoSeleccionadoOT}
         />
       )}

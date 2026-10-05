@@ -49,16 +49,18 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
       }
       setFormData({ ...otToEdit, fechaProgramada: combinedDate });
     } else {
+      const preVeh = vehiculos.find(v => String(v.id) === String(vehiculoPreseleccionadoId));
+      const currentKm = preVeh ? Number(preVeh.kilometrajeActual || (preVeh as any).kilometraje_actual || 0) : 0;
       setFormData({
         vehiculoId: vehiculoPreseleccionadoId || '',
         tipo: 'PREVENTIVA',
         prioridad: 'MEDIA',
-        kilometrajeApertura: 0,
+        kilometrajeApertura: currentKm,
         fechaCreacion: new Date().toISOString(),
         fechaProgramada: new Date().toISOString()
       });
     }
-  }, [otToEdit, vehiculoPreseleccionadoId, isOpen]);
+  }, [otToEdit, vehiculoPreseleccionadoId, isOpen, vehiculos]);
 
   const vehiculoSeleccionado = vehiculos.find(v => v.id === formData.vehiculoId);
   
@@ -83,6 +85,16 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    if (name === 'vehiculoId') {
+      const selectedVeh = vehiculos.find(v => String(v.id) === String(value));
+      const currentKm = selectedVeh ? Number(selectedVeh.kilometrajeActual || (selectedVeh as any).kilometraje_actual || 0) : 0;
+      setFormData(prev => ({ 
+        ...prev, 
+        vehiculoId: value,
+        kilometrajeApertura: prev.kilometrajeApertura ? prev.kilometrajeApertura : currentKm
+      }));
+      return;
+    }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -188,7 +200,16 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
           return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
         });
 
-    const selectedPautaObj = pautas.find(p => p.nombre === formData.pauta);
+    let pautaFinal = formData.pauta;
+    if ((formData.tipo === 'PREVENTIVA' || formData.tipo === 'PREVENTIVA_NEUMATICOS') && !pautaFinal) {
+      if (filteredPautas.length > 0) {
+        pautaFinal = filteredPautas[0].nombre;
+      } else if (vehiculoSeleccionado?.tipoUltimoMant) {
+        pautaFinal = vehiculoSeleccionado.tipoUltimoMant;
+      }
+    }
+
+    const selectedPautaObj = pautas.find(p => p.nombre === pautaFinal);
     const selectedFallaObj = tiposFalla.find(tf => tf.nombre === formData.tipoFalla);
 
     const nuevaOT: OrdenDeTrabajo = {
@@ -208,7 +229,7 @@ export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, veh
       tareasRealizadas: [],
       insumos: insumosDesdeKit,
       observacionInicial: autoInstruccion,
-      pauta: formData.pauta,
+      pauta: pautaFinal,
       pauta_mantenimiento_id: selectedPautaObj?.id,
       kitRepuestos: formData.kitRepuestos,
       tipoFalla: formData.tipoFalla,

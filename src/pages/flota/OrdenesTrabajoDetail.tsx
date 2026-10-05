@@ -365,7 +365,10 @@ export default function OrdenesTrabajoDetail() {
                  return;
             }
             updates.kilometrajeCierre = kmVal;
-            // The Supabase trigger 'procesar_cierre_ot' will handle the Vehicle updating properly.
+            if (!ot.pauta || ot.pauta === 'Mantenimiento Preventivo') {
+                if (vehiculo?.tipoUltimoMant) updates.pauta = vehiculo.tipoUltimoMant;
+                else if (filteredPautas.length > 0) updates.pauta = filteredPautas[0].nombre;
+            }
         }
 
         let comentario = `Cambio de estado a ${estadoStr}`;
@@ -480,8 +483,15 @@ export default function OrdenesTrabajoDetail() {
              return; // hand everything off to the rapid updater
         } else {
              if (!kmCierre || isNaN(kmVal) || kmVal <= 0) {
-                 alert('Debe ingresar un Kilometraje de Cierre válido para finalizar la OT.');
-                 return;
+                 const defaultKm = (ot.kilometrajeApertura && ot.kilometrajeApertura > 0) ? ot.kilometrajeApertura : Number(vehiculo?.kilometrajeActual || (vehiculo as any)?.kilometraje_actual || 0);
+                 const promptVal = window.prompt(`Por favor ingrese el Kilometraje de Cierre del vehículo al finalizar la OT (KM sugerido: ${defaultKm}):`, String(defaultKm || ''));
+                 if (promptVal && !isNaN(Number(promptVal)) && Number(promptVal) > 0) {
+                     kmVal = Number(promptVal);
+                     setKmCierre(promptVal);
+                 } else {
+                     alert('Debe ingresar un Kilometraje de Cierre válido para finalizar la OT.');
+                     return;
+                 }
              }
         }
 
@@ -492,12 +502,18 @@ export default function OrdenesTrabajoDetail() {
 
         setIsUpdatingDb(true);
         try {
-            // Continuar con actualizacion en AppContext para UI y Backend
-            // Nota: Se delega a Supabase Trigger / Lógica central la transacción 
-            // de vehículo e inventario
             const now = new Date().toISOString();
+            
+            // Determinar la mejor pauta si está vacía
+            let pautaFinal = ot.pauta;
+            if (!pautaFinal || pautaFinal === 'Mantenimiento Preventivo') {
+                if (vehiculo?.tipoUltimoMant) pautaFinal = vehiculo.tipoUltimoMant;
+                else if (filteredPautas.length > 0) pautaFinal = filteredPautas[0].nombre;
+            }
+
             await actualizarOrdenTrabajo({
                 ...ot,
+                pauta: pautaFinal,
                 estado: nuevoEstado as any,
                 kilometrajeCierre: kmVal,
                 tiempoTrabajadoSegundos: (nuevoEstado === 'PAUSADA' || nuevoEstado === 'FINALIZADA' || nuevoEstado === 'CERRADA_POR_MECANICO') ? timerDisplay : ot.tiempoTrabajadoSegundos,
