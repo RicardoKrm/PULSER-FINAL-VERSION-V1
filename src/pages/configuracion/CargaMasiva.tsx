@@ -192,33 +192,72 @@ const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[
   vehiculos: { 
     table: 'vehiculo', 
     matchKey: 'patente',
-    mapConfig: (r: any) => ({
-      numero_interno: r.numero_interno?.toString() || '',
-      patente: r.patente,
-      tipo_vehiculo: r.tipo_vehiculo || r.tipo_vehículo || r.tipo,
-      tipo: r.tipo_vehiculo || r.tipo_vehículo || r.tipo,
-      marca: r.marca,
-      modelo: r.modelo,
-      estado: r.estado || 'OPERATIVO',
-      kilometraje_actual: r.kilometraje_actual ? parseFloat(r.kilometraje_actual.toString().replace(/[^0-9.-]+/g,"")) : undefined,
-      norma_euro: r.norma_euro,
-      tipo_aceite: r.tipo_aceite,
-      chasis: r.chasis,
-      motor: r.motor,
-      razon_social: r.razon_social || r.empresa,
-      empresa_nombre: r.empresa || r.razon_social,
-      rut: r.rut,
-      capacidad_carga: r.capacidad_carga,
-      aplicacion: r.aplicacion,
-      intervalo_km: r.intervalo_km ? parseFloat(r.intervalo_km.toString().replace(/[^0-9.-]+/g,"")) : undefined,
-      km_ultima_mantencion: r.km_ultima_mantencion ? parseFloat(r.km_ultima_mantencion.toString().replace(/[^0-9.-]+/g,"")) : undefined,
-      km_ult_mantencion: r.km_ultima_mantencion ? parseFloat(r.km_ultima_mantencion.toString().replace(/[^0-9.-]+/g,"")) : undefined,
-      fecha_ultima_mantencion: parseExcelDate(r.fecha_ultima_mantencion),
-      fecha_ult_mantencion: parseExcelDate(r.fecha_ultima_mantencion),
-      tipo_ultimo_mant: r.tipo_ultimo_mant || r.tipo_ult_pauta,
-      tipo_ult_pauta: r.tipo_ultimo_mant || r.tipo_ult_pauta,
-      detalles: {}
-    })
+    mapConfig: (r: any) => {
+      let marca = getValByKey(r, ['marca', 'Marca', 'MARCA']);
+      let modelo = getValByKey(r, ['modelo', 'Modelo', 'MODELO']);
+      const marcaModeloCombined = getValByKey(r, [
+        'marca_modelo', 'marca / modelo', 'marca/modelo', 'marcamodelo', 
+        'marca y modelo', 'MARCA / MODELO', 'MARCA/MODELO', 'MARCA Y MODELO'
+      ]);
+
+      if (marcaModeloCombined) {
+        const str = String(marcaModeloCombined).trim();
+        if (str.includes('/')) {
+          const parts = str.split('/');
+          if (!marca) marca = parts[0]?.trim();
+          if (!modelo) modelo = parts.slice(1).join('/').trim();
+        } else if (str.includes('-')) {
+          const parts = str.split('-');
+          if (!marca) marca = parts[0]?.trim();
+          if (!modelo) modelo = parts.slice(1).join('-').trim();
+        } else {
+          if (!modelo) modelo = str;
+        }
+      }
+
+      // Desacoplar modelo si contiene '/' o la marca al inicio
+      if (modelo && String(modelo).includes('/')) {
+        const parts = String(modelo).split('/');
+        if (!marca) marca = parts[0]?.trim();
+        modelo = parts.slice(1).join('/').trim();
+      } else if (modelo && marca && String(modelo).toLowerCase().startsWith(String(marca).toLowerCase())) {
+        modelo = String(modelo).substring(String(marca).length).replace(/^[-/:\s]+/, '').trim();
+      }
+
+      const finalMarca = (marca || r.marca || '').toString().trim();
+      const finalModelo = (modelo || r.modelo || '').toString().trim();
+
+      return {
+        numero_interno: (getValByKey(r, ['numero_interno', 'numero interno', 'interno', 'NumeroInterno', 'n_interno']) || r.numero_interno)?.toString() || '',
+        patente: getValByKey(r, ['patente', 'Patente', 'PATENTE', 'ppu', 'PPU']) || r.patente,
+        tipo_vehiculo: getValByKey(r, ['tipo_vehiculo', 'tipo_vehículo', 'tipo', 'TipoVehiculo', 'Tipo']) || r.tipo_vehiculo || r.tipo_vehículo || r.tipo,
+        tipo: getValByKey(r, ['tipo_vehiculo', 'tipo_vehículo', 'tipo', 'TipoVehiculo', 'Tipo']) || r.tipo_vehiculo || r.tipo_vehículo || r.tipo,
+        marca: finalMarca,
+        modelo: finalModelo,
+        estado: getValByKey(r, ['estado', 'Estado']) || r.estado || 'OPERATIVO',
+        kilometraje_actual: r.kilometraje_actual ? parseFloat(r.kilometraje_actual.toString().replace(/[^0-9.-]+/g,"")) : undefined,
+        norma_euro: getValByKey(r, ['norma_euro', 'norma', 'NormaEuro', 'norma euro']) || r.norma_euro,
+        tipo_aceite: getValByKey(r, ['tipo_aceite', 'aceite', 'TipoAceite', 'tipo aceite']) || r.tipo_aceite,
+        chasis: getValByKey(r, ['chasis', 'vin', 'Chasis', 'VIN', 'n_chasis']) || r.chasis,
+        motor: getValByKey(r, ['motor', 'Motor', 'n_motor']) || r.motor,
+        razon_social: getValByKey(r, ['razon_social', 'empresa', 'RazonSocial', 'Empresa']) || r.razon_social || r.empresa,
+        empresa_nombre: getValByKey(r, ['empresa', 'razon_social', 'Empresa']) || r.empresa || r.razon_social,
+        rut: getValByKey(r, ['rut', 'RUT', 'Rut']) || r.rut,
+        capacidad_carga: getValByKey(r, ['capacidad_carga', 'CapacidadCarga', 'capacidad']) || r.capacidad_carga,
+        aplicacion: getValByKey(r, ['aplicacion', 'Aplicacion', 'operacion']) || r.aplicacion,
+        intervalo_km: r.intervalo_km ? parseFloat(r.intervalo_km.toString().replace(/[^0-9.-]+/g,"")) : undefined,
+        km_ultima_mantencion: r.km_ultima_mantencion ? parseFloat(r.km_ultima_mantencion.toString().replace(/[^0-9.-]+/g,"")) : undefined,
+        km_ult_mantencion: r.km_ultima_mantencion ? parseFloat(r.km_ultima_mantencion.toString().replace(/[^0-9.-]+/g,"")) : undefined,
+        fecha_ultima_mantencion: parseExcelDate(r.fecha_ultima_mantencion),
+        fecha_ult_mantencion: parseExcelDate(r.fecha_ultima_mantencion),
+        tipo_ultimo_mant: r.tipo_ultimo_mant || r.tipo_ult_pauta,
+        tipo_ult_pauta: r.tipo_ultimo_mant || r.tipo_ult_pauta,
+        detalles: {
+          marca: finalMarca,
+          modelo: finalModelo
+        }
+      };
+    }
   },
   inventario: { 
     table: 'logistica_repuestos', 

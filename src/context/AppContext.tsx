@@ -182,11 +182,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (vehiculosData && Array.isArray(vehiculosData)) {
         setVehiculos(vehiculosData.map(v => {
           const detalles = v.detalles || {};
+          let rawMarca = v.marca || detalles.marca || '';
+          let rawModelo = v.modelo || detalles.modelo || '';
+
+          if (rawModelo && rawModelo.includes('/')) {
+            const parts = rawModelo.split('/');
+            if (!rawMarca) rawMarca = parts[0]?.trim();
+            rawModelo = parts.slice(1).join('/').trim();
+          } else if (rawModelo && rawMarca && rawModelo.toLowerCase().startsWith(rawMarca.toLowerCase())) {
+            rawModelo = rawModelo.substring(rawMarca.length).replace(/^[-/:\s]+/, '').trim();
+          }
+
           return {
             id: v.id,
             patente: v.patente || v.numero_interno || 'Sin Patente',
-            modelo: v.modelo || detalles.modelo || '',
-            marca: v.marca || detalles.marca || '',
+            modelo: rawModelo,
+            marca: rawMarca,
             ano: v.anio || v.ano || detalles.ano || detalles.anio || '',
             vin: v.vin || v.chasis || detalles.vin || detalles.chasis || ''
           };

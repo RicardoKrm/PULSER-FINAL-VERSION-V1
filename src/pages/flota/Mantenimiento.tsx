@@ -19,6 +19,23 @@ import { calcularDatosPizarra, FilaPizarraMantenimiento, generarSecuenciaParaPau
 import { useAppContext } from '../../context/AppContext';
 import { usePermissions } from '../../hooks/usePermissions';
 
+export const obtenerSoloModelo = (modeloRaw?: string, marcaRaw?: string): string => {
+  if (!modeloRaw || !modeloRaw.trim()) return '--';
+  let mod = modeloRaw.trim();
+  if (mod.includes('/')) {
+    const parts = mod.split('/');
+    mod = parts[parts.length - 1].trim();
+  }
+  if (marcaRaw && marcaRaw.trim()) {
+    const cleanMarca = marcaRaw.trim().toLowerCase();
+    if (mod.toLowerCase().startsWith(cleanMarca)) {
+      mod = mod.substring(cleanMarca.length).trim();
+      mod = mod.replace(/^[-/:\s]+/, '').trim();
+    }
+  }
+  return mod || modeloRaw || '--';
+};
+
 export default function PizarraMantenimiento() {
   const { currentCompany } = useCompany();
   const { ordenesTrabajo } = useAppContext();
@@ -132,13 +149,17 @@ export default function PizarraMantenimiento() {
             if (pautasData) {
               const pautasDelVehiculo = pautasData.filter(p => {
                  const normalizeStr = (s: any) => String(s || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
-                 const vehModelo = normalizeStr(v.modelo);
-                 const pModelo = normalizeStr(p.modelo?.nombre);
+                 const cleanMod = (s: any) => {
+                   const norm = normalizeStr(s);
+                   return norm.includes('/') ? norm.split('/').pop()!.trim() : norm;
+                 };
+                 const vehModelo = cleanMod(v.modelo);
+                 const pModelo = cleanMod(p.modelo?.nombre);
                  
                  const vehAciete = normalizeStr(v.tipo_aceite);
                  const pAciete = normalizeStr(p.tipo_aceite);
 
-                 const isModelMatch = vehModelo === pModelo;
+                 const isModelMatch = vehModelo === pModelo || (vehModelo && pModelo && (vehModelo.includes(pModelo) || pModelo.includes(vehModelo)));
                  const isOilMatch = !pAciete || (vehAciete && pAciete === vehAciete);
                  
                  return isModelMatch && isOilMatch;
@@ -163,6 +184,11 @@ export default function PizarraMantenimiento() {
               });
             }
 
+            const rawMarca = v.marca || detalles.marca || '';
+            const rawMod = v.modelo || detalles.modelo || '';
+            const inferredMarca = (!rawMarca && rawMod && rawMod.includes('/')) ? rawMod.split('/')[0].trim() : rawMarca;
+            const pureModelo = obtenerSoloModelo(rawMod, inferredMarca);
+
             return {
               id: v.id,
               numeroInterno: v.numero_interno?.toString() || '',
@@ -177,8 +203,8 @@ export default function PizarraMantenimiento() {
               pautasSecuencia,
               
               // Technical specifications mapping
-              marca: v.marca || detalles.marca || '',
-              modelo: v.modelo || detalles.modelo || '',
+              marca: inferredMarca,
+              modelo: pureModelo !== '--' ? pureModelo : (rawMod || ''),
               ano: v.anio || v.ano || detalles.ano || detalles.anio || '',
               chasis: v.chasis || detalles.chasis || '',
               motor: v.motor || detalles.motor || '',
@@ -292,9 +318,20 @@ export default function PizarraMantenimiento() {
         
       const existingDetalles = data?.detalles || {};
       
+      let cleanMarca = editFichaData.marca?.trim() || '';
+      let cleanModelo = editFichaData.modelo?.trim() || '';
+      
+      if (cleanModelo.includes('/')) {
+        const parts = cleanModelo.split('/');
+        if (!cleanMarca) cleanMarca = parts[0]?.trim();
+        cleanModelo = parts.slice(1).join('/').trim();
+      } else if (cleanModelo && cleanMarca && cleanModelo.toLowerCase().startsWith(cleanMarca.toLowerCase())) {
+        cleanModelo = cleanModelo.substring(cleanMarca.length).replace(/^[-/:\s]+/, '').trim();
+      }
+
       const payload: any = {
-        marca: editFichaData.marca,
-        modelo: editFichaData.modelo,
+        marca: cleanMarca,
+        modelo: cleanModelo,
         anio: parseInt(editFichaData.ano || '0', 10) || null,
         chasis: editFichaData.chasis,
         motor: editFichaData.motor,
@@ -303,8 +340,8 @@ export default function PizarraMantenimiento() {
         tipo_aceite: editFichaData.tipoAceite,
         detalles: {
           ...existingDetalles,
-          marca: editFichaData.marca,
-          modelo: editFichaData.modelo,
+          marca: cleanMarca,
+          modelo: cleanModelo,
           ano: editFichaData.ano,
           anio: editFichaData.ano,
           chasis: editFichaData.chasis,
@@ -328,8 +365,8 @@ export default function PizarraMantenimiento() {
       // Update local state
       setFichaTecnicaVehiculo({
         ...fichaTecnicaVehiculo,
-        marca: editFichaData.marca,
-        modelo: editFichaData.modelo,
+        marca: cleanMarca,
+        modelo: cleanModelo,
         ano: editFichaData.ano,
         anio: editFichaData.ano,
         chasis: editFichaData.chasis,
@@ -1168,8 +1205,8 @@ export default function PizarraMantenimiento() {
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
-                    <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Marca / Modelo</span>
-                    <span className="font-bold">{fichaTecnicaVehiculo.marca || '--'} {fichaTecnicaVehiculo.modelo || ''}</span>
+                    <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Modelo</span>
+                    <span className="font-bold">{obtenerSoloModelo(fichaTecnicaVehiculo.modelo, fichaTecnicaVehiculo.marca)}</span>
                   </div>
                   <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
                     <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Año de Fabricación</span>
