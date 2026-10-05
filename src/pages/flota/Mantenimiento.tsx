@@ -81,6 +81,44 @@ export default function PizarraMantenimiento() {
   }, [fichaTecnicaVehiculo]);
 
   const [historialVehiculo, setHistorialVehiculo] = useState<any | null>(null);
+  const [otsDirectasVehiculo, setOtsDirectasVehiculo] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!historialVehiculo?.id) {
+      setOtsDirectasVehiculo([]);
+      return;
+    }
+    const fetchOTsDirectas = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('orden_de_trabajo')
+          .select('*')
+          .eq('vehiculo_id', historialVehiculo.id)
+          .order('fecha_creacion', { ascending: false });
+
+        if (data && !error) {
+          setOtsDirectasVehiculo(data.map(d => ({
+            id: d.id,
+            folio: d.folio,
+            tipo: d.tipo,
+            prioridad: d.prioridad,
+            estado: d.estado,
+            fechaCreacion: d.fecha_creacion,
+            fechaCierre: d.termino_proceso || d.fecha_creacion,
+            costoInsumos: Number(d.costo_insumos || 0),
+            costoManoObraHH: Number(d.costo_mano_obra_hh || 0),
+            costoManoObraTareas: Number(d.costo_mano_obra_tareas || 0),
+            vehiculoId: d.vehiculo_id,
+            pauta: d.pauta
+          })));
+        }
+      } catch (err) {
+        console.warn("Error cargando OTs directas para historial:", err);
+      }
+    };
+    fetchOTsDirectas();
+  }, [historialVehiculo]);
+
   const navigate = useNavigate();
   
   const menuRef = useRef<HTMLDivElement>(null);
@@ -596,9 +634,37 @@ export default function PizarraMantenimiento() {
 
   const getRealOTs = (vehiculo: any) => {
     if (!vehiculo) return [];
-    return ordenesTrabajo
-      .filter(o => String(o.vehiculoId) === String(vehiculo.id))
-      .sort((a, b) => new Date(b.fechaCreacion).getTime() - new Date(a.fechaCreacion).getTime());
+    const fromContext = ordenesTrabajo.filter(o => String(o.vehiculoId) === String(vehiculo.id));
+    const merged = [...otsDirectasVehiculo];
+    fromContext.forEach(ctxOt => {
+      if (!merged.some(m => m.id === ctxOt.id || m.folio === ctxOt.folio)) {
+        merged.push(ctxOt);
+      }
+    });
+
+    // Línea Base Histórica Automática: si no hay OTs en la BD pero el vehículo tiene km_ultima_mantencion > 0
+    if (merged.length === 0 && (Number(vehiculo.kmUltimoMantencion) > 0 || Number(vehiculo.km_ultima_mantencion) > 0)) {
+      const kmMant = Number(vehiculo.kmUltimoMantencion || vehiculo.km_ultima_mantencion || 0);
+      const fechaMant = vehiculo.fechaUltimaMantencion || vehiculo.fecha_ultima_mantencion || new Date();
+      const pautaMant = vehiculo.tipoUltimoMantencion || vehiculo.tipoUltimaPauta || vehiculo.tipo_ultimo_mant || 'Mantenimiento Preventivo Inicial';
+
+      merged.push({
+        id: `ot-base-${vehiculo.id}`,
+        folio: `OT-INI-${vehiculo.numeroInterno || vehiculo.ppu || vehiculo.patente || '01'}`,
+        tipo: 'PREVENTIVA',
+        prioridad: 'NORMAL',
+        estado: 'FINALIZADA',
+        fechaCreacion: fechaMant,
+        fechaCierre: fechaMant,
+        costoInsumos: 0,
+        costoManoObraHH: 0,
+        costoManoObraTareas: 0,
+        vehiculoId: vehiculo.id,
+        pauta: pautaMant
+      });
+    }
+
+    return merged.sort((a, b) => new Date(b.fechaCreacion).getTime() - new Date(a.fechaCreacion).getTime());
   };
 
   if (historialVehiculo) {

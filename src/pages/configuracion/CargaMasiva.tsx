@@ -847,9 +847,99 @@ export default function CargaMasiva() {
         }
       }
 
+      let otsInicialesCreadas = 0;
+
+      if (moduleId === 'vehiculos' && currentCompany?.id) {
+        try {
+          // 1. Obtener vehículos de la empresa con km_ultima_mantencion > 0
+          const { data: vehsConMant } = await supabase
+            .from('vehiculo')
+            .select('id, numero_interno, patente, km_ultima_mantencion, fecha_ultima_mantencion, tipo_ultimo_mant')
+            .eq('empresa_id', currentCompany.id)
+            .gt('km_ultima_mantencion', 0);
+
+          if (vehsConMant && vehsConMant.length > 0) {
+            // 2. Obtener OTs existentes para no duplicar si el vehículo ya tiene OT
+            const { data: otsExistentes } = await supabase
+              .from('orden_de_trabajo')
+              .select('id, vehiculo_id, folio')
+              .eq('empresa_id', currentCompany.id);
+
+            const vehiculosConOT = new Set((otsExistentes || []).map(o => String(o.vehiculo_id)));
+            const vehiculosSinOT = vehsConMant.filter(v => !vehiculosConOT.has(String(v.id)));
+
+            if (vehiculosSinOT.length > 0) {
+              // 3. Determinar el mayor número correlativo de folio existente
+              let maxFolioNum = 0;
+              (otsExistentes || []).forEach(o => {
+                const match = String(o.folio || '').match(/OT-(\d+)/i);
+                if (match) {
+                  const num = parseInt(match[1], 10);
+                  if (!isNaN(num)) maxFolioNum = Math.max(maxFolioNum, num);
+                }
+              });
+
+              // 4. Construir las OTs de línea base
+              const otsNuevas = vehiculosSinOT.map(v => {
+                maxFolioNum++;
+                const folio = `OT-${String(maxFolioNum).padStart(4, '0')}`;
+                
+                let fechaOT = new Date().toISOString();
+                if (v.fecha_ultima_mantencion) {
+                  const d = new Date(v.fecha_ultima_mantencion);
+                  if (!isNaN(d.getTime())) {
+                    fechaOT = d.toISOString();
+                  }
+                }
+
+                const kmMant = Number(v.km_ultima_mantencion) || 0;
+                const pautaNombre = v.tipo_ultimo_mant || 'Mantenimiento Preventivo Inicial';
+
+                return {
+                  empresa_id: currentCompany.id,
+                  vehiculo_id: v.id,
+                  folio: folio,
+                  tipo: 'PREVENTIVA',
+                  estado: 'FINALIZADA',
+                  prioridad: 'NORMAL',
+                  kilometraje_apertura: kmMant,
+                  kilometraje_cierre: kmMant,
+                  fecha_creacion: fechaOT,
+                  fecha_programada: fechaOT,
+                  inicio_proceso: fechaOT,
+                  termino_proceso: fechaOT,
+                  pauta: pautaNombre,
+                  observacion_inicial: `Línea Base: Mantención ${pautaNombre} registrada a los ${kmMant.toLocaleString('es-CL')} km.`,
+                  observaciones: `Orden de trabajo generada automáticamente desde Carga Masiva de Flota para trazabilidad y línea base histórica.`,
+                  costo_insumos: 0,
+                  costo_mano_obra_tareas: 0,
+                  costo_mano_obra_hh: 0,
+                  tiempo_trabajado_segundos: 0
+                };
+              });
+
+              // 5. Insertar OTs iniciales en lotes
+              const chunkSizeOT = 500;
+              for (let i = 0; i < otsNuevas.length; i += chunkSizeOT) {
+                const chunkOT = otsNuevas.slice(i, i + chunkSizeOT);
+                const { error: otErr } = await supabase.from('orden_de_trabajo').insert(chunkOT);
+                if (otErr) {
+                  console.warn("Aviso al crear OTs iniciales de línea base:", otErr);
+                } else {
+                  otsInicialesCreadas += chunkOT.length;
+                }
+              }
+            }
+          }
+        } catch (otGenErr) {
+          console.error("Error en proceso de generación de OTs iniciales:", otGenErr);
+        }
+      }
+
       const msgParts = [];
       if (insertCount > 0) msgParts.push(`${insertCount} nuevos creados`);
       if (updateCount > 0) msgParts.push(`${updateCount} existentes actualizados`);
+      if (otsInicialesCreadas > 0) msgParts.push(`${otsInicialesCreadas} OTs iniciales de línea base generadas`);
       if (msgParts.length === 0) msgParts.push("No se modificaron datos");
 
       setResults(prev => ({ 
