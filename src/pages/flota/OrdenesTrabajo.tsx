@@ -8,6 +8,8 @@ import { Badge } from '../../components/ui/Badge';
 import { Plus, Search, Filter, DollarSign, FileDown, Trash, Edit } from 'lucide-react';
 import { CrearOTModal } from '../../components/flota/CrearOTModal';
 import { usePermissions } from '../../hooks/usePermissions';
+import { exportToExcel } from '../../lib/excelExport';
+import Swal from 'sweetalert2';
 
 export default function GestionOrdenesTrabajo() {
   const { ordenesTrabajo, vehiculos, eliminarOrdenTrabajo } = useAppContext();
@@ -98,12 +100,99 @@ export default function GestionOrdenesTrabajo() {
     }
   }
 
+  const handleExportExcel = () => {
+    if (otsFiltradas.length === 0) {
+      Swal.fire({
+        icon: 'info',
+        title: 'Sin datos',
+        text: 'No hay órdenes de trabajo para exportar con los filtros seleccionados.',
+        confirmButtonColor: '#0891b2',
+      });
+      return;
+    }
+
+    const dataToExport = otsFiltradas.map((ot) => {
+      const vehiculo = vehiculos.find((v) => v.id === ot.vehiculoId);
+      const costoInsumos = Number(ot.costoInsumos) || 0;
+      const costoMO = (Number(ot.costoManoObraTareas) || 0) + (Number(ot.costoManoObraHH) || 0);
+      const costoTotalOT = costoInsumos + costoMO;
+
+      return {
+        'Folio': ot.folio || 'S/F',
+        'Vehículo (Patente)': vehiculo?.patente || 'N/A',
+        'Marca': vehiculo?.marca || 'N/A',
+        'Modelo': vehiculo?.modelo || 'N/A',
+        'Tipo de OT': (ot.tipo || '').replace(/_/g, ' '),
+        'Estado': (ot.estado || '').replace(/_/g, ' '),
+        'Prioridad': ot.prioridad || 'MEDIA',
+        'Técnico Responsable': ot.tecnicoResponsable || ot.externo_nombre || 'Sin asignar',
+        'Personal Operativo': ot.personalOperativo || '',
+        'Fecha Creación': ot.fechaCreacion ? new Date(ot.fechaCreacion).toLocaleDateString('es-CL') : '',
+        'Fecha Programada': ot.fechaProgramada || '',
+        'Hora Inicio': ot.horaInicioProgramada || '',
+        'Hora Término': ot.horaTerminoProgramada || '',
+        'KM Apertura': ot.kilometrajeApertura || ot.kilometraje_apertura || 0,
+        'KM Cierre': ot.kilometrajeCierre || ot.kilometraje_cierre || 0,
+        'Pauta': ot.pauta || 'N/A',
+        'Tipo de Falla': ot.tipoFalla || 'N/A',
+        'Observación': ot.observacionInicial || ot.observaciones || '',
+        'Costo Insumos ($)': costoInsumos,
+        'Costo Mano de Obra ($)': costoMO,
+        'Costo Total ($)': costoTotalOT,
+      };
+    });
+
+    const fechaHoy = new Date().toISOString().split('T')[0];
+    exportToExcel(dataToExport, `Reporte_Ordenes_Trabajo_${fechaHoy}`, 'OrdenesDeTrabajo');
+
+    Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: 'success',
+      title: `Se exportaron ${dataToExport.length} órdenes de trabajo a Excel`,
+      showConfirmButton: false,
+      timer: 2500,
+    });
+  };
+
+  const handleEliminarConConfirmacion = (otId: string, folio: string) => {
+    Swal.fire({
+      title: '¿Eliminar Orden de Trabajo?',
+      text: `¿Estás seguro de que deseas eliminar la orden de trabajo ${folio}? Esta acción no se puede deshacer.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        eliminarOrdenTrabajo(otId);
+        Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'success',
+          title: `OT ${folio} eliminada correctamente`,
+          showConfirmButton: false,
+          timer: 2000
+        });
+      }
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-6 rounded-lg border dark:border-slate-800">
         <h1 className="text-3xl font-bold">Órdenes de Trabajo</h1>
         <div className="flex items-center gap-4">
-            <Button variant="outline" className="border-green-600 text-green-600 hover:bg-green-50 dark:bg-green-900/30"><FileDown className="w-4 h-4 mr-2" /> Exportar</Button>
+            <Button 
+              variant="outline" 
+              onClick={handleExportExcel}
+              className="border-green-600 text-green-600 hover:bg-green-50 dark:bg-green-900/30"
+              title="Descargar listado en formato Excel (.xlsx)"
+            >
+              <FileDown className="w-4 h-4 mr-2" /> Exportar a Excel
+            </Button>
             {canCrearOT && (
               <Button className="bg-cyan-600" onClick={() => { setOtToEdit(null); setIsModalOpen(true); }}><Plus className="w-4 h-4 mr-2" /> Crear Nueva OT</Button>
             )}
@@ -123,7 +212,11 @@ export default function GestionOrdenesTrabajo() {
                 <option value="Todos">Todos los Tipos</option>
                 <option value="PREVENTIVA">PREVENTIVA</option>
                 <option value="CORRECTIVA">CORRECTIVA</option>
-                <option value="INSPECCION">INSPECCION</option>
+                <option value="EVALUATIVA">EVALUATIVA</option>
+                <option value="INSPECCION">INSPECCIÓN</option>
+                <option value="PREVENTIVA_NEUMATICOS">PREVENTIVA NEUMÁTICO</option>
+                <option value="CORRECTIVA_NEUMATICOS">CORRECTIVA NEUMÁTICO</option>
+                <option value="EVALUATIVA_NEUMATICOS">EVALUATIVA NEUMÁTICO</option>
             </select>
             <select className="p-2 border rounded rounded-md dark:border-slate-800 dark:bg-slate-800 dark:text-slate-100" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
                 <option value="Todos">Todos los Estados</option>
@@ -161,12 +254,12 @@ export default function GestionOrdenesTrabajo() {
                             <tr key={ot.id} className="border-b dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:bg-slate-900/50">
                                 <td className="p-4 font-bold">{ot.folio}</td>
                                 <td className="p-4">{vehiculo?.patente || 'N/A'}</td>
-                                <td className="p-4"><Badge className={`${getTipoColor(ot.tipo)} border dark:border-slate-800`}>{ot.tipo}</Badge></td>
-                                <td className="p-4"><Badge className={`${getEstadoColor(ot.estado)} border dark:border-slate-800`}>{ot.estado.replace('_', ' ')}</Badge></td>
+                                <td className="p-4"><Badge className={`${getTipoColor(ot.tipo)} border dark:border-slate-800`}>{ot.tipo ? ot.tipo.replace(/_/g, ' ') : ''}</Badge></td>
+                                <td className="p-4"><Badge className={`${getEstadoColor(ot.estado)} border dark:border-slate-800`}>{ot.estado ? ot.estado.replace(/_/g, ' ') : ''}</Badge></td>
                                 <td className="p-4 text-right">
                                     <Button size="sm" variant="ghost" className="mr-2 text-cyan-600" onClick={() => { setOtToEdit(ot); setIsModalOpen(true); }}><Edit className="w-4 h-4"/></Button>
                                     <Button size="sm" variant="outline" className="mr-2" onClick={() => navigate(`/flota/ordenes-trabajo/${ot.id}`)}>Ver</Button>
-                                    <Button size="sm" variant="ghost" className="text-red-500" onClick={() => eliminarOrdenTrabajo(ot.id)}><Trash className="w-4 h-4"/></Button>
+                                    <Button size="sm" variant="ghost" className="text-red-500" onClick={() => handleEliminarConConfirmacion(ot.id, ot.folio)}><Trash className="w-4 h-4"/></Button>
                                 </td>
                             </tr>
                         );

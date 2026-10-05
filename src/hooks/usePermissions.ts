@@ -20,7 +20,8 @@ export function usePermissions() {
       }
 
       // Base permissions from Role
-      const basePerms = profile.rol?.permisos || [];
+      const rawPerms = profile.rol?.permisos;
+      const basePerms: string[] = Array.isArray(rawPerms) ? rawPerms : [];
       
       // Fetch Cargo permissions
       if (profile.cargo) {
@@ -32,18 +33,15 @@ export function usePermissions() {
             .single();
             
           if (isMounted) {
-            if (data && data.permisos) {
-              setPermissions([...new Set([...basePerms, ...data.permisos])]);
-            } else {
-              setPermissions([...basePerms]);
-            }
+            const cargoPerms: string[] = Array.isArray(data?.permisos) ? data.permisos : [];
+            setPermissions([...new Set([...basePerms, ...cargoPerms])]);
           }
         } catch (error) {
           console.error('Error fetching cargo permissions:', error);
-          if (isMounted) setPermissions([...basePerms]);
+          if (isMounted) setPermissions(basePerms);
         }
       } else {
-        if (isMounted) setPermissions([...basePerms]);
+        if (isMounted) setPermissions(basePerms);
       }
       
       if (isMounted) setLoading(false);
@@ -58,10 +56,14 @@ export function usePermissions() {
 
   const hasPermission = (action: string) => {
     // Súper Administrador / owner overrides configurable permissions
-    if (profile?.rol?.nombre === 'Súper Administrador' || profile?.rol?.nombre === 'Super Administrador') {
+    if (
+      profile?.rol?.nombre === 'Súper Administrador' || 
+      profile?.rol?.nombre === 'Super Administrador' ||
+      (profile?.rol?.permisos && typeof profile.rol.permisos === 'object' && (profile.rol.permisos as any).all)
+    ) {
       return true;
     }
-    return permissions.includes(action);
+    return Array.isArray(permissions) && permissions.includes(action);
   };
 
   return { permissions, hasPermission, loading };
