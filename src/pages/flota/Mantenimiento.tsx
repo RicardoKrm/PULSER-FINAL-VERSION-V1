@@ -643,8 +643,9 @@ export default function PizarraMantenimiento() {
     });
 
     // Línea Base Histórica Automática: si no hay OTs en la BD pero el vehículo tiene km_ultima_mantencion > 0
-    if (merged.length === 0 && (Number(vehiculo.kmUltimoMantencion) > 0 || Number(vehiculo.km_ultima_mantencion) > 0)) {
-      const kmMant = Number(vehiculo.kmUltimoMantencion || vehiculo.km_ultima_mantencion || 0);
+    const rawKmVal = Number(vehiculo.kmUltimaMantencion || vehiculo.kmUltimoMantencion || vehiculo.km_ultima_mantencion || 0);
+    if (merged.length === 0 && rawKmVal > 0) {
+      const kmMant = rawKmVal;
       const fechaMant = vehiculo.fechaUltimaMantencion || vehiculo.fecha_ultima_mantencion || new Date();
       const pautaMant = vehiculo.tipoUltimoMantencion || vehiculo.tipoUltimaPauta || vehiculo.tipo_ultimo_mant || 'Mantenimiento Preventivo Inicial';
 

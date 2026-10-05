@@ -12,7 +12,7 @@ import { exportToExcel } from '../../lib/excelExport';
 import Swal from 'sweetalert2';
 
 export default function GestionOrdenesTrabajo() {
-  const { ordenesTrabajo, vehiculos, eliminarOrdenTrabajo } = useAppContext();
+  const { ordenesTrabajo, vehiculos, eliminarOrdenTrabajo, recargarOrdenesTrabajo } = useAppContext();
   const { profile } = useAuth();
   const { hasPermission } = usePermissions();
   const canCrearOT = hasPermission('Módulo de Mantenimiento:Crear Órdenes');
@@ -20,6 +20,10 @@ export default function GestionOrdenesTrabajo() {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [otToEdit, setOtToEdit] = useState<any>(null);
+
+  React.useEffect(() => {
+    recargarOrdenesTrabajo?.();
+  }, [recargarOrdenesTrabajo]);
 
   const [filtroVehiculo, setFiltroVehiculo] = useState('Todos');
   const [filtroTipo, setFiltroTipo] = useState('Todos');
@@ -31,7 +35,7 @@ export default function GestionOrdenesTrabajo() {
     // Seguridad de vistas (Roles)
     if (isMecanico && ot.responsable_id !== profile?.id) return false;
 
-    const vehiculo = vehiculos.find(v => v.id === ot.vehiculoId);
+    const vehiculo = vehiculos.find(v => String(v.id) === String(ot.vehiculoId));
     const matchVehiculo = filtroVehiculo === 'Todos' || (vehiculo && vehiculo.patente === filtroVehiculo);
     const matchTipo = filtroTipo === 'Todos' || ot.tipo === filtroTipo;
     const matchEstado = filtroEstado === 'Todos' || ot.estado === filtroEstado;
@@ -165,17 +169,22 @@ export default function GestionOrdenesTrabajo() {
       cancelButtonColor: '#64748b',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar'
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
-        eliminarOrdenTrabajo(otId);
-        Swal.fire({
-          toast: true,
-          position: 'top-end',
-          icon: 'success',
-          title: `OT ${folio} eliminada correctamente`,
-          showConfirmButton: false,
-          timer: 2000
-        });
+        try {
+          await eliminarOrdenTrabajo(otId, true);
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: `OT ${folio} eliminada correctamente`,
+            showConfirmButton: false,
+            timer: 2000
+          });
+        } catch (err) {
+          console.error("Error al eliminar OT:", err);
+          Swal.fire('Error', 'No se pudo eliminar la orden de trabajo.', 'error');
+        }
       }
     });
   };
@@ -249,11 +258,14 @@ export default function GestionOrdenesTrabajo() {
                 </thead>
                 <tbody>
                     {otsPaginadas.map((ot) => {
-                        const vehiculo = vehiculos.find(v => v.id === ot.vehiculoId);
+                        const vehiculo = vehiculos.find(v => String(v.id) === String(ot.vehiculoId));
                         return (
                             <tr key={ot.id} className="border-b dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:bg-slate-900/50">
                                 <td className="p-4 font-bold">{ot.folio}</td>
-                                <td className="p-4">{vehiculo?.patente || 'N/A'}</td>
+                                <td className="p-4">
+                                    <div className="font-semibold text-slate-800 dark:text-slate-200">{vehiculo?.patente || 'N/A'}</div>
+                                    {vehiculo?.modelo && <div className="text-xs text-slate-500">{vehiculo.modelo}</div>}
+                                </td>
                                 <td className="p-4"><Badge className={`${getTipoColor(ot.tipo)} border dark:border-slate-800`}>{ot.tipo ? ot.tipo.replace(/_/g, ' ') : ''}</Badge></td>
                                 <td className="p-4"><Badge className={`${getEstadoColor(ot.estado)} border dark:border-slate-800`}>{ot.estado ? ot.estado.replace(/_/g, ' ') : ''}</Badge></td>
                                 <td className="p-4 text-right">

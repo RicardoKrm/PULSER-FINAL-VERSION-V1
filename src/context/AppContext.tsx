@@ -25,7 +25,8 @@ interface AppContextType {
   setPersonal: (personal: Collaborator[]) => void;
   crearReservaTurismo: (reserva: ReservaTurismo) => void;
   crearOrdenTrabajo: (ot: OrdenDeTrabajo) => void;
-  eliminarOrdenTrabajo: (id: string) => void;
+  eliminarOrdenTrabajo: (id: string, skipConfirm?: boolean) => Promise<void>;
+  recargarOrdenesTrabajo: () => Promise<void>;
   actualizarOrdenTrabajo: (ot: OrdenDeTrabajo) => void;
   crearTipoFalla: (tipoFalla: TipoFalla) => void;
   eliminarTipoFalla: (id: string) => void;
@@ -91,6 +92,269 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Activa la sincronización del GPS en background cada vez que exista una compañía activa
   useSyncOdometers(activeCompanyId, setVehiculos);
+
+  const generateUUID = () => {
+    if (typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID) {
+      return window.crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+
+  const sincronizarYRecargarOTs = React.useCallback(async (companyId: string) => {
+    if (!companyId) return [];
+
+    try {
+      // 1. Obtener vehículos con mantención registrada previa
+      const { data: vehsData } = await supabase.from('vehiculo').select('*').eq('empresa_id', companyId);
+      let { data: otsData } = await supabase.from('orden_de_trabajo').select('*').eq('empresa_id', companyId);
+
+      // 2. Si hay vehículos con km_ultima_mantencion > 0 que no tengan OT creada, generarles su OT inicial de línea base
+      if (vehsData && Array.isArray(vehsData)) {
+        const vehsConMant = vehsData.filter(v => {
+          const rawKm = v.km_ultima_mantencion !== undefined ? v.km_ultima_mantencion : (v.detalles?.km_ultima_mantencion !== undefined ? v.detalles.km_ultima_mantencion : 0);
+          const km = typeof rawKm === 'number' ? rawKm : parseFloat(String(rawKm).replace(/[^0-9.-]+/g, '')) || 0;
+          return km > 0;
+        });
+
+        const existingVehOts = new Set((otsData || []).map(o => String(o.vehiculo_id)));
+        const vehsMissingOT = vehsConMant.filter(v => !existingVehOts.has(String(v.id)));
+
+        if (vehsMissingOT.length > 0) {
+          const newOtsToInsert = vehsMissingOT.map(v => {
+            const rawKm = v.km_ultima_mantencion !== undefined ? v.km_ultima_mantencion : (v.detalles?.km_ultima_mantencion !== undefined ? v.detalles.km_ultima_mantencion : 0);
+            const km = typeof rawKm === 'number' ? rawKm : parseFloat(String(rawKm).replace(/[^0-9.-]+/g, '')) || 0;
+            const rawFecha = v.fecha_ultima_mantencion || v.fecha_ult_mantencion || v.detalles?.fecha_ultima_mantencion || new Date().toISOString();
+            const pautaNombre = v.tipo_ultimo_mant || v.tipo_ult_pauta || v.detalles?.tipo_ultimo_mant || v.detalles?.tipo_ult_pauta || 'Mantenimiento Preventivo Inicial';
+            const numInt = v.numero_interno || v.patente || '01';
+
+            return {
+              id: generateUUID(),
+              empresa_id: companyId,
+              vehiculo_id: v.id,
+              folio: `OT-INI-${numInt}`,
+              tipo: 'PREVENTIVA',
+              estado: 'FINALIZADA',
+              prioridad: 'NORMAL',
+              kilometraje_apertura: km,
+              kilometraje_cierre: km,
+              fecha_creacion: typeof rawFecha === 'string' ? rawFecha : new Date(rawFecha).toISOString(),
+              fecha_programada: typeof rawFecha === 'string' ? rawFecha : new Date(rawFecha).toISOString(),
+              inicio_proceso: typeof rawFecha === 'string' ? rawFecha : new Date(rawFecha).toISOString(),
+              termino_proceso: typeof rawFecha === 'string' ? rawFecha : new Date(rawFecha).toISOString(),
+              pauta: pautaNombre,
+              observacion_inicial: `Línea Base: Mantención ${pautaNombre} registrada a los ${km.toLocaleString('es-CL')} km.`,
+              observaciones: 'Orden de trabajo generada automáticamente para trazabilidad y línea base histórica.',
+              costo_insumos: 0,
+              costo_mano_obra_tareas: 0,
+              costo_mano_obra_hh: 0,
+              tiempo_trabajado_segundos: 0
+            };
+          });
+
+          try {
+            const { error: insErr } = await supabase.from('orden_de_trabajo').insert(newOtsToInsert);
+            if (insErr) {
+              console.warn("Aviso al insertar OTs iniciales en Supabase:", insErr);
+            }
+          } catch (e) {
+            console.warn("Excepción al insertar OTs iniciales:", e);
+          }
+
+          otsData = [...(otsData || []), ...newOtsToInsert];
+        }
+      }
+
+      if (otsData) {
+        let tareasAll: any[] = [];
+        let insumosAll: any[] = [];
+        let historialAll: any[] = [];
+        let solicitudesAll: any[] = [];
+
+        try {
+          const { data: tData } = await supabase.from('ot_tareas_realizadas').select('*');
+          if (tData) tareasAll = tData;
+        } catch (e) {
+          console.warn("Error loading ot_tareas_realizadas:", e);
+        }
+
+        try {
+          const { data: iData } = await supabase.from('detalle_insumo_ot').select('*');
+          if (iData) insumosAll = iData;
+        } catch (e) {
+          console.warn("Error loading detalle_insumo_ot:", e);
+        }
+
+        try {
+          const { data: hData } = await supabase.from('historial_ot').select('*').order('created_at', { ascending: true });
+          if (hData) historialAll = hData;
+        } catch (e) {
+          console.warn("Error loading historial_ot:", e);
+        }
+
+        try {
+          const { data: sData } = await supabase.from('solicitud_repuesto_ot').select('*').order('created_at', { ascending: true });
+          if (sData) solicitudesAll = sData;
+        } catch (e) {
+          console.warn("Error loading solicitud_repuesto_ot:", e);
+        }
+
+        const mappedDbOts = otsData.map(row => {
+          const otId = row.id;
+
+          const otTareas = tareasAll
+            .filter((t: any) => t.orden_id === otId)
+            .map((t: any) => ({
+              id: t.id,
+              orden_id: t.orden_id,
+              tarea_estandar_id: t.tarea_estandar_id,
+              tiempo_real_minutos: Number(t.tiempo_real_minutos || 0),
+              costo_real: Number(t.costo_real || 0),
+              tarea_estandar: t.tarea_estandar || {
+                id: t.tarea_estandar_id,
+                descripcion: 'Tarea',
+                costoManoObra: Number(t.costo_real || 0)
+              }
+            }));
+
+          const otInsumos = insumosAll
+            .filter((i: any) => i.orden_id === otId)
+            .map((i: any) => ({
+              id: i.id,
+              orden_id: i.orden_id,
+              repuesto_id: i.repuesto_id,
+              cantidad: Number(i.cantidad || 0),
+              costo_unitario_aplicado: Number(i.costo_unitario_aplicado || i.costo_unitario || 0),
+              costo_total: Number(i.costo_total || i.cantidad * (i.costo_unitario_aplicado || i.costo_unitario || 0) || 0),
+              repuesto: i.repuesto || {
+                id: i.repuesto_id,
+                nombre: 'Repuesto/Insumo',
+                costo_unitario: Number(i.costo_unitario_aplicado || i.costo_unitario || 0)
+              }
+            }));
+
+          const otHistorial = historialAll
+            .filter((h: any) => h.orden_id === otId)
+            .map((h: any) => ({
+              id: h.id,
+              orden_id: h.orden_id,
+              usuario_nombre: h.usuario_nombre || 'Sistema',
+              comentario: h.comentario || '',
+              created_at: h.created_at || h.fecha_evento || new Date().toISOString()
+            }));
+
+          const otSolicitudes: SolicitudRepuesto[] = solicitudesAll
+            .filter((s: any) => s.orden_id === otId)
+            .map((s: any) => ({
+              id: s.id,
+              orden_id: s.orden_id,
+              repuesto_id: s.repuesto_id,
+              repuesto_nombre: s.repuesto_nombre,
+              cantidad: Number(s.cantidad || 0),
+              estado: s.estado || 'PENDIENTE',
+              fecha_solicitud: s.fecha_solicitud || s.created_at || new Date().toISOString(),
+              created_at: s.created_at || new Date().toISOString(),
+              usuario_nombre: s.usuario_nombre || 'Mecánico',
+              motivo_rechazo: s.motivo_rechazo || ''
+            }));
+
+          return {
+            id: row.id,
+            folio: row.folio,
+            empresa_id: row.empresa_id,
+            empresaId: row.empresa_id,
+            vehiculoId: row.vehiculo_id,
+            tecnicoResponsable: row.tecnico_responsable || undefined,
+            responsable_id: row.responsable_id || undefined,
+            tecnico_tipo: row.tecnico_tipo || undefined,
+            externo_nombre: row.externo_nombre || undefined,
+            externo_especialidad: row.externo_especialidad || undefined,
+            externo_intervencion: row.externo_intervencion || undefined,
+            tipo: row.tipo as any,
+            estado: row.estado as any,
+            prioridad: row.prioridad as any,
+            inicio_proceso: row.inicio_proceso || undefined,
+            kilometrajeApertura: Number(row.kilometraje_apertura || 0),
+            kilometrajeCierre: row.kilometraje_cierre ? Number(row.kilometraje_cierre) : undefined,
+            fechaCreacion: row.fecha_creacion,
+            fechaProgramada: row.fecha_programada || undefined,
+            horaInicioProgramada: row.hora_inicio_programada || undefined,
+            horaTerminoProgramada: row.hora_termino_programada || undefined,
+            observacionInicial: row.observacion_inicial || undefined,
+            diagnosticoEvaluacion: row.diagnostico_evaluacion || undefined,
+            pauta: row.pauta || undefined,
+            pauta_mantenimiento_id: row.pauta_mantenimiento_id || undefined,
+            kitRepuestos: row.kit_repuestos || undefined,
+            tipoFalla: row.tipo_falla || undefined,
+            sintomas: row.sintomas || undefined,
+            inspeccionTrenMotriz: row.inspeccion_tren_motriz || undefined,
+            eje: row.eje || undefined,
+            presionNeumatico: row.presion_neumatico ? Number(row.presion_neumatico) : undefined,
+            personalOperativo: row.personal_operativo || undefined,
+            proveedor: row.proveedor || undefined,
+            empresaExterna: row.empresa_externa || undefined,
+            rutEmpresa: row.rut_empresa || undefined,
+            valorHH: row.valor_hh ? Number(row.valor_hh) : undefined,
+            presupuestoAprobado: row.presupuesto_aprobado ? Number(row.presupuesto_aprobado) : undefined,
+            observaciones: row.observaciones || undefined,
+            costoInsumos: Number(row.costo_insumos || 0),
+            costoManoObraTareas: Number(row.costo_mano_obra_tareas || 0),
+            costoManoObraHH: Number(row.costo_mano_obra_hh || 0),
+            tiempoTrabajadoSegundos: Number(row.tiempo_trabajado_segundos || 0),
+            tareasRealizadas: otTareas,
+            insumos: otInsumos,
+            historial: otHistorial,
+            solicitudes: otSolicitudes
+          } as OrdenDeTrabajo;
+        });
+
+        const localOTs = loadLocalOTs(companyId);
+        const merged: OrdenDeTrabajo[] = [...mappedDbOts];
+        localOTs.forEach(lot => {
+          if ((!lot.empresa_id || lot.empresa_id === companyId) && !merged.some(m => m.id === lot.id || (lot.folio && m.folio === lot.folio))) {
+            merged.push(lot);
+          }
+        });
+
+        // Also sync with server-side persistent endpoint if available
+        try {
+          const resp = await fetch(`/api/flota/ordenes?empresa_id=${companyId}`);
+          if (resp.ok) {
+            const serverOts = await resp.json();
+            if (Array.isArray(serverOts) && serverOts.length > 0) {
+              serverOts.forEach((s: any) => {
+                if (s.empresa_id === companyId && !merged.some(u => u.id === s.id || (s.folio && u.folio === s.folio))) {
+                  merged.push(s);
+                }
+              });
+            }
+          }
+        } catch (e) {}
+
+        setOrdenesTrabajo(merged);
+        saveLocalOTs(merged, companyId);
+        return merged;
+      } else {
+        const localOTs = loadLocalOTs(companyId);
+        setOrdenesTrabajo(localOTs);
+        return localOTs;
+      }
+    } catch (err) {
+      console.error("Error sincronizando y recargando órdenes de trabajo:", err);
+      const localOTs = loadLocalOTs(companyId);
+      setOrdenesTrabajo(localOTs);
+      return localOTs;
+    }
+  }, []);
+
+  const recargarOrdenesTrabajo = React.useCallback(async () => {
+    if (activeCompanyId) {
+      await sincronizarYRecargarOTs(activeCompanyId);
+    }
+  }, [activeCompanyId, sincronizarYRecargarOTs]);
 
   const fetchAllData = React.useCallback(async () => {
     if (!activeCompanyId) {
@@ -296,190 +560,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }));
       }
 
-      // Fetch Ordenes de Trabajo
-      const { data: otsData } = await supabase.from('orden_de_trabajo').select('*').eq('empresa_id', activeCompanyId);
-      if (otsData) {
-        let tareasAll: any[] = [];
-        let insumosAll: any[] = [];
-        let historialAll: any[] = [];
-        let solicitudesAll: any[] = [];
-
-        try {
-          const { data: tData } = await supabase.from('ot_tareas_realizadas').select('*');
-          if (tData) tareasAll = tData;
-        } catch (e) {
-          console.warn("Error loading ot_tareas_realizadas:", e);
-        }
-
-        try {
-          const { data: iData } = await supabase.from('detalle_insumo_ot').select('*');
-          if (iData) insumosAll = iData;
-        } catch (e) {
-          console.warn("Error loading detalle_insumo_ot:", e);
-        }
-
-        try {
-          const { data: hData } = await supabase.from('historial_ot').select('*').order('created_at', { ascending: true });
-          if (hData) historialAll = hData;
-        } catch (e) {
-          console.warn("Error loading historial_ot:", e);
-        }
-
-        try {
-          const { data: sData } = await supabase.from('solicitud_repuesto_ot').select('*').order('created_at', { ascending: true });
-          if (sData) solicitudesAll = sData;
-        } catch (e) {
-          console.warn("Error loading solicitud_repuesto_ot:", e);
-        }
-
-        const mappedDbOts = otsData.map(row => {
-          const otId = row.id;
-
-          const otTareas = tareasAll
-            .filter((t: any) => t.orden_id === otId)
-            .map((t: any) => ({
-              id: t.id,
-              orden_id: t.orden_id,
-              tarea_estandar_id: t.tarea_estandar_id,
-              tiempo_real_minutos: Number(t.tiempo_real_minutos || 0),
-              costo_real: Number(t.costo_real || 0),
-              tarea_estandar: t.tarea_estandar || {
-                id: t.tarea_estandar_id,
-                descripcion: 'Tarea',
-                costoManoObra: Number(t.costo_real || 0)
-              }
-            }));
-
-          const otInsumos = insumosAll
-            .filter((i: any) => i.orden_id === otId)
-            .map((i: any) => ({
-              id: i.id,
-              orden_id: i.orden_id,
-              repuesto_id: i.repuesto_id,
-              cantidad: Number(i.cantidad || 0),
-              costo_unitario_aplicado: Number(i.costo_unitario_aplicado || i.costo_unitario || 0),
-              costo_total: Number(i.costo_total || i.cantidad * (i.costo_unitario_aplicado || i.costo_unitario || 0) || 0),
-              repuesto: i.repuesto || {
-                id: i.repuesto_id,
-                nombre: 'Repuesto/Insumo',
-                costo_unitario: Number(i.costo_unitario_aplicado || i.costo_unitario || 0)
-              }
-            }));
-
-          const otHistorial = historialAll
-            .filter((h: any) => h.orden_id === otId)
-            .map((h: any) => ({
-              id: h.id,
-              orden_id: h.orden_id,
-              usuario_nombre: h.usuario_nombre || 'Sistema',
-              comentario: h.comentario || '',
-              created_at: h.created_at || h.fecha_evento || new Date().toISOString()
-            }));
-
-          const otSolicitudes: SolicitudRepuesto[] = solicitudesAll
-            .filter((s: any) => s.orden_id === otId)
-            .map((s: any) => ({
-              id: s.id,
-              orden_id: s.orden_id,
-              repuesto_id: s.repuesto_id,
-              repuesto_nombre: s.repuesto_nombre,
-              cantidad: Number(s.cantidad || 0),
-              estado: s.estado || 'PENDIENTE',
-              fecha_solicitud: s.fecha_solicitud || s.created_at || new Date().toISOString(),
-              created_at: s.created_at || new Date().toISOString(),
-              usuario_nombre: s.usuario_nombre || 'Mecánico',
-              motivo_rechazo: s.motivo_rechazo || ''
-            }));
-
-          return {
-            id: row.id,
-            folio: row.folio,
-            empresa_id: row.empresa_id,
-            empresaId: row.empresa_id,
-            vehiculoId: row.vehiculo_id,
-            tecnicoResponsable: row.tecnico_responsable || undefined,
-            responsable_id: row.responsable_id || undefined,
-            tecnico_tipo: row.tecnico_tipo || undefined,
-            externo_nombre: row.externo_nombre || undefined,
-            externo_especialidad: row.externo_especialidad || undefined,
-            externo_intervencion: row.externo_intervencion || undefined,
-            tipo: row.tipo as any,
-            estado: row.estado as any,
-            prioridad: row.prioridad as any,
-            inicio_proceso: row.inicio_proceso || undefined,
-            kilometrajeApertura: Number(row.kilometraje_apertura || 0),
-            kilometrajeCierre: row.kilometraje_cierre ? Number(row.kilometraje_cierre) : undefined,
-            fechaCreacion: row.fecha_creacion,
-            fechaProgramada: row.fecha_programada || undefined,
-            horaInicioProgramada: row.hora_inicio_programada || undefined,
-            horaTerminoProgramada: row.hora_termino_programada || undefined,
-            observacionInicial: row.observacion_inicial || undefined,
-            diagnosticoEvaluacion: row.diagnostico_evaluacion || undefined,
-            pauta: row.pauta || undefined,
-            pauta_mantenimiento_id: row.pauta_mantenimiento_id || undefined,
-            kitRepuestos: row.kit_repuestos || undefined,
-            tipoFalla: row.tipo_falla || undefined,
-            sintomas: row.sintomas || undefined,
-            inspeccionTrenMotriz: row.inspeccion_tren_motriz || undefined,
-            eje: row.eje || undefined,
-            presionNeumatico: row.presion_neumatico ? Number(row.presion_neumatico) : undefined,
-            personalOperativo: row.personal_operativo || undefined,
-            proveedor: row.proveedor || undefined,
-            empresaExterna: row.empresa_externa || undefined,
-            rutEmpresa: row.rut_empresa || undefined,
-            valorHH: row.valor_hh ? Number(row.valor_hh) : undefined,
-            presupuestoAprobado: row.presupuesto_aprobado ? Number(row.presupuesto_aprobado) : undefined,
-            observaciones: row.observaciones || undefined,
-            costoInsumos: Number(row.costo_insumos || 0),
-            costoManoObraTareas: Number(row.costo_mano_obra_tareas || 0),
-            costoManoObraHH: Number(row.costo_mano_obra_hh || 0),
-            tiempoTrabajadoSegundos: Number(row.tiempo_trabajado_segundos || 0),
-            tareasRealizadas: otTareas,
-            insumos: otInsumos,
-            historial: otHistorial,
-            solicitudes: otSolicitudes
-          } as OrdenDeTrabajo;
-        });
-
-        // Merge with local storage cache for this company to guarantee nothing is lost
-        const localOTs = loadLocalOTs(activeCompanyId);
-        const merged: OrdenDeTrabajo[] = [...mappedDbOts];
-        localOTs.forEach(lot => {
-          if ((!lot.empresa_id || lot.empresa_id === activeCompanyId) && !merged.some(m => m.id === lot.id || (lot.folio && m.folio === lot.folio))) {
-            merged.push(lot);
-          }
-        });
-        setOrdenesTrabajo(merged);
-        saveLocalOTs(merged, activeCompanyId);
-      } else {
-        const localOTs = loadLocalOTs(activeCompanyId);
-        setOrdenesTrabajo(localOTs);
-      }
-
-      // Also sync with server-side persistent endpoint
-      try {
-        const resp = await fetch(`/api/flota/ordenes?empresa_id=${activeCompanyId}`);
-        if (resp.ok) {
-          const serverOts = await resp.json();
-          if (Array.isArray(serverOts) && serverOts.length > 0) {
-            setOrdenesTrabajo(prev => {
-              const updated = [...prev];
-              serverOts.forEach((s: any) => {
-                if (s.empresa_id === activeCompanyId && !updated.some(u => u.id === s.id || (s.folio && u.folio === s.folio))) {
-                  updated.push(s);
-                }
-              });
-              saveLocalOTs(updated, activeCompanyId);
-              return updated;
-            });
-          }
-        }
-      } catch (e) {}
+      // Fetch and sync Ordenes de Trabajo
+      await sincronizarYRecargarOTs(activeCompanyId);
 
     };
 
     await loadData();
-  }, [activeCompanyId]);
+  }, [activeCompanyId, sincronizarYRecargarOTs]);
 
   useEffect(() => {
     fetchAllData();
@@ -487,17 +574,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const crearReservaTurismo = (reserva: ReservaTurismo) => {
     // Logic for adding a reservation
-  };
-  
-  const generateUUID = () => {
-    if (typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID) {
-      return window.crypto.randomUUID();
-    }
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-      const r = Math.random() * 16 | 0;
-      const v = c === 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
   };
 
   const crearOrdenTrabajo = async (ot: OrdenDeTrabajo) => {
@@ -726,42 +802,64 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const eliminarOrdenTrabajo = async (id: string) => {
-    const result = await Swal.fire({
-      title: '¿Estás seguro?',
-      text: "Eliminar una Orden de Trabajo es una acción irreversible.",
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#3b82f6',
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar'
+  const eliminarOrdenTrabajo = async (id: string, skipConfirm = false) => {
+    if (!skipConfirm) {
+      const result = await Swal.fire({
+        title: '¿Estás seguro?',
+        text: "Eliminar una Orden de Trabajo es una acción irreversible.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#3b82f6',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar'
+      });
+      if (!result.isConfirmed) return;
+    }
+
+    setOrdenesTrabajo(prev => {
+      const nextList = prev.filter(ot => ot.id !== id && ot.folio !== id);
+      saveLocalOTs(nextList, activeCompanyId);
+      return nextList;
     });
 
-    if (result.isConfirmed) {
-      setOrdenesTrabajo(prev => {
-        const nextList = prev.filter(ot => ot.id !== id);
-        saveLocalOTs(nextList, activeCompanyId);
-        return nextList;
-      });
-      try {
-        fetch(`/api/flota/ordenes/${id}`, { method: 'DELETE' }).catch(() => {});
-      } catch (e) {}
-      try {
-        const { error } = await supabase.from('orden_de_trabajo').delete().eq('id', id);
-        if (error) {
-          console.warn("Error deleting work order from Supabase (handled locally):", error);
-        }
-      } catch (err) {
-        console.warn(err);
+    try {
+      fetch(`/api/flota/ordenes/${id}`, { method: 'DELETE' }).catch(() => {});
+    } catch (e) {}
+
+    try {
+      // Eliminar registros hijos en cascada para evitar restricciones de clave foránea
+      await supabase.from('ot_tareas_realizadas').delete().eq('orden_id', id);
+      await supabase.from('detalle_insumo_ot').delete().eq('orden_id', id);
+      await supabase.from('historial_ot').delete().eq('orden_id', id);
+      await supabase.from('solicitud_repuesto_ot').delete().eq('orden_id', id);
+
+      const { error } = await supabase.from('orden_de_trabajo').delete().eq('id', id);
+      if (error) {
+        console.warn("Aviso al eliminar orden de trabajo en Supabase:", error);
       }
+    } catch (err) {
+      console.warn("Excepción al eliminar OT en Supabase:", err);
+    }
+
+    if (!skipConfirm) {
       Swal.fire('¡Eliminada!', 'La Orden de Trabajo ha sido eliminada.', 'success');
     }
   };
 
   const actualizarOrdenTrabajo = async (otActualizada: OrdenDeTrabajo) => {
+    let finalId = otActualizada.id;
+    const isVirtualId = !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(finalId);
+    if (isVirtualId) {
+      finalId = generateUUID();
+      otActualizada = { ...otActualizada, id: finalId };
+    }
+
     setOrdenesTrabajo(prev => {
-      const nextList = prev.map(ot => ot.id === otActualizada.id ? otActualizada : ot);
+      const exists = prev.some(ot => ot.id === finalId || ot.id === otActualizada.id || (otActualizada.folio && ot.folio === otActualizada.folio));
+      const nextList = exists
+        ? prev.map(ot => (ot.id === finalId || ot.id === otActualizada.id || (otActualizada.folio && ot.folio === otActualizada.folio)) ? otActualizada : ot)
+        : [...prev, otActualizada];
       saveLocalOTs(nextList, activeCompanyId);
       return nextList;
     });
@@ -785,6 +883,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const targetCompanyId = activeCompanyId || profile?.empresa_id || '57fa41da-645d-48ba-a671-65a35312d0e9';
 
       const dbPayload = {
+        id: finalId,
         folio: otActualizada.folio,
         vehiculo_id: otActualizada.vehiculoId,
         empresa_id: targetCompanyId,
@@ -826,7 +925,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         tiempo_trabajado_segundos: clampNum(otActualizada.tiempoTrabajadoSegundos, 2000000000) || 0
       };
 
-      const { error } = await supabase.from('orden_de_trabajo').update(dbPayload).eq('id', otActualizada.id);
+      const { error } = await supabase.from('orden_de_trabajo').upsert(dbPayload);
       if (error) {
         console.warn("Supabase update skipped or rejected (saved locally):", error);
       } else {
@@ -1124,7 +1223,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AppContext.Provider value={{ reservasTurismo, ordenesTrabajo, conductores, vehiculos, pautas, tareasEstandar, tiposFalla, kitsRepuesto, repuestos, setRepuestos, usuarios, currentUser, setCurrentUser, proveedores, personal, setPersonal, crearReservaTurismo, crearOrdenTrabajo, eliminarOrdenTrabajo, actualizarOrdenTrabajo, crearTipoFalla, eliminarTipoFalla, actualizarTipoFalla, crearKitRepuesto, eliminarKitRepuesto, crearProveedor, eliminarProveedor, agregarTareaEstandar }}>
+    <AppContext.Provider value={{ reservasTurismo, ordenesTrabajo, conductores, vehiculos, pautas, tareasEstandar, tiposFalla, kitsRepuesto, repuestos, setRepuestos, usuarios, currentUser, setCurrentUser, proveedores, personal, setPersonal, crearReservaTurismo, crearOrdenTrabajo, eliminarOrdenTrabajo, recargarOrdenesTrabajo, actualizarOrdenTrabajo, crearTipoFalla, eliminarTipoFalla, actualizarTipoFalla, crearKitRepuesto, eliminarKitRepuesto, crearProveedor, eliminarProveedor, agregarTareaEstandar }}>
       {children}
     </AppContext.Provider>
   );

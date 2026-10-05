@@ -15,6 +15,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { usePermissions } from '../../hooks/usePermissions';
 import { FormularioInspeccion } from './GestionNeumaticos';
+import { OrdenDeTrabajo } from '../../types';
 
 export default function OrdenesTrabajoDetail() {
   const { id } = useParams();
@@ -69,15 +70,214 @@ export default function OrdenesTrabajoDetail() {
 
   const [personalTemporal, setPersonalTemporal] = useState('');
 
-  const ot = ordenesTrabajo.find(o => o.id === id || o.folio === id);
+  const otFromContext = ordenesTrabajo.find(o => o.id === id || o.folio === id);
+  const [asyncOt, setAsyncOt] = useState<OrdenDeTrabajo | null>(null);
+  const [loadingOt, setLoadingOt] = useState(!otFromContext);
+  const ot = otFromContext || asyncOt;
+
+  useEffect(() => {
+    if (otFromContext || !id) {
+      setLoadingOt(false);
+      return;
+    }
+
+    let isMounted = true;
+    setLoadingOt(true);
+
+    const loadMissingOt = async () => {
+      // 1. Caso ID de Línea Base virtual: "ot-base-..."
+      if (id.startsWith('ot-base-')) {
+        const vehId = id.replace('ot-base-', '');
+        let veh = vehiculos.find(v => String(v.id) === String(vehId));
+        if (!veh) {
+          const { data } = await supabase.from('vehiculo').select('*').eq('id', vehId).maybeSingle();
+          if (data) {
+            veh = {
+              id: data.id,
+              patente: data.patente || data.numero_interno || 'Sin Patente',
+              modelo: data.modelo || '',
+              marca: data.marca || '',
+              ano: data.anio || '',
+              vin: data.vin || data.chasis || '',
+              kmUltimaMantencion: data.km_ultima_mantencion || 0,
+              tipoUltimoMant: data.tipo_ultimo_mant || ''
+            } as any;
+          }
+        }
+
+        if (veh && isMounted) {
+          const rawKm = Number((veh as any).kmUltimaMantencion || (veh as any).km_ultima_mantencion || 0);
+          const rawFecha = (veh as any).fechaUltimaMantencion || (veh as any).fecha_ultima_mantencion || new Date().toISOString();
+          const pautaNombre = (veh as any).tipoUltimoMant || (veh as any).tipoUltimaPauta || (veh as any).tipo_ultimo_mant || 'Mantenimiento Preventivo Inicial';
+
+          const baselineOt: OrdenDeTrabajo = {
+            id: id,
+            folio: `OT-INI-${(veh as any).numeroInterno || (veh as any).numero_interno || veh.patente || '01'}`,
+            empresa_id: activeCompanyId || '',
+            empresaId: activeCompanyId || '',
+            vehiculoId: veh.id,
+            tipo: 'PREVENTIVA',
+            estado: 'FINALIZADA',
+            prioridad: 'MEDIA',
+            kilometrajeApertura: rawKm,
+            kilometrajeCierre: rawKm,
+            fechaCreacion: typeof rawFecha === 'string' ? rawFecha : new Date(rawFecha).toISOString(),
+            fechaProgramada: typeof rawFecha === 'string' ? rawFecha : new Date(rawFecha).toISOString(),
+            inicio_proceso: typeof rawFecha === 'string' ? rawFecha : new Date(rawFecha).toISOString(),
+            termino_proceso: typeof rawFecha === 'string' ? rawFecha : new Date(rawFecha).toISOString(),
+            pauta: pautaNombre,
+            observacionInicial: `Línea Base: Mantención registrada a los ${rawKm.toLocaleString('es-CL')} km.`,
+            observaciones: 'Orden de trabajo inicial generada automáticamente para trazabilidad y línea base histórica.',
+            costoInsumos: 0,
+            costoManoObraHH: 0,
+            costoManoObraTareas: 0,
+            tiempoTrabajadoSegundos: 0,
+            tareasRealizadas: [],
+            insumos: [],
+            historial: [],
+            solicitudes: []
+          };
+          setAsyncOt(baselineOt);
+        }
+        if (isMounted) setLoadingOt(false);
+        return;
+      }
+
+      // 2. Caso normal: consultar directamente a Supabase
+      try {
+        const { data: row } = await supabase
+          .from('orden_de_trabajo')
+          .select('*')
+          .or(`id.eq.${id},folio.eq.${id}`)
+          .maybeSingle();
+
+        if (row && isMounted) {
+          const [tareasRes, insumosRes, histRes, solRes] = await Promise.all([
+            supabase.from('ot_tareas_realizadas').select('*').eq('orden_id', row.id),
+            supabase.from('detalle_insumo_ot').select('*').eq('orden_id', row.id),
+            supabase.from('historial_ot').select('*').eq('orden_id', row.id).order('created_at', { ascending: true }),
+            supabase.from('solicitud_repuesto_ot').select('*').eq('orden_id', row.id).order('created_at', { ascending: true })
+          ]);
+
+          const loadedOt: OrdenDeTrabajo = {
+            id: row.id,
+            folio: row.folio,
+            empresa_id: row.empresa_id,
+            empresaId: row.empresa_id,
+            vehiculoId: row.vehiculo_id,
+            tecnicoResponsable: row.tecnico_responsable || undefined,
+            responsable_id: row.responsable_id || undefined,
+            tecnico_tipo: row.tecnico_tipo || undefined,
+            externo_nombre: row.externo_nombre || undefined,
+            externo_especialidad: row.externo_especialidad || undefined,
+            externo_intervencion: row.externo_intervencion || undefined,
+            tipo: row.tipo as any,
+            estado: row.estado as any,
+            prioridad: row.prioridad as any,
+            inicio_proceso: row.inicio_proceso || undefined,
+            kilometrajeApertura: Number(row.kilometraje_apertura || 0),
+            kilometrajeCierre: row.kilometraje_cierre ? Number(row.kilometraje_cierre) : undefined,
+            fechaCreacion: row.fecha_creacion,
+            fechaProgramada: row.fecha_programada || undefined,
+            horaInicioProgramada: row.hora_inicio_programada || undefined,
+            horaTerminoProgramada: row.hora_termino_programada || undefined,
+            observacionInicial: row.observacion_inicial || undefined,
+            diagnosticoEvaluacion: row.diagnostico_evaluacion || undefined,
+            pauta: row.pauta || undefined,
+            pauta_mantenimiento_id: row.pauta_mantenimiento_id || undefined,
+            kitRepuestos: row.kit_repuestos || undefined,
+            tipoFalla: row.tipo_falla || undefined,
+            sintomas: row.sintomas || undefined,
+            inspeccionTrenMotriz: row.inspeccion_tren_motriz || undefined,
+            eje: row.eje || undefined,
+            presionNeumatico: row.presion_neumatico ? Number(row.presion_neumatico) : undefined,
+            personalOperativo: row.personal_operativo || undefined,
+            proveedor: row.proveedor || undefined,
+            empresaExterna: row.empresa_externa || undefined,
+            rutEmpresa: row.rut_empresa || undefined,
+            valorHH: row.valor_hh ? Number(row.valor_hh) : undefined,
+            presupuestoAprobado: row.presupuesto_aprobado ? Number(row.presupuesto_aprobado) : undefined,
+            observaciones: row.observaciones || undefined,
+            costoInsumos: Number(row.costo_insumos || 0),
+            costoManoObraTareas: Number(row.costo_mano_obra_tareas || 0),
+            costoManoObraHH: Number(row.costo_mano_obra_hh || 0),
+            tiempoTrabajadoSegundos: Number(row.tiempo_trabajado_segundos || 0),
+            tareasRealizadas: (tareasRes.data || []).map((t: any) => ({
+              id: t.id,
+              orden_id: t.orden_id,
+              tarea_estandar_id: t.tarea_estandar_id,
+              tiempo_real_minutos: Number(t.tiempo_real_minutos || 0),
+              costo_real: Number(t.costo_real || 0),
+              tarea_estandar: t.tarea_estandar || {
+                id: t.tarea_estandar_id,
+                descripcion: 'Tarea',
+                costoManoObra: Number(t.costo_real || 0)
+              }
+            })),
+            insumos: (insumosRes.data || []).map((i: any) => ({
+              id: i.id,
+              orden_id: i.orden_id,
+              repuesto_id: i.repuesto_id,
+              cantidad: Number(i.cantidad || 0),
+              costo_unitario_aplicado: Number(i.costo_unitario_aplicado || i.costo_unitario || 0),
+              costo_total: Number(i.costo_total || 0),
+              repuesto: i.repuesto || {
+                id: i.repuesto_id,
+                nombre: 'Repuesto/Insumo',
+                costo_unitario: Number(i.costo_unitario_aplicado || 0)
+              }
+            })),
+            historial: (histRes.data || []).map((h: any) => ({
+              id: h.id,
+              orden_id: h.orden_id,
+              usuario_nombre: h.usuario_nombre || 'Sistema',
+              comentario: h.comentario || '',
+              created_at: h.created_at || new Date().toISOString()
+            })),
+            solicitudes: (solRes.data || []).map((s: any) => ({
+              id: s.id,
+              orden_id: s.orden_id,
+              repuesto_id: s.repuesto_id,
+              repuesto_nombre: s.repuesto_nombre,
+              cantidad: Number(s.cantidad || 0),
+              estado: s.estado || 'PENDIENTE',
+              fecha_solicitud: s.fecha_solicitud || s.created_at || new Date().toISOString(),
+              created_at: s.created_at || new Date().toISOString(),
+              usuario_nombre: s.usuario_nombre || 'Mecánico',
+              motivo_rechazo: s.motivo_rechazo || ''
+            }))
+          };
+
+          setAsyncOt(loadedOt);
+        }
+      } catch (err) {
+        console.warn("Aviso al consultar OT directamente en BD:", err);
+      } finally {
+        if (isMounted) setLoadingOt(false);
+      }
+    };
+
+    loadMissingOt();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id, otFromContext, activeCompanyId, vehiculos]);
 
   React.useEffect(() => {
     if (ot) {
       setSelectedTecnico(ot.tecnicoResponsable || '');
       setPersonalTemporal(ot.personalOperativo || '');
+      setNuevoEstado(ot.estado || 'ABIERTA');
+      setKmCierre(ot.kilometrajeCierre ? ot.kilometrajeCierre.toString() : '');
+      setSelectedTipoTecnico(ot.tecnico_tipo || 'INTERNO');
+      setExternoNombre(ot.externo_nombre || '');
+      setExternoEspecialidad(ot.externo_especialidad || '');
+      setExternoIntervencion(ot.externo_intervencion || '');
     }
   }, [ot]);
-  const vehiculo = vehiculos.find(v => v.id === ot?.vehiculoId);
+
+  const vehiculo = vehiculos.find(v => String(v.id) === String(ot?.vehiculoId));
 
   const filteredPautas = (pautas || []).filter(p => {
     if (!vehiculo?.modelo) return true;
@@ -87,17 +287,17 @@ export default function OrdenesTrabajoDetail() {
   });
 
   const [nuevoEstado, setNuevoEstado] = useState(ot?.estado || 'ABIERTA');
-    const [kmCierre, setKmCierre] = useState(ot?.kilometrajeCierre?.toString() || '');
-    const [isUpdatingDb, setIsUpdatingDb] = useState(false);
+  const [kmCierre, setKmCierre] = useState(ot?.kilometrajeCierre?.toString() || '');
+  const [isUpdatingDb, setIsUpdatingDb] = useState(false);
 
-    const [isPautaModalOpen, setIsPautaModalOpen] = useState(false);
-    const [infoView, setInfoView] = useState<'info' | 'costos'>('info');
-    
-    // External worker state
-    const [selectedTipoTecnico, setSelectedTipoTecnico] = useState<'INTERNO' | 'EXTERNO'>(ot?.tecnico_tipo || 'INTERNO');
-    const [externoNombre, setExternoNombre] = useState(ot?.externo_nombre || '');
-    const [externoEspecialidad, setExternoEspecialidad] = useState(ot?.externo_especialidad || '');
-    const [externoIntervencion, setExternoIntervencion] = useState(ot?.externo_intervencion || '');
+  const [isPautaModalOpen, setIsPautaModalOpen] = useState(false);
+  const [infoView, setInfoView] = useState<'info' | 'costos'>('info');
+  
+  // External worker state
+  const [selectedTipoTecnico, setSelectedTipoTecnico] = useState<'INTERNO' | 'EXTERNO'>(ot?.tecnico_tipo || 'INTERNO');
+  const [externoNombre, setExternoNombre] = useState(ot?.externo_nombre || '');
+  const [externoEspecialidad, setExternoEspecialidad] = useState(ot?.externo_especialidad || '');
+  const [externoIntervencion, setExternoIntervencion] = useState(ot?.externo_intervencion || '');
 
     const [isPausaModalOpen, setIsPausaModalOpen] = useState(false);
     const [tiposPausa, setTiposPausa] = useState<any[]>([]);
@@ -230,6 +430,15 @@ export default function OrdenesTrabajoDetail() {
         alert('Diagnóstico guardado correctamente');
         togglePanel('diagnostico');
     };
+
+    if (loadingOt) {
+      return (
+        <div className="flex flex-col items-center justify-center p-16 space-y-4">
+          <div className="w-8 h-8 border-4 border-cyan-600 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-slate-500 font-medium">Cargando orden de trabajo...</p>
+        </div>
+      );
+    }
 
     if (!ot) return <div className="p-8 text-center text-slate-500 dark:text-slate-400">OT no encontrada</div>;
 
