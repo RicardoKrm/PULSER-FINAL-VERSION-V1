@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
@@ -135,9 +135,93 @@ export default function PizarraMantenimiento() {
     };
   }, []);
 
-  // Mocks for dropdowns
-  const modelos = ['Sprinter 315', 'Transit Custom', 'Rav4'];
-  const tiposMantenimiento = ['Todos los tipos', 'Inicial', 'PM-1', 'PM-2', 'PM-3', 'PM-4'];
+  const [listaPautas, setListaPautas] = useState<any[]>([]);
+  const [listaModelosBD, setListaModelosBD] = useState<any[]>([]);
+  const [dataFlota, setDataFlota] = useState<FilaPizarraMantenimiento[]>([]);
+
+  // Modelos dinámicos reales de la empresa activa
+  const modelos = useMemo(() => {
+    const modelosMap = new Map<string, string>();
+
+    const agregarModelo = (nombre?: string | null, marca?: string | null) => {
+      if (!nombre) return;
+      const clean = obtenerSoloModelo(nombre, marca);
+      const trimmed = clean !== '--' ? clean.trim() : String(nombre).trim();
+      if (!trimmed || trimmed === '--' || trimmed === 'N/A') return;
+      const key = trimmed.toLowerCase();
+      if (!modelosMap.has(key)) {
+        modelosMap.set(key, trimmed);
+      }
+    };
+
+    // 1. Modelos desde vehículos cargados en dataFlota de la empresa activa
+    dataFlota.forEach(v => {
+      agregarModelo(v.modelo, v.marca);
+      if (v.detalles?.modelo) agregarModelo(v.detalles.modelo, v.marca || v.detalles?.marca);
+    });
+
+    // 2. Modelos configurados en mantenimiento_modelo_vehiculo
+    listaModelosBD.forEach(m => {
+      agregarModelo(m.nombre, m.marca);
+    });
+
+    // 3. Modelos vinculados a las pautas
+    listaPautas.forEach(p => {
+      agregarModelo(p.modelo?.nombre || p.nombre_modelo_vehiculo || p.modelo_nombre);
+    });
+
+    return Array.from(modelosMap.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [dataFlota, listaModelosBD, listaPautas]);
+
+  // Tipos de mantenimiento / Pautas dinámicas reales de la empresa activa
+  const tiposMantenimiento = useMemo(() => {
+    const tiposMap = new Map<string, string>();
+
+    const agregarTipo = (tipo?: string | null) => {
+      if (!tipo) return;
+      const trimmed = String(tipo).trim();
+      if (
+        !trimmed || 
+        trimmed === '--' || 
+        trimmed === 'N/A' || 
+        trimmed === '—' ||
+        trimmed === 'Siguiente Pauta' || 
+        trimmed === 'Todos los tipos' ||
+        trimmed === 'Sin Pauta' ||
+        trimmed.toUpperCase().includes('GENERICO')
+      ) return;
+      const key = trimmed.toLowerCase();
+      if (!tiposMap.has(key)) {
+        tiposMap.set(key, trimmed);
+      }
+    };
+
+    // 1. Pautas configuradas en la BD de la empresa activa
+    listaPautas.forEach(p => {
+      agregarTipo(p.nombre);
+    });
+
+    // 2. Tipos e hitos presentes en la flota actual
+    dataFlota.forEach(v => {
+      agregarTipo(v.tipoUltimoMantencion);
+      agregarTipo(v.tipoProximoMantencion);
+      if (v.pautaVencida) {
+        v.pautaVencida.split(',').forEach(pv => agregarTipo(pv));
+      }
+      if (v.pautasSecuencia && Array.isArray(v.pautasSecuencia)) {
+        v.pautasSecuencia.forEach(h => agregarTipo(h.nombre));
+      }
+    });
+
+    // 3. Tipos/Pautas presentes en las OTs de la empresa
+    ordenesTrabajo.forEach(o => {
+      if (o.pauta) {
+        agregarTipo(o.pauta);
+      }
+    });
+
+    return Array.from(tiposMap.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [listaPautas, dataFlota, ordenesTrabajo]);
 
   const [filtroModelo, setFiltroModelo] = useState('');
   const [filtroTipoMant, setFiltroTipoMant] = useState('');
@@ -155,15 +239,16 @@ export default function PizarraMantenimiento() {
   const [filtroUltMantDesde, setFiltroUltMantDesde] = useState('');
   const [filtroUltMantHasta, setFiltroUltMantHasta] = useState('');
 
-  const [dataFlota, setDataFlota] = useState<FilaPizarraMantenimiento[]>([]);
-
   const fetchVehiculos = async () => {
     if (!currentCompany?.id) return;
     try {
       const { data: vehiculosData, error: vehiculosError } = await supabase.from('vehiculo').select('*').eq('empresa_id', currentCompany.id);
       const { data: pautasData } = await supabase.from('mantenimiento_pauta').select('*, modelo:mantenimiento_modelo_vehiculo(nombre)').eq('empresa_id', currentCompany.id);
+      const { data: modelosBdData } = await supabase.from('mantenimiento_modelo_vehiculo').select('nombre, marca').eq('empresa_id', currentCompany.id);
 
       if (vehiculosError) throw vehiculosError;
+      if (pautasData) setListaPautas(pautasData);
+      if (modelosBdData) setListaModelosBD(modelosBdData);
       
       console.log("FETCHED VEHICULOS DB:", vehiculosData);
       if (vehiculosData) {
@@ -558,20 +643,70 @@ export default function PizarraMantenimiento() {
 
   const [kpiModal, setKpiModal] = useState<string | null>(null);
 
+  const parseFechaString = (fStr?: string | null): Date | null => {
+    if (!fStr || fStr === '—' || fStr === '--') return null;
+    const parts = fStr.split('-');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        const d = new Date(fStr);
+        return isNaN(d.getTime()) ? null : d;
+      } else {
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const year = parseInt(parts[2], 10);
+        const d = new Date(year, month, day);
+        return isNaN(d.getTime()) ? null : d;
+      }
+    }
+    const d = new Date(fStr);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
   const vehiculosFiltrados = dataFlota.filter(v => {
     if (busqueda && !(v.ppu || '').toLowerCase().includes(busqueda.toLowerCase()) && !v.numeroInterno.toLowerCase().includes(busqueda.toLowerCase())) {
       return false;
     }
     if (filtroModelo) {
-       // Currently no model is generated but to safely pass:
-       if ((v as any).modelo && (v as any).modelo !== filtroModelo) return false;
+      const modFiltro = filtroModelo.toLowerCase().trim();
+      const vMod = (v.modelo || '').toLowerCase().trim();
+      const vDetMod = ((v.detalles && v.detalles.modelo) || '').toLowerCase().trim();
+      const vMarca = (v.marca || '').toLowerCase().trim();
+      const match = vMod === modFiltro || 
+                    vMod.includes(modFiltro) || 
+                    modFiltro.includes(vMod) ||
+                    vDetMod.includes(modFiltro) ||
+                    `${vMarca} ${vMod}`.includes(modFiltro);
+      if (!match) return false;
     }
-    if (filtroTipoMant && filtroTipoMant !== 'Todos los tipos' && !(v.tipoProximoMantencion || '').includes(filtroTipoMant)) return false;
+    if (filtroTipoMant && filtroTipoMant !== 'Todos los tipos') {
+      const target = filtroTipoMant.toLowerCase().trim();
+      const prox = (v.tipoProximoMantencion || '').toLowerCase();
+      const ult = (v.tipoUltimoMantencion || '').toLowerCase();
+      const venc = (v.pautaVencida || '').toLowerCase();
+      const enSecuencia = (v.pautasSecuencia || []).some(h => (h.nombre || '').toLowerCase().includes(target));
+
+      if (!prox.includes(target) && !ult.includes(target) && !venc.includes(target) && !enSecuencia) {
+        return false;
+      }
+    }
     if (soloProximosOVencidos && v.estatus === 'NORMAL') return false;
-    
-    // String comparisons on dates might be inaccurate but let's simply map them correctly if we can
-    // We will bypass actual date comparison for this mockup, or just allow it:
-    // ...
+
+    if (filtroProxMantDesde) {
+      const dProx = parseFechaString(v.fechaProximaMantencion);
+      if (!dProx || dProx < new Date(`${filtroProxMantDesde}T00:00:00`)) return false;
+    }
+    if (filtroProxMantHasta) {
+      const dProx = parseFechaString(v.fechaProximaMantencion);
+      if (!dProx || dProx > new Date(`${filtroProxMantHasta}T23:59:59`)) return false;
+    }
+    if (filtroUltMantDesde) {
+      const dUlt = v.fechaUltimaMantencion ? new Date(v.fechaUltimaMantencion) : parseFechaString(v.fechaUltimoMantencion);
+      if (!dUlt || dUlt < new Date(`${filtroUltMantDesde}T00:00:00`)) return false;
+    }
+    if (filtroUltMantHasta) {
+      const dUlt = v.fechaUltimaMantencion ? new Date(v.fechaUltimaMantencion) : parseFechaString(v.fechaUltimoMantencion);
+      if (!dUlt || dUlt > new Date(`${filtroUltMantHasta}T23:59:59`)) return false;
+    }
     
     return true;
   });
@@ -1059,6 +1194,7 @@ export default function PizarraMantenimiento() {
                   value={filtroTipoMant}
                   onChange={(e) => setFiltroTipoMant(e.target.value)}
                 >
+                  <option value="">Todos los tipos</option>
                   {tiposMantenimiento.map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
