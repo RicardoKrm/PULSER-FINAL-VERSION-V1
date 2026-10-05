@@ -262,6 +262,18 @@ export default function PizarraMantenimiento() {
               ? v.km_ultima_mantencion
               : (detalles.km_ultima_mantencion !== undefined && detalles.km_ultima_mantencion !== null ? detalles.km_ultima_mantencion : 0);
             let kmUltMant = typeof rawKmUlt === 'number' ? rawKmUlt : parseFloat(String(rawKmUlt).replace(/[^0-9.-]+/g, '')) || 0;
+
+            // Detección automática si la base de datos tenía un odómetro de GPS con escala x10 errónea (ej: 881051 para un vehículo de ~85.000 km)
+            if (kmUltMant > 1000 && kmsActuales > (kmUltMant * 4) && Math.abs((kmsActuales / 10) - kmUltMant) < kmUltMant) {
+              kmsActuales = Math.round((kmsActuales / 10) * 100) / 100;
+            }
+
+            // Respetar calibración manual si el usuario ingresó un valor manual
+            if (detalles?.odometro_manual && typeof detalles?.km_manual === 'number') {
+              if (kmsActuales < detalles.km_manual || (kmsActuales > (detalles.km_manual * 4))) {
+                kmsActuales = detalles.km_manual;
+              }
+            }
             
             const rawInterval = (v.intervalo_km !== undefined && v.intervalo_km !== null)
               ? v.intervalo_km
@@ -526,7 +538,11 @@ export default function PizarraMantenimiento() {
         if (baseKmPromedio > 0) {
             existingDetalles.kmPromedioDia = baseKmPromedio;
         }
+        const nowIso = new Date().toISOString();
         existingDetalles.fecha_actualizacion_km = newDate.toISOString();
+        existingDetalles.odometro_manual = true;
+        existingDetalles.fecha_odometro_manual = nowIso;
+        existingDetalles.km_manual = newKmVal;
 
         const payload: any = {
             kilometraje_actual: newKmVal,

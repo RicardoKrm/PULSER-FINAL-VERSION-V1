@@ -457,11 +457,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             rawModelo = rawModelo.substring(rawMarca.length).replace(/^[-/:\s]+/, '').trim();
           }
 
-          const kmsActuales = typeof v.kilometraje_actual === 'number' ? v.kilometraje_actual : parseFloat(String(v.kilometraje_actual).replace(/[^0-9.-]+/g, '')) || 0;
+          let kmsActuales = typeof v.kilometraje_actual === 'number' ? v.kilometraje_actual : parseFloat(String(v.kilometraje_actual).replace(/[^0-9.-]+/g, '')) || 0;
           const rawKmUlt = (v.km_ultima_mantencion !== undefined && v.km_ultima_mantencion !== null && v.km_ultima_mantencion !== '')
             ? v.km_ultima_mantencion
             : (detalles.km_ultima_mantencion !== undefined && detalles.km_ultima_mantencion !== null ? detalles.km_ultima_mantencion : 0);
           const kmUltMant = typeof rawKmUlt === 'number' ? rawKmUlt : parseFloat(String(rawKmUlt).replace(/[^0-9.-]+/g, '')) || 0;
+
+          // Detección automática de escala x10 errónea del GPS (ej: 881051 cuando la mantención es 84.484)
+          if (kmUltMant > 1000 && kmsActuales > (kmUltMant * 4) && Math.abs((kmsActuales / 10) - kmUltMant) < kmUltMant) {
+            kmsActuales = Math.round((kmsActuales / 10) * 100) / 100;
+          }
+
+          // Respetar calibración manual realizada por el usuario
+          if (detalles?.odometro_manual && typeof detalles?.km_manual === 'number') {
+            if (kmsActuales < detalles.km_manual || (kmsActuales > (detalles.km_manual * 4))) {
+              kmsActuales = detalles.km_manual;
+            }
+          }
           const pautasSecuenciaStr = v.tipo_ultimo_mant || v.tipo_ult_pauta || detalles.tipo_ultimo_mant || detalles.tipo_ult_pauta || '';
           const fechaUltMant = v.fecha_ultima_mantencion || v.fecha_ult_mantencion || detalles.fecha_ultima_mantencion || '';
           const rawInterval = (v.intervalo_km !== undefined && v.intervalo_km !== null) ? v.intervalo_km : (detalles.intervalo_km !== undefined ? detalles.intervalo_km : 10000);

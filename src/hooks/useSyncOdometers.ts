@@ -12,7 +12,7 @@ export function useSyncOdometers(activeCompanyId: string | null, setVehiculos?: 
       isSyncing.current = true;
       try {
          const [vehiculosRes, configRes] = await Promise.all([
-            supabase.from('vehiculo').select('id, patente, kilometraje_actual, detalles').eq('empresa_id', activeCompanyId),
+            supabase.from('vehiculo').select('id, patente, kilometraje_actual, km_ultima_mantencion, detalles').eq('empresa_id', activeCompanyId),
             supabase.from('empresa').select('detalles').eq('id', activeCompanyId).single()
          ]);
          
@@ -60,10 +60,36 @@ export function useSyncOdometers(activeCompanyId: string | null, setVehiculos?: 
             if (prov === 'traccar') {
                 const registro = gps2Data.find((x: any) => x.plateNumber === v.patente);
                 if (registro && registro.odometer) {
-                    const km = parseInt(registro.odometer);
-                    if (km > newKm) {
-                        newKm = km;
-                        hasUpdate = true;
+                    let km = parseFloat(registro.odometer);
+
+                    // 1. Detección automática de escala (hectómetros, metros o décimas de km)
+                    // Ej: Si el GPS reporta 881051 para un vehículo cuya mantención o rango está en ~84.484 km,
+                    // el valor real es 88105.1 km (escala x10 común en reportes GPS).
+                    const kmBaseRef = Number(v.km_ultima_mantencion || v.detalles?.km_ultima_mantencion || v.kilometraje_actual || 0);
+                    if (kmBaseRef > 1000 && km > (kmBaseRef * 4) && Math.abs((km / 10) - kmBaseRef) < kmBaseRef) {
+                        km = Math.round((km / 10) * 100) / 100;
+                    }
+
+                    // 2. Respetar calibración manual si el usuario ingresó un valor en la pizarra:
+                    const fechaManualStr = v.detalles?.fecha_odometro_manual;
+                    const fechaManual = fechaManualStr ? new Date(fechaManualStr) : null;
+                    const fechaGps = registro.timestamp ? new Date(registro.timestamp) : null;
+                    const esManualReciente = fechaManual && (!fechaGps || fechaGps <= fechaManual);
+
+                    if (esManualReciente && v.detalles?.km_manual) {
+                        const kmManualVal = Number(v.detalles.km_manual);
+                        const delta = km - kmManualVal;
+                        // Solo avanzar si el GPS reporta un recorrido incremental coherente posterior a la calibración
+                        if (delta > 0 && delta < 2000) {
+                            newKm = kmManualVal + delta;
+                            hasUpdate = true;
+                        }
+                    } else if (km > newKm) {
+                        // Evitar saltos anómalos imposibles (ej: más de 50.000 km de golpe)
+                        if (newKm <= 0 || (km - newKm) < 50000) {
+                            newKm = km;
+                            hasUpdate = true;
+                        }
                     }
                 }
             } else if (prov === 'dominio') {
