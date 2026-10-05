@@ -421,8 +421,22 @@ export default function GPS() {
             }
             await supabase
               .from("vehiculo")
-              .update({ kilometraje_actual: newKm, detalles })
+              .update({ 
+                kilometraje_actual: newKm, 
+                fecha_actualizacion_km: detalles.fecha_actualizacion_km,
+                detalles 
+              })
               .eq("id", v.id);
+
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('vehiculo-actualizado', {
+                detail: {
+                  vehiculoId: v.id,
+                  kmActual: newKm,
+                  fechaActualizacionKm: detalles.fecha_actualizacion_km
+                }
+              }));
+            }
           }
 
           return {

@@ -230,12 +230,15 @@ export default function PizarraMantenimiento() {
             const inferredMarca = (!rawMarca && rawMod && rawMod.includes('/')) ? rawMod.split('/')[0].trim() : rawMarca;
             const pureModelo = obtenerSoloModelo(rawMod, inferredMarca);
 
+            const rawFechaAct = v.fecha_actualizacion_km || detalles.fecha_actualizacion_km || v.updated_at || v.created_at;
+            const parsedFechaAct = rawFechaAct ? new Date(rawFechaAct) : new Date();
+
             return {
               id: v.id,
               numeroInterno: v.numero_interno?.toString() || '',
               patente: v.patente || '',
               kilometrajeActual: kmsActuales,
-              fechaActualizacionKm: v.updated_at ? new Date(v.updated_at) : new Date(),
+              fechaActualizacionKm: !isNaN(parsedFechaAct.getTime()) ? parsedFechaAct : new Date(),
               intervaloMantencionKm: kmInterv,
               kmPromedioDia: v.km_promedio_dia || detalles.kmPromedioDia || 0,
               kmUltimaMantencion: kmUltMant,
@@ -285,19 +288,24 @@ export default function PizarraMantenimiento() {
         setDataFlota(prev => {
           return prev.map(fila => {
             if (String(fila.id) === String(detail.vehiculoId)) {
-              const rawKmCierre = Number(detail.kmCierre || 0);
-              const rawFecha = detail.fechaMant ? new Date(detail.fechaMant) : fila.fechaUltimaMantencion;
+              const rawKmCierre = detail.kmCierre !== undefined ? Number(detail.kmCierre || 0) : fila.kmUltimoMantencion;
+              const rawKmActual = detail.kmActual !== undefined ? Number(detail.kmActual || 0) : fila.kilometrajeActual;
+              const rawFechaMant = detail.fechaMant ? new Date(detail.fechaMant) : fila.fechaUltimaMantencion;
+              const rawFechaKm = detail.fechaActualizacionKm ? new Date(detail.fechaActualizacionKm) : fila.fechaActualizacionKm;
               const rawTipo = detail.tipoMant || fila.tipoUltimoMantencion || fila.tipoUltimaPauta;
               const vehActualizado: any = {
                 ...fila,
+                kilometrajeActual: rawKmActual,
+                fechaActualizacionKm: rawFechaKm,
                 kmUltimaMantencion: rawKmCierre,
-                fechaUltimaMantencion: rawFecha,
+                fechaUltimaMantencion: rawFechaMant,
                 tipoUltimoMantencion: rawTipo,
                 tipoUltimaPauta: rawTipo,
                 detalles: {
                   ...(fila.detalles || {}),
                   km_ultima_mantencion: rawKmCierre,
-                  fecha_ultima_mantencion: detail.fechaMant,
+                  fecha_ultima_mantencion: detail.fechaMant || fila.detalles?.fecha_ultima_mantencion,
+                  fecha_actualizacion_km: detail.fechaActualizacionKm || fila.detalles?.fecha_actualizacion_km,
                   tipo_ultimo_mant: rawTipo
                 }
               };
@@ -305,8 +313,10 @@ export default function PizarraMantenimiento() {
               return {
                 ...vehActualizado,
                 ...calculos,
+                kilometrajeActual: rawKmActual,
+                fechaActualizacionKm: rawFechaKm,
                 kmUltimaMantencion: rawKmCierre,
-                fechaUltimaMantencion: rawFecha,
+                fechaUltimaMantencion: rawFechaMant,
                 tipoUltimoMantencion: rawTipo,
                 tipoUltimaPauta: rawTipo
               };
@@ -340,12 +350,12 @@ export default function PizarraMantenimiento() {
   const handleGuardarKM = async () => {
     if (!vehiculoSeleccionadoKM || !nuevoKM || !fechaRegistroKM) return;
     
-    // get old values
     // Remove dots or commas if user typed thousands separator, then parse int
     const cleanNuevoKM = nuevoKM.replace(/\./g, '').replace(/,/g, '');
     const newKmVal = parseInt(cleanNuevoKM, 10);
     
-    if (isNaN(newKmVal)) {
+    if (isNaN(newKmVal) || newKmVal < 0) {
+        Swal.fire('Atención', 'Por favor ingrese un kilometraje numérico válido.', 'warning');
         return;
     }
 
@@ -371,10 +381,56 @@ export default function PizarraMantenimiento() {
         baseKmPromedio = 51;
     }
 
-    try {
-        const { data, error: selectErr } = await supabase.from('vehiculo').select('detalles').eq('id', vehiculoSeleccionadoKM.id).single();
-        if (selectErr) throw selectErr;
+    // 1. ACTUALIZACIÓN OPTIMISTA INMEDIATA EN MEMORIA (0 ms)
+    setDataFlota(prev => prev.map(fila => {
+      if (String(fila.id) === String(vehiculoSeleccionadoKM.id)) {
+        const vehActualizado: any = {
+          ...fila,
+          kilometrajeActual: newKmVal,
+          fechaActualizacionKm: newDate,
+          kmPromedioDia: baseKmPromedio,
+          detalles: {
+            ...(fila.detalles || {}),
+            fecha_actualizacion_km: newDate.toISOString(),
+            kmPromedioDia: baseKmPromedio
+          }
+        };
+        const calculos = calcularDatosPizarra(vehActualizado);
+        return {
+          ...fila,
+          ...calculos,
+          kilometrajeActual: newKmVal,
+          fechaActualizacionKm: newDate
+        };
+      }
+      return fila;
+    }));
 
+    setModalKMOpen(false);
+
+    // 2. DISPARAR EVENTO GLOBAL EN TIEMPO REAL
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('vehiculo-actualizado', {
+        detail: {
+          vehiculoId: vehiculoSeleccionadoKM.id,
+          kmActual: newKmVal,
+          fechaActualizacionKm: newDate.toISOString()
+        }
+      }));
+    }
+
+    Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: 'success',
+      title: `Odómetro de ${vehiculoSeleccionadoKM.numeroInterno || vehiculoSeleccionadoKM.patente} actualizado a ${newKmVal.toLocaleString('es-CL')} km`,
+      showConfirmButton: false,
+      timer: 2000
+    });
+
+    // 3. PERSISTENCIA EN SUPABASE EN SEGUNDO PLANO
+    try {
+        const { data } = await supabase.from('vehiculo').select('detalles').eq('id', vehiculoSeleccionadoKM.id).maybeSingle();
         const existingDetalles = data?.detalles || {};
         if (baseKmPromedio > 0) {
             existingDetalles.kmPromedioDia = baseKmPromedio;
@@ -383,22 +439,24 @@ export default function PizarraMantenimiento() {
 
         const payload: any = {
             kilometraje_actual: newKmVal,
+            fecha_actualizacion_km: newDate.toISOString(),
             km_promedio_dia: baseKmPromedio,
-            updated_at: newDate.toISOString(),
             detalles: existingDetalles
         };
 
         const { error } = await supabase.from('vehiculo').update(payload).eq('id', vehiculoSeleccionadoKM.id);
         if (error) {
-            console.error("DB Update Error Payload:", payload);
-            throw error;
+            console.warn("Reintentando actualización de odómetro con payload básico:", error);
+            await supabase.from('vehiculo').update({
+                kilometraje_actual: newKmVal,
+                fecha_actualizacion_km: newDate.toISOString(),
+                detalles: existingDetalles
+            }).eq('id', vehiculoSeleccionadoKM.id);
         }
         
-        setModalKMOpen(false);
         fetchVehiculos();
     } catch (e: any) {
-        console.error('Error updating KM:', e);
-        alert("Error al actualizar KM en la BD: " + (e.message || JSON.stringify(e)));
+        console.error('Error al persistir KM en Supabase:', e);
     }
   };
 

@@ -121,6 +121,7 @@ export function useSyncOdometers(activeCompanyId: string | null, setVehiculos?: 
                     } else {
                         detalles.fecha_actualizacion_km = new Date().toISOString();
                     }
+                    updates.fecha_actualizacion_km = detalles.fecha_actualizacion_km;
                 }
                 
                 const { error } = await supabase.from('vehiculo').update(updates).eq('id', v.id);
@@ -130,6 +131,16 @@ export function useSyncOdometers(activeCompanyId: string | null, setVehiculos?: 
                         setVehiculos(prev => prev.map(veh => veh.id === v.id ? { ...veh, kilometraje_actual: newKm, detalles: { ...veh.detalles, ...detalles } } : veh));
                     } else if (setVehiculos) {
                         setVehiculos(prev => prev.map(veh => veh.id === v.id ? { ...veh, detalles: { ...veh.detalles, ...detalles } } : veh));
+                    }
+
+                    if (typeof window !== 'undefined' && updates.kilometraje_actual) {
+                        window.dispatchEvent(new CustomEvent('vehiculo-actualizado', {
+                            detail: {
+                                vehiculoId: v.id,
+                                kmActual: newKm,
+                                fechaActualizacionKm: detalles.fecha_actualizacion_km
+                            }
+                        }));
                     }
                 }
             }
