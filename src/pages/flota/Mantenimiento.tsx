@@ -15,7 +15,7 @@ import Swal from 'sweetalert2';
 import { CrearOTModal } from '../../components/flota/CrearOTModal';
 import { CrearVehiculoModal } from '../../components/flota/CrearVehiculoModal';
 import { Modal } from '../../components/ui/Modal';
-import { calcularDatosPizarra, FilaPizarraMantenimiento, generarSecuenciaParaPauta, HitoSecuencia } from '../../lib/mantenimientoLogica';
+import { calcularDatosPizarra, FilaPizarraMantenimiento, generarSecuenciaParaPauta, HitoSecuencia, obtenerPautasSecuenciaParaVehiculo } from '../../lib/mantenimientoLogica';
 import { useAppContext } from '../../context/AppContext';
 import { usePermissions } from '../../hooks/usePermissions';
 
@@ -144,45 +144,10 @@ export default function PizarraMantenimiento() {
             const pautasSecuenciaStr = v.tipo_ultimo_mant || v.tipo_ult_pauta || detalles.tipo_ultimo_mant || detalles.tipo_ult_pauta || '';
             const fechaUltMant = v.fecha_ultima_mantencion || v.fecha_ult_mantencion || detalles.fecha_ultima_mantencion || null;
 
-            let pautasSecuencia: HitoSecuencia[] = [];
-
-            if (pautasData) {
-              const pautasDelVehiculo = pautasData.filter(p => {
-                 const normalizeStr = (s: any) => String(s || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
-                 const cleanMod = (s: any) => {
-                   const norm = normalizeStr(s);
-                   return norm.includes('/') ? norm.split('/').pop()!.trim() : norm;
-                 };
-                 const vehModelo = cleanMod(v.modelo);
-                 const pModelo = cleanMod(p.modelo?.nombre);
-                 
-                 const vehAciete = normalizeStr(v.tipo_aceite);
-                 const pAciete = normalizeStr(p.tipo_aceite);
-
-                 const isModelMatch = vehModelo === pModelo || (vehModelo && pModelo && (vehModelo.includes(pModelo) || pModelo.includes(vehModelo)));
-                 const isOilMatch = !pAciete || (vehAciete && pAciete === vehAciete);
-                 
-                 return isModelMatch && isOilMatch;
-              });
-
-              pautasDelVehiculo.forEach(p => {
-                 const secuenciaPauta = generarSecuenciaParaPauta(p as any, kmsActuales);
-                 pautasSecuencia = [...pautasSecuencia, ...secuenciaPauta];
-              });
-              
-              // 4. Sort sequence mathematically
-              pautasSecuencia.sort((a, b) => a.iteracion_km - b.iteracion_km);
-              
-              // 5. Remove duplicates by iteracion_km (keeping the first one, might want to be careful with which one, but prompt says "conserva solo uno")
-              const uniqueKms = new Set();
-              pautasSecuencia = pautasSecuencia.filter(item => {
-                   if (!uniqueKms.has(item.iteracion_km)) {
-                        uniqueKms.add(item.iteracion_km);
-                        return true;
-                   }
-                   return false;
-              });
-            }
+            const vehOil = v.tipo_aceite || detalles.tipo_aceite || '';
+            const pautasSecuencia: HitoSecuencia[] = pautasData
+              ? obtenerPautasSecuenciaParaVehiculo(v.modelo || detalles.modelo, vehOil, kmsActuales, pautasData)
+              : [];
 
             const rawMarca = v.marca || detalles.marca || '';
             const rawMod = v.modelo || detalles.modelo || '';

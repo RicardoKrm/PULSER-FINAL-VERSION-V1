@@ -3,7 +3,7 @@ import { Clock, AlertCircle, AlertTriangle, ChevronRight, Calculator } from 'luc
 import { cn } from '../../lib/utils';
 import { useCompany } from '../../contexts/CompanyContext';
 import { supabase } from '../../lib/supabase';
-import { calcularDatosPizarra, HitoSecuencia, VehiculoDB, generarSecuenciaParaPauta } from '../../lib/mantenimientoLogica';
+import { calcularDatosPizarra, HitoSecuencia, VehiculoDB, generarSecuenciaParaPauta, obtenerPautasSecuenciaParaVehiculo } from '../../lib/mantenimientoLogica';
 import { useAppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -35,39 +35,10 @@ export default function OperacionesAlertas() {
           const rawInterval = v.intervalo_km !== undefined ? v.intervalo_km : (detalles.intervalo_km !== undefined ? detalles.intervalo_km : 10000);
           const kmInterv = typeof rawInterval === 'number' ? rawInterval : parseFloat(String(rawInterval).replace(/[^0-9.-]+/g, '')) || 10000;
           
-          let pautasSecuencia: HitoSecuencia[] = [];
-
-          if (pautasData) {
-              const pautasDelVehiculo = pautasData.filter(p => {
-                 const normalizeStr = (s: any) => String(s || '').normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toUpperCase();
-                 const vehModelo = normalizeStr(v.modelo);
-                 const pModelo = normalizeStr(p.modelo?.nombre);
-                 
-                 const vehAciete = normalizeStr(v.tipo_aceite);
-                 const pAciete = normalizeStr(p.tipo_aceite);
-
-                 const isModelMatch = vehModelo === pModelo;
-                 const isOilMatch = !pAciete || (vehAciete && pAciete === vehAciete);
-                 
-                 return isModelMatch && isOilMatch;
-              });
-
-              pautasDelVehiculo.forEach(p => {
-                 const secuenciaPauta = generarSecuenciaParaPauta(p as any, kmsActuales);
-                 pautasSecuencia = [...pautasSecuencia, ...secuenciaPauta];
-              });
-              
-              pautasSecuencia.sort((a, b) => a.iteracion_km - b.iteracion_km);
-              
-              const uniqueKms = new Set();
-              pautasSecuencia = pautasSecuencia.filter(item => {
-                   if (!uniqueKms.has(item.iteracion_km)) {
-                        uniqueKms.add(item.iteracion_km);
-                        return true;
-                   }
-                   return false;
-              });
-          }
+          const vehOil = v.tipo_aceite || detalles.tipo_aceite || '';
+          const pautasSecuencia: HitoSecuencia[] = pautasData
+            ? obtenerPautasSecuenciaParaVehiculo(v.modelo || detalles.modelo, vehOil, kmsActuales, pautasData)
+            : [];
 
           const vehDB: VehiculoDB = {
             id: v.id,

@@ -281,15 +281,19 @@ const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[
   pautas: { 
     table: 'mantenimiento_pauta', 
     matchKey: 'nombre',
-    mapConfig: (r: any) => ({ 
-      nombre: r.nombre_pauta || r.NombrePauta || r.Nombre, 
-      kilometraje_inicial: r.cronograma_en_km || r.KilometrajeInicial || 0,
-      intervalo_1: r.intervalo_km || r.Intervalo1 || 0,
-      intervalo_2: r['intervalo_km 2'] || r.intervalo_km_2 || r.Intervalo2 || null,
-      tipo_aplicacion: r.tipo_aplicacion || r.TipoAplicacion || r['descrip_1°_pauta'] || r.descrip_1_pauta,
-      tipo_aceite: r.tipo_aceite || r.TipoAceite,
-      _modelo_nombre: r.nombre_modelo_vehiculo || r.ModeloVehiculo
-    }) 
+    mapConfig: (r: any) => {
+      const rawKm = r.kilometraje_pauta !== undefined ? r.kilometraje_pauta : (r.cronograma_en_km !== undefined ? r.cronograma_en_km : (r.KilometrajeInicial !== undefined ? r.KilometrajeInicial : (r.kilometraje_inicial !== undefined ? r.kilometraje_inicial : 0)));
+      const parsedKm = typeof rawKm === 'number' ? rawKm : parseFloat(String(rawKm).replace(/[^0-9.-]+/g, '')) || 0;
+      return { 
+        nombre: r.nombre_pauta || r.NombrePauta || r.Nombre, 
+        kilometraje_inicial: parsedKm,
+        intervalo_1: r.intervalo_km || r.Intervalo1 || 0,
+        intervalo_2: r['intervalo_km 2'] || r.intervalo_km_2 || r.Intervalo2 || null,
+        tipo_aplicacion: r.tipo_aplicacion || r['tipo_aplicación'] || r.TipoAplicacion || r['descrip_1°_pauta'] || r.descrip_1_pauta,
+        tipo_aceite: r.tipo_aceite || r.TipoAceite,
+        _modelo_nombre: r.nombre_modelo_vehiculo || r.ModeloVehiculo
+      };
+    }
   },
   tareas: { 
     table: 'mantenimiento_tarea', 
@@ -739,15 +743,17 @@ export default function CargaMasiva() {
 
       if (config.matchKey && config.matchKey !== 'NONE') {
         const matchKeyStr = config.matchKey as string;
+        const isPautas = moduleId === 'pautas';
         
         let existingRecords: any[] = [];
         let fromIdx = 0;
         let keepFetching = true;
 
         while (keepFetching) {
+          const selectFields = isPautas ? 'id, nombre, modelo_vehiculo_id' : `id, "${matchKeyStr}"`;
           const { data, error: fetchErr } = await supabase
             .from(config.table)
-            .select(`id, "${matchKeyStr}"`)
+            .select(selectFields)
             .eq('empresa_id', currentCompany?.id)
             .range(fromIdx, fromIdx + 999);
             
@@ -771,14 +777,21 @@ export default function CargaMasiva() {
               .replace(/[^A-Z0-9]/g, ''); // Keep only alphanumeric
         };
 
+        const buildRecordKey = (r: any) => {
+          if (isPautas) {
+            const modId = r.modelo_vehiculo_id || '';
+            const nom = normalizeMatchKey(r.nombre);
+            return `${modId}_${nom}`;
+          }
+          return normalizeMatchKey(r[matchKeyStr]);
+        };
+
         const existingMap = new Map();
         if (existingRecords) {
            existingRecords.forEach(r => {
-              if (r[matchKeyStr] !== undefined && r[matchKeyStr] !== null) {
-                 const key = normalizeMatchKey(r[matchKeyStr]);
-                 if (key) {
-                   existingMap.set(key, r.id);
-                 }
+              const key = buildRecordKey(r);
+              if (key) {
+                existingMap.set(key, r.id);
               }
            });
         }
@@ -787,8 +800,7 @@ export default function CargaMasiva() {
         const toUpdate = [];
 
         for (const row of cleanData) {
-           const matchVal = row[matchKeyStr];
-           const key = normalizeMatchKey(matchVal);
+           const key = buildRecordKey(row);
            
            if (key && existingMap.has(key)) {
               toUpdate.push({ ...row, id: existingMap.get(key) });

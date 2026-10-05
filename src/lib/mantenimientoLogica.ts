@@ -60,6 +60,108 @@ export function generarSecuenciaParaPauta(pauta: PautaEstructura, kilometrajeAct
     return secuencia;
 }
 
+export function normalizeTexto(s: any): string {
+    return String(s || '')
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim()
+        .toUpperCase();
+}
+
+export function obtenerCategoriaAceite(aceite: any): string {
+    const o = normalizeTexto(aceite);
+    if (!o) return 'UNKNOWN';
+    if (o.includes('SINTET') || o.includes('SYNTH') || o === '5W30' || o === '5W40' || o === '0W20' || o === '0W30' || o === '0W40') {
+        return 'SINTETICO';
+    }
+    if (o.includes('SEMI') || o === '10W40' || o === '10W30') {
+        return 'SEMI-SINTETICO';
+    }
+    if (o.includes('MINER') || o === '15W40' || o === '20W50') {
+        return 'MINERAL';
+    }
+    return o;
+}
+
+export function limpiarNombreModelo(modelo: any): string {
+    let s = normalizeTexto(modelo);
+    if (s.includes('/')) s = s.split('/').pop()!.trim();
+    // Remover marcas comunes si vienen pegadas al modelo
+    s = s.replace(/^(MERCEDES BENZ|MERCEDES-BENZ|MERCEDES|HYUNDAI|TOYOTA|VOLVO|SCANIA|CHEVROLET|FORD|PEUGEOT|CITROEN|FIAT|VOLKSWAGEN|VW)\s+/, '');
+    return s.trim();
+}
+
+/**
+ * Obtiene la secuencia consolidada y ordenada de pautas de mantenimiento para un vehículo específico,
+ * resolviendo compatibilidad de modelo y tipo/viscosidad de aceite.
+ */
+export function obtenerPautasSecuenciaParaVehiculo(
+    vehiculoModelo: any,
+    vehiculoAceite: any,
+    kmsActuales: number,
+    todasLasPautas: any[]
+): HitoSecuencia[] {
+    if (!todasLasPautas || todasLasPautas.length === 0) return [];
+
+    const vMod = limpiarNombreModelo(vehiculoModelo);
+    const vOilCat = obtenerCategoriaAceite(vehiculoAceite);
+
+    const pautasCompatibles = todasLasPautas.filter(p => {
+        const pMod = limpiarNombreModelo(p.modelo?.nombre || p.nombre_modelo_vehiculo || p.modelo_nombre || '');
+        const pOilCat = obtenerCategoriaAceite(p.tipo_aceite);
+
+        // 1. Compatibilidad de Modelo (igualdad o inclusión mutua)
+        const modelMatch = vMod === pMod || (vMod && pMod && (vMod.includes(pMod) || pMod.includes(vMod)));
+        if (!modelMatch) return false;
+
+        // 2. Compatibilidad de Aceite
+        // Si la pauta no especifica aceite o el vehículo no lo tiene, es compatible
+        if (!p.tipo_aceite || !vehiculoAceite) return true;
+        // Si coinciden en categoría de aceite (ej: 5W30 -> SINTETICO)
+        if (vOilCat === pOilCat) return true;
+
+        // Si la categoría difiere pero el modelo en la BD no tiene pautas específicas para el otro aceite,
+        // se asume que las pautas existentes del modelo aplican
+        const pautasHermanas = todasLasPautas.filter(sib => {
+            const sibMod = limpiarNombreModelo(sib.modelo?.nombre || sib.nombre_modelo_vehiculo || sib.modelo_nombre || '');
+            return sibMod === pMod || (sibMod && pMod && (sibMod.includes(pMod) || pMod.includes(sibMod)));
+        });
+        const existePautaEspecificaAceite = pautasHermanas.some(sib => obtenerCategoriaAceite(sib.tipo_aceite) === vOilCat);
+        if (!existePautaEspecificaAceite) {
+            return true;
+        }
+
+        return false;
+    });
+
+    let pautasSecuencia: HitoSecuencia[] = [];
+    pautasCompatibles.forEach(p => {
+        const estructura: PautaEstructura = {
+            id: String(p.id || ''),
+            nombre: p.nombre || p.nombre_pauta || '',
+            kilometraje_inicial: Number(p.kilometraje_inicial ?? p.kilometraje_pauta ?? p.cronograma_en_km ?? 0),
+            intervalo_1: Number(p.intervalo_1 ?? p.intervalo_km ?? 0),
+            intervalo_2: p.intervalo_2 !== undefined ? (p.intervalo_2 ? Number(p.intervalo_2) : null) : (p['intervalo_km 2'] ? Number(p['intervalo_km 2']) : null),
+            tipo_aplicacion: p.tipo_aplicacion || p['tipo_aplicación'] || ''
+        };
+        const seq = generarSecuenciaParaPauta(estructura, kmsActuales);
+        pautasSecuencia = [...pautasSecuencia, ...seq];
+    });
+
+    // Ordenar matemáticamente de menor a mayor KM
+    pautasSecuencia.sort((a, b) => a.iteracion_km - b.iteracion_km);
+
+    // Desduplicar conservando el primer hito de cada KM
+    const uniqueKms = new Set<number>();
+    return pautasSecuencia.filter(item => {
+        if (!uniqueKms.has(item.iteracion_km)) {
+            uniqueKms.add(item.iteracion_km);
+            return true;
+        }
+        return false;
+    });
+}
+
 // 1. Datos de entrada (Lo que viene de tu Base de Datos)
 export interface VehiculoDB {
     id: string | number;
@@ -228,16 +330,26 @@ export function calcularDatosPizarra(vehiculo: VehiculoDB): FilaPizarraMantenimi
         // --- LÓGICA DE FALLBACK (SI NO HAY SECUENCIA PAUTAS) ---
         if (kmUltimo > 0 && intervalo > 0) {
             const kmUltimoRedondeado = Math.round(kmUltimo / intervalo) * intervalo;
-            proximoHitoVencimiento = kmUltimoRedondeado + intervalo;
-            const kmsFaltantes = proximoHitoVencimiento - kmActual;
+            const primerHito = kmUltimoRedondeado + intervalo;
 
-            const diferenciaVencida = kmActual - proximoHitoVencimiento;
-            if (diferenciaVencida > 0) {
-                kmVencido = diferenciaVencida;
+            if (kmActual > primerHito) {
+                // Hay un hito vencido en el pasado
+                kmVencido = kmActual - primerHito;
                 estatus = "VENCIDO";
-                pautaVencidaStr = `Mant. de ${proximoHitoVencimiento.toLocaleString('es-CL')} km`;
-            } else if (kmsFaltantes > 0 && kmsFaltantes <= (intervalo * 0.25)) {
-                estatus = "PROXIMO";
+                pautaVencidaStr = `Mant. de ${primerHito.toLocaleString('es-CL')} km`;
+
+                // Avanzar al próximo hito estrictamente futuro
+                let hitoFuturo = primerHito;
+                while (hitoFuturo <= kmActual) {
+                    hitoFuturo += intervalo;
+                }
+                proximoHitoVencimiento = hitoFuturo;
+            } else {
+                proximoHitoVencimiento = primerHito;
+                const kmsFaltantes = proximoHitoVencimiento - kmActual;
+                if (kmsFaltantes > 0 && kmsFaltantes <= (intervalo * 0.25)) {
+                    estatus = "PROXIMO";
+                }
             }
         }
     }
