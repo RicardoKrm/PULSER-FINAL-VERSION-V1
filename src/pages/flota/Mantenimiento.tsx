@@ -15,7 +15,7 @@ import Swal from 'sweetalert2';
 import { CrearOTModal } from '../../components/flota/CrearOTModal';
 import { CrearVehiculoModal } from '../../components/flota/CrearVehiculoModal';
 import { Modal } from '../../components/ui/Modal';
-import { calcularDatosPizarra, FilaPizarraMantenimiento, generarSecuenciaParaPauta, HitoSecuencia, obtenerPautasSecuenciaParaVehiculo } from '../../lib/mantenimientoLogica';
+import { calcularDatosPizarra, FilaPizarraMantenimiento, generarSecuenciaParaPauta, HitoSecuencia, obtenerPautasSecuenciaParaVehiculo, formatearDiaMesAno } from '../../lib/mantenimientoLogica';
 import { useAppContext } from '../../context/AppContext';
 import { usePermissions } from '../../hooks/usePermissions';
 
@@ -217,8 +217,11 @@ export default function PizarraMantenimiento() {
               }
             }
 
-            // El odómetro efectivo del vehículo nunca puede ser inferior al de su última mantención cerrada
-            kmsActuales = Math.max(kmsActuales, kmUltMant);
+            // Si el odómetro del vehículo aún no ha sido registrado (0 o menor), se toma la última mantención como base.
+            // Si el vehículo ya tiene un odómetro registrado (ingresado manualmente o por GPS), se respeta siempre ese valor real.
+            if (kmsActuales <= 0 && kmUltMant > 0) {
+              kmsActuales = kmUltMant;
+            }
 
             const vehOil = v.tipo_aceite || detalles.tipo_aceite || '';
             const pautasSecuencia: HitoSecuencia[] = pautasData
@@ -288,14 +291,15 @@ export default function PizarraMantenimiento() {
         setDataFlota(prev => {
           return prev.map(fila => {
             if (String(fila.id) === String(detail.vehiculoId)) {
-              const rawKmCierre = detail.kmCierre !== undefined ? Number(detail.kmCierre || 0) : fila.kmUltimoMantencion;
-              const rawKmActual = detail.kmActual !== undefined ? Number(detail.kmActual || 0) : fila.kilometrajeActual;
+              const rawKmCierre = detail.kmCierre !== undefined ? Number(detail.kmCierre || 0) : (fila.kmUltimoMantencion || fila.kmUltimaMantencion || 0);
+              const rawKmActual = detail.kmActual !== undefined ? Number(detail.kmActual || 0) : (fila.kmActual || fila.kilometrajeActual || 0);
               const rawFechaMant = detail.fechaMant ? new Date(detail.fechaMant) : fila.fechaUltimaMantencion;
               const rawFechaKm = detail.fechaActualizacionKm ? new Date(detail.fechaActualizacionKm) : fila.fechaActualizacionKm;
               const rawTipo = detail.tipoMant || fila.tipoUltimoMantencion || fila.tipoUltimaPauta;
               const vehActualizado: any = {
                 ...fila,
                 kilometrajeActual: rawKmActual,
+                kmActual: rawKmActual,
                 fechaActualizacionKm: rawFechaKm,
                 kmUltimaMantencion: rawKmCierre,
                 fechaUltimaMantencion: rawFechaMant,
@@ -314,6 +318,7 @@ export default function PizarraMantenimiento() {
                 ...vehActualizado,
                 ...calculos,
                 kilometrajeActual: rawKmActual,
+                kmActual: rawKmActual,
                 fechaActualizacionKm: rawFechaKm,
                 kmUltimaMantencion: rawKmCierre,
                 fechaUltimaMantencion: rawFechaMant,
@@ -325,7 +330,9 @@ export default function PizarraMantenimiento() {
           });
         });
       }
-      fetchVehiculos();
+      if (!detail?.source || detail.source !== 'local') {
+        fetchVehiculos();
+      }
     };
 
     window.addEventListener('vehiculo-actualizado', handleSync);
@@ -359,7 +366,7 @@ export default function PizarraMantenimiento() {
         return;
     }
 
-    const oldKmVal = vehiculoSeleccionadoKM.kilometrajeActual || 0;
+    const oldKmVal = Number(vehiculoSeleccionadoKM.kmActual || vehiculoSeleccionadoKM.kilometrajeActual || 0);
     
     // get dates
     const newDate = new Date(fechaRegistroKM);
@@ -382,12 +389,20 @@ export default function PizarraMantenimiento() {
     }
 
     // 1. ACTUALIZACIÓN OPTIMISTA INMEDIATA EN MEMORIA (0 ms)
+    const kmUltimoRef = vehiculoSeleccionadoKM.kmUltimoMantencion || vehiculoSeleccionadoKM.kmUltimaMantencion || 0;
+    const fechaUltMantRef = vehiculoSeleccionadoKM.fechaUltimaMantencion || (vehiculoSeleccionadoKM.fechaUltimoMantencion ? new Date(vehiculoSeleccionadoKM.fechaUltimoMantencion) : null);
+    const tipoUltPautaRef = vehiculoSeleccionadoKM.tipoUltimaPauta || vehiculoSeleccionadoKM.tipoUltimoMantencion || 'N/A';
+
     setDataFlota(prev => prev.map(fila => {
       if (String(fila.id) === String(vehiculoSeleccionadoKM.id)) {
         const vehActualizado: any = {
           ...fila,
           kilometrajeActual: newKmVal,
+          kmActual: newKmVal,
           fechaActualizacionKm: newDate,
+          kmUltimaMantencion: kmUltimoRef,
+          fechaUltimaMantencion: fechaUltMantRef,
+          tipoUltimaPauta: tipoUltPautaRef,
           kmPromedioDia: baseKmPromedio,
           detalles: {
             ...(fila.detalles || {}),
@@ -397,27 +412,18 @@ export default function PizarraMantenimiento() {
         };
         const calculos = calcularDatosPizarra(vehActualizado);
         return {
-          ...fila,
+          ...vehActualizado,
           ...calculos,
           kilometrajeActual: newKmVal,
-          fechaActualizacionKm: newDate
+          kmActual: newKmVal,
+          fechaActualizacionKm: newDate,
+          fechaKmActual: formatearDiaMesAno(newDate)
         };
       }
       return fila;
     }));
 
     setModalKMOpen(false);
-
-    // 2. DISPARAR EVENTO GLOBAL EN TIEMPO REAL
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('vehiculo-actualizado', {
-        detail: {
-          vehiculoId: vehiculoSeleccionadoKM.id,
-          kmActual: newKmVal,
-          fechaActualizacionKm: newDate.toISOString()
-        }
-      }));
-    }
 
     Swal.fire({
       toast: true,
@@ -428,7 +434,7 @@ export default function PizarraMantenimiento() {
       timer: 2000
     });
 
-    // 3. PERSISTENCIA EN SUPABASE EN SEGUNDO PLANO
+    // 2. PERSISTENCIA EN SUPABASE EN SEGUNDO PLANO
     try {
         const { data } = await supabase.from('vehiculo').select('detalles').eq('id', vehiculoSeleccionadoKM.id).maybeSingle();
         const existingDetalles = data?.detalles || {};
@@ -453,8 +459,18 @@ export default function PizarraMantenimiento() {
                 detalles: existingDetalles
             }).eq('id', vehiculoSeleccionadoKM.id);
         }
-        
-        fetchVehiculos();
+
+        // 3. DISPARAR EVENTO GLOBAL EN TIEMPO REAL DESPUÉS DE LA PERSISTENCIA EXITOSA
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('vehiculo-actualizado', {
+            detail: {
+              vehiculoId: vehiculoSeleccionadoKM.id,
+              kmActual: newKmVal,
+              fechaActualizacionKm: newDate.toISOString(),
+              source: 'local'
+            }
+          }));
+        }
     } catch (e: any) {
         console.error('Error al persistir KM en Supabase:', e);
     }
@@ -736,7 +752,7 @@ export default function PizarraMantenimiento() {
                             onClick={(e) => {
                               e.stopPropagation();
                               setVehiculoSeleccionadoKM(vehiculo);
-                              setNuevoKM(vehiculo.kilometrajeActual?.toString() || '');
+                              setNuevoKM((vehiculo.kmActual || vehiculo.kilometrajeActual)?.toString() || '');
                               setFechaRegistroKM(new Date().toISOString().split('T')[0]);
                               setModalKMOpen(true);
                               setActionMenuOpen(null);
@@ -1252,7 +1268,7 @@ export default function PizarraMantenimiento() {
                             onClick={(e) => {
                               e.stopPropagation();
                               setVehiculoSeleccionadoKM(vehiculo);
-                              setNuevoKM(vehiculo.kilometrajeActual?.toString() || '');
+                              setNuevoKM((vehiculo.kmActual || vehiculo.kilometrajeActual)?.toString() || '');
                               setFechaRegistroKM(new Date().toISOString().split('T')[0]);
                               setModalKMOpen(true);
                               setActionMenuOpen(null);

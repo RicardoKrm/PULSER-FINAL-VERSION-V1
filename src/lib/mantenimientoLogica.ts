@@ -239,6 +239,14 @@ export interface FilaPizarraMantenimiento {
     factorConversionHoras?: number | null;
 }
 
+export function formatearDiaMesAno(d: Date | null): string | null {
+    if (!d) return null;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+}
+
 /**
  * Procesa un vehículo y devuelve las columnas calculadas para la Pizarra.
  */
@@ -405,15 +413,6 @@ export function calcularDatosPizarra(vehiculo: VehiculoDB): FilaPizarraMantenimi
     if (!tipoProximoMantencion || tipoProximoMantencion === "Siguiente Pauta") {
         tipoProximoMantencion = vehiculo.tipoUltimaPauta || "N/A";
     }
-
-    // --- 4. RETORNO DEL OBJETO FORMATEADO PARA LA TABLA ---
-    const formatearDiaMesAno = (d: Date | null) => {
-        if (!d) return null;
-        const day = String(d.getDate()).padStart(2, '0');
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const year = d.getFullYear();
-        return `${day}-${month}-${year}`;
-    };
 
     return {
         ...vehiculo,

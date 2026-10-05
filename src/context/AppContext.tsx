@@ -595,6 +595,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     fetchAllData();
   }, [activeCompanyId, fetchAllData]);
 
+  useEffect(() => {
+    const handleVehiculoActualizado = (e: any) => {
+      const detail = e?.detail;
+      if (detail && detail.vehiculoId) {
+        setVehiculos(prev => prev.map(v => {
+          if (String(v.id) === String(detail.vehiculoId)) {
+            const newKm = detail.kmActual !== undefined ? Number(detail.kmActual) : v.kilometrajeActual;
+            const newFecha = detail.fechaActualizacionKm || new Date().toISOString();
+            return {
+              ...v,
+              kilometrajeActual: newKm,
+              kilometraje_actual: newKm,
+              fechaActualizacionKm: newFecha,
+              detalles: {
+                ...(v.detalles || {}),
+                fecha_actualizacion_km: newFecha
+              }
+            };
+          }
+          return v;
+        }));
+      }
+    };
+
+    window.addEventListener('vehiculo-actualizado', handleVehiculoActualizado);
+    return () => {
+      window.removeEventListener('vehiculo-actualizado', handleVehiculoActualizado);
+    };
+  }, []);
+
   const crearReservaTurismo = (reserva: ReservaTurismo) => {
     // Logic for adding a reservation
   };
