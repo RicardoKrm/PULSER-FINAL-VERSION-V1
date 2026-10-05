@@ -851,117 +851,132 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     const nextList = ordenesTrabajo.filter(ot => ot.id !== id && ot.folio !== id);
+
+    // 1. ACTUALIZACIÓN OPTIMISTA INMEDIATA EN MEMORIA (0 ms)
     setOrdenesTrabajo(nextList);
     saveLocalOTs(nextList, activeCompanyId);
 
-    try {
-      fetch(`/api/flota/ordenes/${id}`, { method: 'DELETE' }).catch(() => {});
-    } catch (e) {}
+    let finalKm = 0;
+    let finalFecha: string | null = null;
+    let finalPauta: string = 'SM1';
+    let newDetalles: any = null;
 
-    try {
-      // Eliminar registros hijos en cascada para evitar restricciones de clave foránea
-      await supabase.from('ot_tareas_realizadas').delete().eq('orden_id', id);
-      await supabase.from('detalle_insumo_ot').delete().eq('orden_id', id);
-      await supabase.from('historial_ot').delete().eq('orden_id', id);
-      await supabase.from('solicitud_repuesto_ot').delete().eq('orden_id', id);
+    if (isOtPreventiva && wasCerrada && vehId) {
+      const remainingPrevOts = nextList.filter(o => 
+        (String(o.vehiculoId) === String(vehId) || String(o.vehiculo_id) === String(vehId)) &&
+        (o.estado === 'FINALIZADA' || o.estado === 'CERRADA_POR_MECANICO') &&
+        String(o.tipo || '').toUpperCase().includes('PREVENTIV')
+      );
 
-      const { error } = await supabase.from('orden_de_trabajo').delete().eq('id', id);
-      if (error) {
-        console.warn("Aviso al eliminar orden de trabajo en Supabase:", error);
+      if (remainingPrevOts.length > 0) {
+        remainingPrevOts.sort((a, b) => {
+          const kmB = Number(b.kilometrajeCierre || b.kilometraje_cierre || b.kilometrajeApertura || 0);
+          const kmA = Number(a.kilometrajeCierre || a.kilometraje_cierre || a.kilometrajeApertura || 0);
+          if (kmB !== kmA) return kmB - kmA;
+          const timeB = new Date(b.termino_proceso || b.fechaProgramada || b.fechaCreacion || 0).getTime();
+          const timeA = new Date(a.termino_proceso || a.fechaProgramada || a.fechaCreacion || 0).getTime();
+          return timeB - timeA;
+        });
+
+        const topPrev = remainingPrevOts[0];
+        finalKm = Number(topPrev.kilometrajeCierre || topPrev.kilometraje_cierre || topPrev.kilometrajeApertura || 0);
+        finalFecha = (topPrev.termino_proceso || topPrev.fechaProgramada || topPrev.fechaCreacion || '').split('T')[0];
+        finalPauta = topPrev.pauta || 'SM1';
+      } else {
+        const vCurrent = vehiculos.find(v => String(v.id) === String(vehId));
+        const existingDetalles = vCurrent?.detalles || {};
+        finalKm = existingDetalles.km_linea_base || existingDetalles.km_ultima_mantencion_inicial || 0;
+        finalFecha = existingDetalles.fecha_linea_base || existingDetalles.fecha_ultima_mantencion_inicial || null;
+        finalPauta = existingDetalles.tipo_linea_base || existingDetalles.tipo_ultimo_mant_inicial || 'SM1';
       }
-    } catch (err) {
-      console.warn("Excepción al eliminar OT en Supabase:", err);
+
+      setVehiculos(prev => prev.map(v => {
+        if (String(v.id) === String(vehId)) {
+          const existingDetalles = v.detalles || {};
+          const fallbackKm = finalKm > 0 ? finalKm : (existingDetalles.km_linea_base || existingDetalles.km_ultima_mantencion_inicial || 0);
+          const fallbackFecha = finalFecha || existingDetalles.fecha_linea_base || existingDetalles.fecha_ultima_mantencion_inicial || null;
+          const fallbackPauta = finalPauta || existingDetalles.tipo_linea_base || existingDetalles.tipo_ultimo_mant_inicial || 'SM1';
+          
+          newDetalles = {
+            ...existingDetalles,
+            km_ultima_mantencion: fallbackKm,
+            fecha_ultima_mantencion: fallbackFecha,
+            tipo_ultimo_mant: fallbackPauta
+          };
+
+          return {
+            ...v,
+            kmUltimaMantencion: fallbackKm,
+            km_ultima_mantencion: fallbackKm,
+            fechaUltimaMantencion: fallbackFecha || undefined,
+            fecha_ultima_mantencion: fallbackFecha || undefined,
+            tipoUltimoMant: fallbackPauta,
+            tipo_ultimo_mant: fallbackPauta,
+            detalles: newDetalles
+          };
+        }
+        return v;
+      }));
+
+      // Disparar evento reactivo inmediato a la Pizarra (0 ms)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('vehiculo-actualizado', { 
+          detail: { vehiculoId: vehId, kmCierre: finalKm, fechaMant: finalFecha, tipoMant: finalPauta } 
+        }));
+        window.dispatchEvent(new CustomEvent('ot-actualizada', { 
+          detail: { otId: id, vehiculoId: vehId } 
+        }));
+      }
     }
 
-    // Rollback / Recálculo automático de la última mantención del vehículo si se eliminó una OT preventiva cerrada
-    if (isOtPreventiva && wasCerrada && vehId) {
-      try {
-        const remainingPrevOts = nextList.filter(o => 
-          (String(o.vehiculoId) === String(vehId) || String(o.vehiculo_id) === String(vehId)) &&
-          (o.estado === 'FINALIZADA' || o.estado === 'CERRADA_POR_MECANICO') &&
-          String(o.tipo || '').toUpperCase().includes('PREVENTIV')
-        );
+    if (!skipConfirm) {
+      Swal.fire({
+        title: '¡Eliminada!',
+        text: 'La Orden de Trabajo ha sido eliminada y la última mantención se recalculó de forma instantánea.',
+        icon: 'success',
+        timer: 1800,
+        showConfirmButton: false
+      });
+    }
 
-        let prevKm: number | null = null;
-        let prevFecha: string | null = null;
-        let prevPauta: string | null = null;
+    // 2. PERSISTENCIA EN SEGUNDO PLANO EN PARALELO (sin bloquear la UI)
+    try {
+      fetch(`/api/flota/ordenes/${id}`, { method: 'DELETE' }).catch(() => {});
 
-        if (remainingPrevOts.length > 0) {
-          remainingPrevOts.sort((a, b) => {
-            const kmB = Number(b.kilometrajeCierre || b.kilometraje_cierre || b.kilometrajeApertura || 0);
-            const kmA = Number(a.kilometrajeCierre || a.kilometraje_cierre || a.kilometrajeApertura || 0);
-            if (kmB !== kmA) return kmB - kmA;
-            const timeB = new Date(b.termino_proceso || b.fechaProgramada || b.fechaCreacion || 0).getTime();
-            const timeA = new Date(a.termino_proceso || a.fechaProgramada || a.fechaCreacion || 0).getTime();
-            return timeB - timeA;
-          });
+      // Borrado en paralelo de tablas hijas
+      await Promise.all([
+        supabase.from('ot_tareas_realizadas').delete().eq('orden_id', id),
+        supabase.from('detalle_insumo_ot').delete().eq('orden_id', id),
+        supabase.from('historial_ot').delete().eq('orden_id', id),
+        supabase.from('solicitud_repuesto_ot').delete().eq('orden_id', id)
+      ]);
 
-          const topPrev = remainingPrevOts[0];
-          prevKm = Number(topPrev.kilometrajeCierre || topPrev.kilometraje_cierre || topPrev.kilometrajeApertura || 0);
-          prevFecha = (topPrev.termino_proceso || topPrev.fechaProgramada || topPrev.fechaCreacion || '').split('T')[0];
-          prevPauta = topPrev.pauta || null;
-        }
+      await supabase.from('orden_de_trabajo').delete().eq('id', id);
 
-        // Consultar detalles base del vehículo en BD por si no quedan OTs
+      if (isOtPreventiva && wasCerrada && vehId) {
         const { data: vParams } = await supabase
           .from('vehiculo')
           .select('id, detalles')
           .eq('id', vehId)
           .maybeSingle();
 
-        const existingDetalles = vParams?.detalles || {};
-        const finalKm = prevKm !== null && prevKm > 0 ? prevKm : (existingDetalles.km_linea_base || existingDetalles.km_ultima_mantencion_inicial || 0);
-        const finalFecha = prevFecha || existingDetalles.fecha_linea_base || existingDetalles.fecha_ultima_mantencion_inicial || null;
-        const finalPauta = prevPauta || existingDetalles.tipo_linea_base || existingDetalles.tipo_ultimo_mant_inicial || 'SM1';
-
-        const newDetalles = {
-          ...existingDetalles,
+        const mergedDetalles = {
+          ...(vParams?.detalles || {}),
+          ...(newDetalles || {}),
           km_ultima_mantencion: finalKm,
           fecha_ultima_mantencion: finalFecha,
           tipo_ultimo_mant: finalPauta
         };
 
-        // 1. Revertir estado en memoria
-        setVehiculos(prev => prev.map(v => {
-          if (String(v.id) === String(vehId)) {
-            return {
-              ...v,
-              kmUltimaMantencion: finalKm,
-              km_ultima_mantencion: finalKm,
-              fechaUltimaMantencion: finalFecha || undefined,
-              fecha_ultima_mantencion: finalFecha || undefined,
-              tipoUltimoMant: finalPauta,
-              tipo_ultimo_mant: finalPauta,
-              detalles: newDetalles
-            };
-          }
-          return v;
-        }));
-
-        // 2. Revertir en Supabase
         await supabase.from('vehiculo').update({
           km_ultima_mantencion: finalKm,
           fecha_ultima_mantencion: finalFecha,
           tipo_ultimo_mant: finalPauta,
-          detalles: newDetalles
+          detalles: mergedDetalles
         }).eq('id', vehId);
-
-        // 3. Notificar a componentes en tiempo real
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('vehiculo-actualizado', { 
-            detail: { vehiculoId: vehId, kmCierre: finalKm, fechaMant: finalFecha, tipoMant: finalPauta } 
-          }));
-          window.dispatchEvent(new CustomEvent('ot-actualizada', { 
-            detail: { otId: id, vehiculoId: vehId } 
-          }));
-        }
-      } catch (revErr) {
-        console.warn("Aviso al recalcular última mantención tras eliminar OT:", revErr);
       }
-    }
-
-    if (!skipConfirm) {
-      Swal.fire('¡Eliminada!', 'La Orden de Trabajo ha sido eliminada y la última mantención del vehículo se recalculó al estado previo.', 'success');
+    } catch (err) {
+      console.warn("Aviso en persistencia background tras eliminar OT:", err);
     }
   };
 
@@ -981,17 +996,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         : undefined;
       const fechaMant = (otCerrada.termino_proceso || otCerrada.fechaProgramada || new Date().toISOString()).split('T')[0];
 
-      // 1. Actualización Inmediata en Memoria (State Local React)
+      let newDetallesLocal: any = {};
+      let finalPautaLocal = 'SM1';
+
+      // 1. Actualización Inmediata en Memoria (State Local React) - 0 ms
       setVehiculos(prev => prev.map(v => {
         if (String(v.id) === String(vehId)) {
-          const finalPauta = tipoMant || v.tipoUltimoMant || v.tipo_ultimo_mant || 'SM1';
+          finalPautaLocal = tipoMant || v.tipoUltimoMant || v.tipo_ultimo_mant || 'SM1';
           const newKmMax = Math.max(kmCierre, Number(v.kilometrajeActual || v.kilometraje_actual || 0));
           const existingDetalles = v.detalles || {};
-          const newDetalles = {
+          
+          // Preservar línea base original para no perderla jamás en futuros rollbacks
+          const kmLineaBase = existingDetalles.km_linea_base || existingDetalles.km_ultima_mantencion_inicial || v.km_ultima_mantencion || v.kmUltimaMantencion;
+          const fechaLineaBase = existingDetalles.fecha_linea_base || existingDetalles.fecha_ultima_mantencion_inicial || v.fecha_ultima_mantencion || v.fechaUltimaMantencion;
+          const tipoLineaBase = existingDetalles.tipo_linea_base || existingDetalles.tipo_ultimo_mant_inicial || v.tipo_ultimo_mant || v.tipoUltimoMant;
+
+          newDetallesLocal = {
             ...existingDetalles,
+            km_linea_base: kmLineaBase,
+            fecha_linea_base: fechaLineaBase,
+            tipo_linea_base: tipoLineaBase,
             km_ultima_mantencion: kmCierre,
             fecha_ultima_mantencion: fechaMant,
-            tipo_ultimo_mant: finalPauta
+            tipo_ultimo_mant: finalPautaLocal
           };
           return {
             ...v,
@@ -1001,60 +1028,62 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             km_ultima_mantencion: kmCierre,
             fechaUltimaMantencion: fechaMant,
             fecha_ultima_mantencion: fechaMant,
-            tipoUltimoMant: finalPauta,
-            tipo_ultimo_mant: finalPauta,
-            detalles: newDetalles
+            tipoUltimoMant: finalPautaLocal,
+            tipo_ultimo_mant: finalPautaLocal,
+            detalles: newDetallesLocal
           };
         }
         return v;
       }));
 
-      // 2. Persistencia en Supabase (Columnas y Detalles JSONB)
-      const { data: vParams } = await supabase
-        .from('vehiculo')
-        .select('id, kilometraje_actual, km_ultima_mantencion, tipo_ultimo_mant, detalles')
-        .eq('id', vehId)
-        .maybeSingle();
-
-      const currentKmMax = vParams ? Math.max(kmCierre, Number(vParams.kilometraje_actual || 0)) : kmCierre;
-      const finalPauta = tipoMant || vParams?.tipo_ultimo_mant || vParams?.detalles?.tipo_ultimo_mant || 'SM1';
-      const existingDetalles = vParams?.detalles || {};
-      const newDetalles = {
-        ...existingDetalles,
-        km_ultima_mantencion: kmCierre,
-        fecha_ultima_mantencion: fechaMant,
-        tipo_ultimo_mant: finalPauta
-      };
-
-      const updatePayload: any = {
-        km_ultima_mantencion: kmCierre,
-        fecha_ultima_mantencion: fechaMant,
-        tipo_ultimo_mant: finalPauta,
-        kilometraje_actual: currentKmMax,
-        fecha_actualizacion_km: new Date().toISOString(),
-        detalles: newDetalles
-      };
-
-      const { error: updateErr } = await supabase
-        .from('vehiculo')
-        .update(updatePayload)
-        .eq('id', vehId);
-
-      if (updateErr) {
-        console.warn("Aviso al actualizar vehiculo en BD al cerrar OT:", updateErr);
-      } else {
-        console.log(`Vehículo ${vehId} actualizado con éxito: KM ${kmCierre}, Fecha ${fechaMant}, Pauta ${finalPauta}`);
-      }
-
-      // 3. Notificación a componentes de UI activos
+      // 2. Disparar evento reactivo de inmediato (0 ms)
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('vehiculo-actualizado', { 
-          detail: { vehiculoId: vehId, kmCierre, fechaMant, tipoMant: finalPauta } 
+          detail: { vehiculoId: vehId, kmCierre, fechaMant, tipoMant: finalPautaLocal } 
         }));
         window.dispatchEvent(new CustomEvent('ot-actualizada', { 
           detail: { otId: otCerrada.id, vehiculoId: vehId } 
         }));
       }
+
+      // 3. Persistencia en Supabase en background
+      const { data: vParams } = await supabase
+        .from('vehiculo')
+        .select('id, kilometraje_actual, km_ultima_mantencion, fecha_ultima_mantencion, tipo_ultimo_mant, detalles')
+        .eq('id', vehId)
+        .maybeSingle();
+
+      const currentKmMax = vParams ? Math.max(kmCierre, Number(vParams.kilometraje_actual || 0)) : kmCierre;
+      const existingDetalles = vParams?.detalles || {};
+      const kmLineaBase = existingDetalles.km_linea_base || existingDetalles.km_ultima_mantencion_inicial || vParams?.km_ultima_mantencion;
+      const fechaLineaBase = existingDetalles.fecha_linea_base || existingDetalles.fecha_ultima_mantencion_inicial || vParams?.fecha_ultima_mantencion;
+      const tipoLineaBase = existingDetalles.tipo_linea_base || existingDetalles.tipo_ultimo_mant_inicial || vParams?.tipo_ultimo_mant;
+
+      const newDetalles = {
+        ...existingDetalles,
+        ...newDetallesLocal,
+        km_linea_base: kmLineaBase,
+        fecha_linea_base: fechaLineaBase,
+        tipo_linea_base: tipoLineaBase,
+        km_ultima_mantencion: kmCierre,
+        fecha_ultima_mantencion: fechaMant,
+        tipo_ultimo_mant: finalPautaLocal
+      };
+
+      const updatePayload: any = {
+        km_ultima_mantencion: kmCierre,
+        fecha_ultima_mantencion: fechaMant,
+        tipo_ultimo_mant: finalPautaLocal,
+        kilometraje_actual: currentKmMax,
+        fecha_actualizacion_km: new Date().toISOString(),
+        detalles: newDetalles
+      };
+
+      await supabase
+        .from('vehiculo')
+        .update(updatePayload)
+        .eq('id', vehId);
+
     } catch (ve) {
       console.error("Error en sincronizarCierreOTVehiculo:", ve);
     }

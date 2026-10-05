@@ -279,7 +279,42 @@ export default function PizarraMantenimiento() {
       fetchVehiculos();
     }, 60000);
 
-    const handleSync = () => {
+    const handleSync = (e?: any) => {
+      const detail = e?.detail;
+      if (detail && detail.vehiculoId) {
+        setDataFlota(prev => {
+          return prev.map(fila => {
+            if (String(fila.id) === String(detail.vehiculoId)) {
+              const rawKmCierre = Number(detail.kmCierre || 0);
+              const rawFecha = detail.fechaMant ? new Date(detail.fechaMant) : fila.fechaUltimaMantencion;
+              const rawTipo = detail.tipoMant || fila.tipoUltimoMantencion || fila.tipoUltimaPauta;
+              const vehActualizado: any = {
+                ...fila,
+                kmUltimaMantencion: rawKmCierre,
+                fechaUltimaMantencion: rawFecha,
+                tipoUltimoMantencion: rawTipo,
+                tipoUltimaPauta: rawTipo,
+                detalles: {
+                  ...(fila.detalles || {}),
+                  km_ultima_mantencion: rawKmCierre,
+                  fecha_ultima_mantencion: detail.fechaMant,
+                  tipo_ultimo_mant: rawTipo
+                }
+              };
+              const calculos = calcularDatosPizarra(vehActualizado);
+              return {
+                ...vehActualizado,
+                ...calculos,
+                kmUltimaMantencion: rawKmCierre,
+                fechaUltimaMantencion: rawFecha,
+                tipoUltimoMantencion: rawTipo,
+                tipoUltimaPauta: rawTipo
+              };
+            }
+            return fila;
+          });
+        });
+      }
       fetchVehiculos();
     };
 
