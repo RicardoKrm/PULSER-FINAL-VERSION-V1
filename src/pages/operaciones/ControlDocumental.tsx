@@ -147,7 +147,7 @@ export default function ControlDocumental() {
     handleFileUpload(e.dataTransfer.files);
   };
 
-  const today = new Date("2026-05-12").getTime();
+  const today = new Date().getTime();
 
   useEffect(() => {
     fetchData();

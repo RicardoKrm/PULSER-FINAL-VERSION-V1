@@ -30,21 +30,29 @@ export default function Dashboard() {
   const { user, ordenesTrabajo, vehiculos } = useAppContext() as any;
   const { currentCompany } = useCompany();
   const [dbVehiculos, setDbVehiculos] = useState<any[]>([]);
+  const [dbColaboradores, setDbColaboradores] = useState<any[]>([]);
   const [fechaDesde, setFechaDesde] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
   const [fechaHasta, setFechaHasta] = useState(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0]);
 
   React.useEffect(() => {
     if (!currentCompany?.id) return;
-    const fetchVehs = async () => {
-      const { data } = await supabase.from('vehiculo').select('*').eq('empresa_id', currentCompany.id);
-      if (data) {
-        const { data: pautasData } = await supabase.from('mantenimiento_pauta').select('*, modelo:mantenimiento_modelo_vehiculo(nombre)').eq('empresa_id', currentCompany.id);
+    const fetchData = async () => {
+      const [vehRes, colRes] = await Promise.all([
+        supabase.from('vehiculo').select('*').eq('empresa_id', currentCompany.id),
+        supabase.from('colaborador').select('*').eq('empresa_id', currentCompany.id)
+      ]);
 
-        const mapped = data.map(v => mapearVehiculoDB(v, pautasData || [], ordenesTrabajo || []));
+      if (vehRes.data) {
+        const { data: pautasData } = await supabase.from('mantenimiento_pauta').select('*, modelo:mantenimiento_modelo_vehiculo(nombre)').eq('empresa_id', currentCompany.id);
+        const mapped = vehRes.data.map(v => mapearVehiculoDB(v, pautasData || [], ordenesTrabajo || []));
         setDbVehiculos(mapped);
       }
+
+      if (colRes.data) {
+        setDbColaboradores(colRes.data);
+      }
     };
-    fetchVehs();
+    fetchData();
   }, [currentCompany?.id, ordenesTrabajo]);
 
   const { 
@@ -73,17 +81,21 @@ export default function Dashboard() {
     ];
 
     // 2. Salud Flota y Disponibilidad
-    let vencidos = 0;
+    let vencidosMantenimiento = 0;
     let proximos = 0;
     let alDia = 0;
     let vehiculosDisponibles = 0;
+    
+    let docsVencidos = 0;
+    const todayMs = new Date().getTime();
 
     const totalDb = dbVehiculos?.length || 0;
     (dbVehiculos || []).forEach((v: any) => {
+       // Check maintenance status
        try {
          const calculo = calcularDatosPizarra(v);
          if (calculo.estatus === 'VENCIDO') {
-           vencidos++;
+           vencidosMantenimiento++;
          } else if (calculo.estatus === 'PROXIMO') {
            proximos++;
          } else {
@@ -92,7 +104,32 @@ export default function Dashboard() {
        } catch (err) {
          alDia++; // Fallback
        }
+       
+       // Check document expiration (Vehicles)
+       const detalles = v.detalles || {};
+       if (detalles.vencimientoRev && new Date(detalles.vencimientoRev).getTime() < todayMs) {
+         docsVencidos++;
+       }
+       if (detalles.vencimientoSeguro && new Date(detalles.vencimientoSeguro).getTime() < todayMs) {
+         docsVencidos++;
+       }
     });
+
+    // Check document expiration (Drivers/Colaboradores)
+    (dbColaboradores || []).forEach((d: any) => {
+       const detalles = d.detalles || {};
+       if (detalles.vencimientoLicencia && new Date(detalles.vencimientoLicencia).getTime() < todayMs) {
+         docsVencidos++;
+       }
+       if (detalles.vencimientoSalud && new Date(detalles.vencimientoSalud).getTime() < todayMs) {
+         docsVencidos++;
+       }
+       if (detalles.vacaciones === "Vencidas") {
+         docsVencidos++;
+       }
+    });
+    
+    const totalAlertasCriticas = vencidosMantenimiento + docsVencidos;
 
     const otsEnCurso = otsEmpresa.filter((ot: any) => ['CREADA', 'EN_PROGRESO', 'PAUSADA'].includes(ot.estado)).map((ot: any) => ot.vehiculoId);
     let indisponibles = new Set(otsEnCurso).size;
@@ -175,7 +212,7 @@ export default function Dashboard() {
     cuellosArr.sort((a, b) => b.value - a.value);
 
     // 5. Cumplimiento Prev (Cumplimiento de Cronograma)
-    let cumpPrev = totalDb > 0 ? Math.max(0, 100 - ((vencidos / totalDb) * 100)) : 0;
+    let cumpPrev = totalDb > 0 ? Math.max(0, 100 - ((vencidosMantenimiento / totalDb) * 100)) : 0;
 
     return {
       tendenciaData: tendencia,
@@ -185,10 +222,10 @@ export default function Dashboard() {
       disponibilidad: (dispActual || 0).toFixed(1),
       cumplimientoPrev: (cumpPrev || 0).toFixed(1),
       gastoMensual: gastoTotalMesActual.toLocaleString(),
-      alertasCriticas: vencidos,
-      saludFlota: { vencidos, proximos, alDia }
+      alertasCriticas: totalAlertasCriticas,
+      saludFlota: { vencidos: vencidosMantenimiento, proximos, alDia }
     };
-  }, [ordenesTrabajo, vehiculos, dbVehiculos]);
+  }, [ordenesTrabajo, vehiculos, dbVehiculos, dbColaboradores]);
 
 
   const handleFilter = () => {
@@ -308,7 +345,7 @@ export default function Dashboard() {
 
         {/* Card 4 */}
         <div 
-          onClick={() => navigate('/operaciones/alertas')}
+          onClick={() => navigate('/flota/alertas')}
           className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm p-4 relative overflow-hidden flex flex-col justify-between h-32 cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-500 hover:shadow-md transition-all group"
         >
           <div className="flex justify-between items-start">
