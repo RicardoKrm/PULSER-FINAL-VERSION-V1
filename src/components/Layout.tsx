@@ -30,7 +30,7 @@ import { useCompany } from "../contexts/CompanyContext";
 import { useAppContext } from "../context/AppContext";
 import { useAuth } from "../context/AuthContext";
 import { WhatsAppButton } from "./WhatsAppButton";
-import { supabase } from "../lib/supabase";
+import { supabase, logActividad } from "../lib/supabase";
 import Swal from "sweetalert2";
 
 export default function Layout() {
@@ -251,6 +251,40 @@ export default function Layout() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // Navegación Tracker
+  useEffect(() => {
+    if (!profile || !profile.id) return;
+    
+    // Ignorar redirecciones automáticas iniciales o la raíz vacía si se desea
+    if (location.pathname === '/' || location.pathname === '') return;
+
+    let moduloNombre = 'Navegación';
+    let panelNombre = location.pathname;
+
+    for (const item of navigation) {
+      if (item.submodules) {
+        const sub = item.submodules.find(s => location.pathname === s.href || location.pathname.startsWith(s.href + '/'));
+        if (sub) {
+          moduloNombre = item.title;
+          panelNombre = sub.title;
+          break;
+        }
+      } else if (item.href && (location.pathname === item.href || location.pathname.startsWith(item.href + '/'))) {
+        moduloNombre = item.title;
+        panelNombre = item.title;
+        break;
+      }
+    }
+
+    logActividad(
+      moduloNombre,
+      'Ingreso a Panel',
+      `El usuario ingresó a la vista de ${panelNombre}`,
+      activeCompanyId,
+      profile.id
+    );
+  }, [location.pathname, profile?.id, activeCompanyId]);
 
   const toggleMenu = (title: string) => {
     setExpandedMenus((prev) => (prev.includes(title) ? [] : [title]));
