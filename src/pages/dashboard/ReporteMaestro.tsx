@@ -4,6 +4,8 @@ import {
   FileSpreadsheet, FileText, Settings2, Download, Table2, Filter, 
   Calendar, Check, Circle, BarChart2, CheckSquare, Search, Copy, Printer, CheckCircle2, ChevronDown, ChevronRight, Info, Package, Fuel, DollarSign, Users, Truck, Wrench, CircleDot
 } from 'lucide-react';
+import { useAppContext } from '../../context/AppContext';
+import { exportToExcel } from '../../lib/excelExport';
 
 // Formatters
 const formatCurrency = (value: number) => {
@@ -31,13 +33,9 @@ const moduleColumns = {
   rrhh: ['ID Empleado', 'Nombre Completo', 'RUT', 'Cargo', 'Departamento', 'OTs Finalizadas', 'Minutos Trabajados', 'Productividad Estándar', 'Sueldo Base ($)', 'Horas Extras'],
 };
 
-// Mock Previews
-const generateMockData = (moduleId: string) => {
-  return [];
-};
-
-
 export default function ReporteMaestro() {
+  const { ordenesTrabajo, vehiculos, repuestos, personal } = useAppContext() as any;
+
   const [activeModule, setActiveModule] = useState<string>('mantenimiento');
   const [selectedFormat, setSelectedFormat] = useState<'excel' | 'pdf' | 'csv'>('excel');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -62,16 +60,107 @@ export default function ReporteMaestro() {
     setSelectedColumns(moduleColumns[modId as keyof typeof moduleColumns]); // reset columns for new module
   };
 
-  const handleGenerate = () => {
-    setIsGenerating(true);
-    setTimeout(() => {
-      setIsGenerating(false);
-      setAlertMsg(`El archivo Reporte_${activeModule.toUpperCase()}_v1.${selectedFormat} se encuentra listo para descargar.`);
-      setTimeout(() => setAlertMsg(''), 5000);
-    }, 2000);
+  const generateReportData = () => {
+    let data: any[] = [];
+    if (activeModule === 'mantenimiento') {
+      data = (ordenesTrabajo || []).map((ot: any) => ({
+        'Folio OT': ot.folio || ot.id || '',
+        'Vehículo': ot.numero_interno || ot.vehiculoNumeroInterno || '',
+        'Patente': ot.patente || ot.vehiculoPatente || '',
+        'Fecha Apertura': ot.fechaApertura || ot.fechaCreacion || '',
+        'Fecha Cierre': ot.fechaCierre || ot.fechaTermino || '',
+        'Estado': ot.estado || '',
+        'Tipo': ot.tipo || '',
+        'Tipo Falla': ot.tipoFalla || ot.fallaObservada || '',
+        'Responsable': ot.responsable || ot.creadoPor || '',
+        'Costo Mano Obra': ot.costoManoObra || ot.costoManoObraTotal || 0,
+        'Costo Repuestos': ot.costoRepuestos || ot.costoInsumos || 0,
+        'Costo Total OT': (ot.costoManoObra || 0) + (ot.costoRepuestos || ot.costoInsumos || 0),
+        'TFS (Min)': ot.tfsMinutos || 0
+      }));
+    } else if (activeModule === 'flota') {
+      data = (vehiculos || []).map((v: any) => {
+        const detalles = v.detalles || {};
+        return {
+          'Nº Interno': v.numero_interno || v.numeroInterno || '',
+          'Patente': v.patente || '',
+          'Marca/Modelo': `${v.marca || detalles.marca || ''} / ${v.modelo || detalles.modelo || ''}`,
+          'Norma Euro': v.norma_euro || detalles.norma_euro || '',
+          'Tipo Aceite': v.tipo_aceite || detalles.tipo_aceite || '',
+          'KM Actual': v.kilometraje_actual || v.kilometrajeActual || 0,
+          'Intervalo Mantenimiento': v.intervalo_km || detalles.intervalo_km || 10000,
+          'KM Últ. Mant.': v.km_ultima_mantencion || detalles.km_ultima_mantencion || 0,
+          'Fecha Últ. Mant.': v.fecha_ultima_mantencion || detalles.fecha_ultima_mantencion || '',
+          'Estado Flota': v.estado || 'Activo',
+          'Aplicación': v.aplicacion || detalles.aplicacion || ''
+        };
+      });
+    } else if (activeModule === 'inventario') {
+      data = (repuestos || []).map((r: any) => ({
+        'SKU': r.sku || r.codigo || '',
+        'Nombre Repuesto': r.nombre || '',
+        'Calidad': r.calidad || '',
+        'Stock Actual': r.stockActual || r.stock || 0,
+        'Stock Mínimo': r.stockMinimo || 0,
+        'Valor Unitario ($)': r.valorUnitario || r.precio || 0,
+        'Valorización Total ($)': (r.stockActual || r.stock || 0) * (r.valorUnitario || r.precio || 0),
+        'Bodega': r.bodega || '',
+        'Proveedor Habitual': r.proveedor || '',
+        'Nivel Criticidad': r.criticidad || '',
+        'Último Movimiento': r.ultimoMovimiento || ''
+      }));
+    } else if (activeModule === 'rrhh') {
+      data = (personal || []).map((p: any) => ({
+        'ID Empleado': p.id || '',
+        'Nombre Completo': p.nombre || '',
+        'RUT': p.rut || '',
+        'Cargo': p.cargo || '',
+        'Departamento': p.departamento || '',
+        'OTs Finalizadas': p.otsFinalizadas || 0,
+        'Minutos Trabajados': p.minutosTrabajados || 0,
+        'Productividad Estándar': p.productividad || '100%',
+        'Sueldo Base ($)': p.sueldo || 0,
+        'Horas Extras': p.horasExtras || 0
+      }));
+    }
+    
+    // Fallback if data is still empty (module not fully hooked up in context)
+    if (data.length === 0) {
+      data = [{ [currentColumns[0]]: 'Sin datos disponibles para este módulo' }];
+    }
+    return data;
   };
 
-  const currentMockData = generateMockData(activeModule);
+  const handleGenerate = () => {
+    setIsGenerating(true);
+    
+    const dataToExport = generateReportData().map(row => {
+      // Keep only selected columns
+      const filteredRow: any = {};
+      selectedColumns.forEach(col => {
+        filteredRow[col] = row[col];
+      });
+      return filteredRow;
+    });
+
+    setTimeout(() => {
+      setIsGenerating(false);
+      
+      const fechaStr = new Date().toISOString().split('T')[0];
+      const fileName = `Reporte_${activeModule.toUpperCase()}_${fechaStr}`;
+      
+      try {
+        exportToExcel(dataToExport, fileName, activeModule.toUpperCase());
+        setAlertMsg(`El archivo ${fileName}.xlsx se ha descargado exitosamente.`);
+      } catch (err) {
+        setAlertMsg(`Error al generar el archivo.`);
+      }
+      
+      setTimeout(() => setAlertMsg(''), 5000);
+    }, 1000);
+  };
+
+  const currentMockData = generateReportData();
 
   return (
     <div className="p-6 w-full max-w-[1600px] mx-auto min-h-screen">
@@ -95,13 +184,10 @@ export default function ReporteMaestro() {
             initial={{ opacity: 0, y: -20, height: 0 }} 
             animate={{ opacity: 1, y: 0, height: 'auto' }} 
             exit={{ opacity: 0, y: -20, height: 0 }}
-            className="mb-6 p-4 rounded-xl font-bold flex items-center gap-3 shadow-sm bg-emerald-50 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+            className={`mb-6 p-4 rounded-xl font-bold flex items-center gap-3 shadow-sm border ${alertMsg.includes('Error') ? 'bg-red-50 text-red-800 border-red-200' : 'bg-emerald-50 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'}`}
           >
             <CheckCircle2 className="w-5 h-5" />
             {alertMsg}
-            <button className="ml-auto bg-emerald-600 text-white px-4 py-1.5 rounded-lg shadow-sm text-xs hover:bg-emerald-700 transition-colors uppercase tracking-wider font-black">
-              Descargar Archivo
-            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -249,64 +335,53 @@ export default function ReporteMaestro() {
                     <button 
                       key={col}
                       onClick={() => toggleColumn(col)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all border
+                      className={`px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all duration-200
                         ${isAssigned 
-                          ? 'bg-slate-900 border-slate-900 text-white dark:bg-slate-700 dark:border-slate-700 shadow-sm' 
-                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-400 hover:text-slate-800 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-200'}
+                          ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 ring-2 ring-indigo-600 ring-offset-2 ring-offset-white dark:ring-offset-slate-900' 
+                          : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-indigo-300 hover:text-indigo-600 dark:hover:text-indigo-400'
+                        }
                       `}
                     >
-                      <div className="flex items-center gap-1.5">
-                        {isAssigned ? <Check className="w-3.5 h-3.5" /> : <div className="w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-slate-600" />}
-                        {col}
-                      </div>
+                      {isAssigned ? <CheckSquare className="w-4 h-4" /> : <Circle className="w-4 h-4 text-slate-300 dark:text-slate-600" />}
+                      {col}
                     </button>
-                  )
+                  );
                 })}
               </div>
             </div>
           </div>
 
-          {/* Data Table Preview */}
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-800 flex-grow flex flex-col min-h-[500px] overflow-hidden">
-             <div className="p-4 md:p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+          {/* Preview Section */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm flex flex-col">
+             <div className="p-4 md:p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/30">
                <div>
                  <h2 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                   <Table2 className="w-5 h-5 text-emerald-500" />
-                   Vista Previa de Datos Reales
+                   <Table2 className="w-5 h-5 text-indigo-500" />
+                   Vista Previa de Datos
                  </h2>
-                 <p className="text-xs font-bold text-slate-500 mt-1 tracking-wider uppercase dark:text-slate-400">
-                   Módulo: {reportModules.find(m => m.id === activeModule)?.name}
-                 </p>
-               </div>
-               <div className="flex gap-2">
-                 <button className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
-                   <Copy className="w-4 h-4" />
-                 </button>
-                 <button className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
-                   <Printer className="w-4 h-4" />
-                 </button>
+                 <p className="text-sm text-slate-500 font-medium mt-1 dark:text-slate-400">Previsualización en vivo (solo los primeros 10 registros).</p>
                </div>
              </div>
-
-             <div className="flex-grow overflow-auto relative">
-                <table className="w-full text-left border-collapse whitespace-nowrap hidden sm:table">
-                  <thead className="sticky top-0 bg-white dark:bg-slate-900 z-10 shadow-[0_1px_0_theme(colors.slate.200)] dark:shadow-[0_1px_0_theme(colors.slate.800)]">
+             
+             {/* Dynamic Table Preview */}
+             <div className="flex-1 w-full overflow-x-auto custom-scrollbar relative">
+                <table className="w-full text-left hidden sm:table">
+                  <thead className="bg-slate-50 dark:bg-slate-800/60 sticky top-0 z-10 border-b border-slate-200 dark:border-slate-800">
                     <tr>
-                      {selectedColumns.map((col, idx) => (
-                        <th key={idx} className="p-4 text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest bg-slate-50/80 dark:bg-slate-800/80 backdrop-blur-md">
+                      {selectedColumns.map(col => (
+                        <th key={col} className="p-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider whitespace-nowrap bg-slate-50 dark:bg-slate-800/90">
                           {col}
                         </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                    {currentMockData.length > 0 ? currentMockData.map((row, rowIdx) => (
+                    {currentMockData.length > 0 && !currentMockData[0]['Sin datos disponibles para este módulo'] ? currentMockData.slice(0, 10).map((row, rowIdx) => (
                       <tr key={rowIdx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors group">
                         {selectedColumns.map((col, colIdx) => {
-                          const originalIdx = currentColumns.indexOf(col);
-                          const val = row[originalIdx];
+                          const val = row[col];
                           return (
-                            <td key={colIdx} className="p-4 text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white">
+                            <td key={colIdx} className="p-4 text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white whitespace-nowrap">
                               {/* Add some basic visual distinctness for common values like statuses */}
                               {val === 'FINALIZADA' || val === 'PREVENTIVA' ? (
                                 <span className="bg-emerald-100/50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-2 py-1 rounded-md text-xs font-bold">{val}</span>
@@ -315,7 +390,7 @@ export default function ReporteMaestro() {
                               ) : typeof col === 'string' && (col.includes('($)') || col.includes('Costo')) ? (
                                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{val}</span>
                               ) : (
-                                val
+                                val !== null && val !== undefined && val !== '' ? val : '—'
                               )}
                             </td>
                           );
@@ -323,7 +398,7 @@ export default function ReporteMaestro() {
                       </tr>
                     )) : (
                       <tr>
-                        <td colSpan={selectedColumns.length} className="p-8 text-center text-slate-500 font-medium">Sin registros disponibles para el período</td>
+                        <td colSpan={selectedColumns.length} className="p-8 text-center text-slate-500 font-medium">Sin registros disponibles para el período o módulo seleccionado</td>
                       </tr>
                     )}
                   </tbody>
@@ -338,8 +413,8 @@ export default function ReporteMaestro() {
              </div>
 
              <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 flex justify-between items-center text-xs font-bold text-slate-500 dark:text-slate-400">
-               <span className="flex items-center gap-1.5"><Info className="w-4 h-4" /> Mostrando muestra de 8 registros de la base de datos real.</span>
-               <span className="px-2 py-1 bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800">12,450 filas aproximadas en total</span>
+               <span className="flex items-center gap-1.5"><Info className="w-4 h-4" /> Mostrando muestra de los registros.</span>
+               <span className="px-2 py-1 bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800">Total: {currentMockData[0]['Sin datos disponibles para este módulo'] ? 0 : currentMockData.length} registros</span>
              </div>
           </div>
 
@@ -349,4 +424,3 @@ export default function ReporteMaestro() {
     </div>
   );
 }
-
