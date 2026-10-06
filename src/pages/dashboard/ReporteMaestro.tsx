@@ -150,8 +150,24 @@ export default function ReporteMaestro() {
       const fileName = `Reporte_${activeModule.toUpperCase()}_${fechaStr}`;
       
       try {
-        exportToExcel(dataToExport, fileName, activeModule.toUpperCase());
-        setAlertMsg(`El archivo ${fileName}.xlsx se ha descargado exitosamente.`);
+        if (selectedFormat === 'pdf') {
+          import('../../lib/pdfExport').then(({ exportToPDF }) => {
+             exportToPDF(dataToExport, fileName, `Reporte: ${activeModule.toUpperCase()}`);
+             setAlertMsg(`El archivo ${fileName}.pdf se ha descargado exitosamente.`);
+          });
+        } else if (selectedFormat === 'csv') {
+          // XLSX library can write CSV if we provide the right filename and bookType
+          import('xlsx').then(XLSX => {
+            const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Data');
+            XLSX.writeFile(workbook, `${fileName}.csv`, { bookType: 'csv' });
+            setAlertMsg(`El archivo ${fileName}.csv se ha descargado exitosamente.`);
+          });
+        } else {
+          exportToExcel(dataToExport, fileName, activeModule.toUpperCase());
+          setAlertMsg(`El archivo ${fileName}.xlsx se ha descargado exitosamente.`);
+        }
       } catch (err) {
         setAlertMsg(`Error al generar el archivo.`);
       }
