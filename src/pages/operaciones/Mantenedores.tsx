@@ -3,10 +3,15 @@ import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Building2, Users, MapPin, Plus, Trash2, Search, Edit2, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { supabase } from '../../lib/supabase';
+import { supabase, logActividad } from '../../lib/supabase';
+import { useCompany } from '../../contexts/CompanyContext';
+import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 
 export default function Mantenedores() {
+  const { activeCompanyId } = useCompany();
+  const { profile } = useAuth();
+  
   const [activeTab, setActiveTab] = useState('empresas');
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -20,16 +25,35 @@ export default function Mantenedores() {
   const [editingId, setEditingId] = useState<number | null>(null);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (activeCompanyId) {
+      fetchData();
+    }
+  }, [activeCompanyId]);
+
+  // Funciones seguras (con fallback) para garantizar compatibilidad con esquemas antiguos que no tengan empresa_id
+  const safeSelect = async (table: string) => {
+    let res = await supabase.from(table).select('*').eq('empresa_id', activeCompanyId).order('id', { ascending: true });
+    if (res.error && res.error.message.includes('empresa_id')) {
+      res = await supabase.from(table).select('*').order('id', { ascending: true });
+    }
+    return res;
+  };
+
+  const safeInsert = async (table: string, payload: any) => {
+    let res = await supabase.from(table).insert([{ ...payload, empresa_id: activeCompanyId }]).select();
+    if (res.error && res.error.message.includes('empresa_id')) {
+      res = await supabase.from(table).insert([payload]).select();
+    }
+    return res;
+  };
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
       const [resEmpresas, resTipos, resRutas] = await Promise.all([
-        supabase.from('empresa_cliente').select('*').order('id', { ascending: true }),
-        supabase.from('tipo_cliente_empresa').select('*').order('id', { ascending: true }),
-        supabase.from('rutas_origen_destino').select('*').order('id', { ascending: true }),
+        safeSelect('empresa_cliente'),
+        safeSelect('tipo_cliente_empresa'),
+        safeSelect('rutas_origen_destino')
       ]);
 
       if (resEmpresas.data) setEmpresas(resEmpresas.data);
@@ -59,22 +83,26 @@ export default function Mantenedores() {
           const { error } = await supabase.from('rutas_origen_destino').update({ ruta: newItem }).eq('id', editingId);
           if (error) throw error;
         }
+        
+        await logActividad('Mantenedores', 'Edición de Registro', `El usuario editó el registro ID ${editingId} en la pestaña ${activeTab} a "${newItem}"`, activeCompanyId, profile?.id);
         toast.success('Registro actualizado exitosamente');
       } else {
         // Create mode
         if(activeTab === 'empresas') {
-          const { data, error } = await supabase.from('empresa_cliente').insert([{ nombre: newItem }]).select();
+          const { data, error } = await safeInsert('empresa_cliente', { nombre: newItem });
           if (error) throw error;
           if (data) setEmpresas([...empresas, data[0]]);
         } else if(activeTab === 'tiposCliente') {
-          const { data, error } = await supabase.from('tipo_cliente_empresa').insert([{ nombre: newItem }]).select();
+          const { data, error } = await safeInsert('tipo_cliente_empresa', { nombre: newItem });
           if (error) throw error;
           if (data) setTiposCliente([...tiposCliente, data[0]]);
         } else if(activeTab === 'origenes') {
-          const { data, error } = await supabase.from('rutas_origen_destino').insert([{ ruta: newItem }]).select();
+          const { data, error } = await safeInsert('rutas_origen_destino', { ruta: newItem });
           if (error) throw error;
           if (data) setOrigenes([...origenes, data[0]]);
         }
+        
+        await logActividad('Mantenedores', 'Creación de Registro', `El usuario creó el registro "${newItem}" en la pestaña ${activeTab}`, activeCompanyId, profile?.id);
         toast.success('Registro creado exitosamente');
       }
       
@@ -108,6 +136,8 @@ export default function Mantenedores() {
         if (error) throw error;
         setOrigenes(origenes.filter(e => e.id !== id));
       }
+      
+      await logActividad('Mantenedores', 'Eliminación de Registro', `El usuario eliminó el registro ID ${id} en la pestaña ${activeTab}`, activeCompanyId, profile?.id);
       toast.success('Registro eliminado');
     } catch (error: any) {
       console.error('Error deleting:', error);
