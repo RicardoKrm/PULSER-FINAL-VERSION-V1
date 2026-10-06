@@ -201,12 +201,12 @@ export default function LogActividad() {
               title="Filtrar por fecha"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="py-1.5 text-sm bg-transparent text-slate-900 dark:text-white outline-none font-semibold cursor-pointer"
+              className="py-1.5 px-2 text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white rounded border border-slate-200 dark:border-slate-700 outline-none font-semibold cursor-pointer"
             />
           </div>
           <select
             title="Filtrar por empresa"
-            className="px-3 py-1.5 text-sm bg-transparent text-slate-900 dark:text-white outline-none font-semibold cursor-pointer"
+            className="px-3 py-1.5 text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white rounded border border-slate-200 dark:border-slate-700 outline-none font-semibold cursor-pointer"
             value={selectedCompany}
             onChange={(e) => setSelectedCompany(e.target.value)}
           >
