@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -17,6 +17,7 @@ import FlotaAlertas from './pages/flota/Alertas';
 import Contratos from './pages/operaciones/Contratos';
 import CrearServicio from './pages/operaciones/CrearServicio';
 import Programacion from './pages/operaciones/Programacion';
+import ConfiguracionAlertas from './pages/configuracion/ConfiguracionAlertas';
 import Mantenedores from './pages/operaciones/Mantenedores';
 import Reservas from './pages/operaciones/Reservas';
 import ProduccionLayout from './pages/produccion/ProduccionLayout';

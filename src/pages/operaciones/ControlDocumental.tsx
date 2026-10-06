@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -116,7 +116,7 @@ export default function ControlDocumental() {
   };
 
   const handleDeleteDocumento = async (docId: string) => {
-    if (!confirm("¿Estás seguro de que deseas eliminar este documento?"))
+    if (!confirm("Â¿EstÃ¡s seguro de que deseas eliminar este documento?"))
       return;
     try {
       const { error } = await supabase
@@ -147,9 +147,22 @@ export default function ControlDocumental() {
     handleFileUpload(e.dataTransfer.files);
   };
 
+  const [alertConfig, setAlertConfig] = useState({
+    diasAvisoLicencia: 15,
+    diasAvisoSalud: 15,
+    diasAvisoRevision: 30,
+    diasAvisoSeguro: 30
+  });
+
   const today = new Date().getTime();
 
   useEffect(() => {
+    if (activeCompanyId) {
+      const saved = localStorage.getItem(`config_alertas_${activeCompanyId}`);
+      if (saved) {
+        setAlertConfig(JSON.parse(saved));
+      }
+    }
     fetchData();
   }, [activeCompanyId]);
 
@@ -177,7 +190,7 @@ export default function ControlDocumental() {
             vencimientoLicencia:
               d.detalles?.vencimientoLicencia || "2026-12-31",
             vencimientoSalud: d.detalles?.vencimientoSalud || "2026-12-31",
-            vacaciones: d.detalles?.vacaciones || "Al día",
+            vacaciones: d.detalles?.vacaciones || "Al dÃ­a",
           })),
         );
       }
@@ -186,7 +199,7 @@ export default function ControlDocumental() {
         setVehicles(
           vRes.data.map((v: any) => ({
             ...v,
-            tipo: v.tipo || "Camión",
+            tipo: v.tipo || "CamiÃ³n",
             anio: v.anio || 2020,
             kmActual: v.kilometraje_actual || 0,
             kmProximo: (v.kilometraje_actual || 0) + 10000,
@@ -243,22 +256,65 @@ export default function ControlDocumental() {
   };
 
   // Rules Check
-  const checkDriverStatus = (driver: any) => {
-    const isLicenciaVencida =
-      new Date(driver.vencimientoLicencia).getTime() < today;
-    const isVacacionesVencidas = driver.vacaciones === "Vencidas";
+    const msPorDia = 24 * 60 * 60 * 1000;
 
-    if (isLicenciaVencida || isVacacionesVencidas) {
-      return {
-        status: "BLOQUEADO",
-        reasons: [
-          isLicenciaVencida ? "Licencia Vencida" : null,
-          isVacacionesVencidas ? "Vacaciones Vencidas" : null,
-        ].filter(Boolean),
-      };
+  const checkDriverStatus = (driver: any) => {
+    let status = 'EN ORDEN';
+    let reasons: string[] = [];
+
+    const licT = new Date(driver.vencimientoLicencia).getTime();
+    const salT = new Date(driver.vencimientoSalud || driver.vencimientoLicencia).getTime();
+    const isVacacionesVencidas = driver.vacaciones === 'Vencidas';
+
+    if (licT < today || salT < today || isVacacionesVencidas) {
+      status = 'VENCIDO';
+      if (licT < today) reasons.push('Licencia Vencida');
+      if (salT < today) reasons.push('Salud Vencida');
+      if (isVacacionesVencidas) reasons.push('Vacaciones Vencidas');
+    } else {
+      let isProximo = false;
+      if (licT < today + alertConfig.diasAvisoLicencia * msPorDia) {
+        isProximo = true;
+        reasons.push(Licencia próxima a vencer (<+alertConfig.diasAvisoLicencia+ días));
+      }
+      if (salT < today + alertConfig.diasAvisoSalud * msPorDia) {
+        isProximo = true;
+        reasons.push(Salud próxima a vencer (<+alertConfig.diasAvisoSalud+ días));
+      }
+      if (isProximo) status = 'PROXIMO';
     }
-    return { status: "ACTIVO", reasons: [] };
+
+    return { status, reasons };
   };
+
+  const checkVehicleStatus = (vehicle: any) => {
+    let status = 'EN ORDEN';
+    let reasons: string[] = [];
+
+    const revT = new Date(vehicle.vencimientoRev).getTime();
+    const segT = new Date(vehicle.vencimientoSeguro).getTime();
+    const isOld = 2026 - vehicle.anio >= 15;
+
+    if (revT < today || segT < today || isOld) {
+      status = 'VENCIDO';
+      if (revT < today) reasons.push('Revisión Técnica Vencida');
+      if (segT < today) reasons.push('Seguro Vencido');
+      if (isOld) reasons.push(Bloqueo automático: Unidad cumple 15+ años);
+    } else {
+      let isProximo = false;
+      if (revT < today + alertConfig.diasAvisoRevision * msPorDia) {
+        isProximo = true;
+        reasons.push(Revisión próxima a vencer (<+alertConfig.diasAvisoRevision+ días));
+      }
+      if (segT < today + alertConfig.diasAvisoSeguro * msPorDia) {
+        isProximo = true;
+        reasons.push(Seguro próximo a vencer (<+alertConfig.diasAvisoSeguro+ días));
+      }
+      if (isProximo) status = 'PROXIMO';
+    }
+
+    return { status, reasons };
+  };;
 
   const checkVehicleStatus = (vehicle: any) => {
     const isRevVencida = new Date(vehicle.vencimientoRev).getTime() < today;
@@ -270,10 +326,10 @@ export default function ControlDocumental() {
       return {
         status: "BLOQUEADO",
         reasons: [
-          isRevVencida ? "Revisión Técnica Vencida" : null,
+          isRevVencida ? "RevisiÃ³n TÃ©cnica Vencida" : null,
           isSeguroVencido ? "Seguro Vencido" : null,
           isOld
-            ? `Bloqueo automático: Unidad cumple 15+ años (Tiene ${2026 - vehicle.anio})`
+            ? `Bloqueo automÃ¡tico: Unidad cumple 15+ aÃ±os (Tiene ${2026 - vehicle.anio})`
             : null,
         ].filter(Boolean),
       };
@@ -317,13 +373,13 @@ export default function ControlDocumental() {
             detalles: {
               tipoLicencia: newDriverForm.tipoLicencia,
               vencimientoLicencia: newDriverForm.vencimientoLicencia,
-              vacaciones: "Al día",
+              vacaciones: "Al dÃ­a",
             },
           },
         ])
         .select();
       if (error) throw error;
-      Swal.fire('Éxito', 'Conductor guardado correctamente', 'success');
+      Swal.fire('Ã‰xito', 'Conductor guardado correctamente', 'success');
       setIsAddingEntity(null);
       fetchData(); // reload
     } catch (error) {
@@ -376,7 +432,7 @@ export default function ControlDocumental() {
         ])
         .select();
       if (error) throw error;
-      Swal.fire('Éxito', 'Unidad guardada correctamente', 'success');
+      Swal.fire('Ã‰xito', 'Unidad guardada correctamente', 'success');
       setIsAddingEntity(null);
       fetchData(); // reload
     } catch (error) {
@@ -406,16 +462,16 @@ export default function ControlDocumental() {
 
   const handleDeleteEntity = async (id: string, type: "driver" | "vehicle") => {
     const table = type === "driver" ? "colaborador" : "vehiculo";
-    const entityName = type === "driver" ? "conductor" : "vehículo";
+    const entityName = type === "driver" ? "conductor" : "vehÃ­culo";
     
     const result = await Swal.fire({
-      title: `¿Eliminar ${entityName}?`,
-      text: "Esta acción no se puede deshacer.",
+      title: `Â¿Eliminar ${entityName}?`,
+      text: "Esta acciÃ³n no se puede deshacer.",
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#ef4444",
       cancelButtonColor: "#64748b",
-      confirmButtonText: "Sí, eliminar",
+      confirmButtonText: "SÃ­, eliminar",
       cancelButtonText: "Cancelar"
     });
 
@@ -453,8 +509,8 @@ export default function ControlDocumental() {
       vehicles.map((v) => ({
         Patente: v.patente,
         Tipo: v.tipo,
-        Año: v.anio,
-        "Venc. Rev. Técnica": v.vencimientoRev,
+        AÃ±o: v.anio,
+        "Venc. Rev. TÃ©cnica": v.vencimientoRev,
         "Venc. Seguro": v.vencimientoSeguro,
         Estado: checkVehicleStatus(v).status,
       })),
@@ -468,7 +524,7 @@ export default function ControlDocumental() {
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-            Gestión de Ciclo de Vida y Documental
+            GestiÃ³n de Ciclo de Vida y Documental
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm font-medium">
             Control de personal operativo y unidades motrices (GCV & GDC).
@@ -489,7 +545,7 @@ export default function ControlDocumental() {
               onClick={() => setIsAddingEntity("vehicle")}
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-colors flex items-center justify-center gap-2 text-sm"
             >
-              <Truck className="w-4 h-4" /> <span>Registrar Vehículo</span>
+              <Truck className="w-4 h-4" /> <span>Registrar VehÃ­culo</span>
             </button>
           )}
         </div>
@@ -553,7 +609,7 @@ export default function ControlDocumental() {
                   <div
                     key={d.id}
                     onClick={() => openDriverModal(d)}
-                    className={`bg-white dark:bg-slate-900 border p-4 rounded-xl cursor-pointer hover:shadow-md transition-all ${status === "BLOQUEADO" ? "border-red-300 dark:border-red-900/50 hover:border-red-400" : "border-slate-200 dark:border-slate-800 hover:border-indigo-400"}`}
+                    className={`bg-white dark:bg-slate-900 border p-4 rounded-xl cursor-pointer hover:shadow-md transition-all ${status === "VENCIDO" ? "border-red-300 dark:border-red-900/50 hover:border-red-400" : "border-slate-200 dark:border-slate-800 hover:border-indigo-400"}`}
                   >
                     <div className="flex justify-between items-start mb-3">
                       <div>
@@ -561,17 +617,17 @@ export default function ControlDocumental() {
                           {d.nombre}
                         </h4>
                         <p className="text-xs text-slate-500 font-medium dark:text-slate-400">
-                          <span>{d.rut}</span> • <span>{d.cargo}</span>
+                          <span>{d.rut}</span> â€¢ <span>{d.cargo}</span>
                         </p>
                       </div>
                       <Badge
                         variant={
-                          status === "ACTIVO" ? "default" : "destructive"
+                          status === "EN ORDEN" ? "default" : "destructive"
                         }
                         className={
-                          status === "ACTIVO"
-                            ? "bg-emerald-500 hover:bg-emerald-600"
-                            : "animate-pulse"
+                          status === "EN ORDEN"
+                            ? "bg-emerald-500 hover:bg-emerald-600 text-white"
+                            : (status === "PROXIMO" ? "bg-amber-500 hover:bg-amber-600 text-white animate-pulse" : "bg-red-500 hover:bg-red-600 text-white animate-pulse")
                         }
                       >
                         <span>{status}</span>
@@ -603,9 +659,9 @@ export default function ControlDocumental() {
                         </span>
                       </p>
                     </div>
-                    {status === "BLOQUEADO" && (
-                      <div className="mt-3 bg-red-50 dark:bg-red-900/10 p-2 rounded border border-red-100 dark:border-red-900/30">
-                        <ul className="text-xs text-red-600 dark:text-red-400 font-medium space-y-0.5">
+                    {status !== "EN ORDEN" && (
+                      <div className={`mt-3 p-2 rounded border ` + (status === "VENCIDO" ? "bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30" : "bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/30")}>
+                        <ul className={`text-xs font-medium space-y-0.5 ` + (status === "VENCIDO" ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400")}>
                           {reasons.map((r, idx) => (
                             <li key={idx} className="flex gap-1.5 items-center">
                               <AlertCircle className="w-3 h-3" /> <span>{r}</span>
@@ -635,7 +691,7 @@ export default function ControlDocumental() {
                   <div
                     key={v.id}
                     onClick={() => openVehicleModal(v)}
-                    className={`bg-white dark:bg-slate-900 border p-4 rounded-xl cursor-pointer hover:shadow-md transition-all ${status === "BLOQUEADO" ? "border-red-300 dark:border-red-900/50 hover:border-red-400" : "border-slate-200 dark:border-slate-800 hover:border-indigo-400"}`}
+                    className={`bg-white dark:bg-slate-900 border p-4 rounded-xl cursor-pointer hover:shadow-md transition-all ${status === "VENCIDO" ? "border-red-300 dark:border-red-900/50 hover:border-red-400" : "border-slate-200 dark:border-slate-800 hover:border-indigo-400"}`}
                   >
                     <div className="flex justify-between items-start mb-3">
                       <div>
@@ -643,17 +699,17 @@ export default function ControlDocumental() {
                           {v.patente}
                         </h4>
                         <p className="text-xs text-slate-500 font-medium dark:text-slate-400">
-                          <span>{v.tipo}</span> • Año <span>{v.anio}</span> ({2026 - v.anio} Años)
+                          <span>{v.tipo}</span> â€¢ AÃ±o <span>{v.anio}</span> ({2026 - v.anio} AÃ±os)
                         </p>
                       </div>
                       <Badge
                         variant={
-                          status === "ACTIVO" ? "default" : "destructive"
+                          status === "EN ORDEN" ? "default" : "destructive"
                         }
                         className={
-                          status === "ACTIVO"
-                            ? "bg-emerald-500 hover:bg-emerald-600"
-                            : "animate-pulse"
+                          status === "EN ORDEN"
+                            ? "bg-emerald-500 hover:bg-emerald-600 text-white"
+                            : (status === "PROXIMO" ? "bg-amber-500 hover:bg-amber-600 text-white animate-pulse" : "bg-red-500 hover:bg-red-600 text-white animate-pulse")
                         }
                       >
                         <span>{status}</span>
@@ -661,9 +717,9 @@ export default function ControlDocumental() {
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-sm mt-4">
                       <p className="text-slate-600 dark:text-slate-400">
-                        Rev. Técnica:{" "}
+                        Rev. TÃ©cnica:{" "}
                         <span
-                          className={`font-semibold ${reasons.some((r) => r?.includes("Revisión")) ? "text-red-500" : "text-slate-800 dark:text-slate-200"}`}
+                          className={`font-semibold ${reasons.some((r) => r?.includes("RevisiÃ³n")) ? "text-red-500" : "text-slate-800 dark:text-slate-200"}`}
                         >
                           {v.vencimientoRev}
                         </span>
@@ -676,9 +732,9 @@ export default function ControlDocumental() {
                         </span>
                       </p>
                     </div>
-                    {status === "BLOQUEADO" && (
-                      <div className="mt-3 bg-red-50 dark:bg-red-900/10 p-2 rounded border border-red-100 dark:border-red-900/30">
-                        <ul className="text-xs text-red-600 dark:text-red-400 font-medium space-y-0.5">
+                    {status !== "EN ORDEN" && (
+                      <div className={`mt-3 p-2 rounded border ` + (status === "VENCIDO" ? "bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30" : "bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/30")}>
+                        <ul className={`text-xs font-medium space-y-0.5 ` + (status === "VENCIDO" ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400")}>
                           {reasons.map((r, idx) => (
                             <li key={idx} className="flex gap-1.5 items-center">
                               <AlertCircle className="w-3 h-3" /> <span>{r}</span>
@@ -918,7 +974,7 @@ export default function ControlDocumental() {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">
-                      Año Inscrip.
+                      AÃ±o Inscrip.
                     </label>
                     <input
                       type="number"
@@ -952,7 +1008,7 @@ export default function ControlDocumental() {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">
-                      Venc. Rev. Técnica
+                      Venc. Rev. TÃ©cnica
                     </label>
                     <input
                       type="date"
@@ -1029,7 +1085,7 @@ export default function ControlDocumental() {
                   <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                     <span>{modalType === "driver"
                       ? `${selectedEntity.rut} - ${selectedEntity.cargo}`
-                      : `${selectedEntity.tipo} - Año ${selectedEntity.anio}`}</span>
+                      : `${selectedEntity.tipo} - AÃ±o ${selectedEntity.anio}`}</span>
                   </p>
                 </div>
               </div>
@@ -1037,7 +1093,7 @@ export default function ControlDocumental() {
                 <button
                   onClick={() => handleDeleteEntity(selectedEntity.id, modalType)}
                   className="p-1.5 rounded-lg hover:bg-red-100 text-slate-400 hover:text-red-600 transition-colors"
-                  title={`Eliminar ${modalType === "driver" ? "conductor" : "vehículo"}`}
+                  title={`Eliminar ${modalType === "driver" ? "conductor" : "vehÃ­culo"}`}
                 >
                   <Trash2 className="w-5 h-5" />
                 </button>
@@ -1081,7 +1137,7 @@ export default function ControlDocumental() {
                         Licencia de Conducir
                       </span>
                       <span className="bg-indigo-100 dark:bg-indigo-900/40 px-2 py-1 rounded">
-                        Cédula de Identidad
+                        CÃ©dula de Identidad
                       </span>
                       <span className="bg-indigo-100 dark:bg-indigo-900/40 px-2 py-1 rounded">
                         Hoja de Vida del Conductor
@@ -1115,7 +1171,7 @@ export default function ControlDocumental() {
                         No hay documentos adjuntos
                       </p>
                       <p className="text-xs font-medium text-slate-400 mt-1">
-                        Arrastra tus archivos aquí o escoge "Adjuntar Documento"
+                        Arrastra tus archivos aquÃ­ o escoge "Adjuntar Documento"
                       </p>
                     </div>
                   ) : (
@@ -1162,7 +1218,7 @@ export default function ControlDocumental() {
 
               {/* Regularizacion Notice */}
               {((modalType === "driver" &&
-                checkDriverStatus(selectedEntity).status === "BLOQUEADO") ||
+                checkDriverStatus(selectedEntity).status === "VENCIDO") ||
                 (modalType === "vehicle" &&
                   checkVehicleStatus(selectedEntity).status ===
                     "BLOQUEADO")) && (
@@ -1183,7 +1239,7 @@ export default function ControlDocumental() {
 
                   <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl">
                     <h4 className="font-bold text-sm text-slate-800 dark:text-white mb-3">
-                      Herramientas de Regularización
+                      Herramientas de RegularizaciÃ³n
                     </h4>
                     {modalType === "driver" &&
                       checkDriverStatus(selectedEntity).reasons.includes(
@@ -1235,23 +1291,23 @@ export default function ControlDocumental() {
                                 selectedEntity.id,
                                 "driver",
                                 "vacaciones",
-                                "Al día",
-                                "Vacaciones marcadas como Al día",
+                                "Al dÃ­a",
+                                "Vacaciones marcadas como Al dÃ­a",
                               );
                             }}
                             className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition flex-1"
                           >
-                            Marcar al día
+                            Marcar al dÃ­a
                           </button>
                         </div>
                       )}
                     {modalType === "vehicle" &&
                       checkVehicleStatus(selectedEntity).reasons.includes(
-                        "Revisión Técnica Vencida",
+                        "RevisiÃ³n TÃ©cnica Vencida",
                       ) && (
                         <div className="flex gap-2 items-center mb-3">
                           <span className="text-xs font-semibold w-1/3 text-slate-700 dark:text-slate-300">
-                            Rev. Técnica Vencida:
+                            Rev. TÃ©cnica Vencida:
                           </span>
                           <input
                             type="date"
@@ -1272,7 +1328,7 @@ export default function ControlDocumental() {
                                   "vehicle",
                                   "vencimientoRev",
                                   v,
-                                  `Revisión Técnica renovada hasta ${v}`,
+                                  `RevisiÃ³n TÃ©cnica renovada hasta ${v}`,
                                 );
                             }}
                             className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition"
@@ -1320,12 +1376,12 @@ export default function ControlDocumental() {
                     {modalType === "vehicle" &&
                       checkVehicleStatus(selectedEntity).reasons.some((r) =>
                         r?.includes(
-                          "Bloqueo automático: Unidad cumple 15+ años",
+                          "Bloqueo automÃ¡tico: Unidad cumple 15+ aÃ±os",
                         ),
                       ) && (
-                        <div className="text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10 p-2 rounded border border-red-100 dark:border-red-900/30">
+                        <div className="text-xs font-bold text-red-600 dark:text-red-400 mt-3 p-2 rounded border bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30">
                           La unidad no puede ser regularizada debido a
-                          antigüedad superior a 15 años. Debe ser dada de baja.
+                          antigÃ¼edad superior a 15 aÃ±os. Debe ser dada de baja.
                         </div>
                       )}
                   </div>
@@ -1364,3 +1420,11 @@ export default function ControlDocumental() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
