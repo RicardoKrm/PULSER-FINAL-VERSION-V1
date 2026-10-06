@@ -100,12 +100,35 @@ export default function Dashboard() {
     vehiculosDisponibles = totalDb > 0 ? Math.max(0, totalDb - indisponibles) : 0;
     const dispActual = totalDb > 0 ? (vehiculosDisponibles / totalDb) * 100 : 0;
     
-    // Tendencia de disponibilidad real por meses
-    const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'];
-    const tendencia = meses.map(m => ({
-      name: m,
-      value: dispActual
-    }));
+    // Tendencia de disponibilidad real por meses (últimos 6 meses)
+    const last6Months = Array.from({length: 6}, (_, i) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - (5 - i));
+      return { 
+        month: d.getMonth(), 
+        year: d.getFullYear(), 
+        name: d.toLocaleString('es', { month: 'short' }).substring(0,3).toUpperCase(),
+        downtime: 0
+      };
+    });
+
+    otsEmpresa.forEach((ot: any) => {
+      const fecha = ot.fechaCreacion || ot.fecha_creacion;
+      if (!fecha) return;
+      const d = new Date(fecha);
+      const m = last6Months.find(x => x.month === d.getMonth() && x.year === d.getFullYear());
+      if (m) {
+        if (ot.tiempoTrabajadoSegundos) m.downtime += ot.tiempoTrabajadoSegundos / 3600;
+        else if (ot.tfs_minutos) m.downtime += ot.tfs_minutos / 60;
+        else m.downtime += 10; // estimate 10h if no explicit downtime logged
+      }
+    });
+    
+    const hrsMes = (totalDb || 1) * 720;
+    const tendencia = last6Months.map(m => {
+       const disp = Math.max(0, 100 * (1 - (m.downtime / hrsMes)));
+       return { name: m.name, value: Number(disp.toFixed(1)) };
+    });
 
     // 3. Costos mensuales reales
     const currentMonth = new Date().getMonth();
