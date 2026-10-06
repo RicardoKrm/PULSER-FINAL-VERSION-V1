@@ -256,8 +256,9 @@ export default function ControlDocumental() {
   };
 
   // Rules Check
-    const msPorDia = 24 * 60 * 60 * 1000;
+      const msPorDia = 24 * 60 * 60 * 1000;
 
+    
   const checkDriverStatus = (driver: any) => {
     let status = 'EN ORDEN';
     let reasons: string[] = [];
@@ -275,11 +276,11 @@ export default function ControlDocumental() {
       let isProximo = false;
       if (licT < today + alertConfig.diasAvisoLicencia * msPorDia) {
         isProximo = true;
-        reasons.push(Licencia próxima a vencer (<+alertConfig.diasAvisoLicencia+ días));
+        reasons.push(`Licencia próxima a vencer (<${alertConfig.diasAvisoLicencia} días)`);
       }
       if (salT < today + alertConfig.diasAvisoSalud * msPorDia) {
         isProximo = true;
-        reasons.push(Salud próxima a vencer (<+alertConfig.diasAvisoSalud+ días));
+        reasons.push(`Salud próxima a vencer (<${alertConfig.diasAvisoSalud} días)`);
       }
       if (isProximo) status = 'PROXIMO';
     }
@@ -299,42 +300,21 @@ export default function ControlDocumental() {
       status = 'VENCIDO';
       if (revT < today) reasons.push('Revisión Técnica Vencida');
       if (segT < today) reasons.push('Seguro Vencido');
-      if (isOld) reasons.push(Bloqueo automático: Unidad cumple 15+ años);
+      if (isOld) reasons.push(`Bloqueo automático: Unidad cumple 15+ años`);
     } else {
       let isProximo = false;
       if (revT < today + alertConfig.diasAvisoRevision * msPorDia) {
         isProximo = true;
-        reasons.push(Revisión próxima a vencer (<+alertConfig.diasAvisoRevision+ días));
+        reasons.push(`Revisión próxima a vencer (<${alertConfig.diasAvisoRevision} días)`);
       }
       if (segT < today + alertConfig.diasAvisoSeguro * msPorDia) {
         isProximo = true;
-        reasons.push(Seguro próximo a vencer (<+alertConfig.diasAvisoSeguro+ días));
+        reasons.push(`Seguro próximo a vencer (<${alertConfig.diasAvisoSeguro} días)`);
       }
       if (isProximo) status = 'PROXIMO';
     }
 
     return { status, reasons };
-  };;
-
-  const checkVehicleStatus = (vehicle: any) => {
-    const isRevVencida = new Date(vehicle.vencimientoRev).getTime() < today;
-    const isSeguroVencido =
-      new Date(vehicle.vencimientoSeguro).getTime() < today;
-    const isOld = 2026 - vehicle.anio >= 15;
-
-    if (isRevVencida || isSeguroVencido || isOld) {
-      return {
-        status: "BLOQUEADO",
-        reasons: [
-          isRevVencida ? "RevisiÃ³n TÃ©cnica Vencida" : null,
-          isSeguroVencido ? "Seguro Vencido" : null,
-          isOld
-            ? `Bloqueo automÃ¡tico: Unidad cumple 15+ aÃ±os (Tiene ${2026 - vehicle.anio})`
-            : null,
-        ].filter(Boolean),
-      };
-    }
-    return { status: "ACTIVO", reasons: [] };
   };
 
   const handleSaveDriver = async (e: React.FormEvent) => {
@@ -1420,6 +1400,8 @@ export default function ControlDocumental() {
     </div>
   );
 }
+
+
 
 
 
