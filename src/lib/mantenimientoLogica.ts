@@ -438,3 +438,120 @@ export function calcularDatosPizarra(vehiculo: VehiculoDB): FilaPizarraMantenimi
     };
 }
 
+
+export const obtenerSoloModelo = (modeloRaw?: string, marcaRaw?: string): string => {
+  if (!modeloRaw || !modeloRaw.trim()) return '--';
+  let mod = modeloRaw.trim();
+  if (mod.includes('/')) {
+    const parts = mod.split('/');
+    mod = parts[parts.length - 1].trim();
+  }
+  if (marcaRaw && marcaRaw.trim()) {
+    const cleanMarca = marcaRaw.trim().toLowerCase();
+    if (mod.toLowerCase().startsWith(cleanMarca)) {
+      mod = mod.substring(cleanMarca.length).trim();
+      mod = mod.replace(/^[-/:\s]+/, '').trim();
+    }
+  }
+  return mod || modeloRaw || '--';
+};
+
+export function mapearVehiculoDB(v: any, pautasData: any[], ordenesTrabajo: any[]): VehiculoDB {
+  const detalles = v.detalles || {};
+  let kmsActuales = typeof v.kilometraje_actual === 'number' ? v.kilometraje_actual : parseFloat(String(v.kilometraje_actual).replace(/[^0-9.-]+/g, '')) || 0;
+  
+  const rawKmUlt = (v.km_ultima_mantencion !== undefined && v.km_ultima_mantencion !== null && v.km_ultima_mantencion !== '')
+    ? v.km_ultima_mantencion
+    : (detalles.km_ultima_mantencion !== undefined && detalles.km_ultima_mantencion !== null ? detalles.km_ultima_mantencion : 0);
+  let kmUltMant = typeof rawKmUlt === 'number' ? rawKmUlt : parseFloat(String(rawKmUlt).replace(/[^0-9.-]+/g, '')) || 0;
+
+  if (kmUltMant > 1000 && kmsActuales > (kmUltMant * 4) && Math.abs((kmsActuales / 10) - kmUltMant) < kmUltMant) {
+    kmsActuales = Math.round((kmsActuales / 10) * 100) / 100;
+  }
+
+  if (detalles?.odometro_manual && typeof detalles?.km_manual === 'number') {
+    if (kmsActuales < detalles.km_manual || (kmsActuales > (detalles.km_manual * 4))) {
+      kmsActuales = detalles.km_manual;
+    }
+  }
+  
+  const rawInterval = (v.intervalo_km !== undefined && v.intervalo_km !== null)
+    ? v.intervalo_km
+    : (detalles.intervalo_km !== undefined && detalles.intervalo_km !== null ? detalles.intervalo_km : 10000);
+  const kmInterv = typeof rawInterval === 'number' ? rawInterval : parseFloat(String(rawInterval).replace(/[^0-9.-]+/g, '')) || 10000;
+  
+  let pautasSecuenciaStr = v.tipo_ultimo_mant || v.tipo_ult_pauta || detalles.tipo_ultimo_mant || detalles.tipo_ult_pauta || '';
+  let fechaUltMant = v.fecha_ultima_mantencion || v.fecha_ult_mantencion || detalles.fecha_ultima_mantencion || null;
+
+  const otsFinalizadas = (ordenesTrabajo || []).filter((o: any) =>
+    (String(o.vehiculoId) === String(v.id) || String(o.vehiculo_id) === String(v.id) || (v.patente && o.patente === v.patente)) &&
+    (o.estado === 'FINALIZADA' || o.estado === 'CERRADA_POR_MECANICO') &&
+    String(o.tipo || '').toUpperCase().includes('PREVENTIV')
+  );
+
+  if (otsFinalizadas.length > 0) {
+    const sortedOts = [...otsFinalizadas].sort((a, b) => {
+      const kmB = Number(b.kilometrajeCierre || b.kilometraje_cierre || b.kilometrajeApertura || 0);
+      const kmA = Number(a.kilometrajeCierre || a.kilometraje_cierre || a.kilometrajeApertura || 0);
+      if (kmB !== kmA) return kmB - kmA;
+      const timeB = new Date(b.termino_proceso || b.fechaProgramada || b.fechaCreacion || 0).getTime();
+      const timeA = new Date(a.termino_proceso || a.fechaProgramada || a.fechaCreacion || 0).getTime();
+      return timeB - timeA;
+    });
+
+    const topOt = sortedOts[0];
+    const otKm = Number(topOt.kilometrajeCierre || topOt.kilometraje_cierre || topOt.kilometrajeApertura || 0);
+    if (otKm >= kmUltMant) {
+      kmUltMant = otKm;
+      const f = topOt.termino_proceso || topOt.fechaProgramada || topOt.fechaCreacion;
+      if (f) fechaUltMant = f;
+      if (topOt.pauta && topOt.pauta !== 'Mantenimiento Preventivo') {
+        pautasSecuenciaStr = topOt.pauta;
+      }
+    }
+  }
+
+  if (kmsActuales <= 0 && kmUltMant > 0) {
+    kmsActuales = kmUltMant;
+  }
+
+  const vehOil = v.tipo_aceite || detalles.tipo_aceite || '';
+  const pautasSecuencia: HitoSecuencia[] = pautasData
+    ? obtenerPautasSecuenciaParaVehiculo(v.modelo || detalles.modelo, vehOil, kmsActuales, pautasData)
+    : [];
+
+  const rawMarca = v.marca || detalles.marca || '';
+  const rawMod = v.modelo || detalles.modelo || '';
+  const inferredMarca = (!rawMarca && rawMod && rawMod.includes('/')) ? rawMod.split('/')[0].trim() : rawMarca;
+  const pureModelo = obtenerSoloModelo(rawMod, inferredMarca);
+
+  const rawFechaAct = v.fecha_actualizacion_km || detalles.fecha_actualizacion_km || v.updated_at || v.created_at;
+  const parsedFechaAct = rawFechaAct ? new Date(rawFechaAct) : new Date();
+
+  return {
+    id: v.id,
+    numeroInterno: v.numero_interno?.toString() || '',
+    patente: v.patente || '',
+    kilometrajeActual: kmsActuales,
+    fechaActualizacionKm: !isNaN(parsedFechaAct.getTime()) ? parsedFechaAct : new Date(),
+    intervaloMantencionKm: kmInterv,
+    kmPromedioDia: v.km_promedio_dia || detalles.kmPromedioDia || 0,
+    kmUltimaMantencion: kmUltMant,
+    fechaUltimaMantencion: fechaUltMant ? new Date(fechaUltMant) : null,
+    tipoUltimaPauta: pautasSecuenciaStr,
+    pautasSecuencia,
+    marca: inferredMarca,
+    modelo: pureModelo !== '--' ? pureModelo : (rawMod || ''),
+    ano: v.anio || v.ano || detalles.ano || detalles.anio || '',
+    chasis: v.chasis || detalles.chasis || '',
+    motor: v.motor || detalles.motor || '',
+    norma: v.norma_euro || v.norma || detalles.norma_euro || detalles.norma || '',
+    aplicacion: v.aplicacion || detalles.aplicacion || '',
+    tipoAceite: v.tipo_aceite || v.tipoAceite || detalles.tipo_aceite || detalles.tipoAceite || '',
+    fecha_matriculacion: v.fecha_matriculacion || detalles.fecha_matriculacion || '',
+    detalles,
+    intervaloMantenimiento: kmInterv,
+    tipoIntervalo: v.tipo_intervalo || 'KM',
+    factorConversionHoras: v.factor_conversion_horas || null
+  };
+}
