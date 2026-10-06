@@ -1,4 +1,4 @@
-﻿import {
+﻿import { ShieldCheck, 
   BarChart3,
   Settings,
   Truck,
@@ -209,6 +209,7 @@ export const navigation = [
     submodules: [
       { title: 'GestiÃ³n de Empresa', icon: Settings, href: '/configuracion/empresa' },
       { title: 'Configuracin de Alertas', icon: Bell, href: '/configuracion/alertas' },
+        { title: 'Matriz de Escalamiento', icon: ShieldCheck, href: '/configuracion/escalamiento' },
       { title: 'IntegraciÃ³n GPS', icon: MapPin, href: '/configuracion/gps' },
       { title: 'Precio de Combustible', icon: DollarSign, href: '/configuracion/precio-combustible' },
       { title: 'GestiÃ³n de Pautas', icon: FileText, href: '/configuracion/pautas' },
