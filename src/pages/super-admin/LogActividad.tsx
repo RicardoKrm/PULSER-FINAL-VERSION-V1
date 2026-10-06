@@ -289,14 +289,18 @@ export default function LogActividad() {
                      <td className="p-3 text-sm">
                        <div className="flex flex-wrap gap-1">
                          {Array.from(sess.modules_visited).map(mod => (
-                           <Badge key={mod} variant="outline" className="text-[10px] bg-white dark:bg-slate-900">
+                           <Badge key={mod} variant="outline" className="text-[10px] bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700">
                              {mod}
                            </Badge>
                          ))}
                        </div>
                      </td>
-                     <td className="p-3 text-sm text-slate-600 dark:text-slate-400">{sess.first_action.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</td>
-                     <td className="p-3 text-sm text-slate-600 dark:text-slate-400">{sess.last_action.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</td>
+                     <td className="p-3 text-sm text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                       {sess.first_action.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' })} - {sess.first_action.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+                     </td>
+                     <td className="p-3 text-sm text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                       {sess.last_action.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' })} - {sess.last_action.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+                     </td>
                      <td className="p-3 text-sm font-medium text-purple-600 dark:text-purple-400">{getDurationString(sess.first_action, sess.last_action)}</td>
                      <td className="p-3 text-sm font-bold text-slate-900 dark:text-slate-100 text-right">{sess.action_count}</td>
                    </tr>
@@ -366,7 +370,7 @@ export default function LogActividad() {
                         </Badge>
                       </div>
                       <span className="text-xs text-slate-500 flex items-center gap-1 font-medium whitespace-nowrap">
-                        {new Date(log.created_at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second:'2-digit' })}
+                        {new Date(log.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' })} - {new Date(log.created_at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second:'2-digit' })}
                       </span>
                     </div>
                     
