@@ -24,7 +24,7 @@ export default function SuperAdminVisionEvolucion() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      let query = supabase.from('ordenes_trabajo').select('id, fechaCreacion, estado, tipo, empresa_id');
+      let query = supabase.from('orden_de_trabajo').select('id, fecha_creacion, estado, tipo, empresa_id');
       
       if (!isGlobal) {
         query = query.eq('empresa_id', selectedCompanyIdForDashboard);
@@ -39,10 +39,10 @@ export default function SuperAdminVisionEvolucion() {
       const monthsMap = new Map<string, { generadas: number, resueltas: number }>();
       
       data.forEach((ot: any) => {
-        if (!ot.fechaCreacion) return;
+        if (!ot.fecha_creacion) return;
         
         // Parse date
-        const dateObj = new Date(ot.fechaCreacion);
+        const dateObj = new Date(ot.fecha_creacion);
         // Format as YYYY-MM
         const monthKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
         
