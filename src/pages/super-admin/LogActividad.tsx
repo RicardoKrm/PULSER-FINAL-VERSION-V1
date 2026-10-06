@@ -24,6 +24,7 @@ interface UserSession {
   first_action: Date;
   last_action: Date;
   action_count: number;
+  modules_visited: Set<string>;
 }
 
 export default function LogActividad() {
@@ -48,8 +49,10 @@ export default function LogActividad() {
       setError(null);
       
       // Calculate start and end bounds based on local date string
-      const start = new Date(`${selectedDate}T00:00:00`);
-      const end = new Date(`${selectedDate}T23:59:59.999`);
+      // If user clears the date input, default to today
+      const safeDate = selectedDate || new Date().toLocaleDateString('en-CA');
+      const start = new Date(`${safeDate}T00:00:00`);
+      const end = new Date(`${safeDate}T23:59:59.999`);
 
       // We remove the currentCompany filter here because the Super Admin should see everything globally.
       let logQuery = supabase.from('log_actividad').select(`
@@ -109,6 +112,7 @@ export default function LogActividad() {
             if (logTime < sess.first_action) sess.first_action = logTime;
             if (logTime > sess.last_action) sess.last_action = logTime;
             sess.action_count++;
+            if (log.module) sess.modules_visited.add(log.module);
           } else {
             sessionsMap.set(log.user_id, {
               user_id: log.user_id,
@@ -116,7 +120,8 @@ export default function LogActividad() {
               company_name: log.company_name,
               first_action: logTime,
               last_action: logTime,
-              action_count: 1
+              action_count: 1,
+              modules_visited: new Set(log.module ? [log.module] : [])
             });
           }
         });
@@ -269,6 +274,7 @@ export default function LogActividad() {
                  <tr>
                    <th className="p-3 text-xs font-bold text-slate-500 uppercase">Usuario</th>
                    <th className="p-3 text-xs font-bold text-slate-500 uppercase">Empresa</th>
+                   <th className="p-3 text-xs font-bold text-slate-500 uppercase">Módulos Visitados</th>
                    <th className="p-3 text-xs font-bold text-slate-500 uppercase">1ra Acción</th>
                    <th className="p-3 text-xs font-bold text-slate-500 uppercase">Última Acción</th>
                    <th className="p-3 text-xs font-bold text-slate-500 uppercase">Tiempo Activo</th>
@@ -280,6 +286,15 @@ export default function LogActividad() {
                    <tr key={sess.user_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
                      <td className="p-3 text-sm font-semibold text-slate-900 dark:text-slate-100">{sess.user_name}</td>
                      <td className="p-3 text-sm text-slate-600 dark:text-slate-400">{sess.company_name}</td>
+                     <td className="p-3 text-sm">
+                       <div className="flex flex-wrap gap-1">
+                         {Array.from(sess.modules_visited).map(mod => (
+                           <Badge key={mod} variant="outline" className="text-[10px] bg-white dark:bg-slate-900">
+                             {mod}
+                           </Badge>
+                         ))}
+                       </div>
+                     </td>
                      <td className="p-3 text-sm text-slate-600 dark:text-slate-400">{sess.first_action.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</td>
                      <td className="p-3 text-sm text-slate-600 dark:text-slate-400">{sess.last_action.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</td>
                      <td className="p-3 text-sm font-medium text-purple-600 dark:text-purple-400">{getDurationString(sess.first_action, sess.last_action)}</td>
@@ -288,7 +303,7 @@ export default function LogActividad() {
                  ))}
                  {activeSessions.length === 0 && (
                    <tr>
-                     <td colSpan={6} className="p-8 text-center text-slate-500">No hay actividad registrada en esta fecha.</td>
+                     <td colSpan={7} className="p-8 text-center text-slate-500">No hay actividad registrada en esta fecha.</td>
                    </tr>
                  )}
                </tbody>
