@@ -157,12 +157,6 @@ export default function ControlDocumental() {
   const today = new Date().getTime();
 
   useEffect(() => {
-    if (activeCompanyId) {
-      const saved = localStorage.getItem(`config_alertas_${activeCompanyId}`);
-      if (saved) {
-        setAlertConfig(JSON.parse(saved));
-      }
-    }
     fetchData();
   }, [activeCompanyId]);
 
@@ -256,40 +250,39 @@ export default function ControlDocumental() {
   };
 
   // Rules Check
-      const msPorDia = 24 * 60 * 60 * 1000;
+    const msPorDia = 24 * 60 * 60 * 1000;
 
-    
   const checkDriverStatus = (driver: any) => {
-    let status = 'EN ORDEN';
+    let status = "EN ORDEN";
     let reasons: string[] = [];
 
     const licT = new Date(driver.vencimientoLicencia).getTime();
     const salT = new Date(driver.vencimientoSalud || driver.vencimientoLicencia).getTime();
-    const isVacacionesVencidas = driver.vacaciones === 'Vencidas';
+    const isVacacionesVencidas = driver.vacaciones === "Vencidas";
 
     if (licT < today || salT < today || isVacacionesVencidas) {
-      status = 'VENCIDO';
-      if (licT < today) reasons.push('Licencia Vencida');
-      if (salT < today) reasons.push('Salud Vencida');
-      if (isVacacionesVencidas) reasons.push('Vacaciones Vencidas');
+      status = "VENCIDO";
+      if (licT < today) reasons.push("Licencia Vencida");
+      if (salT < today) reasons.push("Salud Vencida");
+      if (isVacacionesVencidas) reasons.push("Vacaciones Vencidas");
     } else {
       let isProximo = false;
       if (licT < today + alertConfig.diasAvisoLicencia * msPorDia) {
         isProximo = true;
-        reasons.push(`Licencia próxima a vencer (<${alertConfig.diasAvisoLicencia} días)`);
+        reasons.push(`Licencia prÃ³xima a vencer (<${alertConfig.diasAvisoLicencia} dÃ­as)`);
       }
       if (salT < today + alertConfig.diasAvisoSalud * msPorDia) {
         isProximo = true;
-        reasons.push(`Salud próxima a vencer (<${alertConfig.diasAvisoSalud} días)`);
+        reasons.push(`Salud prÃ³xima a vencer (<${alertConfig.diasAvisoSalud} dÃ­as)`);
       }
-      if (isProximo) status = 'PROXIMO';
+      if (isProximo) status = "PROXIMO";
     }
 
     return { status, reasons };
   };
 
   const checkVehicleStatus = (vehicle: any) => {
-    let status = 'EN ORDEN';
+    let status = "EN ORDEN";
     let reasons: string[] = [];
 
     const revT = new Date(vehicle.vencimientoRev).getTime();
@@ -297,21 +290,21 @@ export default function ControlDocumental() {
     const isOld = 2026 - vehicle.anio >= 15;
 
     if (revT < today || segT < today || isOld) {
-      status = 'VENCIDO';
-      if (revT < today) reasons.push('Revisión Técnica Vencida');
-      if (segT < today) reasons.push('Seguro Vencido');
-      if (isOld) reasons.push(`Bloqueo automático: Unidad cumple 15+ años`);
+      status = "VENCIDO";
+      if (revT < today) reasons.push("RevisiÃ³n Tecnica Vencida");
+      if (segT < today) reasons.push("Seguro Vencido");
+      if (isOld) reasons.push(`Bloqueo automÃ¡tico: Unidad cumple 15+ Anios`);
     } else {
       let isProximo = false;
       if (revT < today + alertConfig.diasAvisoRevision * msPorDia) {
         isProximo = true;
-        reasons.push(`Revisión próxima a vencer (<${alertConfig.diasAvisoRevision} días)`);
+        reasons.push(`RevisiÃ³n prÃ³xima a vencer (<${alertConfig.diasAvisoRevision} dÃ­as)`);
       }
       if (segT < today + alertConfig.diasAvisoSeguro * msPorDia) {
         isProximo = true;
-        reasons.push(`Seguro próximo a vencer (<${alertConfig.diasAvisoSeguro} días)`);
+        reasons.push(`Seguro prÃ³ximo a vencer (<${alertConfig.diasAvisoSeguro} dÃ­as)`);
       }
-      if (isProximo) status = 'PROXIMO';
+      if (isProximo) status = "PROXIMO";
     }
 
     return { status, reasons };
@@ -489,8 +482,8 @@ export default function ControlDocumental() {
       vehicles.map((v) => ({
         Patente: v.patente,
         Tipo: v.tipo,
-        AÃ±o: v.anio,
-        "Venc. Rev. TÃ©cnica": v.vencimientoRev,
+        Anio: v.anio,
+        "Venc. Rev. Tecnica": v.vencimientoRev,
         "Venc. Seguro": v.vencimientoSeguro,
         Estado: checkVehicleStatus(v).status,
       })),
@@ -679,7 +672,7 @@ export default function ControlDocumental() {
                           {v.patente}
                         </h4>
                         <p className="text-xs text-slate-500 font-medium dark:text-slate-400">
-                          <span>{v.tipo}</span> â€¢ AÃ±o <span>{v.anio}</span> ({2026 - v.anio} AÃ±os)
+                          <span>{v.tipo}</span> â€¢ Anio <span>{v.anio}</span> ({2026 - v.anio} Anios)
                         </p>
                       </div>
                       <Badge
@@ -697,7 +690,7 @@ export default function ControlDocumental() {
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-sm mt-4">
                       <p className="text-slate-600 dark:text-slate-400">
-                        Rev. TÃ©cnica:{" "}
+                        Rev. Tecnica:{" "}
                         <span
                           className={`font-semibold ${reasons.some((r) => r?.includes("RevisiÃ³n")) ? "text-red-500" : "text-slate-800 dark:text-slate-200"}`}
                         >
@@ -954,7 +947,7 @@ export default function ControlDocumental() {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">
-                      AÃ±o Inscrip.
+                      Anio Inscrip.
                     </label>
                     <input
                       type="number"
@@ -988,7 +981,7 @@ export default function ControlDocumental() {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">
-                      Venc. Rev. TÃ©cnica
+                      Venc. Rev. Tecnica
                     </label>
                     <input
                       type="date"
@@ -1065,7 +1058,7 @@ export default function ControlDocumental() {
                   <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                     <span>{modalType === "driver"
                       ? `${selectedEntity.rut} - ${selectedEntity.cargo}`
-                      : `${selectedEntity.tipo} - AÃ±o ${selectedEntity.anio}`}</span>
+                      : `${selectedEntity.tipo} - Anio ${selectedEntity.anio}`}</span>
                   </p>
                 </div>
               </div>
@@ -1283,11 +1276,11 @@ export default function ControlDocumental() {
                       )}
                     {modalType === "vehicle" &&
                       checkVehicleStatus(selectedEntity).reasons.includes(
-                        "RevisiÃ³n TÃ©cnica Vencida",
+                        "RevisiÃ³n Tecnica Vencida",
                       ) && (
                         <div className="flex gap-2 items-center mb-3">
                           <span className="text-xs font-semibold w-1/3 text-slate-700 dark:text-slate-300">
-                            Rev. TÃ©cnica Vencida:
+                            Rev. Tecnica Vencida:
                           </span>
                           <input
                             type="date"
@@ -1308,7 +1301,7 @@ export default function ControlDocumental() {
                                   "vehicle",
                                   "vencimientoRev",
                                   v,
-                                  `RevisiÃ³n TÃ©cnica renovada hasta ${v}`,
+                                  `RevisiÃ³n Tecnica renovada hasta ${v}`,
                                 );
                             }}
                             className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition"
@@ -1356,12 +1349,12 @@ export default function ControlDocumental() {
                     {modalType === "vehicle" &&
                       checkVehicleStatus(selectedEntity).reasons.some((r) =>
                         r?.includes(
-                          "Bloqueo automÃ¡tico: Unidad cumple 15+ aÃ±os",
+                          "Bloqueo automÃ¡tico: Unidad cumple 15+ Anios",
                         ),
                       ) && (
-                        <div className="text-xs font-bold text-red-600 dark:text-red-400 mt-3 p-2 rounded border bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30">
+                        <div className="text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10 p-2 rounded border border-red-100 dark:border-red-900/30">
                           La unidad no puede ser regularizada debido a
-                          antigÃ¼edad superior a 15 aÃ±os. Debe ser dada de baja.
+                          antigÃ¼edad superior a 15 Anios. Debe ser dada de baja.
                         </div>
                       )}
                   </div>
@@ -1400,13 +1393,5 @@ export default function ControlDocumental() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
 
 
