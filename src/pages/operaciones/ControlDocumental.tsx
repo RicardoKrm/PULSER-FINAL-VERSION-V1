@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -116,7 +116,7 @@ export default function ControlDocumental() {
   };
 
   const handleDeleteDocumento = async (docId: string) => {
-    if (!confirm("Â¿EstÃ¡s seguro de que deseas eliminar este documento?"))
+    if (!confirm("¿Estás seguro de que deseas eliminar este documento?"))
       return;
     try {
       const { error } = await supabase
@@ -184,7 +184,7 @@ export default function ControlDocumental() {
             vencimientoLicencia:
               d.detalles?.vencimientoLicencia || "2026-12-31",
             vencimientoSalud: d.detalles?.vencimientoSalud || "2026-12-31",
-            vacaciones: d.detalles?.vacaciones || "Al dÃ­a",
+            vacaciones: d.detalles?.vacaciones || "Al día",
           })),
         );
       }
@@ -193,7 +193,7 @@ export default function ControlDocumental() {
         setVehicles(
           vRes.data.map((v: any) => ({
             ...v,
-            tipo: v.tipo || "CamiÃ³n",
+            tipo: v.tipo || "Camión",
             anio: v.anio || 2020,
             kmActual: v.kilometraje_actual || 0,
             kmProximo: (v.kilometraje_actual || 0) + 10000,
@@ -250,7 +250,8 @@ export default function ControlDocumental() {
   };
 
   // Rules Check
-    const msPorDia = 24 * 60 * 60 * 1000;
+  
+  const msPorDia = 24 * 60 * 60 * 1000;
 
   const checkDriverStatus = (driver: any) => {
     let status = "EN ORDEN";
@@ -269,11 +270,11 @@ export default function ControlDocumental() {
       let isProximo = false;
       if (licT < today + alertConfig.diasAvisoLicencia * msPorDia) {
         isProximo = true;
-        reasons.push(`Licencia prÃ³xima a vencer (<${alertConfig.diasAvisoLicencia} dÃ­as)`);
+        reasons.push(`Licencia próxima a vencer (<${alertConfig.diasAvisoLicencia} días)`);
       }
       if (salT < today + alertConfig.diasAvisoSalud * msPorDia) {
         isProximo = true;
-        reasons.push(`Salud prÃ³xima a vencer (<${alertConfig.diasAvisoSalud} dÃ­as)`);
+        reasons.push(`Salud próxima a vencer (<${alertConfig.diasAvisoSalud} días)`);
       }
       if (isProximo) status = "PROXIMO";
     }
@@ -291,18 +292,18 @@ export default function ControlDocumental() {
 
     if (revT < today || segT < today || isOld) {
       status = "VENCIDO";
-      if (revT < today) reasons.push("RevisiÃ³n Tecnica Vencida");
+      if (revT < today) reasons.push("Revisión Técnica Vencida");
       if (segT < today) reasons.push("Seguro Vencido");
-      if (isOld) reasons.push(`Bloqueo automÃ¡tico: Unidad cumple 15+ Anios`);
+      if (isOld) reasons.push(`Bloqueo automático: Unidad cumple 15+ años`);
     } else {
       let isProximo = false;
       if (revT < today + alertConfig.diasAvisoRevision * msPorDia) {
         isProximo = true;
-        reasons.push(`RevisiÃ³n prÃ³xima a vencer (<${alertConfig.diasAvisoRevision} dÃ­as)`);
+        reasons.push(`Revisión próxima a vencer (<${alertConfig.diasAvisoRevision} días)`);
       }
       if (segT < today + alertConfig.diasAvisoSeguro * msPorDia) {
         isProximo = true;
-        reasons.push(`Seguro prÃ³ximo a vencer (<${alertConfig.diasAvisoSeguro} dÃ­as)`);
+        reasons.push(`Seguro próximo a vencer (<${alertConfig.diasAvisoSeguro} días)`);
       }
       if (isProximo) status = "PROXIMO";
     }
@@ -346,13 +347,13 @@ export default function ControlDocumental() {
             detalles: {
               tipoLicencia: newDriverForm.tipoLicencia,
               vencimientoLicencia: newDriverForm.vencimientoLicencia,
-              vacaciones: "Al dÃ­a",
+              vacaciones: "Al día",
             },
           },
         ])
         .select();
       if (error) throw error;
-      Swal.fire('Ã‰xito', 'Conductor guardado correctamente', 'success');
+      Swal.fire('Éxito', 'Conductor guardado correctamente', 'success');
       setIsAddingEntity(null);
       fetchData(); // reload
     } catch (error) {
@@ -405,7 +406,7 @@ export default function ControlDocumental() {
         ])
         .select();
       if (error) throw error;
-      Swal.fire('Ã‰xito', 'Unidad guardada correctamente', 'success');
+      Swal.fire('Éxito', 'Unidad guardada correctamente', 'success');
       setIsAddingEntity(null);
       fetchData(); // reload
     } catch (error) {
@@ -435,16 +436,16 @@ export default function ControlDocumental() {
 
   const handleDeleteEntity = async (id: string, type: "driver" | "vehicle") => {
     const table = type === "driver" ? "colaborador" : "vehiculo";
-    const entityName = type === "driver" ? "conductor" : "vehÃ­culo";
+    const entityName = type === "driver" ? "conductor" : "vehículo";
     
     const result = await Swal.fire({
-      title: `Â¿Eliminar ${entityName}?`,
-      text: "Esta acciÃ³n no se puede deshacer.",
+      title: `¿Eliminar ${entityName}?`,
+      text: "Esta acción no se puede deshacer.",
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#ef4444",
       cancelButtonColor: "#64748b",
-      confirmButtonText: "SÃ­, eliminar",
+      confirmButtonText: "Sí, eliminar",
       cancelButtonText: "Cancelar"
     });
 
@@ -482,8 +483,8 @@ export default function ControlDocumental() {
       vehicles.map((v) => ({
         Patente: v.patente,
         Tipo: v.tipo,
-        Anio: v.anio,
-        "Venc. Rev. Tecnica": v.vencimientoRev,
+        Año: v.anio,
+        "Venc. Rev. Técnica": v.vencimientoRev,
         "Venc. Seguro": v.vencimientoSeguro,
         Estado: checkVehicleStatus(v).status,
       })),
@@ -497,7 +498,7 @@ export default function ControlDocumental() {
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-            GestiÃ³n de Ciclo de Vida y Documental
+            Gestión de Ciclo de Vida y Documental
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm font-medium">
             Control de personal operativo y unidades motrices (GCV & GDC).
@@ -518,7 +519,7 @@ export default function ControlDocumental() {
               onClick={() => setIsAddingEntity("vehicle")}
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-colors flex items-center justify-center gap-2 text-sm"
             >
-              <Truck className="w-4 h-4" /> <span>Registrar VehÃ­culo</span>
+              <Truck className="w-4 h-4" /> <span>Registrar Vehículo</span>
             </button>
           )}
         </div>
@@ -590,7 +591,7 @@ export default function ControlDocumental() {
                           {d.nombre}
                         </h4>
                         <p className="text-xs text-slate-500 font-medium dark:text-slate-400">
-                          <span>{d.rut}</span> â€¢ <span>{d.cargo}</span>
+                          <span>{d.rut}</span> • <span>{d.cargo}</span>
                         </p>
                       </div>
                       <Badge
@@ -600,7 +601,7 @@ export default function ControlDocumental() {
                         className={
                           status === "EN ORDEN"
                             ? "bg-emerald-500 hover:bg-emerald-600 text-white"
-                            : (status === "PROXIMO" ? "bg-amber-500 hover:bg-amber-600 text-white animate-pulse" : "bg-red-500 hover:bg-red-600 text-white animate-pulse")
+                            : "animate-pulse"
                         }
                       >
                         <span>{status}</span>
@@ -632,7 +633,7 @@ export default function ControlDocumental() {
                         </span>
                       </p>
                     </div>
-                    {status !== "EN ORDEN" && (
+                    {status === "VENCIDO" && (
                       <div className={`mt-3 p-2 rounded border ` + (status === "VENCIDO" ? "bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30" : "bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/30")}>
                         <ul className={`text-xs font-medium space-y-0.5 ` + (status === "VENCIDO" ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400")}>
                           {reasons.map((r, idx) => (
@@ -672,7 +673,7 @@ export default function ControlDocumental() {
                           {v.patente}
                         </h4>
                         <p className="text-xs text-slate-500 font-medium dark:text-slate-400">
-                          <span>{v.tipo}</span> â€¢ Anio <span>{v.anio}</span> ({2026 - v.anio} Anios)
+                          <span>{v.tipo}</span> • Año <span>{v.anio}</span> ({2026 - v.anio} Años)
                         </p>
                       </div>
                       <Badge
@@ -682,7 +683,7 @@ export default function ControlDocumental() {
                         className={
                           status === "EN ORDEN"
                             ? "bg-emerald-500 hover:bg-emerald-600 text-white"
-                            : (status === "PROXIMO" ? "bg-amber-500 hover:bg-amber-600 text-white animate-pulse" : "bg-red-500 hover:bg-red-600 text-white animate-pulse")
+                            : "animate-pulse"
                         }
                       >
                         <span>{status}</span>
@@ -690,9 +691,9 @@ export default function ControlDocumental() {
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-sm mt-4">
                       <p className="text-slate-600 dark:text-slate-400">
-                        Rev. Tecnica:{" "}
+                        Rev. Técnica:{" "}
                         <span
-                          className={`font-semibold ${reasons.some((r) => r?.includes("RevisiÃ³n")) ? "text-red-500" : "text-slate-800 dark:text-slate-200"}`}
+                          className={`font-semibold ${reasons.some((r) => r?.includes("Revisión")) ? "text-red-500" : "text-slate-800 dark:text-slate-200"}`}
                         >
                           {v.vencimientoRev}
                         </span>
@@ -705,7 +706,7 @@ export default function ControlDocumental() {
                         </span>
                       </p>
                     </div>
-                    {status !== "EN ORDEN" && (
+                    {status === "VENCIDO" && (
                       <div className={`mt-3 p-2 rounded border ` + (status === "VENCIDO" ? "bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30" : "bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/30")}>
                         <ul className={`text-xs font-medium space-y-0.5 ` + (status === "VENCIDO" ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400")}>
                           {reasons.map((r, idx) => (
@@ -947,7 +948,7 @@ export default function ControlDocumental() {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">
-                      Anio Inscrip.
+                      Año Inscrip.
                     </label>
                     <input
                       type="number"
@@ -981,7 +982,7 @@ export default function ControlDocumental() {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 px-1 dark:text-slate-400">
-                      Venc. Rev. Tecnica
+                      Venc. Rev. Técnica
                     </label>
                     <input
                       type="date"
@@ -1058,7 +1059,7 @@ export default function ControlDocumental() {
                   <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                     <span>{modalType === "driver"
                       ? `${selectedEntity.rut} - ${selectedEntity.cargo}`
-                      : `${selectedEntity.tipo} - Anio ${selectedEntity.anio}`}</span>
+                      : `${selectedEntity.tipo} - Año ${selectedEntity.anio}`}</span>
                   </p>
                 </div>
               </div>
@@ -1066,7 +1067,7 @@ export default function ControlDocumental() {
                 <button
                   onClick={() => handleDeleteEntity(selectedEntity.id, modalType)}
                   className="p-1.5 rounded-lg hover:bg-red-100 text-slate-400 hover:text-red-600 transition-colors"
-                  title={`Eliminar ${modalType === "driver" ? "conductor" : "vehÃ­culo"}`}
+                  title={`Eliminar ${modalType === "driver" ? "conductor" : "vehículo"}`}
                 >
                   <Trash2 className="w-5 h-5" />
                 </button>
@@ -1110,7 +1111,7 @@ export default function ControlDocumental() {
                         Licencia de Conducir
                       </span>
                       <span className="bg-indigo-100 dark:bg-indigo-900/40 px-2 py-1 rounded">
-                        CÃ©dula de Identidad
+                        Cédula de Identidad
                       </span>
                       <span className="bg-indigo-100 dark:bg-indigo-900/40 px-2 py-1 rounded">
                         Hoja de Vida del Conductor
@@ -1144,7 +1145,7 @@ export default function ControlDocumental() {
                         No hay documentos adjuntos
                       </p>
                       <p className="text-xs font-medium text-slate-400 mt-1">
-                        Arrastra tus archivos aquÃ­ o escoge "Adjuntar Documento"
+                        Arrastra tus archivos aquí o escoge "Adjuntar Documento"
                       </p>
                     </div>
                   ) : (
@@ -1212,7 +1213,7 @@ export default function ControlDocumental() {
 
                   <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl">
                     <h4 className="font-bold text-sm text-slate-800 dark:text-white mb-3">
-                      Herramientas de RegularizaciÃ³n
+                      Herramientas de Regularización
                     </h4>
                     {modalType === "driver" &&
                       checkDriverStatus(selectedEntity).reasons.includes(
@@ -1264,23 +1265,23 @@ export default function ControlDocumental() {
                                 selectedEntity.id,
                                 "driver",
                                 "vacaciones",
-                                "Al dÃ­a",
-                                "Vacaciones marcadas como Al dÃ­a",
+                                "Al día",
+                                "Vacaciones marcadas como Al día",
                               );
                             }}
                             className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition flex-1"
                           >
-                            Marcar al dÃ­a
+                            Marcar al día
                           </button>
                         </div>
                       )}
                     {modalType === "vehicle" &&
                       checkVehicleStatus(selectedEntity).reasons.includes(
-                        "RevisiÃ³n Tecnica Vencida",
+                        "Revisión Técnica Vencida",
                       ) && (
                         <div className="flex gap-2 items-center mb-3">
                           <span className="text-xs font-semibold w-1/3 text-slate-700 dark:text-slate-300">
-                            Rev. Tecnica Vencida:
+                            Rev. Técnica Vencida:
                           </span>
                           <input
                             type="date"
@@ -1301,7 +1302,7 @@ export default function ControlDocumental() {
                                   "vehicle",
                                   "vencimientoRev",
                                   v,
-                                  `RevisiÃ³n Tecnica renovada hasta ${v}`,
+                                  `Revisión Técnica renovada hasta ${v}`,
                                 );
                             }}
                             className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition"
@@ -1349,12 +1350,12 @@ export default function ControlDocumental() {
                     {modalType === "vehicle" &&
                       checkVehicleStatus(selectedEntity).reasons.some((r) =>
                         r?.includes(
-                          "Bloqueo automÃ¡tico: Unidad cumple 15+ Anios",
+                          "Bloqueo automático: Unidad cumple 15+ años",
                         ),
                       ) && (
                         <div className="text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10 p-2 rounded border border-red-100 dark:border-red-900/30">
                           La unidad no puede ser regularizada debido a
-                          antigÃ¼edad superior a 15 Anios. Debe ser dada de baja.
+                          antigüedad superior a 15 años. Debe ser dada de baja.
                         </div>
                       )}
                   </div>
@@ -1393,5 +1394,3 @@ export default function ControlDocumental() {
     </div>
   );
 }
-
-
