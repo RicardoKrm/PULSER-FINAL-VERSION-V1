@@ -45,7 +45,7 @@ export default function LogActividad() {
 
   const fetchLogs = async () => {
     try {
-      if (logs.length === 0) setLoading(true);
+      /* no loading spinner on fetch to prevent blinking */
       setError(null);
       
       // Calculate start and end bounds based on local date string
@@ -137,6 +137,7 @@ export default function LogActividad() {
   };
 
   useEffect(() => {
+    setLoading(true);
     fetchLogs();
   }, [selectedDate, selectedCompany]);
 
