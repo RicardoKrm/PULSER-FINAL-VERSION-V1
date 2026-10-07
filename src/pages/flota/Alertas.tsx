@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, AlertCircle, AlertTriangle, FileText, Users, Wrench, Package, Truck } from 'lucide-react';
+import { Clock, AlertCircle, AlertTriangle, FileText, Users, Wrench, Package, CheckCircle2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useCompany } from '../../contexts/CompanyContext';
 import { supabase } from '../../lib/supabase';
-import { calcularDatosPizarra, VehiculoDB, obtenerPautasSecuenciaParaVehiculo } from '../../lib/mantenimientoLogica';
 import { useNavigate } from 'react-router-dom';
 
 export default function OperacionesAlertas() {
@@ -35,7 +34,6 @@ export default function OperacionesAlertas() {
 
         // 1. VEHICULOS (Mantenimiento + Documentos)
         const { data: vehiculosData } = await supabase.from('vehiculo').select('*').eq('empresa_id', currentCompany.id);
-        const { data: pautasData } = await supabase.from('mantenimiento_pauta').select('*, modelo:mantenimiento_modelo_vehiculo(nombre)').eq('empresa_id', currentCompany.id);
 
         if (vehiculosData) {
           vehiculosData.forEach((v: any) => {
@@ -52,51 +50,25 @@ export default function OperacionesAlertas() {
               alertsObj.docsVehiculos.push({ id: v.id + 'per', vehiculo: v.numero_interno || v.patente, documento: 'Permiso Circulación', fechaVencimiento: detalles.vencimientoPermisoCirculacion, estado: 'Vencido' });
             }
 
-            // MANTENIMIENTO
+            // MANTENIMIENTO (Sincronizado con lógica exacta de Dashboard.tsx)
             const kmsActuales = typeof v.kilometraje_actual === 'number' ? v.kilometraje_actual : parseFloat(String(v.kilometraje_actual).replace(/[^0-9.-]+/g, '')) || 0;
             const rawKmUlt = v.km_ultima_mantencion !== undefined ? v.km_ultima_mantencion : (detalles.km_ultima_mantencion !== undefined ? detalles.km_ultima_mantencion : 0);
             const kmUltMant = typeof rawKmUlt === 'number' ? rawKmUlt : parseFloat(String(rawKmUlt).replace(/[^0-9.-]+/g, '')) || 0;
             const rawInterval = v.intervalo_km !== undefined ? v.intervalo_km : (detalles.intervalo_km !== undefined ? detalles.intervalo_km : 10000);
             const kmInterv = typeof rawInterval === 'number' ? rawInterval : parseFloat(String(rawInterval).replace(/[^0-9.-]+/g, '')) || 10000;
             
-            const vehDB: VehiculoDB = {
-              id: v.id,
-              ppu: v.patente,
-              numeroInterno: v.numero_interno,
-              fechaAdquisicion: v.fecha_adquisicion || detalles.fecha_adquisicion,
-              estado: v.estado,
-              marca: v.marca || detalles.marca || '',
-              modelo: v.modelo || detalles.modelo || '',
-              anio: v.anio || detalles.anio || new Date().getFullYear(),
-              kmActual: kmsActuales,
-              fechaUltimoMantenimiento: v.fecha_ultima_mantencion || detalles.fecha_ultima_mantencion || null,
-              kmUltimoMantenimiento: kmUltMant,
-              chasis: v.chasis || detalles.chasis || '',
-              motor: v.motor || detalles.motor || '',
-              norma: v.norma_euro || v.norma || detalles.norma_euro || detalles.norma || '',
-              aplicacion: v.aplicacion || detalles.aplicacion || '',
-              tipoAceite: v.tipo_aceite || v.tipoAceite || detalles.tipo_aceite || detalles.tipoAceite || '',
-              fecha_matriculacion: v.fecha_matriculacion || detalles.fecha_matriculacion || '',
-              detalles,
-              intervaloMantenimiento: kmInterv,
-              tipoIntervalo: v.tipo_intervalo || 'KM',
-              factorConversionHoras: v.factor_conversion_horas || null
-            };
-            
-            try {
-              const calculo = calcularDatosPizarra(vehDB);
-              if (calculo.estatus === 'VENCIDO') {
-                alertsObj.mantenimientos.push({
-                  id: v.id,
-                  vehiculo: calculo.numeroInterno || calculo.ppu,
-                  ultimaMantencion: calculo.fechaUltimoMantencion,
-                  kmActual: calculo.kmActual.toLocaleString(),
-                  pauta: calculo.pautaVencida || calculo.tipoProximoMantencion || '--',
-                  kmFaltantes: '-' + String(calculo.kmVencido?.toLocaleString() || 0),
-                  estado: 'Vencido'
-                });
-              }
-            } catch(e) {}
+            if (kmsActuales >= (kmUltMant + kmInterv)) {
+               const kmFaltantes = kmsActuales - (kmUltMant + kmInterv);
+               alertsObj.mantenimientos.push({
+                 id: v.id,
+                 vehiculo: v.numero_interno || v.patente,
+                 ultimaMantencion: v.fecha_ultima_mantencion || detalles.fecha_ultima_mantencion || '--',
+                 kmActual: kmsActuales.toLocaleString(),
+                 pauta: 'Mantenimiento General',
+                 kmFaltantes: '-' + kmFaltantes.toLocaleString(),
+                 estado: 'Vencido'
+               });
+            }
           });
         }
 
@@ -182,10 +154,9 @@ export default function OperacionesAlertas() {
     fetchData();
   }, [currentCompany]);
 
-  if (loading) return <div className="p-8 text-center text-slate-500 animate-pulse font-medium">Escaneando base de datos en busca de alertas crticas...</div>;
+  if (loading) return <div className="p-8 text-center text-slate-500 animate-pulse font-medium">Escaneando base de datos en busca de alertas críticas...</div>;
 
-  const AlertSection = ({ title, icon: Icon, count, children, colorClass }: any) => {
-    if (count === 0) return null;
+  const AlertSection = ({ title, icon: Icon, count, emptyMessage, children, colorClass }: any) => {
     return (
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 rounded-xl overflow-hidden shadow-sm mb-6 transition-all hover:shadow-md">
         <div className="p-4 md:p-5 flex items-center justify-between border-b border-slate-200 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-800/50">
@@ -195,12 +166,17 @@ export default function OperacionesAlertas() {
             </div>
             <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">{title}</h2>
           </div>
-          <span className={cn("px-3 py-1 rounded-full text-sm font-bold", colorClass.badgeBg, colorClass.text)}>
+          <span className={cn("px-3 py-1 rounded-full text-sm font-bold", count > 0 ? `${colorClass.badgeBg} ${colorClass.text}` : "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400")}>
             {count} {count === 1 ? 'Alerta' : 'Alertas'}
           </span>
         </div>
-        <div className="overflow-x-auto p-4">
-          {children}
+        <div className="overflow-x-auto">
+          {count > 0 ? children : (
+            <div className="p-8 flex flex-col items-center justify-center text-slate-500 dark:text-slate-400">
+              <CheckCircle2 className="w-12 h-12 text-emerald-400 mb-3 opacity-50" />
+              <p className="font-medium text-center">{emptyMessage}</p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -214,7 +190,7 @@ export default function OperacionesAlertas() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
             <AlertTriangle className="h-7 w-7 text-rose-500" />
-            Centro de Alertas Crticas
+            Centro de Alertas Críticas
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
             Monitoreo en tiempo real de cumplimientos, vencimientos y cuellos de botella.
@@ -222,7 +198,8 @@ export default function OperacionesAlertas() {
         </div>
         {totalAlerts === 0 && (
           <div className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-4 py-2 rounded-lg font-bold flex items-center gap-2 border border-emerald-200 dark:border-emerald-800/30">
-            Todo en orden normal!
+            <CheckCircle2 className="w-5 h-5" />
+            ¡Todo en orden normal!
           </div>
         )}
       </div>
@@ -232,6 +209,7 @@ export default function OperacionesAlertas() {
           title="Documentos de Personal Operativo Vencidos" 
           icon={Users} 
           count={alertas.docsPersonal.length}
+          emptyMessage="Todo tu personal está al día con sus licencias y exámenes."
           colorClass={{ bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-600 dark:text-orange-400', badgeBg: 'bg-orange-100 dark:bg-orange-900/50' }}
         >
           <table className="w-full text-sm text-left">
@@ -240,7 +218,7 @@ export default function OperacionesAlertas() {
                 <th className="px-4 py-3 font-semibold rounded-l-lg">Colaborador</th>
                 <th className="px-4 py-3 font-semibold">Rol</th>
                 <th className="px-4 py-3 font-semibold">Asunto</th>
-                <th className="px-4 py-3 font-semibold rounded-r-lg">Detalle Crtico</th>
+                <th className="px-4 py-3 font-semibold rounded-r-lg">Detalle Crítico</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
@@ -262,15 +240,16 @@ export default function OperacionesAlertas() {
           title="Mantenimientos Preventivos Vencidos" 
           icon={Wrench} 
           count={alertas.mantenimientos.length}
+          emptyMessage="No hay vehículos con mantenimiento preventivo vencido."
           colorClass={{ bg: 'bg-rose-100 dark:bg-rose-900/30', text: 'text-rose-600 dark:text-rose-400', badgeBg: 'bg-rose-100 dark:bg-rose-900/50' }}
         >
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/50 uppercase">
               <tr>
-                <th className="px-4 py-3 font-semibold rounded-l-lg">Vehculo</th>
+                <th className="px-4 py-3 font-semibold rounded-l-lg">Vehículo</th>
                 <th className="px-4 py-3 font-semibold">Pauta Vencida</th>
                 <th className="px-4 py-3 font-semibold">Km Faltantes</th>
-                <th className="px-4 py-3 font-semibold rounded-r-lg">Accin</th>
+                <th className="px-4 py-3 font-semibold rounded-r-lg">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
@@ -289,15 +268,16 @@ export default function OperacionesAlertas() {
         </AlertSection>
 
         <AlertSection 
-          title="Documentos de Vehculos Vencidos" 
+          title="Documentos de Vehículos Vencidos" 
           icon={FileText} 
           count={alertas.docsVehiculos.length}
+          emptyMessage="Toda la flota tiene sus permisos y seguros al día."
           colorClass={{ bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-600 dark:text-amber-400', badgeBg: 'bg-amber-100 dark:bg-amber-900/50' }}
         >
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/50 uppercase">
               <tr>
-                <th className="px-4 py-3 font-semibold rounded-l-lg">Vehculo</th>
+                <th className="px-4 py-3 font-semibold rounded-l-lg">Vehículo</th>
                 <th className="px-4 py-3 font-semibold">Documento</th>
                 <th className="px-4 py-3 font-semibold">Fecha Vencimiento</th>
               </tr>
@@ -315,18 +295,19 @@ export default function OperacionesAlertas() {
         </AlertSection>
 
         <AlertSection 
-          title="rdenes de Trabajo Atrasadas" 
+          title="Órdenes de Trabajo Atrasadas" 
           icon={Clock} 
           count={alertas.ots.length}
+          emptyMessage="No tienes órdenes de trabajo atrasadas en este momento."
           colorClass={{ bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-600 dark:text-purple-400', badgeBg: 'bg-purple-100 dark:bg-purple-900/50' }}
         >
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/50 uppercase">
               <tr>
                 <th className="px-4 py-3 font-semibold rounded-l-lg">Folio OT</th>
-                <th className="px-4 py-3 font-semibold">Vehculo</th>
+                <th className="px-4 py-3 font-semibold">Vehículo</th>
                 <th className="px-4 py-3 font-semibold">Estado</th>
-                <th className="px-4 py-3 font-semibold">Das Atraso</th>
+                <th className="px-4 py-3 font-semibold">Días Atraso</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
@@ -335,7 +316,7 @@ export default function OperacionesAlertas() {
                   <td className="px-4 py-3 font-bold text-indigo-600"><button onClick={() => navigate('/flota/mantenimiento')}>{item.folio}</button></td>
                   <td className="px-4 py-3 font-medium">{item.vehiculo}</td>
                   <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{item.estado}</td>
-                  <td className="px-4 py-3 text-rose-600 dark:text-rose-400 font-bold">{item.diasAtraso > 0 ? `${item.diasAtraso} das` : 'Hoy'}</td>
+                  <td className="px-4 py-3 text-rose-600 dark:text-rose-400 font-bold">{item.diasAtraso > 0 ? `${item.diasAtraso} días` : 'Hoy'}</td>
                 </tr>
               ))}
             </tbody>
@@ -343,18 +324,19 @@ export default function OperacionesAlertas() {
         </AlertSection>
 
         <AlertSection 
-          title="Inventario Crtico (Quiebre de Stock)" 
+          title="Inventario Crítico (Quiebre de Stock)" 
           icon={Package} 
           count={alertas.repuestos.length}
+          emptyMessage="Tu bodega tiene niveles de stock saludables."
           colorClass={{ bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-600 dark:text-red-400', badgeBg: 'bg-red-100 dark:bg-red-900/50' }}
         >
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/50 uppercase">
               <tr>
                 <th className="px-4 py-3 font-semibold rounded-l-lg">Repuesto</th>
-                <th className="px-4 py-3 font-semibold">Cdigo</th>
+                <th className="px-4 py-3 font-semibold">Código</th>
                 <th className="px-4 py-3 font-semibold text-right">Stock Actual</th>
-                <th className="px-4 py-3 font-semibold text-right rounded-r-lg">Stock Mnimo</th>
+                <th className="px-4 py-3 font-semibold text-right rounded-r-lg">Stock Mínimo</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
