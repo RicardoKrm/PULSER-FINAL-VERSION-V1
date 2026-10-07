@@ -184,7 +184,11 @@ const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[
           sueldo_base: parseCurrencyCLP(r.Sueldo_Base),
           valor_hh: parseCurrencyCLP(r['HH_$'] || r.Valor_HH),
           hh_extras: parseFloat((r.HH_Extras || '0').toString().replace(/[^0-9.-]+/g,"")),
-          prestador_de_servicio: r.Prestador_de_servicio || r.Prestador_de_s || ''
+          prestador_de_servicio: r.Prestador_de_servicio || r.Prestador_de_s || '',
+          tipoLicencia: r['TIPO LICENCIA'] || r['TIPO DE LICENCIA'] || '',
+          vencimientoLicencia: parseExcelDate(findKey(['VENCIMIENTO LICENCIA', 'VENC. LICENCIA'])),
+          vencimientoExamenes: parseExcelDate(findKey(['EXAMEN PREOCUPACIONAL', 'VENC. EXAMEN PREOC.'])),
+          fechaVacaciones: parseExcelDate(findKey(['INGRESO EMPRESA', 'FECHA INGRESO', 'INGRESO A LA EMPRESA']))
         }
       };
     }
@@ -254,7 +258,10 @@ const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[
         tipo_ult_pauta: r.tipo_ultimo_mant || r.tipo_ult_pauta,
         detalles: {
           marca: finalMarca,
-          modelo: finalModelo
+          modelo: finalModelo,
+          vencimientoRev: parseExcelDate(getValByKey(r, ['VENC. REVISION TECNICA', 'REVISION TECNICA', 'REV. TECNICA'])),
+          vencimientoPermisoCirculacion: parseExcelDate(getValByKey(r, ['VENC. PERMISO CIRCULACION', 'PERMISO CIRCULACION', 'VENC. PERMISO CIRC.'])),
+          vencimientoSeguro: parseExcelDate(getValByKey(r, ['VENC. SEGURO OBLIGATORIO', 'SEGURO OBLIGATORIO', 'VENC. SEGURO']))
         }
       };
     }
@@ -431,7 +438,7 @@ const MODULES: UploadModule[] = [
     description: 'Carga masiva de conductores, técnicos y administrativos desde archivo Excel.',
     icon: Users,
     template: [
-      { TRABAJADOR: 'Acuña Villagrán Claudio Andrés', RUT: '11.572.766-4', 'F. CONTRATO': '6/17/2026', CARGO: 'CONDUCTOR', 'F. CONTRATO_1': 'PLAZO FIJO', VENCIMIENTO: '10/31/2026', 'TURNO ASIGNADO': '7X7', DIRECCION: 'Av. Siempre Viva 742', TELEFONO: '+56912345678', EMPRESA: 'INVERSIONES IMPERIA SpA' }
+      { TRABAJADOR: 'Acuña Villagrán Claudio Andrés', RUT: '11.572.766-4', 'F. CONTRATO': '6/17/2026', CARGO: 'CONDUCTOR', 'F. CONTRATO_1': 'PLAZO FIJO', VENCIMIENTO: '10/31/2026', 'TURNO ASIGNADO': '7X7', DIRECCION: 'Av. Siempre Viva 742', TELEFONO: '+56912345678', EMPRESA: 'INVERSIONES IMPERIA SpA', 'TIPO LICENCIA': 'A4', 'VENCIMIENTO LICENCIA': '12/31/2026', 'EXAMEN PREOCUPACIONAL': '12/31/2026', 'INGRESO EMPRESA': '06/17/2026' }
     ]
   },
   {
@@ -457,7 +464,10 @@ const MODULES: UploadModule[] = [
         intervalo_km: 10000,
         km_ultima_mantencion: 136100,
         fecha_ultima_mantencion: '15-07-25',
-        tipo_ultimo_mant: 'SM1'
+        tipo_ultimo_mant: 'SM1',
+          'VENC. REVISION TECNICA': '12/31/2026',
+          'VENC. PERMISO CIRCULACION': '03/31/2027',
+          'VENC. SEGURO OBLIGATORIO': '03/31/2027'
       }
     ]
   },
