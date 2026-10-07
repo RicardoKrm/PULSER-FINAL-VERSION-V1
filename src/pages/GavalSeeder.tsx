@@ -35,7 +35,25 @@ export default function GavalSeeder() {
       // Intentar obtener catálogo de fallas, tareas y repuestos para vincular
       const { data: tiposFallaData } = await supabase.from('config_tipos_falla').select('id, nombre').eq('empresa_id', selectedCompanyId);
       const { data: tareasEstandarData } = await supabase.from('tarea_estandar').select('id, descripcion').eq('empresa_id', selectedCompanyId);
+      
       const { data: repuestosData } = await supabase.from('logistica_repuestos').select('id, nombre, costo_unitario').eq('empresa_id', selectedCompanyId);
+
+      if (repuestosData && repuestosData.length > 0) {
+          const updates = [];
+          for (const rep of repuestosData) {
+              if (!rep.costo_unitario || rep.costo_unitario <= 0) {
+                  const randomPrice = Math.floor(Math.random() * 85000) + 15000;
+                  updates.push({ id: rep.id, costo_unitario: randomPrice });
+                  rep.costo_unitario = randomPrice;
+              }
+          }
+          if (updates.length > 0) {
+              log(`Fijando valor referencial a ${updates.length} repuestos que no tenían precio...`);
+              const updatePromises = updates.map(u => supabase.from('logistica_repuestos').update({ costo_unitario: u.costo_unitario }).eq('id', u.id));
+              await Promise.all(updatePromises);
+          }
+      }
+
 
       if (!vehiculos?.length || !mecanicos?.length) {
         throw new Error('Faltan vehículos o mecánicos para generar OTs');
