@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { useCompany } from '../contexts/CompanyContext';
@@ -136,7 +136,7 @@ export default function Dashboard() {
     
     const totalAlertasCriticas = vencidosMantenimiento + docsVencidos;
 
-    const otsEnCurso = otsEmpresa.filter((ot: any) => ['CREADA', 'EN_PROGRESO', 'PAUSADA'].includes(ot.estado)).map((ot: any) => ot.vehiculoId);
+    const otsEnCurso = otsEmpresa.filter((ot: any) => ['ABIERTA', 'EN_PROCESO', 'PAUSADA', 'PROGRAMADA', 'POR_ASIGNAR'].includes(ot.estado)).map((ot: any) => ot.vehiculoId);
     let indisponibles = new Set(otsEnCurso).size;
 
     vehiculosDisponibles = totalDb > 0 ? Math.max(0, totalDb - indisponibles) : 0;
@@ -570,6 +570,7 @@ export default function Dashboard() {
     </div>
   );
 }
+
 
 
 
