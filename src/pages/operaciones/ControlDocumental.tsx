@@ -508,7 +508,10 @@ export default function ControlDocumental() {
           </p>
         </div>
         <div className="flex gap-3">
-          <button onClick={() => { setDriverForm({rut:'', nombre:'', rol:'', telefono:'', vencimientoLicencia:'', archivoLicencia:'', licenciasMedicas:[], vencimientoExamenes:'', archivoExamenes:'', fechaVacaciones:''}); setIsEditing(false); setShowDriverModal(true); }} className="bg-white dark:bg-slate-900 text-indigo-600 border border-indigo-200 dark:border-indigo-900 px-4 py-2 rounded-xl font-bold hover:bg-indigo-50 flex items-center gap-2 transition-all shadow-sm">
+          <button onClick={handleExportExcel} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-emerald-700 flex items-center gap-2 transition-all shadow-sm">
+              <Download className="w-4 h-4" /> Exportar
+            </button>
+            <button onClick={() => { setDriverForm({rut:'', nombre:'', rol:'', telefono:'', vencimientoLicencia:'', archivoLicencia:'', licenciasMedicas:[], vencimientoExamenes:'', archivoExamenes:'', fechaVacaciones:''}); setIsEditing(false); setShowDriverModal(true); }} className="bg-white dark:bg-slate-900 text-indigo-600 border border-indigo-200 dark:border-indigo-900 px-4 py-2 rounded-xl font-bold hover:bg-indigo-50 flex items-center gap-2 transition-all shadow-sm">
             <Users className="w-4 h-4" /> Registrar Conductor
           </button>
           <button onClick={() => { setVehicleForm({patente:'', marca:'', modelo:'', tipo:'Camión', anio:new Date().getFullYear(), fechaInscripcion:'', tipoUso:'Carga General', vencimientoRev:'', archivoRev:'', vencimientoSeguro:'', archivoSeguro:'', vencimientoPermisoCirculacion:'', archivoPermisoCirculacion:''}); setIsEditing(false); setShowVehicleModal(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-indigo-700 flex items-center gap-2 transition-all shadow-sm">
