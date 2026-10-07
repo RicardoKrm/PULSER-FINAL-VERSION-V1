@@ -149,11 +149,16 @@ export default function ControlDocumental() {
 
   // ----- STATUS CHECKERS -----
   const checkDocument = (dateStr: string, warningDays: number) => {
-    if (!dateStr) return { status: 'FALTANTE', text: 'No registrado' };
+    if (!dateStr) return { status: 'FALTANTE', text: 'No registrado', date: '' };
+    
+    // Formatear a DD/MM/YYYY
+    const [y, m, d] = dateStr.split('-');
+    const dateFormatted = d && m && y ? `${d}/${m}/${y}` : dateStr;
+
     const t = new Date(dateStr).getTime();
-    if (t < today) return { status: 'VENCIDO', text: 'Vencido' };
-    if (t < today + warningDays * msPorDia) return { status: 'PROXIMO', text: 'Próximo a vencer' };
-    return { status: 'EN ORDEN', text: 'Vigente' };
+    if (t < today) return { status: 'VENCIDO', text: 'Vencido', date: dateFormatted };
+    if (t < today + warningDays * msPorDia) return { status: 'PROXIMO', text: 'Próximo a vencer', date: dateFormatted };
+    return { status: 'EN ORDEN', text: 'Vigente', date: dateFormatted };
   };
 
   const checkDriverStatus = (driver: any) => {
@@ -399,7 +404,7 @@ export default function ControlDocumental() {
         {renderStatusDot(docObj.status)}
         <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{label}:</span>
         <span className={`text-xs font-bold ${docObj.status === 'VENCIDO' ? 'text-red-600' : docObj.status === 'PROXIMO' ? 'text-amber-600' : 'text-slate-800 dark:text-white'}`}>
-          {docObj.text}
+          {docObj.date ? `${docObj.date} (${docObj.text})` : docObj.text}
         </span>
       </div>
       {uploadField && renderFileAction(url || '', type, uploadField)}
