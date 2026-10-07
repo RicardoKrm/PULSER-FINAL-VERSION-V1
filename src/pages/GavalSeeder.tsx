@@ -1,25 +1,34 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAppContext } from '../context/AppContext';
 
 export default function GavalSeeder() {
   const [logs, setLogs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const { activeCompanyId } = useAppContext();
 
   const log = (msg: string) => setLogs(prev => [...prev, msg]);
 
+  const getTargetCompany = () => {
+     // Si es super admin y está viendo "GLOBAL", no podemos sembrar a ciegas.
+     // Usamos el fallback original solo en el peor de los casos
+     if (!activeCompanyId || activeCompanyId === 'GLOBAL') {
+        return '57fa41da-645d-48ba-a671-65a35312d0e9';
+     }
+     return activeCompanyId;
+  };
+
   const handleBackup = async () => {
     setLoading(true);
-    log('Iniciando respaldo de Gaval...');
-    const gavalId = '57fa41da-645d-48ba-a671-65a35312d0e9';
+    const targetId = getTargetCompany();
+    log(`Iniciando respaldo para empresa: ${targetId}...`);
 
     try {
       const backupData: any = {};
-      const tables = ['vehiculo', 'colaborador', 'orden_de_trabajo', 'logistica_repuestos', 'pauta_mantenimiento', 'tarea_estandar'];
+      const tables = ['vehiculo', 'colaborador', 'orden_de_trabajo', 'logistica_repuestos'];
       for (const table of tables) {
         log(`Extrayendo tabla: ${table}...`);
-        let query = supabase.from(table).select('*');
-        if (table !== 'pauta_mantenimiento' && table !== 'tarea_estandar') query = query.eq('empresa_id', gavalId);
-        const { data } = await query;
+        const { data } = await supabase.from(table).select('*').eq('empresa_id', targetId);
         backupData[table] = data || [];
         log(`OK: ${table} (${backupData[table].length} registros)`);
       }
@@ -28,7 +37,7 @@ export default function GavalSeeder() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `backup_gaval_${new Date().toISOString().slice(0,10)}.json`;
+      a.download = `backup_empresa_${targetId}_${new Date().toISOString().slice(0,10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
       log('Respaldo descargado exitosamente.');
@@ -40,31 +49,28 @@ export default function GavalSeeder() {
 
   const handleSeeder = async () => {
     setLoading(true);
-    log('--- INICIANDO SEMBRADO CRONOLÓGICO PARA GAVAL ---');
-    const gavalId = '57fa41da-645d-48ba-a671-65a35312d0e9';
+    const targetId = getTargetCompany();
+    log(`--- INICIANDO SEMBRADO CRONOLÓGICO PARA EMPRESA: ${targetId} ---`);
 
     try {
-      // 0. Limpiar OTs anteriores del seeder para no duplicar
       log('Limpiando OTs simuladas anteriores...');
-      await supabase.from('orden_de_trabajo').delete().like('folio', 'OT-GAV-%').eq('empresa_id', gavalId);
+      await supabase.from('orden_de_trabajo').delete().like('folio', 'OT-GAV-%').eq('empresa_id', targetId);
 
-      // 1. Obtener insumos
       log('Cargando vehículos...');
-      const { data: vehiculos } = await supabase.from('vehiculo').select('id, patente, kilometraje_actual').eq('empresa_id', gavalId);
+      const { data: vehiculos } = await supabase.from('vehiculo').select('id, patente, kilometraje_actual').eq('empresa_id', targetId);
       log(`Vehículos obtenidos: ${vehiculos?.length}`);
 
       log('Cargando mecánicos...');
-      const { data: colaboradores } = await supabase.from('colaborador').select('id, nombre, rol').eq('empresa_id', gavalId);
+      const { data: colaboradores } = await supabase.from('colaborador').select('id, nombre, rol').eq('empresa_id', targetId);
       const mecanicos = (colaboradores || []).filter(c => (c.rol || '').toLowerCase().includes('mecanic') || (c.rol || '').toLowerCase().includes('taller'));
       log(`Mecánicos obtenidos: ${mecanicos.length}`);
 
       if (!vehiculos?.length || !mecanicos?.length) {
-        throw new Error('Faltan vehículos o mecánicos para generar OTs');
+        throw new Error('Faltan vehículos o mecánicos en la empresa seleccionada para generar OTs');
       }
 
       const generateUUID = () => crypto.randomUUID();
 
-      // Fechas desde Enero 2026 a Hoy
       const startDate = new Date('2026-01-01T08:00:00');
       const today = new Date();
       const numDias = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
@@ -86,21 +92,20 @@ export default function GavalSeeder() {
          const isPreventive = Math.random() > 0.4;
          const costoInsumos = Math.floor(Math.random() * 450000) + 50000;
          const costoHH = Math.floor(Math.random() * 200000) + 30000;
-
          const formatDt = randomDate.toISOString().slice(0,10);
 
          otdsToInsert.push({
            id: generateUUID(),
            folio: `OT-GAV-${String(i+1000).padStart(4, '0')}`,
            vehiculo_id: veh.id,
-           empresa_id: gavalId,
+           empresa_id: targetId, // <-- AQUÍ USAMOS EL ID REAL AL QUE ESTÁS CONECTADO
            tecnico_responsable: mec.nombre,
-           tipo: isPreventive ? 'PREVENTIVA' : 'CORRECTIVA', // IMPORTANTE: Sin sufijos extra para coincidir
-           estado: 'FINALIZADA', // IMPORTANTE: FINALIZADA en vez de TERMINADA para KpiRRHH
+           tipo: isPreventive ? 'PREVENTIVA' : 'CORRECTIVA', 
+           estado: 'FINALIZADA', 
            prioridad: isPreventive ? 'Media' : 'Alta',
            kilometraje_apertura: (veh.kilometraje_actual || 0) - (numDias - randomDayOffset) * 100,
            kilometraje_cierre: (veh.kilometraje_actual || 0) - (numDias - randomDayOffset) * 100 + 10,
-           fecha_creacion: randomDate.toISOString(), // IMPORTANTE: full ISO string for sorting
+           fecha_creacion: randomDate.toISOString(), 
            fecha_programada: formatDt,
            hora_inicio_programada: '08:00:00',
            hora_termino_programada: '16:00:00',
@@ -110,14 +115,13 @@ export default function GavalSeeder() {
            costo_insumos: costoInsumos,
            costo_mano_obra_tareas: 0,
            costo_mano_obra_hh: costoHH,
-           tiempo_trabajado_segundos: 28800 // 8 horas
+           tiempo_trabajado_segundos: 28800 
          });
 
          totalCostos += costoInsumos + costoHH;
       }
 
       log(`Insertando ${otdsToInsert.length} OTs históricas...`);
-      // Chunk insertions due to Supabase limits
       const chunkSize = 20;
       for (let i = 0; i < otdsToInsert.length; i += chunkSize) {
          const chunk = otdsToInsert.slice(i, i + chunkSize);
@@ -131,13 +135,11 @@ export default function GavalSeeder() {
 
       log('Registrando actividades (Log)...');
       await supabase.from('log_actividad').insert([
-        { modulo: 'Sistema', accion: 'Sembrado de Datos', detalles: `Se generaron ${otCount} OTs y un histórico de $${totalCostos} simulados`, empresa_id: gavalId }
+        { modulo: 'Sistema', accion: 'Sembrado de Datos', detalles: `Se generaron ${otCount} OTs simuladas`, empresa_id: targetId }
       ]);
 
-      log('¡PROCESO FINALIZADO CON ÉXITO! OTs insertadas en estado FINALIZADA.');
-      
-      // FORZAR RECARGA LOCAL
-      localStorage.removeItem(`pulser_ots_${gavalId}`);
+      log('¡PROCESO FINALIZADO CON ÉXITO! Ve a tu pestaña de incógnito y presiona F5.');
+      localStorage.removeItem(`pulser_ots_${targetId}`);
 
     } catch (e: any) {
       log('Error crítico en sembrado: ' + e.message);
@@ -149,7 +151,8 @@ export default function GavalSeeder() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto bg-white dark:bg-slate-900 min-h-screen">
-      <h1 className="text-3xl font-bold mb-4">Herramienta de Sembrado - Gaval</h1>
+      <h1 className="text-3xl font-bold mb-4">Herramienta de Sembrado Dinámica</h1>
+      <p className="mb-4 text-slate-500">ID de Empresa Activa: <strong>{getTargetCompany()}</strong></p>
       
       <div className="flex gap-4 mb-8">
         <button 
@@ -164,7 +167,7 @@ export default function GavalSeeder() {
           disabled={loading}
           className="bg-emerald-600 text-white px-4 py-2 rounded font-bold hover:bg-emerald-700 disabled:opacity-50 flex-1 shadow-lg border border-emerald-400"
         >
-          {loading ? 'Inyectando datos...' : '2. 🚀 APLICAR PARCHE Y RE-SEMBRAR DATOS (Ene-Oct 2026)'}
+          {loading ? 'Inyectando datos...' : '2. 🚀 INYECTAR DATOS EN LA EMPRESA SELECCIONADA'}
         </button>
       </div>
 
