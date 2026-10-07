@@ -25,6 +25,8 @@ interface UserSession {
   last_action: Date;
   action_count: number;
   modules_visited: Set<string>;
+  is_online?: boolean;
+  last_action_name?: string;
 }
 
 export default function LogActividad() {
@@ -110,7 +112,10 @@ export default function LogActividad() {
           if (sessionsMap.has(log.user_id)) {
             const sess = sessionsMap.get(log.user_id)!;
             if (logTime < sess.first_action) sess.first_action = logTime;
-            if (logTime > sess.last_action) sess.last_action = logTime;
+            if (logTime > sess.last_action) {
+              sess.last_action = logTime;
+              sess.last_action_name = log.action;
+            }
             sess.action_count++;
             if (log.module) sess.modules_visited.add(log.module);
           } else {
@@ -121,12 +126,24 @@ export default function LogActividad() {
               first_action: logTime,
               last_action: logTime,
               action_count: 1,
-              modules_visited: new Set(log.module ? [log.module] : [])
+              modules_visited: new Set(log.module ? [log.module] : []),
+              last_action_name: log.action
             });
           }
         });
 
-        setActiveSessions(Array.from(sessionsMap.values()).sort((a, b) => b.last_action.getTime() - a.last_action.getTime()));
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        const now = new Date().getTime();
+        
+        const activeSessArray = Array.from(sessionsMap.values()).map(sess => {
+          const isToday = selectedDate === todayStr;
+          const diffMins = (now - sess.last_action.getTime()) / 60000;
+          const isLogout = sess.last_action_name?.toLowerCase().includes('cerró sesión') || sess.last_action_name?.toLowerCase().includes('cierre de sesión');
+          sess.is_online = isToday && !isLogout && diffMins < 15;
+          return sess;
+        }).sort((a, b) => b.last_action.getTime() - a.last_action.getTime());
+
+        setActiveSessions(activeSessArray);
       }
     } catch (err: any) {
       console.error('Error fetching logs:', err);
@@ -245,7 +262,7 @@ export default function LogActividad() {
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Usuarios Activos</p>
-                <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{activeSessions.length}</h3>
+                <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{activeSessions.filter(s => s.is_online).length}</h3>
               </div>
             </div>
             <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${showUsersPanel ? 'rotate-180' : ''}`} />
@@ -276,7 +293,10 @@ export default function LogActividad() {
                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                  {activeSessions.map(sess => (
                    <tr key={sess.user_id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                     <td className="p-3 text-sm font-semibold text-slate-900 dark:text-slate-100">{sess.user_name}</td>
+                     <td className="p-3 text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                         <div className={`w-2 h-2 rounded-full ${sess.is_online ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-300 dark:bg-slate-700'}`} title={sess.is_online ? 'En línea' : 'Desconectado'}></div>
+                         {sess.user_name}
+                       </td>
                      <td className="p-3 text-sm text-slate-600 dark:text-slate-400">{sess.company_name}</td>
                      <td className="p-3 text-sm">
                        <div className="flex flex-wrap gap-1">
