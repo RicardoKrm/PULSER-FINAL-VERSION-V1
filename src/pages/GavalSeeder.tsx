@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAppContext } from '../context/AppContext';
 
@@ -17,6 +17,23 @@ export default function GavalSeeder() {
     });
   }, []);
 
+  const handleWipeOts = async () => {
+    if (!selectedCompanyId) return log('Selecciona una empresa primero');
+    if (!window.confirm('¿Seguro que quieres BORRAR TODAS las OTs de esta empresa? Esto liberará el inventario para que puedas subir tu Excel limpio.')) return;
+    
+    setLoading(true);
+    log(Borrando historial de OTs para la empresa: ...);
+    try {
+      const { error } = await supabase.from('orden_de_trabajo').delete().eq('empresa_id', selectedCompanyId);
+      if (error) throw error;
+      log('✅ Todas las OTs han sido eliminadas. Ahora puedes borrar tu inventario viejo y subir el Excel.');
+      localStorage.removeItem(pulser_ots_);
+    } catch(e: any) {
+      log('Error al borrar OTs: ' + e.message);
+    }
+    setLoading(false);
+  };
+
   const handleSeeder = async () => {
     if (!selectedCompanyId) return log('Selecciona una empresa primero');
     setLoading(true);
@@ -33,7 +50,7 @@ export default function GavalSeeder() {
       const mecanicos = (colaboradores || []).filter(c => (c.rol || '').toLowerCase().includes('mecanic') || (c.rol || '').toLowerCase().includes('taller'));
       
       // Intentar obtener catálogo de fallas, tareas y repuestos para vincular
-      const { data: tiposFallaData } = await supabase.from('config_tipos_falla').select('id, nombre').eq('empresa_id', selectedCompanyId);
+      const { data: tiposFallaData } = await supabase.from('tipo_falla').select('id, nombre').eq('empresa_id', selectedCompanyId);
       const { data: tareasEstandarData } = await supabase.from('tarea_estandar').select('id, descripcion').eq('empresa_id', selectedCompanyId);
       
       const { data: repuestosData } = await supabase.from('logistica_repuestos').select('id, nombre, costo_unitario').eq('empresa_id', selectedCompanyId);
@@ -197,6 +214,9 @@ export default function GavalSeeder() {
       </div>
 
       <div className="flex gap-4 mb-8">
+        <button onClick={handleWipeOts} disabled={loading || !selectedCompanyId} className="bg-red-600 text-white px-4 py-2 rounded font-bold hover:bg-red-700 disabled:opacity-50">
+          🔥 LIMPIAR OTs ANTIGUAS
+        </button>
         <button onClick={handleSeeder} disabled={loading || !selectedCompanyId} className="bg-emerald-600 text-white px-4 py-2 rounded font-bold hover:bg-emerald-700 disabled:opacity-50 flex-1 shadow-lg border border-emerald-400">
           {loading ? 'Inyectando matriz de datos...' : '🚀 INYECTAR MATRIZ PROFUNDA (OTs + RRHH + Fallas)'}
         </button>
@@ -209,3 +229,4 @@ export default function GavalSeeder() {
     </div>
   );
 }
+
