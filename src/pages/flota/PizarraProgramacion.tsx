@@ -512,7 +512,7 @@ export default function PizarraProgramacion() {
                  {d.events.slice(0, 2).map((ev, i) => (
                     <div 
                       key={i} 
-                      onClick={(e) => { e.stopPropagation(); navigate(`/flota/ordenes-trabajo/${ev.otId}`); }}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/flota/ordenes-trabajo/${ev.otId}`, { state: { fromPizarra: true } }); }}
                       draggable
                       onDragStart={(e) => handleDragStart(e, ev.otId)}
                       className={cn("text-[10px] px-1.5 py-1 rounded truncate cursor-pointer hover:opacity-90 flex items-center gap-1.5 font-medium shadow-sm transition-opacity",
@@ -602,7 +602,7 @@ export default function PizarraProgramacion() {
                          const top = (ot.startHour! - 8) * 80;
                          const height = ot.duration! * 80;
                          return (
-                           <div key={ot.id} onClick={() => navigate(`/flota/ordenes-trabajo/${ot.id}`)}
+                           <div key={ot.id} onClick={() => navigate(`/flota/ordenes-trabajo/${ot.id}`, { state: { fromPizarra: true } })}
                                 className={cn("absolute left-1 right-1 flex flex-col rounded p-1.5 text-white shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-all hover:z-50", 
                                   getTipoColor(ot.tipo),
                                   ot.isOverdue && "ring-2 ring-red-500 animate-pulse border-2 border-red-500"
@@ -686,7 +686,7 @@ export default function PizarraProgramacion() {
                       const top = (ot.startHour! - 8) * 80;
                       const height = ot.duration! * 80;
                       return (
-                        <div key={ot.id} onClick={() => navigate(`/flota/ordenes-trabajo/${ot.id}`)}
+                        <div key={ot.id} onClick={() => navigate(`/flota/ordenes-trabajo/${ot.id}`, { state: { fromPizarra: true } })}
                              draggable
                              onDragStart={(e) => handleDragStart(e, ot.id)}
                              className={cn("absolute left-1 right-1 rounded-lg p-2 text-white shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-all flex flex-col", 
@@ -979,7 +979,7 @@ export default function PizarraProgramacion() {
                <div 
                  key={i} 
                  onClick={() => {
-                   navigate(`/flota/ordenes-trabajo/${ev.otId}`);
+                   navigate(`/flota/ordenes-trabajo/${ev.otId}`, { state: { fromPizarra: true } });
                    setDayEventsModal({ isOpen: false, date: null, events: [] });
                  }}
                  className={cn("px-3 py-2 rounded-md cursor-pointer hover:opacity-90 flex flex-col gap-1 shadow-sm transition-opacity",
