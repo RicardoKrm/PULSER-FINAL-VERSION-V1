@@ -1,5 +1,9 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
-import { Badge } from "../../components/ui/Badge";
+const fs = require('fs');
+const path = require('path');
+
+const fileContent = `import React, { useState, useEffect, useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
+import { Badge } from "../../components/ui/badge";
 import { 
   FileCheck, Truck, Users, AlertCircle, ShieldAlert, 
   CalendarClock, Search, Filter, Plus, FileText, 
@@ -64,7 +68,7 @@ export default function ControlDocumental() {
 
   useEffect(() => {
     if (saveCompanyId) {
-      const saved = localStorage.getItem(`config_alertas_${saveCompanyId}`);
+      const saved = localStorage.getItem(\`config_alertas_\${saveCompanyId}\`);
       if (saved) setAlertConfig(JSON.parse(saved));
       fetchData();
     }
@@ -105,8 +109,8 @@ export default function ControlDocumental() {
     setUploading(true);
     try {
       const fileExt = 'pdf';
-      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `${saveCompanyId}/${currentUploadField.type}/${fileName}`;
+      const fileName = \`\${Math.random().toString(36).substring(2)}.\${fileExt}\`;
+      const filePath = \`\${saveCompanyId}/\${currentUploadField.type}/\${fileName}\`;
 
       const { error: uploadError } = await supabase.storage
         .from('documentos_legales')
@@ -148,16 +152,11 @@ export default function ControlDocumental() {
 
   // ----- STATUS CHECKERS -----
   const checkDocument = (dateStr: string, warningDays: number) => {
-    if (!dateStr) return { status: 'FALTANTE', text: 'No registrado', date: '' };
-    
-    // Formatear a DD/MM/YYYY
-    const [y, m, d] = dateStr.split('-');
-    const dateFormatted = d && m && y ? `${d}/${m}/${y}` : dateStr;
-
+    if (!dateStr) return { status: 'FALTANTE', text: 'No registrado' };
     const t = new Date(dateStr).getTime();
-    if (t < today) return { status: 'VENCIDO', text: 'Vencido', date: dateFormatted };
-    if (t < today + warningDays * msPorDia) return { status: 'PROXIMO', text: 'Próximo a vencer', date: dateFormatted };
-    return { status: 'EN ORDEN', text: 'Vigente', date: dateFormatted };
+    if (t < today) return { status: 'VENCIDO', text: 'Vencido' };
+    if (t < today + warningDays * msPorDia) return { status: 'PROXIMO', text: 'Próximo a vencer' };
+    return { status: 'EN ORDEN', text: 'Vigente' };
   };
 
   const checkDriverStatus = (driver: any) => {
@@ -179,9 +178,9 @@ export default function ControlDocumental() {
     if (reasons.length > 0) {
       status = 'VENCIDO';
     } else {
-      if (docLicencia.status === 'PROXIMO') reasons.push(`Licencia próxima (< ${alertConfig.diasAvisoLicencia} días)`);
-      if (docSalud.status === 'PROXIMO') reasons.push(`Salud próxima (< ${alertConfig.diasAvisoSalud} días)`);
-      if (docExamen.status === 'PROXIMO') reasons.push(`Exámenes próximos (< ${alertConfig.diasAvisoSalud} días)`);
+      if (docLicencia.status === 'PROXIMO') reasons.push(\`Licencia próxima (< \${alertConfig.diasAvisoLicencia} días)\`);
+      if (docSalud.status === 'PROXIMO') reasons.push(\`Salud próxima (< \${alertConfig.diasAvisoSalud} días)\`);
+      if (docExamen.status === 'PROXIMO') reasons.push(\`Exámenes próximos (< \${alertConfig.diasAvisoSalud} días)\`);
       if (reasons.length > 0) status = 'PROXIMO';
     }
 
@@ -214,9 +213,9 @@ export default function ControlDocumental() {
       const yearInscripcion = new Date(det.fechaInscripcion).getFullYear();
       const currentYear = new Date().getFullYear();
       const age = currentYear - yearInscripcion;
-      if (age >= vidaUtilMax) docVidaUtil = { status: 'VENCIDO', text: `Excedida (${age}/${vidaUtilMax} años)` };
+      if (age >= vidaUtilMax) docVidaUtil = { status: 'VENCIDO', text: \`Excedida (\${age}/\${vidaUtilMax} años)\` };
       else if (age === vidaUtilMax - 1) docVidaUtil = { status: 'PROXIMO', text: 'Último año' };
-      else docVidaUtil.text = `${age}/${vidaUtilMax} años`;
+      else docVidaUtil.text = \`\${age}/\${vidaUtilMax} años\`;
     } else {
       docVidaUtil = { status: 'FALTANTE', text: 'Sin fecha insc.' };
     }
@@ -232,9 +231,9 @@ export default function ControlDocumental() {
     if (reasons.length > 0) {
       status = 'VENCIDO';
     } else {
-      if (docRev.status === 'PROXIMO') reasons.push(`Revisión próxima (< ${alertConfig.diasAvisoRevision} días)`);
-      if (docSeguro.status === 'PROXIMO') reasons.push(`Seguro próximo (< ${alertConfig.diasAvisoSeguro} días)`);
-      if (docPermiso.status === 'PROXIMO') reasons.push(`Permiso próximo (< 30 días)`);
+      if (docRev.status === 'PROXIMO') reasons.push(\`Revisión próxima (< \${alertConfig.diasAvisoRevision} días)\`);
+      if (docSeguro.status === 'PROXIMO') reasons.push(\`Seguro próximo (< \${alertConfig.diasAvisoSeguro} días)\`);
+      if (docPermiso.status === 'PROXIMO') reasons.push(\`Permiso próximo (< 30 días)\`);
       if (docVidaUtil.status === 'PROXIMO') reasons.push(docVidaUtil.text);
       if (reasons.length > 0) status = 'PROXIMO';
     }
@@ -402,8 +401,8 @@ export default function ControlDocumental() {
       <div className="flex items-center gap-2">
         {renderStatusDot(docObj.status)}
         <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{label}:</span>
-        <span className={`text-xs font-bold ${docObj.status === 'VENCIDO' ? 'text-red-600' : docObj.status === 'PROXIMO' ? 'text-amber-600' : 'text-slate-800 dark:text-white'}`}>
-          {docObj.date ? `${docObj.date} (${docObj.text})` : docObj.text}
+        <span className={\`text-xs font-bold \${docObj.status === 'VENCIDO' ? 'text-red-600' : docObj.status === 'PROXIMO' ? 'text-amber-600' : 'text-slate-800 dark:text-white'}\`}>
+          {docObj.text}
         </span>
       </div>
       {uploadField && renderFileAction(url || '', type, uploadField)}
@@ -435,10 +434,10 @@ export default function ControlDocumental() {
       </div>
 
       <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit">
-        <button onClick={() => setActiveTab('personal')} className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'personal' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+        <button onClick={() => setActiveTab('personal')} className={\`px-6 py-2.5 rounded-lg font-bold text-sm transition-all flex items-center gap-2 \${activeTab === 'personal' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'}\`}>
           <Users className="w-4 h-4" /> Personal Operativo
         </button>
-        <button onClick={() => setActiveTab('unidades')} className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'unidades' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+        <button onClick={() => setActiveTab('unidades')} className={\`px-6 py-2.5 rounded-lg font-bold text-sm transition-all flex items-center gap-2 \${activeTab === 'unidades' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'}\`}>
           <Truck className="w-4 h-4" /> Unidades Motrices
         </button>
       </div>
@@ -448,7 +447,7 @@ export default function ControlDocumental() {
           const { status, reasons, docs } = checkDriverStatus(d);
           const det = d.detalles || {};
           return (
-            <div key={d.id} className={`bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-sm hover:shadow-md transition-all ${status === 'VENCIDO' ? 'border-red-300 dark:border-red-900/50' : status === 'PROXIMO' ? 'border-amber-300 dark:border-amber-900/50' : 'border-slate-200 dark:border-slate-800'}`}>
+            <div key={d.id} className={\`bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-sm hover:shadow-md transition-all \${status === 'VENCIDO' ? 'border-red-300 dark:border-red-900/50' : status === 'PROXIMO' ? 'border-amber-300 dark:border-amber-900/50' : 'border-slate-200 dark:border-slate-800'}\`}>
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h4 className="font-bold text-slate-900 dark:text-white text-lg leading-tight">{d.nombre}</h4>
@@ -468,7 +467,7 @@ export default function ControlDocumental() {
               </div>
 
               {status !== 'EN ORDEN' && (
-                <div className={`mt-3 p-3 rounded-xl border text-xs font-bold ${status === 'VENCIDO' ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400' : 'bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/30 text-amber-600 dark:text-amber-400'}`}>
+                <div className={\`mt-3 p-3 rounded-xl border text-xs font-bold \${status === 'VENCIDO' ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400' : 'bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/30 text-amber-600 dark:text-amber-400'}\`}>
                   <div className="flex items-center gap-1.5 mb-1">
                     <AlertCircle className="w-4 h-4" /> Alertas:
                   </div>
@@ -485,7 +484,7 @@ export default function ControlDocumental() {
           const { status, reasons, docs } = checkVehicleStatus(v);
           const det = v.detalles || {};
           return (
-            <div key={v.id} className={`bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-sm hover:shadow-md transition-all ${status === 'VENCIDO' ? 'border-red-300 dark:border-red-900/50' : status === 'PROXIMO' ? 'border-amber-300 dark:border-amber-900/50' : 'border-slate-200 dark:border-slate-800'}`}>
+            <div key={v.id} className={\`bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-sm hover:shadow-md transition-all \${status === 'VENCIDO' ? 'border-red-300 dark:border-red-900/50' : status === 'PROXIMO' ? 'border-amber-300 dark:border-amber-900/50' : 'border-slate-200 dark:border-slate-800'}\`}>
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h4 className="font-black text-slate-900 dark:text-white text-xl tracking-wide uppercase">{v.patente}</h4>
@@ -507,7 +506,7 @@ export default function ControlDocumental() {
               </div>
 
               {status !== 'EN ORDEN' && (
-                <div className={`mt-3 p-3 rounded-xl border text-xs font-bold ${status === 'VENCIDO' ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400' : 'bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/30 text-amber-600 dark:text-amber-400'}`}>
+                <div className={\`mt-3 p-3 rounded-xl border text-xs font-bold \${status === 'VENCIDO' ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400' : 'bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/30 text-amber-600 dark:text-amber-400'}\`}>
                   <div className="flex items-center gap-1.5 mb-1">
                     <AlertCircle className="w-4 h-4" /> Alertas:
                   </div>
@@ -675,6 +674,6 @@ export default function ControlDocumental() {
     </div>
   );
 }
+`;
 
-
-
+fs.writeFileSync(path.join(__dirname, 'src', 'pages', 'operaciones', 'ControlDocumental.tsx'), fileContent, 'utf8');

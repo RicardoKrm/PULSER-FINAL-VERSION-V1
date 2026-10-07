@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
+﻿import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/Card";
 import { Bell, Save, ShieldAlert, FileText, Settings2 } from 'lucide-react';
 import { useCompany } from '../../contexts/CompanyContext';
 import Swal from 'sweetalert2';
@@ -58,7 +58,7 @@ export default function ConfiguracionAlertas() {
               <FileText className="w-5 h-5 text-emerald-500" />
               Documentos de Conductores
             </CardTitle>
-            <CardDescription>Días de pre-aviso antes del vencimiento real</CardDescription>
+            <p className="text-sm text-slate-500">Días de pre-aviso antes del vencimiento real</p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -102,7 +102,7 @@ export default function ConfiguracionAlertas() {
               <ShieldAlert className="w-5 h-5 text-blue-500" />
               Documentos de Vehículos
             </CardTitle>
-            <CardDescription>Días de pre-aviso antes del vencimiento real</CardDescription>
+            <p className="text-sm text-slate-500">Días de pre-aviso antes del vencimiento real</p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -143,3 +143,5 @@ export default function ConfiguracionAlertas() {
     </div>
   );
 }
+
+

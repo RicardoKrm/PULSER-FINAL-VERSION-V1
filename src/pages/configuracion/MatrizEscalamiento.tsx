@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
+﻿import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/Card";
 import { Users, Save, ShieldCheck, Mail, MessageSquare } from 'lucide-react';
 import { useCompany } from '../../contexts/CompanyContext';
 import { supabase } from '../../lib/supabase';
@@ -131,9 +131,9 @@ export default function MatrizEscalamiento() {
                 <Users className="w-5 h-5 text-blue-500" />
                 Jerarquía de Alertas (Control Documental)
               </CardTitle>
-              <CardDescription>
+              <p className="text-sm text-slate-500">
                 Si el Nivel 1 no responde con un "OK Recibido", el sistema escalará automáticamente la alerta al Nivel 2.
-              </CardDescription>
+              </p>
             </CardHeader>
             <CardContent className="pt-6 space-y-6">
               {/* Nivel 1 */}
@@ -265,3 +265,5 @@ export default function MatrizEscalamiento() {
     </div>
   );
 }
+
+

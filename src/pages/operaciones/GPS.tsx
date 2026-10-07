@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -327,7 +327,7 @@ export default function GPS() {
               if (registro.odometer) {
                 let km = parseFloat(registro.odometer);
                 // 1. Detección automática de escala (hectómetros, metros o décimas de km)
-                const kmBaseRef = Number(v.km_ultima_mantencion || v.detalles?.km_ultima_mantencion || v.kilometraje_actual || 0);
+                const kmBaseRef = Number((v as any).km_ultima_mantencion || v.detalles?.km_ultima_mantencion || v.kilometraje_actual || 0);
                 if (kmBaseRef > 1000 && km > (kmBaseRef * 4) && Math.abs((km / 10) - kmBaseRef) < kmBaseRef) {
                   km = Math.round((km / 10) * 100) / 100;
                 }
@@ -1380,3 +1380,4 @@ export default function GPS() {
     </div>
   );
 }
+

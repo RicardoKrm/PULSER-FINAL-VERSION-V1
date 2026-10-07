@@ -1,5 +1,9 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
-import { Badge } from "../../components/ui/Badge";
+const fs = require('fs');
+const path = require('path');
+
+const fileContent = `import React, { useState, useEffect, useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
+import { Badge } from "../../components/ui/badge";
 import { 
   FileCheck, Truck, Users, AlertCircle, ShieldAlert, 
   CalendarClock, Search, Filter, Plus, FileText, 
@@ -7,16 +11,14 @@ import {
   UploadCloud, Download, Edit, Paperclip, Eye, Calendar
 } from 'lucide-react';
 import { useCompany } from '../../contexts/CompanyContext';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import Swal from 'sweetalert2';
 
 export default function ControlDocumental() {
-  const { activeCompanyId } = useCompany();
+  const { currentCompany } = useCompany();
   const { profile } = useAuth();
-  
-  // Try to use activeCompanyId first, fallback to profile.empresa_id
-  const saveCompanyId = activeCompanyId || profile?.empresa_id;
+  const activeCompanyId = currentCompany?.id || profile?.empresa_id;
 
   const [alertConfig, setAlertConfig] = useState({
     diasAvisoLicencia: 15,
@@ -39,7 +41,7 @@ export default function ControlDocumental() {
 
   // Forms
   const [driverForm, setDriverForm] = useState({
-    rut: '', nombre: '', rol: '', telefono: '',
+    rut: '', nombre: '', cargo: '',
     vencimientoLicencia: '', archivoLicencia: '',
     vencimientoSalud: '', archivoSalud: '',
     vencimientoExamenes: '', archivoExamenes: '',
@@ -47,7 +49,7 @@ export default function ControlDocumental() {
   });
 
   const [vehicleForm, setVehicleForm] = useState({
-    patente: '', marca: '', modelo: '', tipo: 'Camión', anio: new Date().getFullYear(),
+    patente: '', tipo: 'Camión', anio: new Date().getFullYear(),
     fechaInscripcion: '', tipoUso: 'Carga General',
     vencimientoRev: '', archivoRev: '',
     vencimientoSeguro: '', archivoSeguro: '',
@@ -63,26 +65,27 @@ export default function ControlDocumental() {
   const today = new Date().getTime();
 
   useEffect(() => {
-    if (saveCompanyId) {
-      const saved = localStorage.getItem(`config_alertas_${saveCompanyId}`);
+    if (activeCompanyId) {
+      const saved = localStorage.getItem(\`config_alertas_\${activeCompanyId}\`);
       if (saved) setAlertConfig(JSON.parse(saved));
       fetchData();
     }
-  }, [saveCompanyId]);
+  }, [activeCompanyId]);
 
   const fetchData = async () => {
-    if (!saveCompanyId) return;
     setLoading(true);
     try {
       const { data: cols } = await supabase
-        .from('colaborador')
+        .from('colaboradores')
         .select('*')
-        .eq('empresa_id', saveCompanyId);
+        .eq('empresa_id', activeCompanyId)
+        .eq('estado', 'Activo');
       
       const { data: vehs } = await supabase
-        .from('vehiculo')
+        .from('vehiculos')
         .select('*')
-        .eq('empresa_id', saveCompanyId);
+        .eq('empresa_id', activeCompanyId)
+        .eq('estado', 'Activo');
       
       if (cols) setDrivers(cols);
       if (vehs) setVehicles(vehs);
@@ -94,9 +97,10 @@ export default function ControlDocumental() {
 
   // ----- FILE UPLOAD HANDLER -----
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files || event.target.files.length === 0 || !currentUploadField || !saveCompanyId) return;
+    if (!event.target.files || event.target.files.length === 0 || !currentUploadField) return;
     const file = event.target.files[0];
     
+    // Validar PDF
     if (file.type !== 'application/pdf') {
       Swal.fire('Error', 'Solo se permiten archivos PDF', 'error');
       return;
@@ -104,27 +108,31 @@ export default function ControlDocumental() {
 
     setUploading(true);
     try {
+      // Crear bucket si no existe (esto normalmente se hace en dashboard, asumimos que existe o lo creamos simulado)
       const fileExt = 'pdf';
-      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `${saveCompanyId}/${currentUploadField.type}/${fileName}`;
+      const fileName = \`\${Math.random().toString(36).substring(2)}.\${fileExt}\`;
+      const filePath = \`\${activeCompanyId}/\${currentUploadField.type}/\${fileName}\`;
 
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError, data } = await supabase.storage
         .from('documentos_legales')
         .upload(filePath, file);
 
       if (uploadError) {
+        // Si el bucket no existe, tirará error. Mostramos un mensaje amigable.
         console.error(uploadError);
         Swal.fire('Error de Almacenamiento', 'No se pudo subir el archivo. Por favor, asegúrate de haber creado el bucket "documentos_legales" en Supabase Storage.', 'error');
         setUploading(false);
         return;
       }
 
+      // Obtener URL pública
       const { data: publicUrlData } = supabase.storage
         .from('documentos_legales')
         .getPublicUrl(filePath);
 
       const url = publicUrlData.publicUrl;
 
+      // Actualizar formulario local
       if (currentUploadField.type === 'driver') {
         setDriverForm(prev => ({ ...prev, [currentUploadField.field]: url }));
       } else {
@@ -148,16 +156,11 @@ export default function ControlDocumental() {
 
   // ----- STATUS CHECKERS -----
   const checkDocument = (dateStr: string, warningDays: number) => {
-    if (!dateStr) return { status: 'FALTANTE', text: 'No registrado', date: '' };
-    
-    // Formatear a DD/MM/YYYY
-    const [y, m, d] = dateStr.split('-');
-    const dateFormatted = d && m && y ? `${d}/${m}/${y}` : dateStr;
-
+    if (!dateStr) return { status: 'FALTANTE', text: 'No registrado' };
     const t = new Date(dateStr).getTime();
-    if (t < today) return { status: 'VENCIDO', text: 'Vencido', date: dateFormatted };
-    if (t < today + warningDays * msPorDia) return { status: 'PROXIMO', text: 'Próximo a vencer', date: dateFormatted };
-    return { status: 'EN ORDEN', text: 'Vigente', date: dateFormatted };
+    if (t < today) return { status: 'VENCIDO', text: 'Vencido' };
+    if (t < today + warningDays * msPorDia) return { status: 'PROXIMO', text: 'Próximo a vencer' };
+    return { status: 'EN ORDEN', text: 'Vigente' };
   };
 
   const checkDriverStatus = (driver: any) => {
@@ -166,7 +169,7 @@ export default function ControlDocumental() {
     const docLicencia = checkDocument(det.vencimientoLicencia, alertConfig.diasAvisoLicencia);
     const docSalud = checkDocument(det.vencimientoSalud, alertConfig.diasAvisoSalud);
     const docExamen = checkDocument(det.vencimientoExamenes, alertConfig.diasAvisoSalud);
-    const docVacaciones = checkDocument(det.fechaVacaciones, 0);
+    const docVacaciones = checkDocument(det.fechaVacaciones, 0); // Vacaciones solo importa si pasaron
     
     let status = 'EN ORDEN';
     let reasons: string[] = [];
@@ -179,9 +182,9 @@ export default function ControlDocumental() {
     if (reasons.length > 0) {
       status = 'VENCIDO';
     } else {
-      if (docLicencia.status === 'PROXIMO') reasons.push(`Licencia próxima (< ${alertConfig.diasAvisoLicencia} días)`);
-      if (docSalud.status === 'PROXIMO') reasons.push(`Salud próxima (< ${alertConfig.diasAvisoSalud} días)`);
-      if (docExamen.status === 'PROXIMO') reasons.push(`Exámenes próximos (< ${alertConfig.diasAvisoSalud} días)`);
+      if (docLicencia.status === 'PROXIMO') reasons.push(\`Licencia próxima (< \${alertConfig.diasAvisoLicencia} días)\`);
+      if (docSalud.status === 'PROXIMO') reasons.push(\`Salud próxima (< \${alertConfig.diasAvisoSalud} días)\`);
+      if (docExamen.status === 'PROXIMO') reasons.push(\`Exámenes próximos (< \${alertConfig.diasAvisoSalud} días)\`);
       if (reasons.length > 0) status = 'PROXIMO';
     }
 
@@ -197,7 +200,7 @@ export default function ControlDocumental() {
       case 'Carga Peligrosa': return 10;
       case 'Minería': return 5;
       case 'Pasajeros': return 12;
-      default: return 15;
+      default: return 15; // Carga General o Vías Públicas
     }
   };
 
@@ -208,15 +211,16 @@ export default function ControlDocumental() {
     const docSeguro = checkDocument(det.vencimientoSeguro, alertConfig.diasAvisoSeguro);
     const docPermiso = checkDocument(det.vencimientoPermisoCirculacion, 30);
     
+    // Calcular Vida Útil
     let docVidaUtil = { status: 'EN ORDEN', text: 'Vigente' };
     const vidaUtilMax = getVidaUtil(det.tipoUso);
     if (det.fechaInscripcion) {
       const yearInscripcion = new Date(det.fechaInscripcion).getFullYear();
       const currentYear = new Date().getFullYear();
       const age = currentYear - yearInscripcion;
-      if (age >= vidaUtilMax) docVidaUtil = { status: 'VENCIDO', text: `Excedida (${age}/${vidaUtilMax} años)` };
-      else if (age === vidaUtilMax - 1) docVidaUtil = { status: 'PROXIMO', text: 'Último año' };
-      else docVidaUtil.text = `${age}/${vidaUtilMax} años`;
+      if (age >= vidaUtilMax) docVidaUtil = { status: 'VENCIDO', text: \`Vida útil excedida (\${age}/\${vidaUtilMax} años)\` };
+      else if (age === vidaUtilMax - 1) docVidaUtil = { status: 'PROXIMO', text: 'Último año de vida útil' };
+      else docVidaUtil.text = \`\${age}/\${vidaUtilMax} años\`;
     } else {
       docVidaUtil = { status: 'FALTANTE', text: 'Sin fecha insc.' };
     }
@@ -232,9 +236,9 @@ export default function ControlDocumental() {
     if (reasons.length > 0) {
       status = 'VENCIDO';
     } else {
-      if (docRev.status === 'PROXIMO') reasons.push(`Revisión próxima (< ${alertConfig.diasAvisoRevision} días)`);
-      if (docSeguro.status === 'PROXIMO') reasons.push(`Seguro próximo (< ${alertConfig.diasAvisoSeguro} días)`);
-      if (docPermiso.status === 'PROXIMO') reasons.push(`Permiso próximo (< 30 días)`);
+      if (docRev.status === 'PROXIMO') reasons.push(\`Revisión próxima (< \${alertConfig.diasAvisoRevision} días)\`);
+      if (docSeguro.status === 'PROXIMO') reasons.push(\`Seguro próximo (< \${alertConfig.diasAvisoSeguro} días)\`);
+      if (docPermiso.status === 'PROXIMO') reasons.push(\`Permiso próximo (< 30 días)\`);
       if (docVidaUtil.status === 'PROXIMO') reasons.push(docVidaUtil.text);
       if (reasons.length > 0) status = 'PROXIMO';
     }
@@ -250,10 +254,9 @@ export default function ControlDocumental() {
   const handleEditDriver = (driver: any) => {
     const det = driver.detalles || {};
     setDriverForm({
-      rut: driver.rut || '',
-      nombre: driver.nombre || '',
-      rol: driver.rol || '',
-      telefono: driver.telefono || '',
+      rut: driver.rut,
+      nombre: driver.nombre,
+      cargo: driver.cargo,
       vencimientoLicencia: det.vencimientoLicencia || '',
       archivoLicencia: det.archivoLicencia || '',
       vencimientoSalud: det.vencimientoSalud || '',
@@ -270,11 +273,9 @@ export default function ControlDocumental() {
   const handleEditVehicle = (vehicle: any) => {
     const det = vehicle.detalles || {};
     setVehicleForm({
-      patente: vehicle.patente || '',
-      marca: vehicle.marca || '',
-      modelo: vehicle.modelo || '',
-      tipo: vehicle.tipo || 'Camión',
-      anio: vehicle.anio || new Date().getFullYear(),
+      patente: vehicle.patente,
+      tipo: vehicle.tipo,
+      anio: vehicle.anio,
       fechaInscripcion: det.fechaInscripcion || '',
       tipoUso: det.tipoUso || 'Carga General',
       vencimientoRev: det.vencimientoRev || '',
@@ -291,13 +292,12 @@ export default function ControlDocumental() {
 
   const handleSaveDriver = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!saveCompanyId) return;
     const payload = {
-      empresa_id: saveCompanyId,
+      empresa_id: activeCompanyId,
       rut: driverForm.rut,
       nombre: driverForm.nombre,
-      rol: driverForm.rol,
-      telefono: driverForm.telefono,
+      cargo: driverForm.cargo,
+      estado: 'Activo',
       detalles: {
         vencimientoLicencia: driverForm.vencimientoLicencia,
         archivoLicencia: driverForm.archivoLicencia,
@@ -311,10 +311,10 @@ export default function ControlDocumental() {
 
     try {
       if (isEditing && editingId) {
-        await supabase.from('colaborador').update(payload).eq('id', editingId);
+        await supabase.from('colaboradores').update(payload).eq('id', editingId);
         Swal.fire('Actualizado', 'Ficha de conductor actualizada', 'success');
       } else {
-        await supabase.from('colaborador').insert([payload]);
+        await supabase.from('colaboradores').insert([payload]);
         Swal.fire('Registrado', 'Conductor registrado', 'success');
       }
       setShowDriverModal(false);
@@ -326,14 +326,12 @@ export default function ControlDocumental() {
 
   const handleSaveVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!saveCompanyId) return;
     const payload = {
-      empresa_id: saveCompanyId,
+      empresa_id: activeCompanyId,
       patente: vehicleForm.patente,
-      marca: vehicleForm.marca,
-      modelo: vehicleForm.modelo,
       tipo: vehicleForm.tipo,
       anio: vehicleForm.anio,
+      estado: 'Activo',
       detalles: {
         fechaInscripcion: vehicleForm.fechaInscripcion,
         tipoUso: vehicleForm.tipoUso,
@@ -348,10 +346,10 @@ export default function ControlDocumental() {
 
     try {
       if (isEditing && editingId) {
-        await supabase.from('vehiculo').update(payload).eq('id', editingId);
+        await supabase.from('vehiculos').update(payload).eq('id', editingId);
         Swal.fire('Actualizado', 'Ficha de vehículo actualizada', 'success');
       } else {
-        await supabase.from('vehiculo').insert([payload]);
+        await supabase.from('vehiculos').insert([payload]);
         Swal.fire('Registrado', 'Vehículo registrado', 'success');
       }
       setShowVehicleModal(false);
@@ -391,7 +389,7 @@ export default function ControlDocumental() {
       );
     }
     return (
-      <button type="button" onClick={(e) => { e.stopPropagation(); triggerUpload(type, field); }} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400" title="Subir Documento PDF">
+      <button type="button" onClick={(e) => { e.stopPropagation(); triggerUpload(type, field); }} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400" title="Subir Documento">
         <UploadCloud className="w-4 h-4" />
       </button>
     );
@@ -402,64 +400,68 @@ export default function ControlDocumental() {
       <div className="flex items-center gap-2">
         {renderStatusDot(docObj.status)}
         <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{label}:</span>
-        <span className={`text-xs font-bold ${docObj.status === 'VENCIDO' ? 'text-red-600' : docObj.status === 'PROXIMO' ? 'text-amber-600' : 'text-slate-800 dark:text-white'}`}>
-          {docObj.date ? `${docObj.date} (${docObj.text})` : docObj.text}
+        <span className={\`text-xs font-bold \${docObj.status === 'VENCIDO' ? 'text-red-600' : docObj.status === 'PROXIMO' ? 'text-amber-600' : 'text-slate-800 dark:text-white'}\`}>
+          {docObj.text}
         </span>
       </div>
-      {uploadField && renderFileAction(url || '', type, uploadField)}
+      {renderFileAction(url || '', type, uploadField)}
     </div>
   );
 
   return (
     <div className="p-6 w-full max-w-[1600px] mx-auto space-y-6">
+      {/* Hidden File Input for Uploads */}
       <input type="file" ref={fileInputRef} className="hidden" accept=".pdf" onChange={handleFileUpload} />
 
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
             <FileCheck className="w-8 h-8 text-indigo-500" />
-            Control de Ciclo de Vida y Documental
+            Gestión de Ciclo de Vida y Documental
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm font-medium">
-            Sistema centralizado de vigencias, certificaciones y documentos legales.
+            Control integral de vigencias y documentos para personal y unidades motrices.
           </p>
         </div>
         <div className="flex gap-3">
-          <button onClick={() => { setDriverForm({rut:'', nombre:'', rol:'', telefono:'', vencimientoLicencia:'', archivoLicencia:'', vencimientoSalud:'', archivoSalud:'', vencimientoExamenes:'', archivoExamenes:'', fechaVacaciones:''}); setIsEditing(false); setShowDriverModal(true); }} className="bg-white dark:bg-slate-900 text-indigo-600 border border-indigo-200 dark:border-indigo-900 px-4 py-2 rounded-xl font-bold hover:bg-indigo-50 flex items-center gap-2 transition-all shadow-sm">
+          <button onClick={() => { setDriverForm({rut:'', nombre:'', cargo:'', vencimientoLicencia:'', archivoLicencia:'', vencimientoSalud:'', archivoSalud:'', vencimientoExamenes:'', archivoExamenes:'', fechaVacaciones:''}); setIsEditing(false); setShowDriverModal(true); }} className="bg-white dark:bg-slate-900 text-indigo-600 border border-indigo-200 dark:border-indigo-900 px-4 py-2 rounded-xl font-bold hover:bg-indigo-50 flex items-center gap-2 transition-all shadow-sm">
             <Users className="w-4 h-4" /> Registrar Conductor
           </button>
-          <button onClick={() => { setVehicleForm({patente:'', marca:'', modelo:'', tipo:'Camión', anio:new Date().getFullYear(), fechaInscripcion:'', tipoUso:'Carga General', vencimientoRev:'', archivoRev:'', vencimientoSeguro:'', archivoSeguro:'', vencimientoPermisoCirculacion:'', archivoPermisoCirculacion:''}); setIsEditing(false); setShowVehicleModal(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-indigo-700 flex items-center gap-2 transition-all shadow-sm">
+          <button onClick={() => { setVehicleForm({patente:'', tipo:'Camión', anio:new Date().getFullYear(), fechaInscripcion:'', tipoUso:'Carga General', vencimientoRev:'', archivoRev:'', vencimientoSeguro:'', archivoSeguro:'', vencimientoPermisoCirculacion:'', archivoPermisoCirculacion:''}); setIsEditing(false); setShowVehicleModal(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-indigo-700 flex items-center gap-2 transition-all shadow-sm">
             <Truck className="w-4 h-4" /> Registrar Vehículo
           </button>
         </div>
       </div>
 
+      {/* Tabs */}
       <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit">
-        <button onClick={() => setActiveTab('personal')} className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'personal' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+        <button onClick={() => setActiveTab('personal')} className={\`px-6 py-2.5 rounded-lg font-bold text-sm transition-all flex items-center gap-2 \${activeTab === 'personal' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'}\`}>
           <Users className="w-4 h-4" /> Personal Operativo
         </button>
-        <button onClick={() => setActiveTab('unidades')} className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'unidades' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+        <button onClick={() => setActiveTab('unidades')} className={\`px-6 py-2.5 rounded-lg font-bold text-sm transition-all flex items-center gap-2 \${activeTab === 'unidades' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'}\`}>
           <Truck className="w-4 h-4" /> Unidades Motrices
         </button>
       </div>
 
+      {/* Grid Content */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {activeTab === 'personal' && drivers.map(d => {
           const { status, reasons, docs } = checkDriverStatus(d);
           const det = d.detalles || {};
           return (
-            <div key={d.id} className={`bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-sm hover:shadow-md transition-all ${status === 'VENCIDO' ? 'border-red-300 dark:border-red-900/50' : status === 'PROXIMO' ? 'border-amber-300 dark:border-amber-900/50' : 'border-slate-200 dark:border-slate-800'}`}>
+            <div key={d.id} className={\`bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-sm hover:shadow-md transition-all \${status === 'VENCIDO' ? 'border-red-300 dark:border-red-900/50' : status === 'PROXIMO' ? 'border-amber-300 dark:border-amber-900/50' : 'border-slate-200 dark:border-slate-800'}\`}>
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h4 className="font-bold text-slate-900 dark:text-white text-lg leading-tight">{d.nombre}</h4>
-                  <p className="text-xs text-slate-500 mt-1">{d.rut} • {d.rol || 'Conductor'}</p>
+                  <h4 className="font-bold text-slate-900 dark:text-white text-lg">{d.nombre}</h4>
+                  <p className="text-xs text-slate-500">{d.rut} • {d.cargo}</p>
                 </div>
-                <div className="flex gap-1 shrink-0">
+                <div className="flex gap-1">
                   <button onClick={() => handleEditDriver(d)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400"><Edit className="w-4 h-4"/></button>
-                  <button onClick={() => handleDelete('colaborador', d.id)} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded text-red-400"><X className="w-4 h-4"/></button>
+                  <button onClick={() => handleDelete('colaboradores', d.id)} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded text-red-400"><X className="w-4 h-4"/></button>
                 </div>
               </div>
 
+              {/* Mini Dashboard Documental */}
               <div className="space-y-1 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
                 {renderDocRow('Licencia', docs.licencia, det.archivoLicencia, 'driver', 'archivoLicencia')}
                 {renderDocRow('Salud', docs.salud, det.archivoSalud, 'driver', 'archivoSalud')}
@@ -468,9 +470,9 @@ export default function ControlDocumental() {
               </div>
 
               {status !== 'EN ORDEN' && (
-                <div className={`mt-3 p-3 rounded-xl border text-xs font-bold ${status === 'VENCIDO' ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400' : 'bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/30 text-amber-600 dark:text-amber-400'}`}>
+                <div className={\`mt-3 p-3 rounded-xl border text-xs font-bold \${status === 'VENCIDO' ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400' : 'bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/30 text-amber-600 dark:text-amber-400'}\`}>
                   <div className="flex items-center gap-1.5 mb-1">
-                    <AlertCircle className="w-4 h-4" /> Alertas:
+                    <AlertCircle className="w-4 h-4" /> Alertas Críticas:
                   </div>
                   <ul className="pl-5 list-disc font-medium opacity-90 space-y-0.5">
                     {reasons.map((r: string, i: number) => <li key={i}>{r}</li>)}
@@ -485,31 +487,32 @@ export default function ControlDocumental() {
           const { status, reasons, docs } = checkVehicleStatus(v);
           const det = v.detalles || {};
           return (
-            <div key={v.id} className={`bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-sm hover:shadow-md transition-all ${status === 'VENCIDO' ? 'border-red-300 dark:border-red-900/50' : status === 'PROXIMO' ? 'border-amber-300 dark:border-amber-900/50' : 'border-slate-200 dark:border-slate-800'}`}>
+            <div key={v.id} className={\`bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-sm hover:shadow-md transition-all \${status === 'VENCIDO' ? 'border-red-300 dark:border-red-900/50' : status === 'PROXIMO' ? 'border-amber-300 dark:border-amber-900/50' : 'border-slate-200 dark:border-slate-800'}\`}>
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h4 className="font-black text-slate-900 dark:text-white text-xl tracking-wide uppercase">{v.patente}</h4>
+                  <h4 className="font-black text-slate-900 dark:text-white text-xl tracking-wide">{v.patente}</h4>
                   <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-0.5 rounded inline-block mt-1">
                     {det.tipoUso || 'Carga General'} • Año {v.anio}
                   </p>
                 </div>
-                <div className="flex gap-1 shrink-0">
+                <div className="flex gap-1">
                   <button onClick={() => handleEditVehicle(v)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400"><Edit className="w-4 h-4"/></button>
-                  <button onClick={() => handleDelete('vehiculo', v.id)} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded text-red-400"><X className="w-4 h-4"/></button>
+                  <button onClick={() => handleDelete('vehiculos', v.id)} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded text-red-400"><X className="w-4 h-4"/></button>
                 </div>
               </div>
 
+              {/* Mini Dashboard Documental */}
               <div className="space-y-1 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
                 {renderDocRow('Rev. Técnica', docs.rev, det.archivoRev, 'vehicle', 'archivoRev')}
                 {renderDocRow('Seguro', docs.seguro, det.archivoSeguro, 'vehicle', 'archivoSeguro')}
-                {renderDocRow('Permiso', docs.permiso, det.archivoPermisoCirculacion, 'vehicle', 'archivoPermisoCirculacion')}
+                {renderDocRow('Permiso Circ.', docs.permiso, det.archivoPermisoCirculacion, 'vehicle', 'archivoPermisoCirculacion')}
                 {renderDocRow('Vida Útil', docs.vida, null, 'vehicle', '')}
               </div>
 
               {status !== 'EN ORDEN' && (
-                <div className={`mt-3 p-3 rounded-xl border text-xs font-bold ${status === 'VENCIDO' ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400' : 'bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/30 text-amber-600 dark:text-amber-400'}`}>
+                <div className={\`mt-3 p-3 rounded-xl border text-xs font-bold \${status === 'VENCIDO' ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400' : 'bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/30 text-amber-600 dark:text-amber-400'}\`}>
                   <div className="flex items-center gap-1.5 mb-1">
-                    <AlertCircle className="w-4 h-4" /> Alertas:
+                    <AlertCircle className="w-4 h-4" /> Alertas Críticas:
                   </div>
                   <ul className="pl-5 list-disc font-medium opacity-90 space-y-0.5">
                     {reasons.map((r: string, i: number) => <li key={i}>{r}</li>)}
@@ -521,6 +524,7 @@ export default function ControlDocumental() {
         })}
       </div>
 
+      {/* --- MODALS --- */}
       {showDriverModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
@@ -529,45 +533,42 @@ export default function ControlDocumental() {
                 <Users className="w-5 h-5 text-indigo-500" />
                 {isEditing ? 'Editar Ficha de Conductor' : 'Registrar Nuevo Conductor'}
               </h2>
-              <button type="button" onClick={() => setShowDriverModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-6 h-6" /></button>
+              <button onClick={() => setShowDriverModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-6 h-6" /></button>
             </div>
-            <form onSubmit={handleSaveDriver} className="p-6 h-[70vh] overflow-y-auto">
+            <form onSubmit={handleSaveDriver} className="p-6">
               <div className="grid grid-cols-2 gap-6 mb-6">
-                <div className="space-y-1">
+                <div className="col-span-2 md:col-span-1 space-y-1">
                   <label className="text-xs font-bold text-slate-500 uppercase">RUT</label>
-                  <input required value={driverForm.rut} onChange={e=>setDriverForm({...driverForm, rut: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" placeholder="12.345.678-9"/>
+                  <input required value={driverForm.rut} onChange={e=>setDriverForm({...driverForm, rut: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-indigo-500" placeholder="12.345.678-9"/>
                 </div>
-                <div className="space-y-1">
+                <div className="col-span-2 md:col-span-1 space-y-1">
                   <label className="text-xs font-bold text-slate-500 uppercase">Nombre Completo</label>
-                  <input required value={driverForm.nombre} onChange={e=>setDriverForm({...driverForm, nombre: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" />
+                  <input required value={driverForm.nombre} onChange={e=>setDriverForm({...driverForm, nombre: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-indigo-500" />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Rol / Cargo</label>
-                  <input required value={driverForm.rol} onChange={e=>setDriverForm({...driverForm, rol: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Teléfono</label>
-                  <input value={driverForm.telefono} onChange={e=>setDriverForm({...driverForm, telefono: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" />
+                <div className="col-span-2 space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Cargo / Puesto</label>
+                  <input required value={driverForm.cargo} onChange={e=>setDriverForm({...driverForm, cargo: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-indigo-500" />
                 </div>
                 
+                {/* Fechas de Vencimiento */}
                 <div className="col-span-2 pt-4 border-t border-slate-100 dark:border-slate-800">
-                  <h4 className="font-bold text-slate-800 dark:text-white mb-4">Fechas de Vencimiento</h4>
+                  <h4 className="font-bold text-slate-800 dark:text-white mb-4">Fechas de Vencimiento y Documentos</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-500">Venc. Licencia</label>
+                      <label className="text-xs font-bold text-slate-500 flex justify-between">Venc. Licencia</label>
                       <input type="date" required value={driverForm.vencimientoLicencia} onChange={e=>setDriverForm({...driverForm, vencimientoLicencia: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-slate-500">Venc. Declaración Salud</label>
-                      <input type="date" value={driverForm.vencimientoSalud} onChange={e=>setDriverForm({...driverForm, vencimientoSalud: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" />
+                      <input type="date" required value={driverForm.vencimientoSalud} onChange={e=>setDriverForm({...driverForm, vencimientoSalud: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-500">Venc. Examen Médico/Preocupacional</label>
-                      <input type="date" value={driverForm.vencimientoExamenes} onChange={e=>setDriverForm({...driverForm, vencimientoExamenes: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" />
+                      <label className="text-xs font-bold text-slate-500">Venc. Examen Preocupacional</label>
+                      <input type="date" required value={driverForm.vencimientoExamenes} onChange={e=>setDriverForm({...driverForm, vencimientoExamenes: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" />
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-slate-500">Fecha Límite Vacaciones</label>
-                      <input type="date" value={driverForm.fechaVacaciones} onChange={e=>setDriverForm({...driverForm, fechaVacaciones: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" />
+                      <input type="date" required value={driverForm.fechaVacaciones} onChange={e=>setDriverForm({...driverForm, fechaVacaciones: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" />
                     </div>
                   </div>
                 </div>
@@ -591,7 +592,7 @@ export default function ControlDocumental() {
                 <Truck className="w-5 h-5 text-indigo-500" />
                 {isEditing ? 'Editar Ficha de Vehículo' : 'Registrar Nuevo Vehículo'}
               </h2>
-              <button type="button" onClick={() => setShowVehicleModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-6 h-6" /></button>
+              <button onClick={() => setShowVehicleModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-6 h-6" /></button>
             </div>
             <form onSubmit={handleSaveVehicle} className="p-6 h-[70vh] overflow-y-auto">
               <div className="grid grid-cols-2 gap-6 mb-6">
@@ -612,18 +613,11 @@ export default function ControlDocumental() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Marca / Modelo</label>
-                  <input value={vehicleForm.marca + (vehicleForm.modelo ? ' ' + vehicleForm.modelo : '')} onChange={e=>{
-                    const parts = e.target.value.split(' ');
-                    setVehicleForm({...vehicleForm, marca: parts[0] || '', modelo: parts.slice(1).join(' ')})
-                  }} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" placeholder="Ej: Mercedes Benz Actros"/>
-                </div>
-                <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500 uppercase">Año Fabricación</label>
                   <input type="number" required value={vehicleForm.anio} onChange={e=>setVehicleForm({...vehicleForm, anio: parseInt(e.target.value)})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" />
                 </div>
-                <div className="space-y-1 col-span-2 md:col-span-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Tipo de Uso (Operación)</label>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Tipo de Uso</label>
                   <select required value={vehicleForm.tipoUso} onChange={e=>setVehicleForm({...vehicleForm, tipoUso: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg">
                     <option>Carga General</option>
                     <option>Carga Peligrosa</option>
@@ -633,14 +627,14 @@ export default function ControlDocumental() {
                 </div>
                 
                 <div className="col-span-2 pt-4 border-t border-slate-100 dark:border-slate-800">
-                  <h4 className="font-bold text-slate-800 dark:text-white mb-4">Fechas de Ciclo de Vida y Legal</h4>
+                  <h4 className="font-bold text-slate-800 dark:text-white mb-4">Fechas y Documentos de Ciclo de Vida</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1 col-span-2 md:col-span-1">
                       <label className="text-xs font-bold text-slate-500">Fecha Primera Inscripción</label>
                       <input type="date" required value={vehicleForm.fechaInscripcion} onChange={e=>setVehicleForm({...vehicleForm, fechaInscripcion: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" />
                     </div>
                     <div className="space-y-1 col-span-2 md:col-span-1">
-                      <label className="text-xs font-bold text-slate-500">Venc. Rev. Técnica</label>
+                      <label className="text-xs font-bold text-slate-500 flex justify-between">Venc. Rev. Técnica</label>
                       <input type="date" required value={vehicleForm.vencimientoRev} onChange={e=>setVehicleForm({...vehicleForm, vencimientoRev: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" />
                     </div>
                     <div className="space-y-1 col-span-2 md:col-span-1">
@@ -665,16 +659,17 @@ export default function ControlDocumental() {
         </div>
       )}
 
+      {/* Global Loading overlay for uploads */}
       {uploading && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex flex-col items-center justify-center p-4">
           <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <h2 className="text-white font-bold text-xl">Subiendo documento a la nube...</h2>
+          <h2 className="text-white font-bold text-xl">Subiendo archivo a Supabase Storage...</h2>
         </div>
       )}
 
     </div>
   );
 }
+`;
 
-
-
+fs.writeFileSync(path.join(__dirname, 'src', 'pages', 'operaciones', 'ControlDocumental.tsx'), fileContent, 'utf8');
