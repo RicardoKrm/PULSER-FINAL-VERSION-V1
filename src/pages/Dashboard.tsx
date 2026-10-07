@@ -99,120 +99,101 @@ export default function Dashboard() {
       { name: 'Correctivo', value: corrCount }
     ];
 
-    // 2. Salud Flota y Disponibilidad
+    // 2. Salud Flota y Disponibilidad (Snapshot Metrics)
     let vencidosMantenimiento = 0;
     let proximos = 0;
     let alDia = 0;
     let vehiculosDisponibles = 0;
     
-    let docsVencidos = 0;
-    const todayMs = new Date().getTime();
-
-    const totalDb = dbVehiculos?.length || 0;
-    (dbVehiculos || []).forEach((v: any) => {
-       // Check maintenance status
-       try {
-         const calculo = calcularDatosPizarra(v);
-         if (calculo.estatus === 'VENCIDO') {
-           vencidosMantenimiento++;
-         } else if (calculo.estatus === 'PROXIMO') {
-           proximos++;
-         } else {
-           alDia++;
-         }
-       } catch (err) {
-         alDia++; // Fallback
-       }
-       
-       // Check document expiration (Vehicles)
-       const detalles = v.detalles || {};
-       if (detalles.vencimientoRev && new Date(detalles.vencimientoRev).getTime() < todayMs) docsVencidos++;
-       if (detalles.vencimientoSeguro && new Date(detalles.vencimientoSeguro).getTime() < todayMs) docsVencidos++;
-       if (detalles.vencimientoPermisoCirculacion && new Date(detalles.vencimientoPermisoCirculacion).getTime() < todayMs) docsVencidos++;
-    });
-
-    // Check document expiration (Drivers/Colaboradores)
-    (dbColaboradores || []).forEach((d: any) => {
-       const detalles = d.detalles || {};
-       if (detalles.vencimientoLicencia && new Date(detalles.vencimientoLicencia).getTime() < todayMs) docsVencidos++;
-       if (detalles.vencimientoExamenes && new Date(detalles.vencimientoExamenes).getTime() < todayMs) docsVencidos++;
-       if (detalles.estadoExamen === 'NO APTO') docsVencidos++;
-       
-       if (detalles.licenciasMedicas && detalles.licenciasMedicas.length > 0) {
-         const hasActive = detalles.licenciasMedicas.some((lm:any) => {
-           const h = new Date(); h.setHours(0,0,0,0);
-           const de = new Date(lm.desde); de.setHours(0,0,0,0);
-           const t = new Date(lm.hasta); t.setHours(23,59,59,999);
-           return h >= de && h <= t;
-         });
-         if (hasActive) docsVencidos++;
-       }
-    });
+    const totalDb = dbVehiculos.length;
     
-    const totalAlertasCriticas = vencidosMantenimiento + docsVencidos;
+    dbVehiculos.forEach((v: any) => {
+      let kmActual = parseInt(v.kilometraje_actual) || 0;
+      let prox = parseInt(v.proximo_mantenimiento) || 0;
+      let inter = parseInt(v.intervalo_mantenimiento) || 10000;
+      
+      let dif = prox - kmActual;
+      if (dif < 0) {
+        vencidosMantenimiento++;
+      } else if (dif <= (inter * 0.1)) {
+        proximos++;
+      } else {
+        alDia++;
+      }
+    });
+
+    const totalAlertasCriticas = vencidosMantenimiento + dbColaboradores.reduce((acc, col) => {
+      const docs = [col.vencimientoLicencia, col.vencimientoExamenSalud, col.vencimientoPsicosensotecnico, col.vencimientoManejoDefensivo];
+      const hasVencidos = docs.some(d => d && new Date(d).getTime() < new Date().getTime());
+      return acc + (hasVencidos ? 1 : 0);
+    }, 0);
 
     const otsEnCurso = otsEmpresa.filter((ot: any) => ['ABIERTA', 'EN_PROCESO', 'PAUSADA', 'PROGRAMADA', 'POR_ASIGNAR'].includes(ot.estado)).map((ot: any) => ot.vehiculoId);
     let indisponibles = new Set(otsEnCurso).size;
 
     vehiculosDisponibles = totalDb > 0 ? Math.max(0, totalDb - indisponibles) : 0;
-    const dispActual = totalDb > 0 ? (vehiculosDisponibles / totalDb) * 100 : 0;
-    
-    // Tendencia de disponibilidad real por meses (últimos 6 meses)
-    const last6Months = Array.from({length: 6}, (_, i) => {
-      const d = new Date();
-      d.setMonth(d.getMonth() - (5 - i));
-      return { 
-        month: d.getMonth(), 
-        year: d.getFullYear(), 
-        name: d.toLocaleString('es', { month: 'short' }).substring(0,3).toUpperCase(),
-        downtime: 0
-      };
-    });
+    let disp = totalDb > 0 ? (vehiculosDisponibles / totalDb) * 100 : 0;
+    let cumpPrev = totalDb > 0 ? Math.max(0, 100 - ((vencidosMantenimiento / totalDb) * 100)) : 0;
 
-    otsEmpresaHistorico.forEach((ot: any) => {
+    // 3. Costos y Tendencias Dinámicos (Responden al Filtro de Fechas)
+    const startD = new Date(activeFechaDesde); startD.setDate(1); startD.setHours(0,0,0,0);
+    const endD = new Date(activeFechaHasta); endD.setDate(1); endD.setHours(0,0,0,0);
+    
+    const dynamicMonths = [];
+    let currentD = new Date(startD);
+    let safetyCounter = 0;
+    
+    while (currentD <= endD && safetyCounter < 24) { 
+      dynamicMonths.push({
+        month: currentD.getMonth(),
+        year: currentD.getFullYear(),
+        name: currentD.toLocaleString('es', { month: 'short' }).substring(0, 3).toUpperCase() + ' ' + currentD.getFullYear().toString().slice(-2),
+        downtime: 0,
+        prev: 0,
+        corr: 0
+      });
+      currentD.setMonth(currentD.getMonth() + 1);
+      safetyCounter++;
+    }
+    
+    if (dynamicMonths.length === 0) {
+      const d = new Date(activeFechaDesde);
+      dynamicMonths.push({
+        month: d.getMonth(),
+        year: d.getFullYear(),
+        name: d.toLocaleString('es', { month: 'short' }).substring(0, 3).toUpperCase() + ' ' + d.getFullYear().toString().slice(-2),
+        downtime: 0,
+        prev: 0,
+        corr: 0
+      });
+    }
+
+    otsEmpresa.forEach((ot: any) => {
       const fecha = ot.fechaCreacion || ot.fecha_creacion;
       if (!fecha) return;
       const d = new Date(fecha);
-      const m = last6Months.find(x => x.month === d.getMonth() && x.year === d.getFullYear());
+      const m = dynamicMonths.find(dm => dm.month === d.getMonth() && dm.year === d.getFullYear());
+      
       if (m) {
-        if (ot.tiempoTrabajadoSegundos) m.downtime += ot.tiempoTrabajadoSegundos / 3600;
-        else if (ot.tfs_minutos) m.downtime += ot.tfs_minutos / 60;
-        else m.downtime += 10; // estimate 10h if no explicit downtime logged
+        if (['ABIERTA', 'EN_PROCESO', 'PAUSADA', 'PROGRAMADA', 'POR_ASIGNAR'].includes(ot.estado)) {
+           m.downtime += 24; 
+        }
+        const cost = (Number(ot.costoManoObraTareas) || 0) + (Number(ot.costoInsumos) || 0) + (Number(ot.costoManoObraHH) || 0);
+        if (ot.tipo?.includes('PREVENTIVA')) {
+           m.prev += cost;
+        } else {
+           m.corr += cost;
+        }
       }
     });
-    
-    const hrsMes = (totalDb || 1) * 720;
-    const tendencia = last6Months.map(m => {
+
+    const hrsMes = 24 * 30; // approx
+    const tendencia = dynamicMonths.map(m => {
        const disp = Math.max(0, 100 * (1 - (m.downtime / hrsMes)));
        return { name: m.name, value: Number(disp.toFixed(1)) };
     });
-
-    // 3. Costos mensuales reales
-    const currentMonth = new Date().getMonth();
-    const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-    const mesesNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-
-    let currPrev = 0, currCorr = 0;
-    let pastPrev = 0, pastCorr = 0;
-
-    otsEmpresaHistorico.forEach((ot: any) => {
-        const d = new Date(ot.fechaCreacion || new Date());
-        const mon = d.getMonth();
-        const cost = (Number(ot.costoManoObraTareas) || 0) + (Number(ot.costoInsumos) || 0) + (Number(ot.costoManoObraHH) || 0);
-
-        if (mon === currentMonth) {
-            if (ot.tipo?.includes('PREVENTIVA')) currPrev += cost;
-            else currCorr += cost;
-        } else if (mon === prevMonth) {
-            if (ot.tipo?.includes('PREVENTIVA')) pastPrev += cost;
-            else pastCorr += cost;
-        }
-    });
-
-    const costos = [
-      { name: mesesNames[prevMonth], prev: pastPrev, corr: pastCorr },
-      { name: mesesNames[currentMonth], prev: currPrev, corr: currCorr }
-    ];
+    
+    const costos = dynamicMonths.map(m => ({ name: m.name, prev: m.prev, corr: m.corr }));
 
     let gastoTotalPeriodo = 0;
     otsEmpresa.forEach((ot: any) => {
@@ -235,21 +216,18 @@ export default function Dashboard() {
     let cuellosArr = Object.entries(cuellosMap).map(([name, value]) => ({ name, value }));
     cuellosArr.sort((a, b) => b.value - a.value);
 
-    // 5. Cumplimiento Prev (Cumplimiento de Cronograma)
-    let cumpPrev = totalDb > 0 ? Math.max(0, 100 - ((vencidosMantenimiento / totalDb) * 100)) : 0;
-
     return {
       tendenciaData: tendencia,
       estrategiaData: estrategia,
       costosData: costos,
       cuellosData: cuellosArr.slice(0, 5),
-      disponibilidad: (dispActual || 0).toFixed(1),
-      cumplimientoPrev: (cumpPrev || 0).toFixed(1),
-      gastoMensual: gastoTotalPeriodo.toLocaleString(),
+      disponibilidad: Number(disp.toFixed(1)),
+      cumplimientoPrev: Number(cumpPrev.toFixed(1)),
+      gastoMensual: gastoTotalMesActual,
       alertasCriticas: totalAlertasCriticas,
-      saludFlota: { vencidos: vencidosMantenimiento, proximos, alDia }
+      saludFlota: { vencidos: vencidosMantenimiento, proximos: proximos, alDia: alDia }
     };
-  }, [ordenesTrabajo, vehiculos, dbVehiculos, dbColaboradores, activeFechaDesde, activeFechaHasta]);
+  }, [ordenesTrabajo, vehiculos, dbVehiculos, dbColaboradores, activeFechaDesde, activeFechaHasta]););
 
 
   const handleFilter = () => {
@@ -592,6 +570,7 @@ export default function Dashboard() {
     </div>
   );
 }
+
 
 
 
