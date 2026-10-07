@@ -42,7 +42,7 @@ export default function ControlDocumental() {
     rut: '', nombre: '', rol: '', telefono: '',
     vencimientoLicencia: '', archivoLicencia: '',
     licenciasMedicas: [],
-    vencimientoExamenes: '', archivoExamenes: '',
+    vencimientoExamenes: '', archivoExamenes: '', estadoExamen: 'APTO',
     fechaVacaciones: ''
   });
 
@@ -187,6 +187,10 @@ export default function ControlDocumental() {
        }
     }
     const docExamen = checkDocument(det.vencimientoExamenes, alertConfig.diasAvisoSalud);
+      if (det.estadoExamen === 'NO APTO') {
+        docExamen.status = 'VENCIDO';
+        docExamen.text = 'NO APTO';
+      }
     const docVacaciones = checkDocument(det.fechaVacaciones, 0);
     
     let status = 'EN ORDEN';
@@ -194,7 +198,7 @@ export default function ControlDocumental() {
 
     if (docLicencia.status === 'VENCIDO') reasons.push('Licencia Vencida');
     if (tieneLicenciaActiva) reasons.push('Con Licencia Médica Activa');
-    if (docExamen.status === 'VENCIDO') reasons.push('Examen Vencido');
+    if (docExamen.status === 'VENCIDO') reasons.push(det.estadoExamen === 'NO APTO' ? 'Examen Médico NO APTO' : 'Examen Vencido');
     if (docVacaciones.status === 'VENCIDO') reasons.push('Vacaciones Vencidas');
 
     if (reasons.length > 0) {
@@ -342,6 +346,7 @@ export default function ControlDocumental() {
       vencimientoSalud: det.vencimientoSalud || '',
       archivoSalud: det.archivoSalud || '',
       vencimientoExamenes: det.vencimientoExamenes || '',
+        estadoExamen: det.estadoExamen || 'APTO',
       archivoExamenes: det.archivoExamenes || '',
       fechaVacaciones: det.fechaVacaciones || ''
     });
@@ -387,6 +392,7 @@ export default function ControlDocumental() {
         vencimientoSalud: driverForm.vencimientoSalud,
         archivoSalud: driverForm.archivoSalud,
         vencimientoExamenes: driverForm.vencimientoExamenes,
+          estadoExamen: driverForm.estadoExamen,
         archivoExamenes: driverForm.archivoExamenes,
         fechaVacaciones: driverForm.fechaVacaciones
       }
@@ -511,7 +517,7 @@ export default function ControlDocumental() {
           <button onClick={handleExportExcel} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-emerald-700 flex items-center gap-2 transition-all shadow-sm">
               <Download className="w-4 h-4" /> Exportar
             </button>
-            <button onClick={() => { setDriverForm({rut:'', nombre:'', rol:'', telefono:'', vencimientoLicencia:'', archivoLicencia:'', licenciasMedicas:[], vencimientoExamenes:'', archivoExamenes:'', fechaVacaciones:''}); setIsEditing(false); setShowDriverModal(true); }} className="bg-white dark:bg-slate-900 text-indigo-600 border border-indigo-200 dark:border-indigo-900 px-4 py-2 rounded-xl font-bold hover:bg-indigo-50 flex items-center gap-2 transition-all shadow-sm">
+            <button onClick={() => { setDriverForm({rut:'', nombre:'', rol:'', telefono:'', vencimientoLicencia:'', archivoLicencia:'', licenciasMedicas:[], vencimientoExamenes:'', archivoExamenes:'', estadoExamen:'APTO', fechaVacaciones:''}); setIsEditing(false); setShowDriverModal(true); }} className="bg-white dark:bg-slate-900 text-indigo-600 border border-indigo-200 dark:border-indigo-900 px-4 py-2 rounded-xl font-bold hover:bg-indigo-50 flex items-center gap-2 transition-all shadow-sm">
             <Users className="w-4 h-4" /> Registrar Conductor
           </button>
           <button onClick={() => { setVehicleForm({patente:'', marca:'', modelo:'', tipo:'Camión', anio:new Date().getFullYear(), fechaInscripcion:'', tipoUso:'Carga General', vencimientoRev:'', archivoRev:'', vencimientoSeguro:'', archivoSeguro:'', vencimientoPermisoCirculacion:'', archivoPermisoCirculacion:''}); setIsEditing(false); setShowVehicleModal(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-indigo-700 flex items-center gap-2 transition-all shadow-sm">
@@ -595,7 +601,10 @@ export default function ControlDocumental() {
             <div key={v.id} className={`bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-sm hover:shadow-md transition-all ${status === 'VENCIDO' ? 'border-red-300 dark:border-red-900/50' : status === 'PROXIMO' ? 'border-amber-300 dark:border-amber-900/50' : 'border-slate-200 dark:border-slate-800'}`}>
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h4 className="font-black text-slate-900 dark:text-white text-xl tracking-wide uppercase">{v.patente}</h4>
+                  <div className="flex items-center gap-3">
+                      <h4 className="font-black text-slate-900 dark:text-white text-xl tracking-wide uppercase">{v.patente}</h4>
+                      {status === 'VENCIDO' ? <Badge className="bg-red-500 text-white text-[10px] py-0">BLOQUEADO</Badge> : <Badge className="bg-emerald-500 text-white text-[10px] py-0">OPERATIVO</Badge>}
+                    </div>
                   <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-0.5 rounded inline-block mt-1">
                     {det.tipoUso || 'Carga General'} • Año {v.anio}
                   </p>

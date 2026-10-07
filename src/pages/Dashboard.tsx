@@ -107,25 +107,26 @@ export default function Dashboard() {
        
        // Check document expiration (Vehicles)
        const detalles = v.detalles || {};
-       if (detalles.vencimientoRev && new Date(detalles.vencimientoRev).getTime() < todayMs) {
-         docsVencidos++;
-       }
-       if (detalles.vencimientoSeguro && new Date(detalles.vencimientoSeguro).getTime() < todayMs) {
-         docsVencidos++;
-       }
+       if (detalles.vencimientoRev && new Date(detalles.vencimientoRev).getTime() < todayMs) docsVencidos++;
+       if (detalles.vencimientoSeguro && new Date(detalles.vencimientoSeguro).getTime() < todayMs) docsVencidos++;
+       if (detalles.vencimientoPermisoCirculacion && new Date(detalles.vencimientoPermisoCirculacion).getTime() < todayMs) docsVencidos++;
     });
 
     // Check document expiration (Drivers/Colaboradores)
     (dbColaboradores || []).forEach((d: any) => {
        const detalles = d.detalles || {};
-       if (detalles.vencimientoLicencia && new Date(detalles.vencimientoLicencia).getTime() < todayMs) {
-         docsVencidos++;
-       }
-       if (detalles.vencimientoSalud && new Date(detalles.vencimientoSalud).getTime() < todayMs) {
-         docsVencidos++;
-       }
-       if (detalles.vacaciones === "Vencidas") {
-         docsVencidos++;
+       if (detalles.vencimientoLicencia && new Date(detalles.vencimientoLicencia).getTime() < todayMs) docsVencidos++;
+       if (detalles.vencimientoExamenes && new Date(detalles.vencimientoExamenes).getTime() < todayMs) docsVencidos++;
+       if (detalles.estadoExamen === 'NO APTO') docsVencidos++;
+       
+       if (detalles.licenciasMedicas && detalles.licenciasMedicas.length > 0) {
+         const hasActive = detalles.licenciasMedicas.some((lm:any) => {
+           const h = new Date(); h.setHours(0,0,0,0);
+           const de = new Date(lm.desde); de.setHours(0,0,0,0);
+           const t = new Date(lm.hasta); t.setHours(23,59,59,999);
+           return h >= de && h <= t;
+         });
+         if (hasActive) docsVencidos++;
        }
     });
     

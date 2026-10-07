@@ -188,6 +188,7 @@ const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[
           tipoLicencia: r['TIPO LICENCIA'] || r['TIPO DE LICENCIA'] || '',
           vencimientoLicencia: parseExcelDate(findKey(['VENCIMIENTO LICENCIA', 'VENC. LICENCIA'])),
           vencimientoExamenes: parseExcelDate(findKey(['EXAMEN PREOCUPACIONAL', 'VENC. EXAMEN PREOC.'])),
+          estadoExamen: findKey(['ESTADO EXAMEN', 'ESTADO EXAMEN MEDICO']) || 'APTO',
           fechaVacaciones: parseExcelDate(findKey(['INGRESO EMPRESA', 'FECHA INGRESO', 'INGRESO A LA EMPRESA']))
         }
       };
@@ -438,7 +439,7 @@ const MODULES: UploadModule[] = [
     description: 'Carga masiva de conductores, técnicos y administrativos desde archivo Excel.',
     icon: Users,
     template: [
-      { TRABAJADOR: 'Acuña Villagrán Claudio Andrés', RUT: '11.572.766-4', 'F. CONTRATO': '6/17/2026', CARGO: 'CONDUCTOR', 'F. CONTRATO_1': 'PLAZO FIJO', VENCIMIENTO: '10/31/2026', 'TURNO ASIGNADO': '7X7', DIRECCION: 'Av. Siempre Viva 742', TELEFONO: '+56912345678', EMPRESA: 'INVERSIONES IMPERIA SpA', 'TIPO LICENCIA': 'A4', 'VENCIMIENTO LICENCIA': '12/31/2026', 'EXAMEN PREOCUPACIONAL': '12/31/2026', 'INGRESO EMPRESA': '06/17/2026' }
+      { TRABAJADOR: 'Acuña Villagrán Claudio Andrés', RUT: '11.572.766-4', 'F. CONTRATO': '6/17/2026', CARGO: 'CONDUCTOR', 'F. CONTRATO_1': 'PLAZO FIJO', VENCIMIENTO: '10/31/2026', 'TURNO ASIGNADO': '7X7', DIRECCION: 'Av. Siempre Viva 742', TELEFONO: '+56912345678', EMPRESA: 'INVERSIONES IMPERIA SpA', 'TIPO LICENCIA': 'A4', 'VENCIMIENTO LICENCIA': '12/31/2026', 'EXAMEN PREOCUPACIONAL': '12/31/2026', 'ESTADO EXAMEN': 'APTO', 'INGRESO EMPRESA': '06/17/2026' }
     ]
   },
   {
