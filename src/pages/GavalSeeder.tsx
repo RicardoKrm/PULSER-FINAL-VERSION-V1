@@ -39,12 +39,15 @@ export default function GavalSeeder() {
   };
 
   const handleSeeder = async () => {
-    if(!window.confirm("¿Estás 100% seguro? Ya deberías tener tu archivo backup descargado. Esto inyectará decenas de OTs en Gaval.")) return;
     setLoading(true);
     log('--- INICIANDO SEMBRADO CRONOLÓGICO PARA GAVAL ---');
     const gavalId = '57fa41da-645d-48ba-a671-65a35312d0e9';
 
     try {
+      // 0. Limpiar OTs anteriores del seeder para no duplicar
+      log('Limpiando OTs simuladas anteriores...');
+      await supabase.from('orden_de_trabajo').delete().like('folio', 'OT-GAV-%').eq('empresa_id', gavalId);
+
       // 1. Obtener insumos
       log('Cargando vehículos...');
       const { data: vehiculos } = await supabase.from('vehiculo').select('id, patente, kilometraje_actual').eq('empresa_id', gavalId);
@@ -71,7 +74,6 @@ export default function GavalSeeder() {
 
       log('Generando historial OTs...');
       
-      // Vamos a generar unas 80-120 OTs repartidas en este tiempo
       const otCount = 100;
       for (let i = 0; i < otCount; i++) {
          const randomDayOffset = Math.floor(Math.random() * numDias);
@@ -81,9 +83,9 @@ export default function GavalSeeder() {
          const veh = vehiculos[Math.floor(Math.random() * vehiculos.length)];
          const mec = mecanicos[Math.floor(Math.random() * mecanicos.length)];
 
-         const isPreventive = Math.random() > 0.4; // 60% prev, 40% correct
-         const costoInsumos = Math.floor(Math.random() * 450000) + 50000; // 50k - 500k
-         const costoHH = Math.floor(Math.random() * 200000) + 30000; // 30k - 230k
+         const isPreventive = Math.random() > 0.4;
+         const costoInsumos = Math.floor(Math.random() * 450000) + 50000;
+         const costoHH = Math.floor(Math.random() * 200000) + 30000;
 
          const formatDt = randomDate.toISOString().slice(0,10);
 
@@ -93,12 +95,12 @@ export default function GavalSeeder() {
            vehiculo_id: veh.id,
            empresa_id: gavalId,
            tecnico_responsable: mec.nombre,
-           tipo: isPreventive ? 'PREVENTIVA_MANTENCION' : 'CORRECTIVA',
-           estado: 'TERMINADA',
+           tipo: isPreventive ? 'PREVENTIVA' : 'CORRECTIVA', // IMPORTANTE: Sin sufijos extra para coincidir
+           estado: 'FINALIZADA', // IMPORTANTE: FINALIZADA en vez de TERMINADA para KpiRRHH
            prioridad: isPreventive ? 'Media' : 'Alta',
-           kilometraje_apertura: (veh.kilometraje_actual || 0) - (numDias - randomDayOffset) * 100, // simular km pasado
+           kilometraje_apertura: (veh.kilometraje_actual || 0) - (numDias - randomDayOffset) * 100,
            kilometraje_cierre: (veh.kilometraje_actual || 0) - (numDias - randomDayOffset) * 100 + 10,
-           fecha_creacion: formatDt,
+           fecha_creacion: randomDate.toISOString(), // IMPORTANTE: full ISO string for sorting
            fecha_programada: formatDt,
            hora_inicio_programada: '08:00:00',
            hora_termino_programada: '16:00:00',
@@ -120,7 +122,10 @@ export default function GavalSeeder() {
       for (let i = 0; i < otdsToInsert.length; i += chunkSize) {
          const chunk = otdsToInsert.slice(i, i + chunkSize);
          const { error } = await supabase.from('orden_de_trabajo').insert(chunk);
-         if (error) throw error;
+         if (error) {
+           log(`Error insertando chunk: ${error.message}`);
+           throw error;
+         }
          log(`Insertado chunk ${i/chunkSize + 1} / ${Math.ceil(otdsToInsert.length/chunkSize)}`);
       }
 
@@ -129,7 +134,10 @@ export default function GavalSeeder() {
         { modulo: 'Sistema', accion: 'Sembrado de Datos', detalles: `Se generaron ${otCount} OTs y un histórico de $${totalCostos} simulados`, empresa_id: gavalId }
       ]);
 
-      log('¡PROCESO FINALIZADO CON ÉXITO! Todos los dashboards y KPIs de Gaval ahora tienen vida.');
+      log('¡PROCESO FINALIZADO CON ÉXITO! OTs insertadas en estado FINALIZADA.');
+      
+      // FORZAR RECARGA LOCAL
+      localStorage.removeItem(`pulser_ots_${gavalId}`);
 
     } catch (e: any) {
       log('Error crítico en sembrado: ' + e.message);
@@ -156,7 +164,7 @@ export default function GavalSeeder() {
           disabled={loading}
           className="bg-emerald-600 text-white px-4 py-2 rounded font-bold hover:bg-emerald-700 disabled:opacity-50 flex-1 shadow-lg border border-emerald-400"
         >
-          {loading ? 'Inyectando datos...' : '2. 🚀 INYECTAR DATOS HISTÓRICOS (Ene-Oct 2026)'}
+          {loading ? 'Inyectando datos...' : '2. 🚀 APLICAR PARCHE Y RE-SEMBRAR DATOS (Ene-Oct 2026)'}
         </button>
       </div>
 
