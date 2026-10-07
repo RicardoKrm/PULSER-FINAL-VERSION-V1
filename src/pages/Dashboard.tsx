@@ -214,7 +214,11 @@ export default function Dashboard() {
       { name: mesesNames[currentMonth], prev: currPrev, corr: currCorr }
     ];
 
-    const gastoTotalMesActual = currPrev + currCorr;
+    let gastoTotalPeriodo = 0;
+    otsEmpresa.forEach((ot: any) => {
+      gastoTotalPeriodo += (Number(ot.costoManoObraTareas) || 0) + (Number(ot.costoInsumos) || 0) + (Number(ot.costoManoObraHH) || 0);
+    });
+    const gastoTotalMesActual = gastoTotalPeriodo;
 
     // 4. Cuellos de botella reales
     const cuellosMap: Record<string, number> = {};
@@ -241,7 +245,7 @@ export default function Dashboard() {
       cuellosData: cuellosArr.slice(0, 5),
       disponibilidad: (dispActual || 0).toFixed(1),
       cumplimientoPrev: (cumpPrev || 0).toFixed(1),
-      gastoMensual: gastoTotalMesActual.toLocaleString(),
+      gastoMensual: gastoTotalPeriodo.toLocaleString(),
       alertasCriticas: totalAlertasCriticas,
       saludFlota: { vencidos: vencidosMantenimiento, proximos, alDia }
     };
@@ -352,7 +356,7 @@ export default function Dashboard() {
         >
           <div className="flex justify-between items-start">
             <div className="flex flex-col">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Gasto Mensual</span>
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Gasto del Período</span>
               <span className="text-2xl font-bold text-slate-800 dark:text-white mt-1">$ {gastoMensual}</span>
             </div>
             <div className="bg-amber-50 dark:bg-amber-500/10 text-amber-500 dark:text-amber-400 p-2 rounded-lg">
@@ -588,6 +592,8 @@ export default function Dashboard() {
     </div>
   );
 }
+
+
 
 
 
