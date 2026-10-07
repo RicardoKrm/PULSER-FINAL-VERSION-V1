@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAppContext } from '../context/AppContext';
 
@@ -58,7 +58,7 @@ export default function GavalSeeder() {
 
     try {
       log('Limpiando OTs simuladas anteriores...');
-      await supabase.from('orden_de_trabajo').delete().like('folio', 'OT-GAV-%').eq('empresa_id', selectedCompanyId);
+      await supabase.from('orden_de_trabajo').delete().like('folio', 'OT-SIM-%').eq('empresa_id', selectedCompanyId);
 
       log('Cargando vehículos...');
       const { data: vehiculos } = await supabase.from('vehiculo').select('id, patente, kilometraje_actual').eq('empresa_id', selectedCompanyId);
@@ -100,7 +100,7 @@ export default function GavalSeeder() {
 
          otdsToInsert.push({
            id: generateUUID(),
-           folio: `OT-GAV-${String(i+1000).padStart(4, '0')}`,
+           folio: `OT-SIM-2886-${String(i+1000).padStart(4, '0')}`,
            vehiculo_id: veh.id,
            empresa_id: selectedCompanyId, 
            tecnico_responsable: mec.nombre,
@@ -195,3 +195,4 @@ export default function GavalSeeder() {
     </div>
   );
 }
+
