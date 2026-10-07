@@ -17,6 +17,22 @@ export default function GavalSeeder() {
     });
   }, []);
 
+  const handleWipeInventory = async () => {
+    if (!selectedCompanyId) return log('Selecciona una empresa primero');
+    if (!window.confirm('¿Seguro que quieres BORRAR TODO EL INVENTARIO (Repuestos) de esta empresa?')) return;
+    
+    setLoading(true);
+    log(Destruyendo catálogo de repuestos para la empresa: ...);
+    try {
+      const { error } = await supabase.from('logistica_repuestos').delete().eq('empresa_id', selectedCompanyId);
+      if (error) throw error;
+      log('✅ Catálogo de inventario eliminado. Ya puedes subir tu Excel.');
+    } catch(e: any) {
+      log('Error al borrar inventario: ' + e.message);
+    }
+    setLoading(false);
+  };
+
   const handleWipeOts = async () => {
     if (!selectedCompanyId) return log('Selecciona una empresa primero');
     if (!window.confirm('¿Seguro que quieres BORRAR TODAS las OTs de esta empresa? Esto liberará el inventario para que puedas subir tu Excel limpio.')) return;
@@ -213,10 +229,15 @@ export default function GavalSeeder() {
         </select>
       </div>
 
-      <div className="flex gap-4 mb-8">
+      <div className="flex gap-4 mb-4">
         <button onClick={handleWipeOts} disabled={loading || !selectedCompanyId} className="bg-red-600 text-white px-4 py-2 rounded font-bold hover:bg-red-700 disabled:opacity-50">
-          🔥 LIMPIAR OTs ANTIGUAS
+          🔥 LIMPIAR OTs
         </button>
+        <button onClick={handleWipeInventory} disabled={loading || !selectedCompanyId} className="bg-orange-600 text-white px-4 py-2 rounded font-bold hover:bg-orange-700 disabled:opacity-50">
+          🧹 BORRAR INVENTARIO (3000+)
+        </button>
+      </div>
+      <div className="flex gap-4 mb-8">
         <button onClick={handleSeeder} disabled={loading || !selectedCompanyId} className="bg-emerald-600 text-white px-4 py-2 rounded font-bold hover:bg-emerald-700 disabled:opacity-50 flex-1 shadow-lg border border-emerald-400">
           {loading ? 'Inyectando matriz de datos...' : '🚀 INYECTAR MATRIZ PROFUNDA (OTs + RRHH + Fallas)'}
         </button>
@@ -229,4 +250,5 @@ export default function GavalSeeder() {
     </div>
   );
 }
+
 
