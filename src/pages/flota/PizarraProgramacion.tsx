@@ -365,9 +365,12 @@ export default function PizarraProgramacion() {
 
     // Si aún no tiene programado un técnico ni hora, asignar uno por defecto al primer mecánico activo
     if (!targetOt.tecnicoResponsable) {
-      const activeMecs = personal.filter(p => p.isMecanico || p.roleBadgeText?.toLowerCase().includes('mecanic') || p.role?.toLowerCase().includes('mecanic') || p.roleBadgeText?.toLowerCase().includes('taller') || p.role?.toLowerCase().includes('taller'));
-      if (activeMecs.length > 0) {
-        updatedOt.tecnicoResponsable = activeMecs[0].name;
+      if (mecanicos.length > 0) {
+        updatedOt.tecnicoResponsable = mecanicos[0].nombre;
+        updatedOt.horaInicioProgramada = '08:00';
+        updatedOt.horaTerminoProgramada = '10:00';
+      } else {
+        updatedOt.tecnicoResponsable = 'Técnico General';
         updatedOt.horaInicioProgramada = '08:00';
         updatedOt.horaTerminoProgramada = '10:00';
       }
