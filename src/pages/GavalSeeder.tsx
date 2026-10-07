@@ -1,34 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAppContext } from '../context/AppContext';
 
 export default function GavalSeeder() {
   const [logs, setLogs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const { activeCompanyId } = useAppContext();
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
 
   const log = (msg: string) => setLogs(prev => [...prev, msg]);
 
-  const getTargetCompany = () => {
-     // Si es super admin y está viendo "GLOBAL", no podemos sembrar a ciegas.
-     // Usamos el fallback original solo en el peor de los casos
-     if (!activeCompanyId || activeCompanyId === 'GLOBAL') {
-        return '57fa41da-645d-48ba-a671-65a35312d0e9';
-     }
-     return activeCompanyId;
-  };
+  useEffect(() => {
+    // Fetch all companies to avoid blind fallback IDs
+    supabase.from('empresa').select('id, nombre').then(({ data, error }) => {
+      if (data) {
+        setCompanies(data);
+      } else if (error) {
+         log('Error cargando empresas: ' + error.message);
+      }
+    });
+  }, []);
 
   const handleBackup = async () => {
+    if (!selectedCompanyId) return log('Selecciona una empresa primero');
     setLoading(true);
-    const targetId = getTargetCompany();
-    log(`Iniciando respaldo para empresa: ${targetId}...`);
+    log(`Iniciando respaldo para empresa: ${selectedCompanyId}...`);
 
     try {
       const backupData: any = {};
       const tables = ['vehiculo', 'colaborador', 'orden_de_trabajo', 'logistica_repuestos'];
       for (const table of tables) {
         log(`Extrayendo tabla: ${table}...`);
-        const { data } = await supabase.from(table).select('*').eq('empresa_id', targetId);
+        const { data } = await supabase.from(table).select('*').eq('empresa_id', selectedCompanyId);
         backupData[table] = data || [];
         log(`OK: ${table} (${backupData[table].length} registros)`);
       }
@@ -37,7 +40,8 @@ export default function GavalSeeder() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `backup_empresa_${targetId}_${new Date().toISOString().slice(0,10)}.json`;
+      const compName = companies.find(c => c.id === selectedCompanyId)?.nombre || 'empresa';
+      a.download = `backup_${compName}_${new Date().toISOString().slice(0,10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
       log('Respaldo descargado exitosamente.');
@@ -48,20 +52,20 @@ export default function GavalSeeder() {
   };
 
   const handleSeeder = async () => {
+    if (!selectedCompanyId) return log('Selecciona una empresa primero');
     setLoading(true);
-    const targetId = getTargetCompany();
-    log(`--- INICIANDO SEMBRADO CRONOLÓGICO PARA EMPRESA: ${targetId} ---`);
+    log(`--- INICIANDO SEMBRADO CRONOLÓGICO PARA EMPRESA: ${selectedCompanyId} ---`);
 
     try {
       log('Limpiando OTs simuladas anteriores...');
-      await supabase.from('orden_de_trabajo').delete().like('folio', 'OT-GAV-%').eq('empresa_id', targetId);
+      await supabase.from('orden_de_trabajo').delete().like('folio', 'OT-GAV-%').eq('empresa_id', selectedCompanyId);
 
       log('Cargando vehículos...');
-      const { data: vehiculos } = await supabase.from('vehiculo').select('id, patente, kilometraje_actual').eq('empresa_id', targetId);
+      const { data: vehiculos } = await supabase.from('vehiculo').select('id, patente, kilometraje_actual').eq('empresa_id', selectedCompanyId);
       log(`Vehículos obtenidos: ${vehiculos?.length}`);
 
       log('Cargando mecánicos...');
-      const { data: colaboradores } = await supabase.from('colaborador').select('id, nombre, rol').eq('empresa_id', targetId);
+      const { data: colaboradores } = await supabase.from('colaborador').select('id, nombre, rol').eq('empresa_id', selectedCompanyId);
       const mecanicos = (colaboradores || []).filter(c => (c.rol || '').toLowerCase().includes('mecanic') || (c.rol || '').toLowerCase().includes('taller'));
       log(`Mecánicos obtenidos: ${mecanicos.length}`);
 
@@ -98,7 +102,7 @@ export default function GavalSeeder() {
            id: generateUUID(),
            folio: `OT-GAV-${String(i+1000).padStart(4, '0')}`,
            vehiculo_id: veh.id,
-           empresa_id: targetId, // <-- AQUÍ USAMOS EL ID REAL AL QUE ESTÁS CONECTADO
+           empresa_id: selectedCompanyId, 
            tecnico_responsable: mec.nombre,
            tipo: isPreventive ? 'PREVENTIVA' : 'CORRECTIVA', 
            estado: 'FINALIZADA', 
@@ -135,11 +139,11 @@ export default function GavalSeeder() {
 
       log('Registrando actividades (Log)...');
       await supabase.from('log_actividad').insert([
-        { modulo: 'Sistema', accion: 'Sembrado de Datos', detalles: `Se generaron ${otCount} OTs simuladas`, empresa_id: targetId }
+        { modulo: 'Sistema', accion: 'Sembrado de Datos', detalles: `Se generaron ${otCount} OTs simuladas`, empresa_id: selectedCompanyId }
       ]);
 
       log('¡PROCESO FINALIZADO CON ÉXITO! Ve a tu pestaña de incógnito y presiona F5.');
-      localStorage.removeItem(`pulser_ots_${targetId}`);
+      localStorage.removeItem(`pulser_ots_${selectedCompanyId}`);
 
     } catch (e: any) {
       log('Error crítico en sembrado: ' + e.message);
@@ -151,23 +155,36 @@ export default function GavalSeeder() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto bg-white dark:bg-slate-900 min-h-screen">
-      <h1 className="text-3xl font-bold mb-4">Herramienta de Sembrado Dinámica</h1>
-      <p className="mb-4 text-slate-500">ID de Empresa Activa: <strong>{getTargetCompany()}</strong></p>
+      <h1 className="text-3xl font-bold mb-4">Herramienta de Sembrado Definitiva</h1>
+      <p className="mb-4 text-slate-500">Selecciona la empresa exacta donde inyectarás los datos:</p>
       
+      <div className="mb-6">
+        <select 
+          className="w-full p-3 border rounded text-lg font-bold"
+          value={selectedCompanyId}
+          onChange={(e) => setSelectedCompanyId(e.target.value)}
+        >
+           <option value="">-- SELECCIONA LA EMPRESA --</option>
+           {companies.map(c => (
+              <option key={c.id} value={c.id}>{c.nombre} (ID: {c.id.slice(0,8)}...)</option>
+           ))}
+        </select>
+      </div>
+
       <div className="flex gap-4 mb-8">
         <button 
           onClick={handleBackup} 
-          disabled={loading}
+          disabled={loading || !selectedCompanyId}
           className="bg-slate-600 text-white px-4 py-2 rounded font-bold hover:bg-slate-700 disabled:opacity-50"
         >
           1. Descargar Respaldo Actual
         </button>
         <button 
           onClick={handleSeeder} 
-          disabled={loading}
+          disabled={loading || !selectedCompanyId}
           className="bg-emerald-600 text-white px-4 py-2 rounded font-bold hover:bg-emerald-700 disabled:opacity-50 flex-1 shadow-lg border border-emerald-400"
         >
-          {loading ? 'Inyectando datos...' : '2. 🚀 INYECTAR DATOS EN LA EMPRESA SELECCIONADA'}
+          {loading ? 'Inyectando datos...' : '2. 🚀 INYECTAR DATOS'}
         </button>
       </div>
 
