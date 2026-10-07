@@ -41,7 +41,7 @@ export default function ControlDocumental() {
   const [driverForm, setDriverForm] = useState({
     rut: '', nombre: '', rol: '', telefono: '',
     vencimientoLicencia: '', archivoLicencia: '',
-    vencimientoSalud: '', archivoSalud: '',
+    licenciasMedicas: [],
     vencimientoExamenes: '', archivoExamenes: '',
     fechaVacaciones: ''
   });
@@ -164,7 +164,28 @@ export default function ControlDocumental() {
     const det = driver.detalles || {};
     
     const docLicencia = checkDocument(det.vencimientoLicencia, alertConfig.diasAvisoLicencia);
-    const docSalud = checkDocument(det.vencimientoSalud, alertConfig.diasAvisoSalud);
+    // Licencias médicas logic
+    const hoy = new Date();
+    hoy.setHours(0,0,0,0);
+    let tieneLicenciaActiva = false;
+    let tieneLicenciaVencida = false;
+    let docSalud = { status: 'EN ORDEN', days: 0 };
+    
+    if (det.licenciasMedicas && det.licenciasMedicas.length > 0) {
+       const sorted = [...det.licenciasMedicas].sort((a,b) => new Date(b.hasta).getTime() - new Date(a.hasta).getTime());
+       const newest = sorted[0];
+       const hastaDate = new Date(newest.hasta);
+       const desdeDate = new Date(newest.desde);
+       hastaDate.setHours(23,59,59,999);
+       desdeDate.setHours(0,0,0,0);
+       
+       if (hoy >= desdeDate && hoy <= hastaDate) {
+         tieneLicenciaActiva = true;
+         docSalud = { status: 'VENCIDO', days: 0 }; 
+       } else if (hastaDate < hoy) {
+         docSalud = { status: 'EN ORDEN', days: 0 };
+       }
+    }
     const docExamen = checkDocument(det.vencimientoExamenes, alertConfig.diasAvisoSalud);
     const docVacaciones = checkDocument(det.fechaVacaciones, 0);
     
@@ -172,7 +193,7 @@ export default function ControlDocumental() {
     let reasons: string[] = [];
 
     if (docLicencia.status === 'VENCIDO') reasons.push('Licencia Vencida');
-    if (docSalud.status === 'VENCIDO') reasons.push('Salud Vencida');
+    if (tieneLicenciaActiva) reasons.push('Con Licencia Médica Activa');
     if (docExamen.status === 'VENCIDO') reasons.push('Examen Vencido');
     if (docVacaciones.status === 'VENCIDO') reasons.push('Vacaciones Vencidas');
 
@@ -180,7 +201,7 @@ export default function ControlDocumental() {
       status = 'VENCIDO';
     } else {
       if (docLicencia.status === 'PROXIMO') reasons.push(`Licencia próxima (< ${alertConfig.diasAvisoLicencia} días)`);
-      if (docSalud.status === 'PROXIMO') reasons.push(`Salud próxima (< ${alertConfig.diasAvisoSalud} días)`);
+      // No PROXIMO for sick leave
       if (docExamen.status === 'PROXIMO') reasons.push(`Exámenes próximos (< ${alertConfig.diasAvisoSalud} días)`);
       if (reasons.length > 0) status = 'PROXIMO';
     }
@@ -425,7 +446,7 @@ export default function ControlDocumental() {
           </p>
         </div>
         <div className="flex gap-3">
-          <button onClick={() => { setDriverForm({rut:'', nombre:'', rol:'', telefono:'', vencimientoLicencia:'', archivoLicencia:'', vencimientoSalud:'', archivoSalud:'', vencimientoExamenes:'', archivoExamenes:'', fechaVacaciones:''}); setIsEditing(false); setShowDriverModal(true); }} className="bg-white dark:bg-slate-900 text-indigo-600 border border-indigo-200 dark:border-indigo-900 px-4 py-2 rounded-xl font-bold hover:bg-indigo-50 flex items-center gap-2 transition-all shadow-sm">
+          <button onClick={() => { setDriverForm({rut:'', nombre:'', rol:'', telefono:'', vencimientoLicencia:'', archivoLicencia:'', licenciasMedicas:[], vencimientoExamenes:'', archivoExamenes:'', fechaVacaciones:''}); setIsEditing(false); setShowDriverModal(true); }} className="bg-white dark:bg-slate-900 text-indigo-600 border border-indigo-200 dark:border-indigo-900 px-4 py-2 rounded-xl font-bold hover:bg-indigo-50 flex items-center gap-2 transition-all shadow-sm">
             <Users className="w-4 h-4" /> Registrar Conductor
           </button>
           <button onClick={() => { setVehicleForm({patente:'', marca:'', modelo:'', tipo:'Camión', anio:new Date().getFullYear(), fechaInscripcion:'', tipoUso:'Carga General', vencimientoRev:'', archivoRev:'', vencimientoSeguro:'', archivoSeguro:'', vencimientoPermisoCirculacion:'', archivoPermisoCirculacion:''}); setIsEditing(false); setShowVehicleModal(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-indigo-700 flex items-center gap-2 transition-all shadow-sm">
@@ -462,7 +483,28 @@ export default function ControlDocumental() {
 
               <div className="space-y-1 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
                 {renderDocRow('Licencia', docs.licencia, det.archivoLicencia, 'driver', 'archivoLicencia')}
-                {renderDocRow('Salud', docs.salud, det.archivoSalud, 'driver', 'archivoSalud')}
+                {(() => {
+                    const hasActive = det.licenciasMedicas && det.licenciasMedicas.some((lm:any) => {
+                      const h = new Date(); h.setHours(0,0,0,0);
+                      const d = new Date(lm.desde); d.setHours(0,0,0,0);
+                      const t = new Date(lm.hasta); t.setHours(23,59,59,999);
+                      return h >= d && h <= t;
+                    });
+                    const color = hasActive ? 'bg-red-500' : 'bg-emerald-500';
+                    const text = hasActive ? 'Con Licencia Médica' : 'Apto para trabajar';
+                    return (
+                      <div className="flex items-center justify-between p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-800">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-slate-400" />
+                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Licencias Médicas</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-bold text-slate-500">{text}</span>
+                          <div className={`w-3 h-3 rounded-full ${color} shadow-sm border border-white dark:border-slate-800`}></div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 {renderDocRow('Examen Med.', docs.examen, det.archivoExamenes, 'driver', 'archivoExamenes')}
                 {renderDocRow('Vacaciones', docs.vacaciones, null, 'driver', '')}
               </div>
@@ -557,10 +599,61 @@ export default function ControlDocumental() {
                       <label className="text-xs font-bold text-slate-500">Venc. Licencia</label>
                       <input type="date" required value={driverForm.vencimientoLicencia} onChange={e=>setDriverForm({...driverForm, vencimientoLicencia: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" />
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-500">Venc. Declaración Salud</label>
-                      <input type="date" value={driverForm.vencimientoSalud} onChange={e=>setDriverForm({...driverForm, vencimientoSalud: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" />
+                    
+                    <div className="space-y-2 col-span-1 md:col-span-2">
+                      <div className="flex justify-between items-center bg-slate-100 dark:bg-slate-800 p-2 rounded-lg">
+                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Historial de Licencias Médicas</label>
+                        <button type="button" onClick={() => setDriverForm({...driverForm, licenciasMedicas: [...(driverForm.licenciasMedicas||[]), {desde: '', hasta: '', archivo: '', motivo: ''}]})} className="text-xs bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 flex items-center gap-1">
+                          <Plus className="w-3 h-3" /> Agregar Licencia
+                        </button>
+                      </div>
+                      
+                      {(driverForm.licenciasMedicas || []).map((lic: any, idx: number) => (
+                        <div key={idx} className="grid grid-cols-1 md:grid-cols-4 gap-2 bg-slate-50 dark:bg-slate-900 p-3 rounded-lg border border-slate-200 dark:border-slate-800 relative group">
+                          <button type="button" onClick={() => { const nl = [...driverForm.licenciasMedicas]; nl.splice(idx, 1); setDriverForm({...driverForm, licenciasMedicas: nl}); }} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                            <X className="w-3 h-3" />
+                          </button>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Desde</label>
+                            <input type="date" value={lic.desde} onChange={(e) => { const nl = [...driverForm.licenciasMedicas]; nl[idx].desde = e.target.value; setDriverForm({...driverForm, licenciasMedicas: nl}); }} className="w-full px-2 py-1.5 text-sm bg-white dark:bg-slate-800 border rounded" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Hasta</label>
+                            <input type="date" value={lic.hasta} onChange={(e) => { const nl = [...driverForm.licenciasMedicas]; nl[idx].hasta = e.target.value; setDriverForm({...driverForm, licenciasMedicas: nl}); }} className="w-full px-2 py-1.5 text-sm bg-white dark:bg-slate-800 border rounded" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Motivo (Opcional)</label>
+                            <input type="text" value={lic.motivo || ''} placeholder="Ej: Reposo" onChange={(e) => { const nl = [...driverForm.licenciasMedicas]; nl[idx].motivo = e.target.value; setDriverForm({...driverForm, licenciasMedicas: nl}); }} className="w-full px-2 py-1.5 text-sm bg-white dark:bg-slate-800 border rounded" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Certificado PDF</label>
+                            <div className="flex items-center gap-1">
+                                {lic.archivo ? (
+                                  <div className="flex items-center gap-1 w-full">
+                                    <a href={lic.archivo} target="_blank" rel="noreferrer" className="flex-1 truncate text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-1.5 rounded border border-blue-200 dark:border-blue-800 flex items-center justify-center gap-1 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors">
+                                      <Eye className="w-3 h-3" /> Ver
+                                    </a>
+                                    <button type="button" onClick={() => { const nl = [...driverForm.licenciasMedicas]; nl[idx].archivo = ''; setDriverForm({...driverForm, licenciasMedicas: nl}); }} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded border border-red-200 dark:border-red-800 transition-colors">
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button type="button" onClick={() => triggerUpload('driver', 'licencia_medica_' + idx)} className="w-full cursor-pointer flex items-center justify-center gap-1 bg-slate-100 dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-700 rounded px-2 py-1.5 text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                                    <UploadCloud className="w-3 h-3" />
+                                    <span>Subir PDF</span>
+                                  </button>
+                                )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {(!driverForm.licenciasMedicas || driverForm.licenciasMedicas.length === 0) && (
+                        <div className="text-center p-4 bg-slate-50 dark:bg-slate-900 border border-dashed rounded-lg text-sm text-slate-500">
+                          Sin historial de licencias médicas.
+                        </div>
+                      )}
                     </div>
+
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-slate-500">Venc. Examen Médico/Preocupacional</label>
                       <input type="date" value={driverForm.vencimientoExamenes} onChange={e=>setDriverForm({...driverForm, vencimientoExamenes: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" />

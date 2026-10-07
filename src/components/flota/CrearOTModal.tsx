@@ -17,10 +17,14 @@ export interface CrearOTModalProps {
 export const CrearOTModal: React.FC<CrearOTModalProps> = ({ isOpen, onClose, vehiculoPreseleccionadoId, otToEdit }) => {
   const { ordenesTrabajo, crearOrdenTrabajo, actualizarOrdenTrabajo, vehiculos, tiposFalla, pautas, kitsRepuesto, personal } = useAppContext();
   const { activeCompanyId } = useCompany();
+    const [allowConductor, setAllowConductor] = useState(false);
   const excludedRoles = ['super administrador', 'súper administrador', 'super admin', 'súper admin', 'administrador', 'gerente', 'administrativo'];
   
   const personalOperativoList = personal.filter(u => {
     const roleLower = (u.roleBadgeText || u.rol?.nombre || '').toLowerCase();
+    if (!allowConductor && (roleLower.includes('conductor') || roleLower.includes('operador') || roleLower.includes('chofer'))) {
+        return false;
+    }
     return !excludedRoles.some(r => roleLower.includes(r));
   });
 
