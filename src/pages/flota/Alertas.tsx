@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Clock, AlertCircle, AlertTriangle, FileText, Users, Wrench, Package, CheckCircle2 } from 'lucide-react';
+﻿import React, { useState, useEffect } from 'react';
+import { Clock, AlertCircle, AlertTriangle, FileText, Users, Wrench, Package, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useCompany } from '../../contexts/CompanyContext';
 import { supabase } from '../../lib/supabase';
@@ -186,6 +186,7 @@ export default function OperacionesAlertas() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 transition-colors font-medium mb-6"><ArrowLeft className="w-5 h-5" /> Volver al Dashboard</button>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
@@ -356,3 +357,4 @@ export default function OperacionesAlertas() {
     </div>
   );
 }
+
