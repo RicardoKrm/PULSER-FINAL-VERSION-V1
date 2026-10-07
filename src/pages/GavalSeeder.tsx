@@ -120,7 +120,7 @@ export default function GavalSeeder() {
            costo_mano_obra_tareas: costoHH,
            costo_mano_obra_hh: 0,
            tiempo_trabajado_segundos: minsReal * 60,
-           tipo_falla_id: falla ? falla.id : null,
+           tipo_falla_id: (falla && !falla.id.startsWith('sim-')) ? falla.id : null,
            tipo_falla: falla ? falla.nombre : null
          });
 
