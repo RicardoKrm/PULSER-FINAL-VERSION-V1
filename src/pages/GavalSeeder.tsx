@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAppContext } from '../context/AppContext';
 
@@ -22,11 +22,11 @@ export default function GavalSeeder() {
     if (!window.confirm('¿Seguro que quieres BORRAR TODO EL INVENTARIO (Repuestos) de esta empresa?')) return;
     
     setLoading(true);
-    log(Destruyendo catálogo de repuestos para la empresa: ...);
+    log(`Destruyendo catalogo de repuestos para la empresa: ${selectedCompanyId}...`);
     try {
       const { error } = await supabase.from('logistica_repuestos').delete().eq('empresa_id', selectedCompanyId);
       if (error) throw error;
-      log('✅ Catálogo de inventario eliminado. Ya puedes subir tu Excel.');
+      log('✅ Catalogo de inventario eliminado. Ya puedes subir tu Excel.');
     } catch(e: any) {
       log('Error al borrar inventario: ' + e.message);
     }
@@ -38,12 +38,12 @@ export default function GavalSeeder() {
     if (!window.confirm('¿Seguro que quieres BORRAR TODAS las OTs de esta empresa? Esto liberará el inventario para que puedas subir tu Excel limpio.')) return;
     
     setLoading(true);
-    log(Borrando historial de OTs para la empresa: ...);
+    log(`Borrando historial de OTs para la empresa: ${selectedCompanyId}...`);
     try {
       const { error } = await supabase.from('orden_de_trabajo').delete().eq('empresa_id', selectedCompanyId);
       if (error) throw error;
       log('✅ Todas las OTs han sido eliminadas. Ahora puedes borrar tu inventario viejo y subir el Excel.');
-      localStorage.removeItem(pulser_ots_);
+      localStorage.removeItem(`pulser_ots_${selectedCompanyId}`);
     } catch(e: any) {
       log('Error al borrar OTs: ' + e.message);
     }
@@ -65,10 +65,8 @@ export default function GavalSeeder() {
       const { data: colaboradores } = await supabase.from('colaborador').select('id, nombre, rol').eq('empresa_id', selectedCompanyId);
       const mecanicos = (colaboradores || []).filter(c => (c.rol || '').toLowerCase().includes('mecanic') || (c.rol || '').toLowerCase().includes('taller'));
       
-      // Intentar obtener catálogo de fallas, tareas y repuestos para vincular
       const { data: tiposFallaData } = await supabase.from('tipo_falla').select('id, nombre').eq('empresa_id', selectedCompanyId);
       const { data: tareasEstandarData } = await supabase.from('tarea_estandar').select('id, descripcion').eq('empresa_id', selectedCompanyId);
-      
       const { data: repuestosData } = await supabase.from('logistica_repuestos').select('id, nombre, costo_unitario').eq('empresa_id', selectedCompanyId);
 
       if (repuestosData && repuestosData.length > 0) {
@@ -81,18 +79,16 @@ export default function GavalSeeder() {
               }
           }
           if (updates.length > 0) {
-              log(`Fijando valor referencial a ${updates.length} repuestos que no tenían precio...`);
+              log(`Fijando valor referencial a ${updates.length} repuestos que no tenian precio...`);
               const updatePromises = updates.map(u => supabase.from('logistica_repuestos').update({ costo_unitario: u.costo_unitario }).eq('id', u.id));
               await Promise.all(updatePromises);
           }
       }
 
-
       if (!vehiculos?.length || !mecanicos?.length) {
         throw new Error('Faltan vehículos o mecánicos para generar OTs');
       }
 
-      // Fallbacks si no hay maestros creados
       const tiposFalla = tiposFallaData?.length ? tiposFallaData : [{ id: 'sim-falla-1', nombre: 'Falla Mecánica Simulada' }];
       const tareas = tareasEstandarData?.length ? tareasEstandarData : [{ id: 'sim-tarea-1', descripcion: 'Inspección General Simulada' }];
       const repuestos = repuestosData?.length ? repuestosData : [{ id: 'sim-rep-1', nombre: 'Kit Mantenimiento Simulado', costo_unitario: 50000 }];
@@ -130,7 +126,6 @@ export default function GavalSeeder() {
          const costoInsumos = cantRepuestos * costoUnitarioRep;
          const minsReal = Math.floor(Math.random() * 180) + 60; // 1 a 4 horas
 
-         // 1. Crear OT
          otdsToInsert.push({
            id: otId,
            folio: `OT-SIM-${Date.now().toString().slice(-4)}-${String(i).padStart(3, '0')}`,
@@ -157,7 +152,6 @@ export default function GavalSeeder() {
            tipo_falla: falla ? falla.nombre : null
          });
 
-         // 2. Crear Tarea Realizada (Productividad / RRHH)
          if (!tareaObj.id.startsWith('sim-')) {
             tareasToInsert.push({
               id: generateUUID(),
@@ -168,7 +162,6 @@ export default function GavalSeeder() {
             });
          }
 
-         // 3. Crear Consumo de Insumo (Bodega / Logística)
          if (!repuestoObj.id.startsWith('sim-')) {
             insumosToInsert.push({
               id: generateUUID(),
@@ -250,5 +243,3 @@ export default function GavalSeeder() {
     </div>
   );
 }
-
-
