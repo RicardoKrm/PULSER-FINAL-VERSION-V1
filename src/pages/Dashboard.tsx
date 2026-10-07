@@ -252,7 +252,7 @@ export default function Dashboard() {
       {/* Header section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-2">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-white">{greeting}, {userName} <span style={{color:'red', fontSize: '14px'}}> [DB OTs: {dbCount} | Mem OTs: {ordenesTrabajo.length}]</span></h1>
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-white">{greeting}, {userName}</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Indicadores clave de rendimiento y salud operativa</p>
         </div>
         <div className="flex gap-2 items-center">
@@ -569,6 +569,7 @@ export default function Dashboard() {
     </div>
   );
 }
+
 
 
 
