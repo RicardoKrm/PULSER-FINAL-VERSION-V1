@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { useCompany } from '../contexts/CompanyContext';
@@ -517,6 +517,7 @@ export default function Dashboard() {
                   cursor={{ fill: 'transparent' }}
                   contentStyle={{ borderRadius: '8px', border: 'none', backgroundColor: '#1e293b', color: '#f8fafc', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   itemStyle={{ color: '#f8fafc' }}
+                  formatter={(value: any, name: string) => [`$ ${Number(value).toLocaleString()}`, name === 'prev' ? 'Preventivo' : name === 'corr' ? 'Correctivo' : name]}
                 />
                 <Bar dataKey="prev" stackId="a" fill="#3b82f6" />
                 <Bar dataKey="corr" stackId="a" fill="#f43f5e" />
@@ -569,6 +570,7 @@ export default function Dashboard() {
     </div>
   );
 }
+
 
 
 
