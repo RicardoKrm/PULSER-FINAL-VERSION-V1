@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { useCompany } from '../contexts/CompanyContext';
@@ -362,8 +362,10 @@ export default function Dashboard() {
               <AlertTriangle className="w-5 h-5" />
             </div>
           </div>
-          <div className="flex items-center text-xs font-medium text-slate-400 dark:text-slate-500">
-            <span className="font-normal ml-1">Todo en orden normal</span>
+          <div className={`flex items-center text-xs font-medium ${alertasCriticas > 0 ? 'text-rose-500 dark:text-rose-400' : 'text-emerald-500 dark:text-emerald-400'}`}>
+            <span className="font-semibold ml-1">
+              {alertasCriticas === 0 ? 'Todo en orden normal' : 'Requieren atención urgente'}
+            </span>
           </div>
         </div>
       </div>
@@ -570,6 +572,7 @@ export default function Dashboard() {
     </div>
   );
 }
+
 
 
 
