@@ -729,9 +729,16 @@ export default function ControlDocumental() {
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-500">Venc. Examen Médico/Preocupacional</label>
-                      <input type="date" value={driverForm.vencimientoExamenes} onChange={e=>setDriverForm({...driverForm, vencimientoExamenes: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" />
-                    </div>
+                        <label className="text-xs font-bold text-slate-500">Venc. Examen Médico/Preocupacional</label>
+                        <input type="date" value={driverForm.vencimientoExamenes} onChange={e=>setDriverForm({...driverForm, vencimientoExamenes: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-500">Estado Examen</label>
+                        <select value={driverForm.estadoExamen || 'APTO'} onChange={e=>setDriverForm({...driverForm, estadoExamen: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg font-semibold text-slate-700 dark:text-slate-300">
+                          <option value="APTO">APTO PARA EL TRABAJO</option>
+                          <option value="NO APTO">NO APTO PARA EL TRABAJO</option>
+                        </select>
+                      </div>
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-slate-500">Fecha Límite Vacaciones</label>
                       <input type="date" value={driverForm.fechaVacaciones} onChange={e=>setDriverForm({...driverForm, fechaVacaciones: e.target.value})} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg" />
