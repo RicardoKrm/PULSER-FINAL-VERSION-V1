@@ -213,6 +213,68 @@ export default function ControlDocumental() {
     };
   };
 
+
+  const handleExportExcel = () => {
+    import('xlsx').then(XLSX => {
+      const wb = XLSX.utils.book_new();
+
+      // Exportar Conductores
+      const driversData = drivers.map(d => {
+        const stats = checkDriverStatus(d);
+        let licenciaActivaStr = 'Apto para trabajar';
+        if (d.detalles?.licenciasMedicas && d.detalles.licenciasMedicas.length > 0) {
+           const hasActive = d.detalles.licenciasMedicas.some((lm:any) => {
+             const h = new Date(); h.setHours(0,0,0,0);
+             const de = new Date(lm.desde); de.setHours(0,0,0,0);
+             const t = new Date(lm.hasta); t.setHours(23,59,59,999);
+             return h >= de && h <= t;
+           });
+           if (hasActive) licenciaActivaStr = 'Con Licencia Médica';
+        }
+
+        return {
+          'Nombre': d.nombre || '',
+          'RUT': d.rut || '',
+          'Cargo': d.rol || 'Conductor',
+          'Teléfono': d.telefono || '',
+          'Tipo Licencia': d.detalles?.tipoLicencia || '',
+          'Venc. Licencia Conducir': d.detalles?.vencimientoLicencia || 'No registrado',
+          'Estado Médico': licenciaActivaStr,
+          'Venc. Exámenes': d.detalles?.vencimientoExamenes || 'No registrado',
+          'Fecha Vacaciones': d.detalles?.fechaVacaciones || 'No registrado',
+          'Estado Documental': stats.status,
+          'Observaciones': stats.reasons.join(', ')
+        };
+      });
+      const wsDrivers = XLSX.utils.json_to_sheet(driversData);
+      XLSX.utils.book_append_sheet(wb, wsDrivers, 'Conductores');
+
+      // Exportar Vehículos
+      const vehiclesData = vehicles.map(v => {
+        const stats = checkVehicleStatus(v);
+        return {
+          'Patente': v.patente || '',
+          'N° Interno': v.numero_interno || '',
+          'Tipo': v.tipo || '',
+          'Marca': v.marca || '',
+          'Modelo': v.modelo || '',
+          'Año': v.anio || '',
+          'Tipo Uso': v.detalles?.tipoUso || '',
+          'Inscripción': v.detalles?.fechaInscripcion || '',
+          'Venc. Rev. Técnica': v.detalles?.vencimientoRev || 'No registrado',
+          'Venc. Seguro': v.detalles?.vencimientoSeguro || 'No registrado',
+          'Venc. Permiso Circ.': v.detalles?.vencimientoPermisoCirculacion || 'No registrado',
+          'Estado Documental': stats.status,
+          'Observaciones': stats.reasons.join(', ')
+        };
+      });
+      const wsVehicles = XLSX.utils.json_to_sheet(vehiclesData);
+      XLSX.utils.book_append_sheet(wb, wsVehicles, 'Vehículos');
+
+      XLSX.writeFile(wb, 'Control_Documental.xlsx');
+    });
+  };
+
   const getVidaUtil = (tipoUso: string) => {
     switch(tipoUso) {
       case 'Carga Peligrosa': return 10;
