@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { useCompany } from '../contexts/CompanyContext';
@@ -25,7 +25,11 @@ import {
 
 const COLORS = ['#3b82f6', '#ef4444'];
 
+import { supabase } from '../lib/supabase';
+
 export default function Dashboard() {
+  const [dbCount, setDbCount] = React.useState<number | null>(null);
+  React.useEffect(() => { supabase.from('orden_de_trabajo').select('id', { count: 'exact' }).then(res => setDbCount(res.count)); }, []);
   const navigate = useNavigate();
   const { user, ordenesTrabajo, vehiculos } = useAppContext() as any;
   const { currentCompany } = useCompany();
@@ -565,3 +569,5 @@ export default function Dashboard() {
     </div>
   );
 }
+
+
