@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Activity, Clock, Users, Building, ShieldAlert, FileText, CheckCircle2, ChevronDown, Calendar } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -45,7 +45,7 @@ export default function LogActividad() {
 
   const fetchLogs = async () => {
     try {
-      setLoading(true);
+      if (logs.length === 0) setLoading(true);
       setError(null);
       
       // Calculate start and end bounds based on local date string
@@ -140,25 +140,16 @@ export default function LogActividad() {
     fetchLogs();
   }, [selectedDate, selectedCompany]);
 
-  // Optionally subscribe to realtime if the date is today
+  // Use polling for 100% reliable real-time updates without needing Supabase Realtime configured
   useEffect(() => {
     const todayStr = new Date().toLocaleDateString('en-CA');
-    if (selectedDate !== todayStr) return; // Don't real-time update past dates
+    if (selectedDate !== todayStr) return; // Only poll if viewing today
 
-    const channel = supabase
-      .channel('log_actividad_changes')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'log_actividad' },
-        (payload) => {
-          fetchLogs();
-        }
-      )
-      .subscribe();
+    const interval = setInterval(() => {
+      fetchLogs();
+    }, 2000); // Poll every 2 seconds for hyper-fast real-time feel
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => clearInterval(interval);
   }, [selectedDate, selectedCompany]);
 
   const getModuleIcon = (moduleName: string) => {
@@ -393,3 +384,4 @@ export default function LogActividad() {
     </div>
   );
 }
+
