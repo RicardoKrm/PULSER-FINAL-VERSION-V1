@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { useCompany } from '../contexts/CompanyContext';
@@ -37,6 +37,8 @@ export default function Dashboard() {
   const [dbColaboradores, setDbColaboradores] = useState<any[]>([]);
   const [fechaDesde, setFechaDesde] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
   const [fechaHasta, setFechaHasta] = useState(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0]);
+  const [activeFechaDesde, setActiveFechaDesde] = useState(fechaDesde);
+  const [activeFechaHasta, setActiveFechaHasta] = useState(fechaHasta);
 
   React.useEffect(() => {
     if (!currentCompany?.id) return;
@@ -73,7 +75,20 @@ export default function Dashboard() {
     
     // 1. Preventivas vs Correctivas - strictly for this company
     const currentEmpresaId = currentCompany?.id;
-    const otsEmpresa = (ordenesTrabajo || []).filter((ot: any) => !currentEmpresaId || ot.empresa_id === currentEmpresaId);
+    
+    // Raw filter to get all OTs of the company (needed for historical charts)
+    const otsEmpresaHistorico = (ordenesTrabajo || []).filter((ot: any) => !currentEmpresaId || ot.empresa_id === currentEmpresaId);
+    
+    // Filtered by date range (for KPIs and current metrics)
+    const otsEmpresa = otsEmpresaHistorico.filter((ot: any) => {
+      const otDate = ot.fechaCreacion || ot.fecha_creacion;
+      if (!otDate) return false;
+      const d = new Date(otDate);
+      const start = new Date(activeFechaDesde); start.setHours(0,0,0,0);
+      const end = new Date(activeFechaHasta); end.setHours(23,59,59,999);
+      return d >= start && d <= end;
+    });
+
     const preventivas = otsEmpresa.filter((ot: any) => ot.tipo === 'PREVENTIVA' || ot.tipo?.includes('PREVENTIVA'));
     const correctivas = otsEmpresa.filter((ot: any) => ot.tipo === 'CORRECTIVA' || ot.tipo?.includes('CORRECTIVA') || ot.tipo?.includes('FALLA'));
     const prevCount = preventivas.length;
@@ -154,7 +169,7 @@ export default function Dashboard() {
       };
     });
 
-    otsEmpresa.forEach((ot: any) => {
+    otsEmpresaHistorico.forEach((ot: any) => {
       const fecha = ot.fechaCreacion || ot.fecha_creacion;
       if (!fecha) return;
       const d = new Date(fecha);
@@ -180,7 +195,7 @@ export default function Dashboard() {
     let currPrev = 0, currCorr = 0;
     let pastPrev = 0, pastCorr = 0;
 
-    otsEmpresa.forEach((ot: any) => {
+    otsEmpresaHistorico.forEach((ot: any) => {
         const d = new Date(ot.fechaCreacion || new Date());
         const mon = d.getMonth();
         const cost = (Number(ot.costoManoObraTareas) || 0) + (Number(ot.costoInsumos) || 0) + (Number(ot.costoManoObraHH) || 0);
@@ -230,11 +245,12 @@ export default function Dashboard() {
       alertasCriticas: totalAlertasCriticas,
       saludFlota: { vencidos: vencidosMantenimiento, proximos, alDia }
     };
-  }, [ordenesTrabajo, vehiculos, dbVehiculos, dbColaboradores]);
+  }, [ordenesTrabajo, vehiculos, dbVehiculos, dbColaboradores, activeFechaDesde, activeFechaHasta]);
 
 
   const handleFilter = () => {
-    // Implementar lógica de filtrado real aquí
+    setActiveFechaDesde(fechaDesde);
+    setActiveFechaHasta(fechaHasta);
   };
 
   const currentHour = new Date().getHours();
@@ -572,6 +588,7 @@ export default function Dashboard() {
     </div>
   );
 }
+
 
 
 
