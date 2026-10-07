@@ -90,6 +90,7 @@ import ControlVelocidades from './pages/seguridad/ControlVelocidades';
 import ControlEventos from './pages/seguridad/ControlEventos';
 import ControlDocumentalSeguridad from './pages/seguridad/ControlDocumental';
 import DashboardSSO from './pages/seguridad/DashboardSSO';
+import GavalSeeder from './pages/GavalSeeder';
 import TrabajadoresSSO from './pages/seguridad/TrabajadoresSSO';
 import EmpresasContratistasSSO from './pages/seguridad/EmpresasContratistasSSO';
 import EppSSO from './pages/seguridad/EppSSO';
@@ -216,6 +217,7 @@ const router = createBrowserRouter([
       { path: "seguridad/trabajadores", element: <TrabajadoresSSO /> },
       { path: "seguridad/contratistas", element: <EmpresasContratistasSSO /> },
       { path: "seguridad/epp", element: <EppSSO /> },
+        { path: "gaval-seeder", element: <GavalSeeder /> },
       { path: "seguridad/charlas", element: <CharlasSSO /> },
       { path: "seguridad/capacitaciones", element: <CapacitacionesSSO /> },
       { path: "seguridad/riesgos", element: <GestionRiesgosSSO /> },
@@ -252,4 +254,5 @@ export default function App() {
     </ThemeProvider>
   );
 }
+
 
