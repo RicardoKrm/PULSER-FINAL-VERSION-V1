@@ -1408,7 +1408,7 @@ export default function OrdenesTrabajoDetail() {
       )}
 
       <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border dark:border-slate-800">
-        <Button variant="ghost" onClick={() => navigate('/flota/ordenes-trabajo')}><ArrowLeft className="w-4 h-4 mr-2" />Volver</Button>
+        <Button variant="ghost" onClick={() => { if (window.history.length > 2) { navigate(-1); } else { navigate('/flota/ordenes-trabajo'); } }}><ArrowLeft className="w-4 h-4 mr-2" />Volver a la vista anterior</Button>
         <div className="flex flex-col items-center">
             <h1 className="text-xl font-bold">OT #{ot.folio} <Badge className="ml-2 bg-green-600 text-white">{ot.estado.replace('_', ' ')}</Badge></h1>
             <p className="text-xs text-slate-500 mt-1">
