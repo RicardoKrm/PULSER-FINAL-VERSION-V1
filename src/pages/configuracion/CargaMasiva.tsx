@@ -109,7 +109,7 @@ const parseCurrencyCLP = (val: any) => {
   return isNaN(parsed) ? 0 : Math.round(parsed);
 };
 
-const normalizeKey = (k: string) => (k || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const normalizeKey = (k: string) => String(k || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 const getValByKey = (obj: any, possibleKeys: string[]) => {
   if (!obj || typeof obj !== 'object') return undefined;
@@ -268,10 +268,10 @@ const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[
       nombre: getValByKey(r, ['nombre', 'Repuesto', 'descripcion']),
       calidad: getValByKey(r, ['calidad']),
       stock: getValByKey(r, ['stock_actual', 'StockInicial', 'Stock', 'stockinicial', 'stock']) || 0,
-      min_stock: getValByKey(r, ['stock_minim', 'stock_minimo', 'StockMinimo', 'minimo']) || 0,
-      ubicacion: getValByKey(r, ['ubicacion', 'Ubicacion']),
+      min_stock: Number(getValByKey(r, ['stock_minim', 'stock_minimo', 'StockMinimo', 'minimo', 'min', 'stock_min'])) || 0,
+      ubicacion: getValByKey(r, ['ubicacion', 'Ubicacion', 'posicion', 'estante']),
       proveedor: getValByKey(r, ['proveedor_habitua', 'proveedor_habitual', 'ProveedorPrincipal', 'Proveedor']),
-      precio: parseCurrencyCLP(getValByKey(r, ['precio_unitario', 'PrecioUnitario', 'Precio', 'precio', 'valor_unitario', 'costo_unitario', 'valor', 'costo']))
+      precio: parseCurrencyCLP(getValByKey(r, ['precio_unitario', 'PrecioUnitario', 'Precio Un.', 'precio_un', 'Precio', 'precio', 'valor_unitario', 'costo_unitario', 'valor', 'costo']))
     }) 
   },
   bodegas: { 
@@ -471,7 +471,7 @@ const MODULES: UploadModule[] = [
     description: 'Carga de catálogo de repuestos, precios, stock inicial y proveedores.',
     icon: Package,
     template: [
-      { nombre: 'ABRAZADERA 1"', numero_parte: 'N3540319:MBB', calidad: 'ORIGINAL', stock_actual: 100, stock_minimo: 2, ubicacion: 'Estante A-4', proveedor_habitual: 'KAUFMANN', precio_unitario: '$2.000' }
+      { nombre: 'ABRAZADERA 1 PULGADA', numero_parte: 'N3540319:MBB', calidad: 'ORIGINAL', stock_actual: 100, stock_minimo: 2, ubicacion: 'Estante A-4', proveedor_habitual: 'KAUFMANN', precio_unitario: 2000 }
     ]
   },
   {
