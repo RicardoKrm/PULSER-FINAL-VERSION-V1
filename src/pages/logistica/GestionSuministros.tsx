@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Package, History, Smartphone, Boxes, Plus, Download, 
   Search, Pencil, Trash2, AlertTriangle, AlertCircle, ArrowLeft, ArrowRightLeft, CheckCircle,
-  FileText as Edit
+  FileText as Edit, ShoppingCart
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
@@ -405,7 +405,7 @@ export default function GestionSuministros() {
     }
   };
 
-  const [activeView, setActiveView] = useState<'inventario' | 'auditoria' | 'validaciones' | 'solicitudesOT'>('inventario');
+  const [activeView, setActiveView] = useState<'inventario' | 'auditoria' | 'validaciones' | 'solicitudesOT' | 'compras'>('inventario');
   const [entriesPerPage, setEntriesPerPage] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
   const [auditoriaData, setAuditoriaData] = React.useState<any[]>([]);
@@ -1190,6 +1190,153 @@ export default function GestionSuministros() {
     
     Swal.fire("Entregado", "El repuesto ha sido marcado como entregado a Taller.", "success");
   };
+
+  
+  if (activeView === 'compras') {
+    const itemsCriticos = sumInsumosData.filter(i => Number(i.stock) < Number(i.min));
+    const [comprasPlan, setComprasPlan] = useState<any[]>(() => {
+      // Initialize with default purchase amount
+      return itemsCriticos.map(i => {
+        let faltante = Number(i.min) - Number(i.stock);
+        let sugerido = faltante > 0 ? faltante + Math.ceil(Number(i.min) * 0.5) : 0;
+        if(sugerido === 0 && Number(i.min) === 0) sugerido = 10;
+        return {
+          ...i,
+          cantidadComprar: sugerido
+        };
+      });
+    });
+
+    const handleCantidadChange = (id: string, newVal: number) => {
+      setComprasPlan(prev => prev.map(p => p.id === id ? { ...p, cantidadComprar: newVal } : p));
+    };
+
+    const costoTotalOrden = comprasPlan.reduce((acc, curr) => acc + (curr.cantidadComprar * (Number(curr.precio) || 0)), 0);
+
+    const exportOC = () => {
+      const csvHeader = 'SKU,Nombre,Bodega,Stock Actual,Stock Minimo,Comprar,Precio Unit,Subtotal\n';
+      const csvRows = comprasPlan.map(i => {
+        return `${i.sku || ''},${(i.nombre || '').replace(/,/g, '')},${i.bodegaNombre || ''},${i.stock},${i.min},${i.cantidadComprar},${i.precio || 0},${(i.precio || 0) * i.cantidadComprar}`;
+      }).join('\n');
+      const csvContent = csvHeader + csvRows;
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'Orden_de_Compra_Sugerida.csv');
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center p-6 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="bg-emerald-500/10 p-2 rounded-lg">
+                <ShoppingCart className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Generador Automático de O.C.</h1>
+            </div>
+            <div className="mt-2 flex items-center gap-2 text-sm text-slate-500 uppercase font-medium">
+              Punto de Reorden · Cálculo Financiero
+            </div>
+          </div>
+          <Button variant="secondary" className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-sm" onClick={() => setActiveView('inventario')}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            VOLVER AL INVENTARIO
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm">
+            <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">Ítems en Quiebre (Stock Crítico)</h3>
+            <p className="text-3xl font-bold text-rose-600 dark:text-rose-400 mt-2">{itemsCriticos.length}</p>
+          </div>
+          <div className="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm">
+            <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Ítems a Comprar</h3>
+            <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400 mt-2">{comprasPlan.reduce((a,b)=>a+b.cantidadComprar,0)} uds</p>
+          </div>
+          <div className="bg-white dark:bg-slate-800 rounded-xl p-5 border border-emerald-200 dark:border-emerald-900/50 shadow-sm bg-emerald-50/50 dark:bg-emerald-900/10">
+            <h3 className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Valor Estimado O.C.</h3>
+            <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-400 mt-2">
+              $ {costoTotalOrden.toLocaleString()}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+            <h3 className="font-bold text-slate-800 dark:text-white">Plan de Abastecimiento Sugerido</h3>
+            <Button onClick={exportOC} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+              <Download className="w-4 h-4 mr-2" />
+              Exportar Orden (Excel)
+            </Button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-slate-500 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 uppercase font-bold">
+                <tr>
+                  <th className="px-4 py-4">SKU / Repuesto</th>
+                  <th className="px-4 py-4">Bodega</th>
+                  <th className="px-4 py-4 text-center">Stock Actual</th>
+                  <th className="px-4 py-4 text-center">Mínimo</th>
+                  <th className="px-4 py-4 text-center text-rose-500">Faltante</th>
+                  <th className="px-4 py-4 text-right">Precio Unitario</th>
+                  <th className="px-4 py-4 text-center bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300">Comprar (Uds)</th>
+                  <th className="px-4 py-4 text-right bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                {comprasPlan.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-12 text-center text-slate-500">
+                      <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+                      <p className="text-lg font-medium text-slate-800 dark:text-slate-200">Inventario Saludable</p>
+                      <p>No hay repuestos bajo el stock mínimo paramétrico.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  comprasPlan.map(item => {
+                    const faltante = Number(item.min) - Number(item.stock);
+                    const subtotal = item.cantidadComprar * (Number(item.precio) || 0);
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-slate-800 dark:text-white">{item.nombre}</div>
+                          <div className="text-xs text-slate-500">{item.sku}</div>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{item.bodegaNombre || '-'}</td>
+                        <td className="px-4 py-3 text-center font-bold text-slate-700 dark:text-slate-300">{item.stock}</td>
+                        <td className="px-4 py-3 text-center text-slate-500">{item.min}</td>
+                        <td className="px-4 py-3 text-center font-bold text-rose-500">-{faltante > 0 ? faltante : 0}</td>
+                        <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-400">$ {(Number(item.precio) || 0).toLocaleString()}</td>
+                        <td className="px-4 py-3 text-center bg-indigo-50/50 dark:bg-indigo-900/10">
+                          <input 
+                            type="number" 
+                            min="0"
+                            value={item.cantidadComprar}
+                            onChange={(e) => handleCantidadChange(item.id, parseInt(e.target.value) || 0)}
+                            className="w-20 px-2 py-1 text-center border border-indigo-200 dark:border-indigo-700 rounded-md bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-900/10">
+                          $ {subtotal.toLocaleString()}
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
 
   if (activeView === 'solicitudesOT') {
     // Get all OT solicitudes
