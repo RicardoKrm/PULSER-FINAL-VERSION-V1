@@ -89,31 +89,24 @@ const parseCurrencyCLP = (val: any) => {
   const lastComma = str.lastIndexOf(',');
 
   if (lastDot > lastComma) {
-    // US Format: 1,500.00 -> dot is decimal
-    str = str.replace(/,/g, '');
-  } else if (lastComma > lastDot) {
-    // LatAm format: 1.500,00 -> comma is decimal
-    str = str.replace(/\./g, '');
-    str = str.replace(/,/g, '.');
-  } else {
-    // Only one type of separator or none
-    if (str.includes('.')) {
-      const parts = str.split('.');
-      if (parts[parts.length - 1].length === 3) {
-        str = str.replace(/\./g, '');
-      }
-    } else if (str.includes(',')) {
-      const parts = str.split(',');
-      if (parts[parts.length - 1].length === 3) {
-        str = str.replace(/,/g, '');
-      } else {
-        str = str.replace(/,/g, '.');
-      }
+    if (lastComma === -1 && str.length - lastDot - 1 === 3) {
+      str = str.replace(/\./g, '');
+    } else {
+      str = str.replace(/,/g, '');
     }
+  } else if (lastComma > lastDot) {
+    if (lastDot === -1 && str.length - lastComma - 1 === 3) {
+      str = str.replace(/,/g, '');
+    } else {
+      str = str.replace(/\./g, '');
+      str = str.replace(/,/g, '.');
+    }
+  } else {
+    str = str.replace(/[.,]/g, '');
   }
 
-  const num = parseFloat(str);
-  return isNaN(num) ? 0 : Math.round(num); // CLP does not use decimals in real life
+  const parsed = parseFloat(str);
+  return isNaN(parsed) ? 0 : Math.round(parsed);
 };
 
 const normalizeKey = (k: string) => (k || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -379,7 +372,7 @@ const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[
   suministros: { 
     table: 'suministro', 
     matchKey: 'codigo_suministro',
-    mapConfig: (r: any) => ({ codigo_suministro: getValByKey(r, ['CodigoSuministro', 'codigo']), nombres: getValByKey(r, ['Nombres', 'nombre']), tipo: getValByKey(r, ['Tipo', 'tipo']), stock: getValByKey(r, ['Stock', 'stock_actual', 'stock']), precio_unitario: parseCurrencyCLP(getValByKey(r, ['PrecioUnitario', 'precio_unitario', 'precio', 'valor'])) }) 
+    mapConfig: (r: any) => ({ codigo_suministro: getValByKey(r, ['CodigoSuministro', 'codigo']), nombres: getValByKey(r, ['Nombres', 'nombre']), tipo: getValByKey(r, ['Tipo', 'tipo']), stock: getValByKey(r, ['Stock', 'stock_actual', 'stock']), min_stock: getValByKey(r, ['StockMinimo', 'stock_minimo', 'minimo']) || 0, precio_unitario: parseCurrencyCLP(getValByKey(r, ['PrecioUnitario', 'precio_unitario', 'precio', 'valor'])) }) 
   },
   ots: { 
     table: 'orden_de_trabajo', 
@@ -559,7 +552,7 @@ const MODULES: UploadModule[] = [
     description: 'Carga de EPP, consumibles y materiales varios que requiere la operación.',
     icon: Box,
     template: [
-      { CodigoSuministro: 'EPP-001', Nombres: 'Casco de Seguridad', Tipo: 'EPP', Stock: 100, PrecioUnitario: 5000 }
+      { CodigoSuministro: 'EPP-001', Nombres: 'Casco de Seguridad', Tipo: 'EPP', Stock: 100, StockMinimo: 10, PrecioUnitario: 5000 }
     ]
   },
   {
