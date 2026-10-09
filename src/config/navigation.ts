@@ -1,4 +1,4 @@
-﻿import {
+import {
   BarChart3,
   Settings,
   Truck,
@@ -121,6 +121,7 @@ export const navigation = [
     submodules: [
       { title: 'Gestión de Suministros', icon: Package, href: '/logistica/suministros' },
       { title: 'Gestión de Bodegas', icon: Boxes, href: '/logistica/bodegas' },
+      { title: 'Punto de Reorden', icon: ShoppingCart, href: '/logistica/suministros?view=compras' },
       { title: 'Puerto de Escaneo', icon: ScanBarcode, href: '/logistica/escaneo' },
       { title: 'Auditoría de Salidas', icon: CheckSquare, href: '/logistica/auditoria-salidas' },
       { title: 'Aprobaciones', icon: CheckSquare, href: '/logistica/validaciones' },

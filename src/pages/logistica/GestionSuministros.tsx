@@ -9,7 +9,7 @@ import { Modal } from '../../components/ui/Modal';
 import { useAppContext } from '../../context/AppContext';
 import { useCompany } from '../../contexts/CompanyContext';
 import { supabase } from '../../lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { exportToExcel } from '../../lib/excelExport';
 import Swal from 'sweetalert2';
 
@@ -405,7 +405,23 @@ export default function GestionSuministros() {
     }
   };
 
-  const [activeView, setActiveView] = useState<'inventario' | 'auditoria' | 'validaciones' | 'solicitudesOT' | 'compras'>('inventario');
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const requestedView = searchParams.get('view') as any;
+
+  const [activeView, setActiveView] = useState<'inventario' | 'auditoria' | 'validaciones' | 'solicitudesOT' | 'compras'>(
+    requestedView === 'compras' ? 'compras' : 'inventario'
+  );
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('view') === 'compras') {
+      setActiveView('compras');
+    }
+  }, [location.search]);
+
+  const [comprasPlan, setComprasPlan] = useState<any[]>([]);
+
   const [entriesPerPage, setEntriesPerPage] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
   const [auditoriaData, setAuditoriaData] = React.useState<any[]>([]);
@@ -430,6 +446,21 @@ export default function GestionSuministros() {
   React.useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, selectedBodega, selectedUbicacion, selectedCalidad, selectedCategoria, selectedProveedor, filterBajoStock, filterSinMov]);
+
+  React.useEffect(() => {
+    if (activeView === 'compras') {
+      const itemsCriticos = sumInsumosData.filter(i => Number(i.stock) < Number(i.min));
+      setComprasPlan(itemsCriticos.map(i => {
+        let faltante = Number(i.min) - Number(i.stock);
+        let sugerido = faltante > 0 ? faltante + Math.ceil(Number(i.min) * 0.5) : 0;
+        if (sugerido === 0 && Number(i.min) === 0) sugerido = 10;
+        return {
+          ...i,
+          cantidadComprar: sugerido
+        };
+      }));
+    }
+  }, [activeView, sumInsumosData]);
 
   React.useEffect(() => {
      if (selectedRepuestoDetalle) {
@@ -1194,40 +1225,29 @@ export default function GestionSuministros() {
   
   if (activeView === 'compras') {
     const itemsCriticos = sumInsumosData.filter(i => Number(i.stock) < Number(i.min));
-    const [comprasPlan, setComprasPlan] = useState<any[]>(() => {
-      // Initialize with default purchase amount
-      return itemsCriticos.map(i => {
-        let faltante = Number(i.min) - Number(i.stock);
-        let sugerido = faltante > 0 ? faltante + Math.ceil(Number(i.min) * 0.5) : 0;
-        if(sugerido === 0 && Number(i.min) === 0) sugerido = 10;
-        return {
-          ...i,
-          cantidadComprar: sugerido
-        };
-      });
-    });
 
     const handleCantidadChange = (id: string, newVal: number) => {
-      setComprasPlan(prev => prev.map(p => p.id === id ? { ...p, cantidadComprar: newVal } : p));
+      setComprasPlan(prev => prev.map(p => p.id === id ? { ...p, cantidadComprar: Math.max(0, newVal) } : p));
     };
 
     const costoTotalOrden = comprasPlan.reduce((acc, curr) => acc + (curr.cantidadComprar * (Number(curr.precio) || 0)), 0);
 
     const exportOC = () => {
-      const csvHeader = 'SKU,Nombre,Bodega,Stock Actual,Stock Minimo,Comprar,Precio Unit,Subtotal\n';
-      const csvRows = comprasPlan.map(i => {
-        return `${i.sku || ''},${(i.nombre || '').replace(/,/g, '')},${i.bodegaNombre || ''},${i.stock},${i.min},${i.cantidadComprar},${i.precio || 0},${(i.precio || 0) * i.cantidadComprar}`;
-      }).join('\n');
-      const csvContent = csvHeader + csvRows;
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', 'Orden_de_Compra_Sugerida.csv');
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const exportData = comprasPlan.map(i => {
+        const faltante = Number(i.min) - Number(i.stock);
+        return {
+          'SKU / Código': i.sku || '',
+          'Repuesto': i.nombre || '',
+          'Bodega': i.bodegaNombre || 'Principal',
+          'Stock Actual': i.stock,
+          'Stock Mínimo': i.min,
+          'Faltante': faltante > 0 ? faltante : 0,
+          'Precio Unitario': Number(i.precio) || 0,
+          'Cantidad a Comprar': i.cantidadComprar,
+          'Subtotal Estimado': i.cantidadComprar * (Number(i.precio) || 0)
+        };
+      });
+      exportToExcel(exportData, 'Orden_de_Compra_Sugerida', 'Orden de Compra');
     };
 
     return (
@@ -1482,6 +1502,10 @@ export default function GestionSuministros() {
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm flex items-center font-medium" onClick={() => setActiveView('compras')}>
+            <ShoppingCart className="w-4 h-4 mr-1.5" />
+            Punto de Reorden
+          </Button>
           <Button className="bg-orange-500 hover:bg-orange-600 text-white shadow-sm" onClick={() => setActiveView('solicitudesOT')}>
             <Boxes className="w-4 h-4 mr-2" />
             Solicitudes de Taller
