@@ -263,16 +263,27 @@ const UPLOAD_MAPPING: Record<string, { table: string, matchKey: string | string[
   inventario: { 
     table: 'logistica_repuestos', 
     matchKey: 'sku',
-    mapConfig: (r: any) => ({
-      sku: getValByKey(r, ['numero_parte', 'Codigo', 'SKU', 'numero', 'parte', 'nro_parte', 'codigo']),
-      nombre: getValByKey(r, ['nombre', 'Repuesto', 'descripcion']),
-      calidad: getValByKey(r, ['calidad']),
-      stock: getValByKey(r, ['stock_actual', 'StockInicial', 'Stock', 'stockinicial', 'stock']) || 0,
-      min_stock: Number(getValByKey(r, ['stock_minim', 'stock_minimo', 'StockMinimo', 'minimo', 'min', 'stock_min'])) || 0,
-      ubicacion: getValByKey(r, ['ubicacion', 'Ubicacion', 'posicion', 'estante']),
-      proveedor: getValByKey(r, ['proveedor_habitua', 'proveedor_habitual', 'ProveedorPrincipal', 'Proveedor']),
-      precio: parseCurrencyCLP(getValByKey(r, ['precio_unitario', 'PrecioUnitario', 'Precio Un.', 'precio_un', 'Precio', 'precio', 'valor_unitario', 'costo_unitario', 'valor', 'costo']))
-    }) 
+    mapConfig: (r: any) => {
+      const stock = Number(getValByKey(r, ['stock_actual', 'StockInicial', 'Stock', 'stockinicial', 'stock'])) || 0;
+      const minStockRaw = getValByKey(r, ['stock_minim', 'stock_minimo', 'StockMinimo', 'minimo', 'min', 'stock_min']);
+      const min_stock = minStockRaw !== undefined && minStockRaw !== '' ? (Number(minStockRaw) || 0) : 0;
+      const rawUbic = getValByKey(r, ['ubicacion', 'Ubicacion', 'posicion', 'estante']);
+      const rawPos = getValByKey(r, ['posicion', 'Posicion']);
+      const ubicacion = (rawUbic || rawPos || '').toString().trim() || 'Sin Ubicación';
+      const precio = parseCurrencyCLP(getValByKey(r, ['precio_unitario', 'PrecioUnitario', 'Precio Un.', 'precio_un', 'Precio', 'precio', 'valor_unitario', 'costo_unitario', 'valor', 'costo']));
+      return {
+        sku: String(getValByKey(r, ['numero_parte', 'Codigo', 'SKU', 'numero', 'parte', 'nro_parte', 'codigo']) || '').trim(),
+        nombre: String(getValByKey(r, ['nombre', 'Repuesto', 'descripcion']) || '').trim(),
+        calidad: String(getValByKey(r, ['calidad']) || 'ORIGINAL').trim().toUpperCase(),
+        stock,
+        min_stock,
+        ubicacion,
+        proveedor: String(getValByKey(r, ['proveedor_habitua', 'proveedor_habitual', 'ProveedorPrincipal', 'Proveedor']) || 'GENERAL').trim(),
+        precio,
+        valor_total: stock * precio,
+        estado: 'ACTIVO'
+      };
+    }
   },
   bodegas: { 
     table: 'logistica_bodegas', 

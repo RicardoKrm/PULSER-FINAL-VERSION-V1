@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { useCompany } from '../contexts/CompanyContext';
@@ -227,7 +227,7 @@ export default function Dashboard() {
       alertasCriticas: totalAlertasCriticas,
       saludFlota: { vencidos: vencidosMantenimiento, proximos: proximos, alDia: alDia }
     };
-  }, [ordenesTrabajo, vehiculos, dbVehiculos, dbColaboradores, activeFechaDesde, activeFechaHasta]););
+  }, [ordenesTrabajo, vehiculos, dbVehiculos, dbColaboradores, activeFechaDesde, activeFechaHasta]);
 
 
   const handleFilter = () => {
