@@ -88,11 +88,39 @@ export default function GavalSeeder() {
       const { data: colaboradores } = await supabase.from('colaborador').select('id, nombre, rol').eq('empresa_id', selectedCompanyId);
       const mecanicos = (colaboradores || []).filter(c => (c.rol || '').toLowerCase().includes('mecanic') || (c.rol || '').toLowerCase().includes('taller'));
       
-      const { data: tiposFallaData } = await supabase.from('tipo_falla').select('id, nombre').eq('empresa_id', selectedCompanyId);
-      const { data: tareasEstandarData } = await supabase.from('mantenimiento_tarea').select('id, descripcion, costo_mano_obra, tiempo_estandar_minutos').eq('empresa_id', selectedCompanyId);
-      const { data: repuestosData } = await supabase.from('logistica_repuestos').select('id, nombre, precio, stock_actual').eq('empresa_id', selectedCompanyId);
+      const generateUUID = () => crypto.randomUUID();
 
-      if (repuestosData && repuestosData.length > 0) {
+      const { data: tiposFallaData } = await supabase.from('tipo_falla').select('id, nombre').eq('empresa_id', selectedCompanyId);
+
+      // 1. Asegurar tareas estándar para Gaval
+      let { data: tareasEstandarData } = await supabase.from('mantenimiento_tarea').select('id, descripcion, costo_mano_obra, tiempo_estandar_minutos').eq('empresa_id', selectedCompanyId);
+      if (!tareasEstandarData || tareasEstandarData.length === 0) {
+        log('Creando tareas estándar de taller para Gaval...');
+        const baseTareas = [
+          { id: generateUUID(), empresa_id: selectedCompanyId, descripcion: 'Mantenimiento Preventivo 10K (Aceite y Filtros)', costo_mano_obra: 65000, tiempo_estandar_minutos: 120 },
+          { id: generateUUID(), empresa_id: selectedCompanyId, descripcion: 'Inspección de Frenos y Cambio de Pastillas', costo_mano_obra: 85000, tiempo_estandar_minutos: 150 },
+          { id: generateUUID(), empresa_id: selectedCompanyId, descripcion: 'Engrase Integral de Chasis y Puntos de Giro', costo_mano_obra: 40000, tiempo_estandar_minutos: 60 },
+          { id: generateUUID(), empresa_id: selectedCompanyId, descripcion: 'Diagnóstico Electrónico por Scanner', costo_mano_obra: 50000, tiempo_estandar_minutos: 90 },
+          { id: generateUUID(), empresa_id: selectedCompanyId, descripcion: 'Alineación, Balanceo y Rotación de Neumáticos', costo_mano_obra: 45000, tiempo_estandar_minutos: 75 }
+        ];
+        await supabase.from('mantenimiento_tarea').insert(baseTareas);
+        tareasEstandarData = baseTareas;
+      }
+
+      // 2. Asegurar repuestos válidos y sincronizados para Gaval
+      let { data: repuestosData } = await supabase.from('logistica_repuestos').select('id, nombre, precio, stock_actual').eq('empresa_id', selectedCompanyId);
+      if (!repuestosData || repuestosData.length === 0) {
+        log('Creando catálogo base de insumos para Gaval...');
+        const baseItems = [
+          { id: generateUUID(), empresa_id: selectedCompanyId, sku: 'REP-FIL-01', codigo: 'FIL-01', nombre: 'Filtro de Aceite Heavy Duty', precio: 38500, stock_actual: 45, stock_minimo: 10 },
+          { id: generateUUID(), empresa_id: selectedCompanyId, sku: 'REP-FIL-02', codigo: 'FIL-02', nombre: 'Filtro de Aire Primario', precio: 48900, stock_actual: 30, stock_minimo: 8 },
+          { id: generateUUID(), empresa_id: selectedCompanyId, sku: 'REP-LUB-01', codigo: 'LUB-01', nombre: 'Aceite Motor 15W40 (Tambor 20L)', precio: 95000, stock_actual: 25, stock_minimo: 5 },
+          { id: generateUUID(), empresa_id: selectedCompanyId, sku: 'REP-FRE-01', codigo: 'FRE-01', nombre: 'Juego Pastillas de Freno', precio: 82000, stock_actual: 20, stock_minimo: 6 },
+          { id: generateUUID(), empresa_id: selectedCompanyId, sku: 'REP-COR-01', codigo: 'COR-01', nombre: 'Correa Serpentina Accesorios', precio: 29500, stock_actual: 35, stock_minimo: 10 }
+        ];
+        await supabase.from('logistica_repuestos').insert(baseItems);
+        repuestosData = baseItems;
+      } else {
         for (const rep of repuestosData) {
           if (!rep.precio || rep.precio <= 0) {
             rep.precio = Math.floor(Math.random() * 85000) + 15000;
@@ -100,15 +128,26 @@ export default function GavalSeeder() {
         }
       }
 
+      // Sincronizar en tabla auxiliar 'repuesto' para garantizar que 'repuesto_id' nunca falle por FK
+      for (const rep of repuestosData) {
+        try {
+          await supabase.from('repuesto').upsert({
+            id: rep.id,
+            sku: rep.id.slice(0, 8),
+            nombre: rep.nombre || 'Repuesto Demo',
+            stock_actual: Number(rep.stock_actual || 50),
+            costo_unitario: Number(rep.precio || 45000)
+          });
+        } catch (eRep) {}
+      }
+
       if (!vehiculos?.length || !mecanicos?.length) {
         throw new Error('Faltan vehículos o mecánicos para generar OTs en la empresa seleccionada');
       }
 
       const tiposFalla = tiposFallaData?.length ? tiposFallaData : [{ id: 'sim-falla-1', nombre: 'Falla Mecánica General' }];
-      const tareas = tareasEstandarData?.length ? tareasEstandarData : [{ id: 'sim-tarea-1', descripcion: 'Inspección Rutinaria', costo_mano_obra: 35000, tiempo_estandar_minutos: 90 }];
-      const repuestos = repuestosData?.length ? repuestosData : [{ id: 'sim-rep-1', nombre: 'Kit Mantenimiento Preventivo', precio: 50000 }];
-
-      const generateUUID = () => crypto.randomUUID();
+      const tareas = tareasEstandarData;
+      const repuestos = repuestosData;
 
       const startDate = new Date('2026-01-01T08:00:00');
       const today = new Date();
@@ -170,7 +209,7 @@ export default function GavalSeeder() {
          tareasToInsert.push({
            id: generateUUID(),
            orden_id: otId,
-           tarea_estandar_id: (tareaObj && !tareaObj.id.startsWith('sim-')) ? tareaObj.id : null,
+           tarea_estandar_id: tareaObj.id,
            tiempo_real_minutos: minsReal,
            costo_real: costoHH
          });
@@ -178,7 +217,7 @@ export default function GavalSeeder() {
          insumosToInsert.push({
            id: generateUUID(),
            orden_id: otId,
-           repuesto_id: (repuestoObj && !repuestoObj.id.startsWith('sim-')) ? repuestoObj.id : null,
+           repuesto_id: repuestoObj.id,
            cantidad: cantRepuestos,
            costo_unitario_aplicado: costoUnitarioRep
          });
