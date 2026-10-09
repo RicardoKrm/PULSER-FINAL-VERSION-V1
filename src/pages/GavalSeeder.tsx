@@ -180,8 +180,7 @@ export default function GavalSeeder() {
            orden_id: otId,
            repuesto_id: (repuestoObj && !repuestoObj.id.startsWith('sim-')) ? repuestoObj.id : null,
            cantidad: cantRepuestos,
-           costo_unitario_aplicado: costoUnitarioRep,
-           costo_total: costoInsumos
+           costo_unitario_aplicado: costoUnitarioRep
          });
       }
 
