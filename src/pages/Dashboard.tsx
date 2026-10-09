@@ -31,7 +31,7 @@ export default function Dashboard() {
   const [dbCount, setDbCount] = React.useState<number | null>(null);
   React.useEffect(() => { supabase.from('orden_de_trabajo').select('id', { count: 'exact' }).then(res => setDbCount(res.count)); }, []);
   const navigate = useNavigate();
-  const { user, ordenesTrabajo, vehiculos } = useAppContext() as any;
+  const { user, ordenesTrabajo, vehiculos, repuestos } = useAppContext() as any;
   const { currentCompany } = useCompany();
   const [dbVehiculos, setDbVehiculos] = useState<any[]>([]);
   const [dbColaboradores, setDbColaboradores] = useState<any[]>([]);
@@ -99,41 +99,51 @@ export default function Dashboard() {
       { name: 'Correctivo', value: corrCount }
     ];
 
-    // 2. Salud Flota y Disponibilidad (Snapshot Metrics)
-    let vencidosMantenimiento = 0;
-    let proximos = 0;
-    let alDia = 0;
-    let vehiculosDisponibles = 0;
-    
-    const totalDb = dbVehiculos.length;
-    
-    dbVehiculos.forEach((v: any) => {
-      let kmActual = parseInt(v.kilometraje_actual) || 0;
-      let prox = parseInt(v.proximo_mantenimiento) || 0;
-      let inter = parseInt(v.intervalo_mantenimiento) || 10000;
-      
-      let dif = prox - kmActual;
-      if (dif < 0) {
-        vencidosMantenimiento++;
-      } else if (dif <= (inter * 0.1)) {
-        proximos++;
-      } else {
-        alDia++;
-      }
-    });
+    // 2. Salud Flota y Disponibilidad usando el motor algorítmico real (calcularDatosPizarra)
+    const pizarraData = dbVehiculos.map(v => calcularDatosPizarra(v));
+    const vencidosMantenimiento = pizarraData.filter(p => p.estatus === 'VENCIDO').length;
+    const proximos = pizarraData.filter(p => p.estatus === 'PROXIMO').length;
+    const alDia = pizarraData.filter(p => p.estatus === 'NORMAL').length;
 
-    const totalAlertasCriticas = vencidosMantenimiento + dbColaboradores.reduce((acc, col) => {
+    // Alertas Críticas (Flota + Colaboradores + Legal Vehicular + Quiebre Stock Bodega)
+    const nowTs = new Date().getTime();
+    const alertasColaboradores = dbColaboradores.reduce((acc, col) => {
       const docs = [col.vencimientoLicencia, col.vencimientoExamenSalud, col.vencimientoPsicosensotecnico, col.vencimientoManejoDefensivo];
-      const hasVencidos = docs.some(d => d && new Date(d).getTime() < new Date().getTime());
+      const hasVencidos = docs.some(d => d && new Date(d).getTime() < nowTs);
       return acc + (hasVencidos ? 1 : 0);
     }, 0);
 
-    const otsEnCurso = otsEmpresa.filter((ot: any) => ['ABIERTA', 'EN_PROCESO', 'PAUSADA', 'PROGRAMADA', 'POR_ASIGNAR'].includes(ot.estado)).map((ot: any) => ot.vehiculoId);
-    let indisponibles = new Set(otsEnCurso).size;
+    const alertasVehiculares = dbVehiculos.reduce((acc, v) => {
+      const d = v.detalles || {};
+      const docs = [
+        v.vencimiento_revision_tecnica || d.vencimiento_revision_tecnica || d.vencimientoRevisionTecnica,
+        v.vencimiento_permiso_circulacion || d.vencimiento_permiso_circulacion || d.vencimientoPermisoCirculacion,
+        v.vencimiento_seguro || d.vencimiento_seguro || d.vencimientoSeguroSoap || d.vencimientoSoap
+      ];
+      const hasVencidos = docs.some(docDate => docDate && new Date(docDate).getTime() < nowTs);
+      return acc + (hasVencidos ? 1 : 0);
+    }, 0);
 
-    vehiculosDisponibles = totalDb > 0 ? Math.max(0, totalDb - indisponibles) : 0;
-    let disp = totalDb > 0 ? (vehiculosDisponibles / totalDb) * 100 : 0;
-    let cumpPrev = totalDb > 0 ? Math.max(0, 100 - ((vencidosMantenimiento / totalDb) * 100)) : 0;
+    const alertasStock = (repuestos || []).filter((r: any) => {
+      const stock = Number(r.stock_actual ?? r.stockActual ?? 0);
+      const min = Number(r.stock_minimo ?? r.stockMinimo ?? r.minimo ?? 0);
+      return min > 0 && stock <= min;
+    }).length;
+
+    const totalAlertasCriticas = vencidosMantenimiento + alertasColaboradores + alertasVehiculares + alertasStock;
+
+    // Disponibilidad en tiempo real (independiente del filtro de fecha histórico)
+    const otsActivas = otsEmpresaHistorico.filter((ot: any) => 
+      ['ABIERTA', 'EN_PROCESO', 'PAUSADA', 'PROGRAMADA', 'POR_ASIGNAR'].includes(ot.estado)
+    );
+    const indisponiblesIds = new Set(otsActivas.map((ot: any) => String(ot.vehiculoId || ot.vehiculo_id || '')));
+    indisponiblesIds.delete('');
+    const totalDb = dbVehiculos.length;
+    const vehiculosDisponibles = totalDb > 0 ? Math.max(0, totalDb - indisponiblesIds.size) : 0;
+    const disp = totalDb > 0 ? (vehiculosDisponibles / totalDb) * 100 : 100;
+
+    // Cumplimiento Preventivo real de la flota
+    const cumpPrev = totalDb > 0 ? Math.max(0, Math.round(((totalDb - vencidosMantenimiento) / totalDb) * 100)) : 100;
 
     // 3. Costos y Tendencias Dinámicos (Responden al Filtro de Fechas)
     const startD = new Date(activeFechaDesde); startD.setDate(1); startD.setHours(0,0,0,0);
@@ -168,15 +178,17 @@ export default function Dashboard() {
       });
     }
 
-    otsEmpresa.forEach((ot: any) => {
+    otsEmpresaHistorico.forEach((ot: any) => {
       const fecha = ot.fechaCreacion || ot.fecha_creacion;
       if (!fecha) return;
       const d = new Date(fecha);
       const m = dynamicMonths.find(dm => dm.month === d.getMonth() && dm.year === d.getFullYear());
       
       if (m) {
-        if (['ABIERTA', 'EN_PROCESO', 'PAUSADA', 'PROGRAMADA', 'POR_ASIGNAR'].includes(ot.estado)) {
-           m.downtime += 24; 
+        if (ot.tiempoTrabajadoSegundos && ot.tiempoTrabajadoSegundos > 0) {
+          m.downtime += Number((ot.tiempoTrabajadoSegundos / 3600).toFixed(1));
+        } else if (['ABIERTA', 'EN_PROCESO', 'PAUSADA', 'PROGRAMADA', 'POR_ASIGNAR'].includes(ot.estado)) {
+          m.downtime += 8; 
         }
         const cost = (Number(ot.costoManoObraTareas) || 0) + (Number(ot.costoInsumos) || 0) + (Number(ot.costoManoObraHH) || 0);
         if (ot.tipo?.includes('PREVENTIVA')) {
@@ -201,17 +213,40 @@ export default function Dashboard() {
     });
     const gastoTotalMesActual = gastoTotalPeriodo;
 
-    // 4. Cuellos de botella reales
+    // 4. Cuellos de botella operacionales reales
     const cuellosMap: Record<string, number> = {};
+    
     otsEmpresa.forEach((ot: any) => {
       if (ot.historial && Array.isArray(ot.historial)) {
         ot.historial.forEach((h: any) => {
           if (h.comentario && h.comentario.toLowerCase().includes('pausa')) {
-             cuellosMap['Pausa en OT'] = (cuellosMap['Pausa en OT'] || 0) + 1;
+             cuellosMap['Pausa en Taller'] = (cuellosMap['Pausa en Taller'] || 0) + 1;
           }
         });
       }
     });
+
+    const otsRetrasadas = otsEmpresa.filter((ot: any) => {
+      if (!['ABIERTA', 'EN_PROCESO', 'POR_ASIGNAR', 'PAUSADA'].includes(ot.estado)) return false;
+      const fProg = ot.fechaProgramada || ot.fecha_programada;
+      return fProg && new Date(fProg).getTime() < nowTs;
+    }).length;
+    if (otsRetrasadas > 0) cuellosMap['OTs con Fecha Vencida'] = otsRetrasadas;
+
+    const otsSinAsignar = otsEmpresa.filter((ot: any) => {
+      return ['ABIERTA', 'POR_ASIGNAR'].includes(ot.estado) && !ot.tecnicoResponsable && !ot.personalOperativo && !ot.tecnico_responsable;
+    }).length;
+    if (otsSinAsignar > 0) cuellosMap['Sin Mecánico Asignado'] = otsSinAsignar;
+
+    let solPendientes = 0;
+    otsEmpresa.forEach((ot: any) => {
+      if (ot.solicitudes && Array.isArray(ot.solicitudes)) {
+        solPendientes += ot.solicitudes.filter((s: any) => s.estado === 'PENDIENTE').length;
+      }
+    });
+    if (solPendientes > 0) cuellosMap['En Espera de Repuestos'] = solPendientes;
+
+    if (alertasStock > 0) cuellosMap['Quiebres Stock Bodega'] = alertasStock;
     
     let cuellosArr = Object.entries(cuellosMap).map(([name, value]) => ({ name, value }));
     cuellosArr.sort((a, b) => b.value - a.value);
@@ -227,7 +262,7 @@ export default function Dashboard() {
       alertasCriticas: totalAlertasCriticas,
       saludFlota: { vencidos: vencidosMantenimiento, proximos: proximos, alDia: alDia }
     };
-  }, [ordenesTrabajo, vehiculos, dbVehiculos, dbColaboradores, activeFechaDesde, activeFechaHasta]);
+  }, [ordenesTrabajo, vehiculos, repuestos, dbVehiculos, dbColaboradores, activeFechaDesde, activeFechaHasta, currentCompany?.id]);
 
 
   const handleFilter = () => {
