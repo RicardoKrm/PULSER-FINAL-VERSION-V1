@@ -838,11 +838,14 @@ export default function CargaMasiva() {
            const chunk = toUpdate.slice(i, i + chunkSize);
            const { error: updError } = await supabase.from(config.table).upsert(chunk, { onConflict: 'id' });
            if (updError) {
-              console.warn("Bulk upsert failed, falling back to sequential update", updError);
-              for (const uRow of chunk) {
-                 const { id, ...updateData } = uRow;
-                 const { error } = await supabase.from(config.table).update(updateData).eq('id', id);
-                 if (error) console.error(`Error updating record ${id}:`, error);
+              console.warn("Bulk upsert failed, executing concurrent batch updates", updError);
+              const batchParallel = 25;
+              for (let j = 0; j < chunk.length; j += batchParallel) {
+                 const sub = chunk.slice(j, j + batchParallel);
+                 await Promise.all(sub.map(async (uRow: any) => {
+                    const { id, ...updateData } = uRow;
+                    return supabase.from(config.table).update(updateData).eq('id', id);
+                 }));
               }
            }
            updateCount += chunk.length;
