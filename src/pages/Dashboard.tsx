@@ -31,14 +31,21 @@ export default function Dashboard() {
   const [dbCount, setDbCount] = React.useState<number | null>(null);
   React.useEffect(() => { supabase.from('orden_de_trabajo').select('id', { count: 'exact' }).then(res => setDbCount(res.count)); }, []);
   const navigate = useNavigate();
-  const { user, ordenesTrabajo, vehiculos, repuestos } = useAppContext() as any;
+  const { user, ordenesTrabajo, vehiculos, repuestos, recargarOrdenesTrabajo } = useAppContext() as any;
   const { currentCompany } = useCompany();
   const [dbVehiculos, setDbVehiculos] = useState<any[]>([]);
   const [dbColaboradores, setDbColaboradores] = useState<any[]>([]);
-  const [fechaDesde, setFechaDesde] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
-  const [fechaHasta, setFechaHasta] = useState(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0]);
-  const [activeFechaDesde, setActiveFechaDesde] = useState(fechaDesde);
-  const [activeFechaHasta, setActiveFechaHasta] = useState(fechaHasta);
+  const gavalCalibratedRef = React.useRef<boolean>(false);
+
+  const nowInit = new Date();
+  const initDesde = `${nowInit.getFullYear()}-${String(nowInit.getMonth() + 1).padStart(2, '0')}-01`;
+  const lastDayInit = new Date(nowInit.getFullYear(), nowInit.getMonth() + 1, 0).getDate();
+  const initHasta = `${nowInit.getFullYear()}-${String(nowInit.getMonth() + 1).padStart(2, '0')}-${String(lastDayInit).padStart(2, '0')}`;
+
+  const [fechaDesde, setFechaDesde] = useState(initDesde);
+  const [fechaHasta, setFechaHasta] = useState(initHasta);
+  const [activeFechaDesde, setActiveFechaDesde] = useState(initDesde);
+  const [activeFechaHasta, setActiveFechaHasta] = useState(initHasta);
 
   React.useEffect(() => {
     if (!currentCompany?.id) return;
@@ -56,6 +63,160 @@ export default function Dashboard() {
 
       if (colRes.data) {
         setDbColaboradores(colRes.data);
+      }
+
+      // Auto-calibración exclusiva para el Demo Gaval si el mes en curso quedó sin preventivas o sin OTs activas tras el sembrado aleatorio
+      const compName = (currentCompany?.name || (currentCompany as any)?.nombre || '').toLowerCase();
+      if (compName.includes('gaval') && !gavalCalibratedRef.current && vehRes.data && vehRes.data.length > 0 && Array.isArray(ordenesTrabajo) && ordenesTrabajo.length > 0) {
+        const now = new Date();
+        const curMonth = now.getMonth();
+        const curYear = now.getFullYear();
+        const otsGaval = ordenesTrabajo.filter((ot: any) => ot.empresa_id === currentCompany.id);
+        const prevMesActual = otsGaval.filter((ot: any) => {
+          const d = new Date(ot.fechaCreacion || ot.fecha_creacion || '');
+          return d.getMonth() === curMonth && d.getFullYear() === curYear && String(ot.tipo || '').includes('PREVENTIVA');
+        });
+        const activasGaval = otsGaval.filter((ot: any) => ['ABIERTA', 'EN_PROCESO', 'PAUSADA', 'PROGRAMADA', 'POR_ASIGNAR'].includes(ot.estado));
+
+        if (prevMesActual.length === 0 || activasGaval.length === 0) {
+          gavalCalibratedRef.current = true;
+          try {
+            const genId = () => crypto.randomUUID();
+            await supabase.from('orden_de_trabajo').delete().like('folio', 'OT-SIM-OCT-%').eq('empresa_id', currentCompany.id);
+
+            const { data: tareasData } = await supabase.from('mantenimiento_tarea').select('id, descripcion, costo_mano_obra, tiempo_estandar_minutos').eq('empresa_id', currentCompany.id);
+            const { data: repData } = await supabase.from('logistica_repuestos').select('id, nombre, precio').eq('empresa_id', currentCompany.id);
+            const mecs = (colRes.data || []).filter((c: any) => (c.rol || '').toLowerCase().includes('mecanic') || (c.rol || '').toLowerCase().includes('taller'));
+
+            let tareaId = tareasData?.[0]?.id || null;
+            if (!tareaId) {
+              const newTId = genId();
+              await supabase.from('mantenimiento_tarea').insert({
+                id: newTId,
+                empresa_id: currentCompany.id,
+                descripcion: 'Mantenimiento Preventivo Pauta General',
+                costo_mano_obra: 95000,
+                tiempo_estandar_minutos: 120
+              });
+              tareaId = newTId;
+            }
+            const repRef = repData?.[0] || null;
+            if (repRef?.id) {
+              try {
+                await supabase.from('repuesto').upsert({
+                  id: repRef.id,
+                  sku: String(repRef.id).slice(0, 8),
+                  nombre: repRef.nombre || 'Repuesto Taller Gaval',
+                  stock_actual: 40,
+                  costo_unitario: Number(repRef.precio || 45000)
+                });
+              } catch (_e) {}
+            }
+            const mecNombre = mecs[0]?.nombre || 'Taller Central Gaval';
+            const ymPrefix = `${curYear}-${String(curMonth + 1).padStart(2, '0')}`;
+
+            const octSpecs = [
+              { idx: 1, day: '02', tipo: 'PREVENTIVA', estado: 'FINALIZADA', vehIdx: 2, hh: 95000, ins: 135000, mec: mecNombre, progDay: '02' },
+              { idx: 2, day: '03', tipo: 'PREVENTIVA', estado: 'FINALIZADA', vehIdx: 3, hh: 110000, ins: 145000, mec: mecNombre, progDay: '03' },
+              { idx: 3, day: '04', tipo: 'PREVENTIVA', estado: 'FINALIZADA', vehIdx: 4, hh: 85000, ins: 120000, mec: mecNombre, progDay: '04' },
+              { idx: 4, day: '05', tipo: 'PREVENTIVA', estado: 'FINALIZADA', vehIdx: 5, hh: 105000, ins: 155000, mec: mecNombre, progDay: '05' },
+              { idx: 5, day: '07', tipo: 'PREVENTIVA', estado: 'FINALIZADA', vehIdx: 6, hh: 90000, ins: 130000, mec: mecNombre, progDay: '07' },
+              { idx: 6, day: '08', tipo: 'PREVENTIVA', estado: 'EN_PROCESO', vehIdx: 0, hh: 95000, ins: 115000, mec: mecNombre, progDay: '06' },
+              { idx: 7, day: '06', tipo: 'CORRECTIVA', estado: 'PAUSADA', vehIdx: 1, hh: 125000, ins: 165000, mec: mecNombre, progDay: '04' },
+              { idx: 8, day: '08', tipo: 'CORRECTIVA', estado: 'POR_ASIGNAR', vehIdx: 1, hh: 80000, ins: 90000, mec: null, progDay: '05' }
+            ];
+
+            const newOts: any[] = [];
+            const newTareas: any[] = [];
+            const newInsumos: any[] = [];
+            const newHist: any[] = [];
+            const newSol: any[] = [];
+
+            for (const sp of octSpecs) {
+              const otId = genId();
+              const vObj = vehRes.data[sp.vehIdx % vehRes.data.length];
+              const fechaIso = `${ymPrefix}-${sp.day}T15:00:00.000Z`;
+              const fechaProg = `${ymPrefix}-${sp.progDay}`;
+
+              newOts.push({
+                id: otId,
+                folio: `OT-SIM-OCT-0${sp.idx}`,
+                vehiculo_id: vObj.id,
+                empresa_id: currentCompany.id,
+                tecnico_responsable: sp.mec,
+                tipo: sp.tipo,
+                estado: sp.estado,
+                prioridad: sp.tipo === 'PREVENTIVA' ? 'Media' : 'Alta',
+                kilometraje_apertura: Number(vObj.kilometraje_actual || 50000),
+                kilometraje_cierre: sp.estado === 'FINALIZADA' ? Number(vObj.kilometraje_actual || 50000) + 15 : null,
+                fecha_creacion: fechaIso,
+                fecha_programada: fechaProg,
+                hora_inicio_programada: '08:30:00',
+                hora_termino_programada: '17:30:00',
+                inicio_proceso: fechaIso,
+                observacion_inicial: sp.tipo === 'PREVENTIVA' ? 'Mantenimiento preventivo programado según pauta' : 'Correctivo por alerta operativa en ruta',
+                diagnostico_evaluacion: 'Intervención técnica documentada con repuestos y HH.',
+                costo_insumos: sp.ins,
+                costo_mano_obra_tareas: sp.hh,
+                costo_mano_obra_hh: 0,
+                tiempo_trabajado_segundos: 10800,
+                tipo_falla: sp.tipo === 'CORRECTIVA' ? 'Sistema de Frenos y Neumáticos' : null
+              });
+
+              if (tareaId) {
+                newTareas.push({
+                  id: genId(),
+                  orden_id: otId,
+                  tarea_estandar_id: tareaId,
+                  tiempo_real_minutos: 120,
+                  costo_real: sp.hh
+                });
+              }
+
+              if (repRef?.id) {
+                newInsumos.push({
+                  id: genId(),
+                  orden_id: otId,
+                  repuesto_id: repRef.id,
+                  cantidad: 2,
+                  costo_unitario_aplicado: Math.round(sp.ins / 2)
+                });
+              }
+
+              if (sp.estado === 'PAUSADA') {
+                newHist.push({
+                  orden_id: otId,
+                  usuario_nombre: mecNombre,
+                  comentario: 'Pausa en OT: unidad en espera de repuesto crítico de bodega',
+                  created_at: fechaIso
+                });
+                newSol.push({
+                  id: genId(),
+                  orden_id: otId,
+                  repuesto_id: repRef?.id || null,
+                  repuesto_nombre: repRef?.nombre || 'Kit Frenos Heavy Duty',
+                  cantidad: 2,
+                  estado: 'PENDIENTE',
+                  usuario_nombre: mecNombre,
+                  created_at: fechaIso
+                });
+              }
+            }
+
+            await supabase.from('orden_de_trabajo').insert(newOts);
+            if (newTareas.length > 0) await supabase.from('ot_tareas_realizadas').insert(newTareas);
+            if (newInsumos.length > 0) await supabase.from('detalle_insumo_ot').insert(newInsumos);
+            if (newHist.length > 0) await supabase.from('historial_ot').insert(newHist);
+            if (newSol.length > 0) await supabase.from('solicitud_repuesto_ot').insert(newSol);
+
+            localStorage.removeItem(`pulser_ordenes_trabajo_${currentCompany.id}`);
+            if (typeof recargarOrdenesTrabajo === 'function') {
+              await recargarOrdenesTrabajo();
+            }
+          } catch (calErr) {
+            console.warn('Aviso calibrando mes actual Demo Gaval:', calErr);
+          }
+        }
       }
     };
     fetchData();
@@ -537,10 +698,15 @@ export default function Dashboard() {
           </div>
           <div className="w-full h-[240px] mt-4">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={costosData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} barSize={32}>
+              <BarChart data={costosData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }} barSize={32}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 11, fill: '#64748b' }} 
+                  tickFormatter={(val) => val >= 1000000 ? `$${(val / 1000000).toFixed(1)}M` : val >= 1000 ? `$${(val / 1000).toFixed(0)}k` : `$${val}`}
+                />
                 <Tooltip 
                   cursor={{ fill: 'transparent' }}
                   contentStyle={{ borderRadius: '8px', border: 'none', backgroundColor: '#1e293b', color: '#f8fafc', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}

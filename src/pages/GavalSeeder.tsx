@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAppContext } from '../context/AppContext';
 
 export default function GavalSeeder() {
+  const { recargarOrdenesTrabajo } = useAppContext() as any;
   const [logs, setLogs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
@@ -63,6 +64,8 @@ export default function GavalSeeder() {
       if (error) throw error;
       log('✅ Todas las OTs de Gaval han sido eliminadas.');
       localStorage.removeItem(`pulser_ots_${selectedCompanyId}`);
+      localStorage.removeItem(`pulser_ordenes_trabajo_${selectedCompanyId}`);
+      if (typeof recargarOrdenesTrabajo === 'function') await recargarOrdenesTrabajo();
     } catch(e: any) {
       log('Error al borrar OTs: ' + e.message);
     }
@@ -161,13 +164,19 @@ export default function GavalSeeder() {
       
       const otCount = 100;
       for (let i = 0; i < otCount; i++) {
-         const randomDayOffset = Math.floor(Math.random() * numDias);
+         const isCurrentMonthGuaranteed = i >= 92;
+         const randomDayOffset = isCurrentMonthGuaranteed
+           ? Math.max(0, numDias - (100 - i))
+           : Math.floor(Math.random() * numDias);
          const randomDate = new Date(startDate);
          randomDate.setDate(startDate.getDate() + randomDayOffset);
          
-         const veh = vehiculos[Math.floor(Math.random() * vehiculos.length)];
+         const veh = isCurrentMonthGuaranteed && i >= 97
+           ? vehiculos[(i - 97) % Math.min(2, vehiculos.length)]
+           : vehiculos[Math.floor(Math.random() * vehiculos.length)];
          const mec = mecanicos[Math.floor(Math.random() * mecanicos.length)];
-         const isPreventive = Math.random() > 0.4;
+         const isPreventive = isCurrentMonthGuaranteed ? (i < 98) : (Math.random() > 0.4);
+         const estadoOt = i === 97 ? 'EN_PROCESO' : i === 98 ? 'PAUSADA' : i === 99 ? 'POR_ASIGNAR' : 'FINALIZADA';
          const falla = isPreventive ? null : tiposFalla[Math.floor(Math.random() * tiposFalla.length)];
          const tareaObj = tareas[Math.floor(Math.random() * tareas.length)];
          const repuestoObj = repuestos[Math.floor(Math.random() * repuestos.length)];
@@ -185,12 +194,12 @@ export default function GavalSeeder() {
            folio: `OT-SIM-${Date.now().toString().slice(-4)}-${String(i).padStart(3, '0')}`,
            vehiculo_id: veh.id,
            empresa_id: selectedCompanyId, 
-           tecnico_responsable: mec.nombre,
+           tecnico_responsable: estadoOt === 'POR_ASIGNAR' ? null : mec.nombre,
            tipo: isPreventive ? 'PREVENTIVA' : 'CORRECTIVA', 
-           estado: 'FINALIZADA', 
+           estado: estadoOt, 
            prioridad: isPreventive ? 'Media' : 'Alta',
            kilometraje_apertura: Math.max(0, (veh.kilometraje_actual || 0) - (numDias - randomDayOffset) * 100),
-           kilometraje_cierre: Math.max(0, (veh.kilometraje_actual || 0) - (numDias - randomDayOffset) * 100 + 10),
+           kilometraje_cierre: estadoOt === 'FINALIZADA' ? Math.max(0, (veh.kilometraje_actual || 0) - (numDias - randomDayOffset) * 100 + 10) : null,
            fecha_creacion: randomDate.toISOString(), 
            fecha_programada: formatDt,
            hora_inicio_programada: '08:00:00',
@@ -252,6 +261,8 @@ export default function GavalSeeder() {
 
       log('¡PROCESO FINALIZADO CON ÉXITO! Ve al Dashboard o al módulo de OTs y presiona F5.');
       localStorage.removeItem(`pulser_ots_${selectedCompanyId}`);
+      localStorage.removeItem(`pulser_ordenes_trabajo_${selectedCompanyId}`);
+      if (typeof recargarOrdenesTrabajo === 'function') await recargarOrdenesTrabajo();
 
     } catch (e: any) {
       log('Error crítico en sembrado: ' + e.message);
