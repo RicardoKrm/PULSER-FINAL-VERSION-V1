@@ -79,13 +79,24 @@ export default function Dashboard() {
     // Raw filter to get all OTs of the company (needed for historical charts)
     const otsEmpresaHistorico = (ordenesTrabajo || []).filter((ot: any) => !currentEmpresaId || ot.empresa_id === currentEmpresaId);
     
+    const parseLocalDate = (dateStr: string, isEnd = false) => {
+      if (!dateStr) return new Date();
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const [y, m, d] = parts.map(Number);
+        return isEnd ? new Date(y, m - 1, d, 23, 59, 59, 999) : new Date(y, m - 1, d, 0, 0, 0, 0);
+      }
+      return new Date(dateStr);
+    };
+
+    const start = parseLocalDate(activeFechaDesde, false);
+    const end = parseLocalDate(activeFechaHasta, true);
+
     // Filtered by date range (for KPIs and current metrics)
     const otsEmpresa = otsEmpresaHistorico.filter((ot: any) => {
       const otDate = ot.fechaCreacion || ot.fecha_creacion;
       if (!otDate) return false;
       const d = new Date(otDate);
-      const start = new Date(activeFechaDesde); start.setHours(0,0,0,0);
-      const end = new Date(activeFechaHasta); end.setHours(23,59,59,999);
       return d >= start && d <= end;
     });
 
@@ -145,33 +156,15 @@ export default function Dashboard() {
     // Cumplimiento Preventivo real de la flota
     const cumpPrev = totalDb > 0 ? Math.max(0, Math.round(((totalDb - vencidosMantenimiento) / totalDb) * 100)) : 100;
 
-    // 3. Costos y Tendencias Dinámicos (Responden al Filtro de Fechas)
-    const startD = new Date(activeFechaDesde); startD.setDate(1); startD.setHours(0,0,0,0);
-    const endD = new Date(activeFechaHasta); endD.setDate(1); endD.setHours(0,0,0,0);
-    
+    // 3. Costos y Tendencias Semestrales (Últimos 6 meses continuos vs Meta)
+    const endRef = parseLocalDate(activeFechaHasta, true);
     const dynamicMonths = [];
-    let currentD = new Date(startD);
-    let safetyCounter = 0;
-    
-    while (currentD <= endD && safetyCounter < 24) { 
-      dynamicMonths.push({
-        month: currentD.getMonth(),
-        year: currentD.getFullYear(),
-        name: currentD.toLocaleString('es', { month: 'short' }).substring(0, 3).toUpperCase() + ' ' + currentD.getFullYear().toString().slice(-2),
-        downtime: 0,
-        prev: 0,
-        corr: 0
-      });
-      currentD.setMonth(currentD.getMonth() + 1);
-      safetyCounter++;
-    }
-    
-    if (dynamicMonths.length === 0) {
-      const d = new Date(activeFechaDesde);
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(endRef.getFullYear(), endRef.getMonth() - i, 1);
       dynamicMonths.push({
         month: d.getMonth(),
         year: d.getFullYear(),
-        name: d.toLocaleString('es', { month: 'short' }).substring(0, 3).toUpperCase() + ' ' + d.getFullYear().toString().slice(-2),
+        name: d.toLocaleString('es-ES', { month: 'short' }).substring(0, 3).toUpperCase() + ' ' + d.getFullYear().toString().slice(-2),
         downtime: 0,
         prev: 0,
         corr: 0
@@ -370,7 +363,7 @@ export default function Dashboard() {
           <div className="flex justify-between items-start">
             <div className="flex flex-col">
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Gasto del Período</span>
-              <span className="text-2xl font-bold text-slate-800 dark:text-white mt-1">$ {gastoMensual}</span>
+              <span className="text-2xl font-bold text-slate-800 dark:text-white mt-1">$ {Math.round(Number(gastoMensual) || 0).toLocaleString('es-CL')}</span>
             </div>
             <div className="bg-amber-50 dark:bg-amber-500/10 text-amber-500 dark:text-amber-400 p-2 rounded-lg">
               <DollarSign className="w-5 h-5" />
@@ -552,7 +545,7 @@ export default function Dashboard() {
                   cursor={{ fill: 'transparent' }}
                   contentStyle={{ borderRadius: '8px', border: 'none', backgroundColor: '#1e293b', color: '#f8fafc', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   itemStyle={{ color: '#f8fafc' }}
-                  formatter={(value: any, name: string) => [`$ ${Number(value).toLocaleString()}`, name === 'prev' ? 'Preventivo' : name === 'corr' ? 'Correctivo' : name]}
+                  formatter={(value: any, name: string) => [`$ ${Math.round(Number(value) || 0).toLocaleString('es-CL')}`, name === 'prev' ? 'Preventivo' : name === 'corr' ? 'Correctivo' : name]}
                 />
                 <Bar dataKey="prev" stackId="a" fill="#3b82f6" />
                 <Bar dataKey="corr" stackId="a" fill="#f43f5e" />
