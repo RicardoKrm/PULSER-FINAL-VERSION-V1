@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -20,7 +20,7 @@ import Programacion from './pages/operaciones/Programacion';
 import ConfiguracionAlertas from './pages/configuracion/ConfiguracionAlertas';
 import MatrizEscalamiento from './pages/configuracion/MatrizEscalamiento';
 import Mantenedores from './pages/operaciones/Mantenedores';
-import Reservas from './pages/operaciones/Reservas';
+import ServiciosSpot from './pages/operaciones/ServiciosSpot';
 import ProduccionLayout from './pages/produccion/ProduccionLayout';
 import DashboardProduccion from './pages/produccion/DashboardProduccion';
 import ReportesDiariosPage from './pages/produccion/ReportesDiariosPage';
@@ -147,7 +147,8 @@ const router = createBrowserRouter([
         { path: "trazabilidad", element: <TrazabilidadPage /> }
       ]},
 
-      { path: "operaciones/reservas", element: <Reservas /> },
+      { path: "operaciones/spot", element: <ServiciosSpot /> },
+      { path: "operaciones/reservas", element: <Navigate to="/operaciones/spot" replace /> },
       { path: "operaciones/mantenedores", element: <Mantenedores /> },
       { path: "operaciones/programacion", element: <Programacion /> },
       { path: "operaciones/gps", element: <GPS /> },
