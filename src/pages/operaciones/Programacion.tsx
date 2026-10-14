@@ -61,7 +61,7 @@ export default function Programacion() {
   const { activeCompanyId, currentCompany } = useCompany();
   const { profile } = useAuth();
   const navigate = useNavigate();
-  const [mainTab, setMainTab] = useState<'CALENDARIO' | 'MONITOREO_SOLON'>('MONITOREO_SOLON');
+  const [mainTab, setMainTab] = useState<'CALENDARIO' | 'MONITOREO'>('CALENDARIO');
   const [viewMode, setViewMode] = useState<'Día' | 'Semana' | 'Mes' | 'Tabla'>('Semana');
   const [currentDate, setCurrentDate] = useState<Date>(INIT_DATE);
   const [draggedItem, setDraggedItem] = useState<any>(null);
@@ -578,17 +578,24 @@ export default function Programacion() {
           </button>
 
           <button
-            onClick={() => setMainTab('MONITOREO_SOLON')}
+            onClick={() => setMainTab('MONITOREO')}
             className={cn(
               "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 relative",
-              mainTab === 'MONITOREO_SOLON'
+              mainTab === 'MONITOREO'
                 ? "bg-blue-600 text-white shadow-md shadow-blue-500/25 border border-blue-500"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
             )}
           >
             <Truck className="w-4 h-4" />
-            <span>🛰️ Monitoreo & Auditoría de Paradas (4 Tractos Arica • Solon Chavez)</span>
-            <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+            <span>🛰️ Monitoreo & Auditoría de Paradas</span>
+            {currentCompany?.name && (
+              <span className={cn(
+                "text-[10px] px-1.5 py-0.5 rounded font-semibold",
+                mainTab === 'MONITOREO' ? "bg-blue-700 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
+              )}>
+                {currentCompany.name}
+              </span>
+            )}
           </button>
         </div>
 
@@ -599,12 +606,12 @@ export default function Programacion() {
           </span>
           <span>•</span>
           <span className="font-semibold text-slate-700 dark:text-slate-300">
-            Cliente: Solon Chavez
+            Cliente: {currentCompany?.name || 'Cliente Activo'}
           </span>
         </div>
       </div>
 
-      {mainTab === 'MONITOREO_SOLON' ? (
+      {mainTab === 'MONITOREO' ? (
         <MonitoreoAricaDetenciones />
       ) : (
         <div className="flex-1 flex overflow-hidden">

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Truck, 
   MapPin, 
@@ -30,6 +30,10 @@ import {
 import { exportToExcel } from '../../lib/excelExport';
 import { Modal } from '../../components/ui/Modal';
 import { cn } from '../../lib/utils';
+import { useCompany } from '../../contexts/CompanyContext';
+import { useAppContext } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabase';
 
 // ==========================================
 // TIPOS Y MODELOS DE DATOS
@@ -333,10 +337,113 @@ const DETENCIONES_INICIALES: RegistroDetencion[] = [
 ];
 
 export default function MonitoreoAricaDetenciones() {
+  const { currentCompany, activeCompanyId } = useCompany();
+  const { currentUser } = useAppContext();
+  const { profile } = useAuth();
+
+  const companyId = activeCompanyId || currentCompany?.id || profile?.empresa_id || 'default';
+  const companyName = currentCompany?.name || (currentCompany as any)?.nombre || 'Cliente';
+  const isSolonChavez = companyName.toLowerCase().includes('solon') || companyName.toLowerCase().includes('chavez');
+
   const [subTab, setSubTab] = useState<'EN_VIVO' | 'DETENCIONES' | 'ENTREVISTAS' | 'MAPA_ARICA'>('EN_VIVO');
-  const [unidades, setUnidades] = useState<TractocamionAgua[]>(UNIDADES_INICIALES);
-  const [detenciones, setDetenciones] = useState<RegistroDetencion[]>(DETENCIONES_INICIALES);
-  
+  const [unidades, setUnidades] = useState<TractocamionAgua[]>([]);
+  const [detenciones, setDetenciones] = useState<RegistroDetencion[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Aislamiento Multi-Tenant: Cargar datos específicos de este cliente
+  useEffect(() => {
+    if (!companyId) return;
+
+    // 1. Cargar Detenciones y Actas aisladas estrictamente por empresa
+    const storageKeyDetenciones = `pulser_detenciones_${companyId}`;
+    const savedDet = localStorage.getItem(storageKeyDetenciones);
+    if (savedDet) {
+      try {
+        setDetenciones(JSON.parse(savedDet));
+      } catch (e) {
+        setDetenciones(isSolonChavez ? DETENCIONES_INICIALES : []);
+      }
+    } else {
+      const initial = isSolonChavez ? DETENCIONES_INICIALES : [];
+      setDetenciones(initial);
+      localStorage.setItem(storageKeyDetenciones, JSON.stringify(initial));
+    }
+
+    // 2. Cargar Unidades de Flota aisladas estrictamente por empresa
+    if (isSolonChavez) {
+      const storageKeyUnidades = `pulser_unidades_${companyId}`;
+      const savedUni = localStorage.getItem(storageKeyUnidades);
+      if (savedUni) {
+        try {
+          setUnidades(JSON.parse(savedUni));
+        } catch (e) {
+          setUnidades(UNIDADES_INICIALES);
+        }
+      } else {
+        setUnidades(UNIDADES_INICIALES);
+        localStorage.setItem(storageKeyUnidades, JSON.stringify(UNIDADES_INICIALES));
+      }
+    } else {
+      // Para cualquier otro cliente (ej. Pullman Araksaya, Gaval, etc.):
+      // Consultar la base de datos real de vehiculo y colaborador de esta empresa
+      const fetchVehiculosEmpresa = async () => {
+        setLoading(true);
+        try {
+          const [vehsRes, colabsRes] = await Promise.all([
+            supabase.from('vehiculo').select('*').eq('empresa_id', companyId),
+            supabase.from('colaborador').select('*').eq('empresa_id', companyId)
+          ]);
+
+          const vehsData = vehsRes.data || [];
+          const colabsData = colabsRes.data || [];
+
+          if (vehsData.length > 0) {
+            const mapped: TractocamionAgua[] = vehsData.map((v: any, idx: number) => {
+              const d = v.detalles || {};
+              const colab = colabsData.length > 0 ? colabsData[idx % colabsData.length] : null;
+              const hasAlert = idx === 0 && savedDet && JSON.parse(savedDet).length > 0;
+              return {
+                id: v.id,
+                patente: v.patente || `UNID-${idx + 1}`,
+                unidadNumero: v.numero_interno ? `Unidad #${v.numero_interno}` : `Unidad #${idx + 1}`,
+                modelo: (v.marca || d.marca) && (v.modelo || d.modelo) 
+                  ? `${v.marca || d.marca} ${v.modelo || d.modelo}` 
+                  : (v.modelo || v.marca || d.modelo || 'Unidad de Flota'),
+                capacidadLitros: Number(d.capacidadLitros || 25000),
+                conductorNombre: colab?.nombre || d.conductor || 'Conductor Asignado',
+                conductorRut: colab?.rut || d.conductorRut || 'Sin RUT',
+                conductorTelefono: colab?.telefono || d.conductorTelefono || '+56 9 ...',
+                rutaAsignada: d.rutaAsignada || 'Ruta Operacional Activa',
+                origen: d.origen || 'Base Central',
+                destino: d.destino || 'Punto Operativo',
+                estadoOperativo: hasAlert ? 'DETENIDO_CRITICO' : 'EN_RUTA',
+                velocidadActualKmH: hasAlert ? 0 : 54,
+                odometroKm: Number(v.kilometraje_actual || d.km_manual || 185000),
+                nivelAguaPorcentaje: 90,
+                nivelCombustiblePorcentaje: 75,
+                latitud: -18.4783 + (idx * 0.02),
+                longitud: -70.3126 + (idx * 0.02),
+                ubicacionTexto: d.ubicacionTexto || 'En ruta operacional',
+                tiempoDetenidoMinutos: hasAlert ? 35 : 0,
+                tiempoRalentiMinutos: hasAlert ? 28 : 0,
+                ultimaActualizacion: 'En tiempo real',
+                alertasActivas: hasAlert ? ['Detención no programada > 30 min en ruta'] : []
+              };
+            });
+            setUnidades(mapped);
+          } else {
+            setUnidades([]);
+          }
+        } catch (err) {
+          console.error("Error al cargar unidades de la empresa:", err);
+          setUnidades([]);
+        }
+        setLoading(false);
+      };
+      fetchVehiculosEmpresa();
+    }
+  }, [companyId, isSolonChavez]);
+
   // Filtros
   const [filtroUnidad, setFiltroUnidad] = useState<string>('TODAS');
   const [filtroEstado, setFiltroEstado] = useState<string>('TODOS');
@@ -354,29 +461,28 @@ export default function MonitoreoAricaDetenciones() {
   const [formAvisoCentral, setFormAvisoCentral] = useState(false);
   const [formDictamen, setFormDictamen] = useState<'INJUSTIFICADA' | 'JUSTIFICADA' | 'OBSERVADA'>('INJUSTIFICADA');
   const [formAccion, setFormAccion] = useState('Amonestación verbal y registro en hoja de vida');
-  const [formSupervisor, setFormSupervisor] = useState('Gabriel Ávalos / Supervisor Solon Chavez');
+  const defaultSupervisor = `${profile?.nombre || currentUser?.nombre || 'Supervisor Operativo'} / ${companyName}`;
+  const [formSupervisor, setFormSupervisor] = useState(defaultSupervisor);
 
-  // KPIs
+  // KPIs dinámicos
   const totalDetenidoHoyMinutos = useMemo(() => {
     return detenciones
-      .filter(d => d.fecha === '2026-10-14' && d.tipoDetencion !== 'PUNTO_CARGA')
+      .filter(d => d.tipoDetencion !== 'PUNTO_CARGA')
       .reduce((acc, curr) => acc + curr.duracionMinutos, 0);
   }, [detenciones]);
 
   const totalCombustiblePerdidoLitros = useMemo(() => {
     return detenciones
-      .filter(d => d.fecha === '2026-10-14')
       .reduce((acc, curr) => acc + curr.combustiblePerdidoLitros, 0);
   }, [detenciones]);
 
   const totalCostoPerdidaCLP = useMemo(() => {
     return detenciones
-      .filter(d => d.fecha === '2026-10-14')
       .reduce((acc, curr) => acc + curr.costoPerdidaCLP, 0);
   }, [detenciones]);
 
   const totalDesviosDetectados = useMemo(() => {
-    return detenciones.filter(d => d.desvioRutaKm > 0 && d.fecha === '2026-10-14').length;
+    return detenciones.filter(d => d.desvioRutaKm > 0).length;
   }, [detenciones]);
 
   const entrevistasPendientesCount = useMemo(() => {
@@ -399,7 +505,7 @@ export default function MonitoreoAricaDetenciones() {
       setFormAvisoCentral(false);
       setFormDictamen('INJUSTIFICADA');
       setFormAccion('Amonestación escrita y cobro por merma de combustible');
-      setFormSupervisor('Gabriel Ávalos / Supervisor Solon Chavez');
+      setFormSupervisor(defaultSupervisor);
     }
     setIsModalEntrevistaOpen(true);
   };
@@ -408,7 +514,7 @@ export default function MonitoreoAricaDetenciones() {
     if (!detencionSeleccionada) return;
 
     const nuevaActa: ActaEntrevista = {
-      folioActa: detencionSeleccionada.actaEntrevista?.folioActa || `ACTA-ACH-${Date.now().toString().slice(-4)}`,
+      folioActa: detencionSeleccionada.actaEntrevista?.folioActa || `ACTA-${companyName.substring(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`,
       fechaEntrevista: new Date().toLocaleString('es-CL'),
       supervisorNombre: formSupervisor,
       versionConductorMotivo: formMotivo,
@@ -421,19 +527,58 @@ export default function MonitoreoAricaDetenciones() {
       firmado: true
     };
 
-    setDetenciones(prev => prev.map(d => {
+    const updated = detenciones.map(d => {
       if (d.id === detencionSeleccionada.id) {
         return {
           ...d,
           estadoEntrevista: formDictamen === 'INJUSTIFICADA' ? 'INJUSTIFICADA' : formDictamen === 'JUSTIFICADA' ? 'JUSTIFICADA' : 'EN_INVESTIGACION',
           actaEntrevista: nuevaActa
-        };
+        } as RegistroDetencion;
       }
       return d;
-    }));
+    });
 
+    setDetenciones(updated);
+    localStorage.setItem(`pulser_detenciones_${companyId}`, JSON.stringify(updated));
     setIsModalEntrevistaOpen(false);
     alert(`Acta ${nuevaActa.folioActa} registrada y firmada exitosamente en el sistema.`);
+  };
+
+  // Simulación de Parada para pruebas en cualquier cliente
+  const handleSimularDetencion = () => {
+    if (unidades.length === 0) {
+      alert(`No hay unidades registradas para ${companyName}. Ingrese vehículos primero en Configuración > Vehículos.`);
+      return;
+    }
+    const targetUni = unidades[0];
+    const nuevaDet: RegistroDetencion = {
+      id: `DET-${Date.now().toString().slice(-4)}`,
+      folio: `DET-${companyName.substring(0, 3).toUpperCase()}-${new Date().toISOString().split('T')[0]}-${Date.now().toString().slice(-2)}`,
+      unidadId: targetUni.unidadNumero,
+      patente: targetUni.patente,
+      conductorNombre: targetUni.conductorNombre,
+      conductorRut: targetUni.conductorRut,
+      fecha: new Date().toISOString().split('T')[0],
+      horaInicio: '11:15',
+      horaFin: '11:52',
+      duracionMinutos: 37,
+      latitud: targetUni.latitud,
+      longitud: targetUni.longitud,
+      lugarTexto: `${targetUni.ubicacionTexto} (Detención no autorizada en berma)`,
+      zona: 'Arica Urbano',
+      motorEstado: 'RALENTI_ENCENDIDO',
+      combustiblePerdidoLitros: 2.8,
+      costoPerdidaCLP: 2940,
+      desvioRutaKm: 1.5,
+      tipoDetencion: 'NO_AUTORIZADA',
+      nivelCriticidad: 'ALTA',
+      estadoEntrevista: 'PENDIENTE'
+    };
+
+    const updated = [nuevaDet, ...detenciones];
+    setDetenciones(updated);
+    localStorage.setItem(`pulser_detenciones_${companyId}`, JSON.stringify(updated));
+    alert(`Detección de parada generada para la unidad ${targetUni.patente}. Ahora puede realizar el contraste con el conductor en la pestaña de Detenciones.`);
   };
 
   // Exportar Detenciones a Excel
@@ -459,7 +604,7 @@ export default function MonitoreoAricaDetenciones() {
       'Versión Chofer': d.actaEntrevista?.versionConductorMotivo || 'Sin entrevista',
       'Dictamen Supervisor': d.actaEntrevista?.dictamenSupervisor || 'Pendiente'
     }));
-    exportToExcel(dataAExportar, 'Auditoria_Detenciones_Agua_Arica_Solon_Chavez');
+    exportToExcel(dataAExportar, `Auditoria_Detenciones_${companyName.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}`);
   };
 
   // Filtrado
@@ -494,14 +639,16 @@ export default function MonitoreoAricaDetenciones() {
                     Monitoreo en Tiempo Real y Auditoría de Paradas
                   </h1>
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                    CLIENTE: SOLON CHAVEZ
+                    CLIENTE: {companyName.toUpperCase()}
                   </span>
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-                    SERVICIO TRASLADO AGUA • ARICA
+                    {isSolonChavez ? 'SERVICIO TRASLADO AGUA • ARICA' : `SERVICIO OPERATIVO • ${companyName.toUpperCase()}`}
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Control operativo de 4 unidades tractocamión cisterna (Azapa, Lluta, Poconchile, Chaca). Detección automática de detenciones, mermas de tiempo, ralentí y módulo de entrevista con conductor.
+                  {isSolonChavez
+                    ? 'Control operativo de 4 unidades tractocamión cisterna (Azapa, Lluta, Poconchile, Chaca). Detección automática de detenciones, mermas de tiempo, ralentí y módulo de entrevista con conductor.'
+                    : `Supervisión en tiempo real de paradas no autorizadas, excesos de ralentí, mermas de diésel y entrevistas de contraste con conductores para la flota de ${companyName}.`}
                 </p>
               </div>
             </div>
@@ -511,7 +658,7 @@ export default function MonitoreoAricaDetenciones() {
           <div className="flex items-center gap-2 shrink-0">
             <button 
               onClick={() => {
-                alert("Sincronizando telemetría con antenas GPS de los 4 tractocamiones en Arica...");
+                alert(`Sincronizando telemetría en tiempo real para las unidades de ${companyName}...`);
               }}
               className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors border border-slate-600"
             >
@@ -536,8 +683,12 @@ export default function MonitoreoAricaDetenciones() {
             </div>
             <div>
               <span className="text-[11px] font-semibold text-slate-400 block uppercase">Flota en Servicio</span>
-              <span className="text-lg font-black text-white">4 Tractocamiones</span>
-              <span className="text-[10px] text-emerald-400 block font-medium">100% unidades monitoreadas</span>
+              <span className="text-lg font-black text-white">
+                {unidades.length} {isSolonChavez ? 'Tractocamiones' : 'Unidades'}
+              </span>
+              <span className="text-[10px] text-emerald-400 block font-medium">
+                {unidades.length > 0 ? '100% unidades monitoreadas' : 'Sin unidades activas'}
+              </span>
             </div>
           </div>
 
@@ -589,7 +740,7 @@ export default function MonitoreoAricaDetenciones() {
             )}
           >
             <Activity className="w-4 h-4" />
-            1. Monitoreo en Vivo (4 Unidades)
+            1. Monitoreo en Vivo ({unidades.length} Unidades)
           </button>
 
           <button
@@ -633,30 +784,41 @@ export default function MonitoreoAricaDetenciones() {
             )}
           >
             <Compass className="w-4 h-4" />
-            4. Mapa Satelital de Corredores (Arica)
+            4. {isSolonChavez ? 'Mapa Satelital de Corredores (Arica)' : `Mapa Satelital de Rutas (${companyName})`}
           </button>
         </div>
       </div>
 
       {/* ============================================================== */}
-      {/* SUB-PESTAÑA 1: MONITOREO EN VIVO (TARJETAS DE LAS 4 UNIDADES)   */}
+      {/* SUB-PESTAÑA 1: MONITOREO EN VIVO                                */}
       {/* ============================================================== */}
       {subTab === 'EN_VIVO' && (
         <div className="p-6 space-y-6">
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <span>Estado Operacional de Tractocamiones Cisterna de Agua</span>
+                <span>Estado Operacional de Flota ({companyName})</span>
                 <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-normal">
                   Actualización automática cada 30 seg
                 </span>
               </h2>
               <p className="text-xs text-slate-400">
-                Supervisión directa de velocidad, posición satelital en Arica, nivel de cisterna y alertas de ralentí/detención prolongada.
+                Supervisión directa de velocidad, posición satelital, nivel de cisterna/estanque y alertas de ralentí/detención prolongada.
               </p>
             </div>
           </div>
 
+          {unidades.length === 0 ? (
+            <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-12 text-center space-y-3">
+              <div className="w-12 h-12 rounded-xl bg-slate-700/50 flex items-center justify-center mx-auto text-slate-400">
+                <Truck className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-white">No hay vehículos registrados para {companyName}</h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                Para iniciar el monitoreo de telemetría y auditoría de paradas en este cliente, registre unidades en el módulo de Configuración o realice una carga de flota.
+              </p>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {unidades.map(u => {
               const isDetenido = u.estadoOperativo === 'DETENIDO_CRITICO';
@@ -818,6 +980,7 @@ export default function MonitoreoAricaDetenciones() {
               );
             })}
           </div>
+          )}
         </div>
       )}
 
@@ -858,10 +1021,11 @@ export default function MonitoreoAricaDetenciones() {
                 className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500"
               >
                 <option value="TODAS">Todas las Unidades</option>
-                <option value="TRACTO-01">Unidad #01 (LJ-TR-42)</option>
-                <option value="TRACTO-02">Unidad #02 (PK-CW-18)</option>
-                <option value="TRACTO-03">Unidad #03 (SH-ZK-85)</option>
-                <option value="TRACTO-04">Unidad #04 (VR-BP-33)</option>
+                {unidades.map(u => (
+                  <option key={u.id} value={u.unidadNumero}>
+                    {u.unidadNumero} ({u.patente})
+                  </option>
+                ))}
               </select>
 
               <select 
@@ -894,7 +1058,27 @@ export default function MonitoreoAricaDetenciones() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/60 text-slate-300">
-                  {detencionesFiltradas.map(d => {
+                  {detencionesFiltradas.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-12 text-center">
+                        <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center mx-auto text-slate-400 mb-3 border border-slate-700">
+                          <Clock className="w-6 h-6" />
+                        </div>
+                        <h4 className="text-sm font-bold text-white mb-1">Sin eventos de detención registrados</h4>
+                        <p className="text-xs text-slate-400 max-w-md mx-auto mb-4">
+                          No se encontraron detenciones con los filtros actuales para {companyName}.
+                        </p>
+                        <button
+                          onClick={handleSimularParada}
+                          className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all shadow-md inline-flex items-center gap-2"
+                        >
+                          <Activity className="w-3.5 h-3.5" />
+                          <span>Simular Detección de Parada para Prueba</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ) : (
+                    detencionesFiltradas.map(d => {
                     const isPendiente = d.estadoEntrevista === 'PENDIENTE';
                     const isInjustificada = d.estadoEntrevista === 'INJUSTIFICADA';
                     const isJustificada = d.estadoEntrevista === 'JUSTIFICADA';
@@ -998,7 +1182,8 @@ export default function MonitoreoAricaDetenciones() {
                         </td>
                       </tr>
                     );
-                  })}
+                  })
+                )}
                 </tbody>
               </table>
             </div>
@@ -1025,87 +1210,99 @@ export default function MonitoreoAricaDetenciones() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {detenciones.filter(d => d.actaEntrevista).map(d => {
-              const acta = d.actaEntrevista!;
-              const isInjustificada = acta.dictamenSupervisor === 'INJUSTIFICADA';
+          {detenciones.filter(d => d.actaEntrevista).length === 0 ? (
+            <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-12 text-center space-y-3">
+              <div className="w-12 h-12 rounded-xl bg-slate-700/50 flex items-center justify-center mx-auto text-slate-400">
+                <FileText className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-white">No hay actas de entrevista registradas para {companyName}</h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                Las actas oficiales se generan desde la pestaña "Bitácora de Detenciones" al pulsar el botón "Entrevistar Chofer" sobre una detención registrada.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {detenciones.filter(d => d.actaEntrevista).map(d => {
+                const acta = d.actaEntrevista!;
+                const isInjustificada = acta.dictamenSupervisor === 'INJUSTIFICADA';
 
-              return (
-                <div key={d.id} className="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-5 shadow-lg space-y-4">
-                  {/* Encabezado Acta */}
-                  <div className="flex justify-between items-start border-b border-slate-700 pb-3">
-                    <div>
-                      <span className="text-xs font-mono font-bold text-blue-400 block">{acta.folioActa}</span>
-                      <h3 className="text-base font-black text-white">Conductor: {d.conductorNombre}</h3>
-                      <span className="text-xs text-slate-400">Tractocamión Patente: {d.patente} • Fecha: {acta.fechaEntrevista}</span>
-                    </div>
-
-                    <span className={cn(
-                      "px-3 py-1 rounded-full text-xs font-black border",
-                      isInjustificada ? "bg-rose-500/20 text-rose-400 border-rose-500/40" : "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
-                    )}>
-                      {acta.dictamenSupervisor}
-                    </span>
-                  </div>
-
-                  {/* Lado A: Versión del Conductor */}
-                  <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-700/60 space-y-1 text-xs">
-                    <span className="font-bold text-amber-400 flex items-center gap-1.5 uppercase text-[10px]">
-                      🗣️ Versión Declarada por el Conductor:
-                    </span>
-                    <div className="font-semibold text-white">Motivo: "{acta.versionConductorMotivo}"</div>
-                    <p className="text-slate-300 italic text-[11px] bg-slate-800/50 p-2 rounded border border-slate-700/40">
-                      "{acta.declaracionConductor}"
-                    </p>
-                    <div className="text-[10px] text-slate-400">
-                      ¿Reportó a la central de radio/despacho?: <strong className={acta.avisoCentral ? "text-emerald-400" : "text-rose-400"}>{acta.avisoCentral ? "SÍ AVISÓ" : "NO AVISÓ"}</strong>
-                    </div>
-                  </div>
-
-                  {/* Lado B: Evidencia Telemetría Pulser */}
-                  <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-700/60 space-y-1 text-xs">
-                    <span className="font-bold text-blue-400 flex items-center gap-1.5 uppercase text-[10px]">
-                      🛰️ Evidencia Técnica de Telemetría Pulser:
-                    </span>
-                    <p className="text-slate-300 text-[11px]">
-                      {acta.evidenciaTelemetria}
-                    </p>
-                  </div>
-
-                  {/* Resolución y Sanción */}
-                  <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-700/60 space-y-1.5 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400">Resolución del Supervisor:</span>
-                      <span className="font-bold text-white">{acta.supervisorNombre}</span>
-                    </div>
-                    <div className="text-slate-300">
-                      <strong>Acción aplicada:</strong> {acta.accionDisciplinaria}
-                    </div>
-                    {acta.montoCobroCombustibleCLP && acta.montoCobroCombustibleCLP > 0 && (
-                      <div className="text-rose-400 font-black">
-                        Cargo por pérdida de combustible: ${acta.montoCobroCombustibleCLP.toLocaleString('es-CL')} CLP
+                return (
+                  <div key={d.id} className="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-5 shadow-lg space-y-4">
+                    {/* Encabezado Acta */}
+                    <div className="flex justify-between items-start border-b border-slate-700 pb-3">
+                      <div>
+                        <span className="text-xs font-mono font-bold text-blue-400 block">{acta.folioActa}</span>
+                        <h3 className="text-base font-black text-white">Conductor: {d.conductorNombre}</h3>
+                        <span className="text-xs text-slate-400">Tractocamión Patente: {d.patente} • Fecha: {acta.fechaEntrevista}</span>
                       </div>
-                    )}
-                  </div>
 
-                  {/* Pie de Firma */}
-                  <div className="flex justify-between items-center pt-2 text-[11px] text-slate-400">
-                    <span className="flex items-center gap-1 text-emerald-400 font-bold">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Acta Registrada y Firmada
-                    </span>
-                    <button 
-                      onClick={() => window.print()}
-                      className="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs font-bold flex items-center gap-1 transition-colors"
-                    >
-                      <Printer className="w-3 h-3" />
-                      Imprimir Acta
-                    </button>
+                      <span className={cn(
+                        "px-3 py-1 rounded-full text-xs font-black border",
+                        isInjustificada ? "bg-rose-500/20 text-rose-400 border-rose-500/40" : "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                      )}>
+                        {acta.dictamenSupervisor}
+                      </span>
+                    </div>
+
+                    {/* Lado A: Versión del Conductor */}
+                    <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-700/60 space-y-1 text-xs">
+                      <span className="font-bold text-amber-400 flex items-center gap-1.5 uppercase text-[10px]">
+                        🗣️ Versión Declarada por el Conductor:
+                      </span>
+                      <div className="font-semibold text-white">Motivo: "{acta.versionConductorMotivo}"</div>
+                      <p className="text-slate-300 italic text-[11px] bg-slate-800/50 p-2 rounded border border-slate-700/40">
+                        "{acta.declaracionConductor}"
+                      </p>
+                      <div className="text-[10px] text-slate-400">
+                        ¿Reportó a la central de radio/despacho?: <strong className={acta.avisoCentral ? "text-emerald-400" : "text-rose-400"}>{acta.avisoCentral ? "SÍ AVISÓ" : "NO AVISÓ"}</strong>
+                      </div>
+                    </div>
+
+                    {/* Lado B: Evidencia Telemetría Pulser */}
+                    <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-700/60 space-y-1 text-xs">
+                      <span className="font-bold text-blue-400 flex items-center gap-1.5 uppercase text-[10px]">
+                        🛰️ Evidencia Técnica de Telemetría Pulser:
+                      </span>
+                      <p className="text-slate-300 text-[11px]">
+                        {acta.evidenciaTelemetria}
+                      </p>
+                    </div>
+
+                    {/* Resolución y Sanción */}
+                    <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-700/60 space-y-1.5 text-xs">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400">Resolución del Supervisor:</span>
+                        <span className="font-bold text-white">{acta.supervisorNombre}</span>
+                      </div>
+                      <div className="text-slate-300">
+                        <strong>Acción aplicada:</strong> {acta.accionDisciplinaria}
+                      </div>
+                      {acta.montoCobroCombustibleCLP && acta.montoCobroCombustibleCLP > 0 && (
+                        <div className="text-rose-400 font-black">
+                          Cargo por pérdida de combustible: ${acta.montoCobroCombustibleCLP.toLocaleString('es-CL')} CLP
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Pie de Firma */}
+                    <div className="flex justify-between items-center pt-2 text-[11px] text-slate-400">
+                      <span className="flex items-center gap-1 text-emerald-400 font-bold">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Acta Registrada y Firmada
+                      </span>
+                      <button 
+                        onClick={() => window.print()}
+                        className="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs font-bold flex items-center gap-1 transition-colors"
+                      >
+                        <Printer className="w-3 h-3" />
+                        Imprimir Acta
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -1117,13 +1314,19 @@ export default function MonitoreoAricaDetenciones() {
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <span>Corredores de Transporte de Agua • Región de Arica y Parinacota</span>
+                <span>
+                  {isSolonChavez
+                    ? 'Corredores de Transporte de Agua • Región de Arica y Parinacota'
+                    : `Monitoreo Satelital de Rutas y Corredores • ${companyName}`}
+                </span>
                 <span className="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-normal">
                   Red Georreferenciada
                 </span>
               </h2>
               <p className="text-xs text-slate-400">
-                Visualización de las 4 rutas activas: Valle de Azapa (Ruta A-133), Valle de Lluta / Poconchile (Ruta 11-CH) y Chaca (Ruta 5 Sur).
+                {isSolonChavez
+                  ? 'Visualización de las 4 rutas activas: Valle de Azapa (Ruta A-133), Valle de Lluta / Poconchile (Ruta 11-CH) y Chaca (Ruta 5 Sur).'
+                  : `Supervisión de rutas activas, geocercas operacionales y puntos de control de flota para ${companyName}.`}
               </p>
             </div>
           </div>
@@ -1143,61 +1346,105 @@ export default function MonitoreoAricaDetenciones() {
                   <div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div> Ralentí Crítico
                 </div>
                 <div className="flex items-center gap-2 text-[10px] text-cyan-400">
-                  <div className="w-2.5 h-2.5 rounded-full bg-cyan-500"></div> Planta de Carga (Chacalluta)
+                  <div className="w-2.5 h-2.5 rounded-full bg-cyan-500"></div> Base / Planta de Carga
                 </div>
               </div>
 
-              {/* RUTA 1: VALLE DE AZAPA */}
-              <div className="mb-6 p-4 bg-slate-900/60 border border-slate-800 rounded-xl space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-black text-cyan-400 flex items-center gap-2">
-                    <Navigation className="w-4 h-4" />
-                    Corredor 1: Arica Centro ➔ Valle de Azapa (Ruta A-133 hasta Km 28)
-                  </span>
-                  <span className="text-xs text-rose-400 font-bold">1 Alerta Activa</span>
-                </div>
-                <div className="flex items-center justify-between text-xs text-slate-300 bg-slate-950 p-3 rounded-lg border border-slate-800">
-                  <span>💧 Punto Carga: Planta Arica</span>
-                  <span>➔ Km 8 Sobraya</span>
-                  <span>➔ Km 14 San Miguel</span>
-                  <span className="text-rose-400 font-black">🔴 Unidad #01 Detenida (Km 14.2)</span>
-                  <span>➔ Km 28 Estanque Final</span>
-                </div>
-              </div>
+              {isSolonChavez ? (
+                <>
+                  {/* RUTA 1: VALLE DE AZAPA */}
+                  <div className="mb-6 p-4 bg-slate-900/60 border border-slate-800 rounded-xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-black text-cyan-400 flex items-center gap-2">
+                        <Navigation className="w-4 h-4" />
+                        Corredor 1: Arica Centro ➔ Valle de Azapa (Ruta A-133 hasta Km 28)
+                      </span>
+                      <span className="text-xs text-rose-400 font-bold">1 Alerta Activa</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-300 bg-slate-950 p-3 rounded-lg border border-slate-800">
+                      <span>💧 Punto Carga: Planta Arica</span>
+                      <span>➔ Km 8 Sobraya</span>
+                      <span>➔ Km 14 San Miguel</span>
+                      <span className="text-rose-400 font-black">🔴 Unidad #01 Detenida (Km 14.2)</span>
+                      <span>➔ Km 28 Estanque Final</span>
+                    </div>
+                  </div>
 
-              {/* RUTA 2: VALLE DE LLUTA */}
-              <div className="mb-6 p-4 bg-slate-900/60 border border-slate-800 rounded-xl space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-black text-emerald-400 flex items-center gap-2">
-                    <Navigation className="w-4 h-4" />
-                    Corredor 2: Arica ➔ Valle de Lluta / Poconchile (Ruta 11-CH hasta Km 36)
-                  </span>
-                  <span className="text-xs text-emerald-400 font-bold">Tránsito Fluido</span>
-                </div>
-                <div className="flex items-center justify-between text-xs text-slate-300 bg-slate-950 p-3 rounded-lg border border-slate-800">
-                  <span>💧 Punto Carga: Chacalluta</span>
-                  <span>➔ Cruce Panamericana</span>
-                  <span className="text-emerald-400 font-black">🟢 Unidad #02 en Tránsito (62 km/h)</span>
-                  <span>➔ Poconchile Estanque</span>
-                </div>
-              </div>
+                  {/* RUTA 2: VALLE DE LLUTA */}
+                  <div className="mb-6 p-4 bg-slate-900/60 border border-slate-800 rounded-xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-black text-emerald-400 flex items-center gap-2">
+                        <Navigation className="w-4 h-4" />
+                        Corredor 2: Arica ➔ Valle de Lluta / Poconchile (Ruta 11-CH hasta Km 36)
+                      </span>
+                      <span className="text-xs text-emerald-400 font-bold">Tránsito Fluido</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-300 bg-slate-950 p-3 rounded-lg border border-slate-800">
+                      <span>💧 Punto Carga: Chacalluta</span>
+                      <span>➔ Cruce Panamericana</span>
+                      <span className="text-emerald-400 font-black">🟢 Unidad #02 en Tránsito (62 km/h)</span>
+                      <span>➔ Poconchile Estanque</span>
+                    </div>
+                  </div>
 
-              {/* RUTA 3: RUTA 5 SUR A CHACA */}
-              <div className="p-4 bg-slate-900/60 border border-slate-800 rounded-xl space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-black text-amber-400 flex items-center gap-2">
-                    <Navigation className="w-4 h-4" />
-                    Corredor 3: Arica ➔ Caleta Vítor / Quebrada de Chaca (Ruta 5 Sur)
-                  </span>
-                  <span className="text-xs text-amber-400 font-bold">1 Carga Activa</span>
+                  {/* RUTA 3: RUTA 5 SUR A CHACA */}
+                  <div className="p-4 bg-slate-900/60 border border-slate-800 rounded-xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-black text-amber-400 flex items-center gap-2">
+                        <Navigation className="w-4 h-4" />
+                        Corredor 3: Arica ➔ Caleta Vítor / Quebrada de Chaca (Ruta 5 Sur)
+                      </span>
+                      <span className="text-xs text-amber-400 font-bold">1 Carga Activa</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-300 bg-slate-950 p-3 rounded-lg border border-slate-800">
+                      <span className="text-cyan-400 font-black">💧 Unidad #04 Cargando en Planta</span>
+                      <span>➔ Cuesta de Acha</span>
+                      <span>➔ Cruce Vítor</span>
+                      <span>➔ Chaca</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-4">
+                  {unidades.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 space-y-2">
+                      <Compass className="w-8 h-8 mx-auto text-slate-500 opacity-60" />
+                      <p className="text-sm font-semibold text-slate-300">No hay vehículos con rutas satelitales configuradas para {companyName}.</p>
+                      <p className="text-xs text-slate-500">Agregue unidades vehiculares para visualizarlas en el mapa de trayectos.</p>
+                    </div>
+                  ) : (
+                    unidades.map((u, idx) => {
+                      const isDetenido = u.estadoOperativo === 'DETENIDO_CRITICO';
+                      const isRalenti = u.estadoOperativo === 'RALENTI_EXCESIVO';
+
+                      return (
+                        <div key={u.id} className="p-4 bg-slate-900/60 border border-slate-800 rounded-xl space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-black text-cyan-400 flex items-center gap-2">
+                              <Navigation className="w-4 h-4" />
+                              Ruta Operativa #{idx + 1}: {u.unidadNumero} ({u.patente})
+                            </span>
+                            <span className={cn(
+                              "text-xs font-bold",
+                              isDetenido ? "text-rose-400" : isRalenti ? "text-amber-400" : "text-emerald-400"
+                            )}>
+                              {isDetenido ? '🔴 Detenido Crítico' : isRalenti ? '🟡 Ralentí Excesivo' : '🟢 En Tránsito Normal'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-slate-300 bg-slate-950 p-3 rounded-lg border border-slate-800">
+                            <span>Base Central</span>
+                            <span>➔ En Desplazamiento</span>
+                            <span className={isDetenido ? "text-rose-400 font-black" : "text-emerald-400 font-bold"}>
+                              {u.patente} • {u.velocidadKmH} km/h • {u.ubicacionActual}
+                            </span>
+                            <span>➔ Destino Operativo</span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
-                <div className="flex items-center justify-between text-xs text-slate-300 bg-slate-950 p-3 rounded-lg border border-slate-800">
-                  <span className="text-cyan-400 font-black">💧 Unidad #04 Cargando en Planta</span>
-                  <span>➔ Cuesta de Acha</span>
-                  <span>➔ Cruce Vítor</span>
-                  <span>➔ Chaca</span>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
