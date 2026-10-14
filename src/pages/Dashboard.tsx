@@ -12,7 +12,11 @@ import {
   AlertTriangle,
   ArrowUpRight,
   ArrowDownRight,
-  ArrowRight
+  ArrowRight,
+  FileText,
+  FileCheck,
+  ShieldAlert,
+  AlertCircle
 } from 'lucide-react';
 import { 
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
@@ -25,17 +29,16 @@ import {
 
 const COLORS = ['#3b82f6', '#ef4444'];
 
-import { supabase } from '../lib/supabase';
-
 export default function Dashboard() {
   const [dbCount, setDbCount] = React.useState<number | null>(null);
   React.useEffect(() => { supabase.from('orden_de_trabajo').select('id', { count: 'exact' }).then(res => setDbCount(res.count)); }, []);
   const navigate = useNavigate();
-  const { user, ordenesTrabajo, vehiculos, repuestos, recargarOrdenesTrabajo } = useAppContext() as any;
+  const { user, ordenesTrabajo, vehiculos, personal, repuestos, recargarOrdenesTrabajo } = useAppContext() as any;
   const { currentCompany } = useCompany();
   const [dbVehiculos, setDbVehiculos] = useState<any[]>([]);
   const [dbColaboradores, setDbColaboradores] = useState<any[]>([]);
   const gavalCalibratedRef = React.useRef<boolean>(false);
+  const [saludTab, setSaludTab] = useState<'mantenimiento' | 'documentos'>('documentos');
 
   const nowInit = new Date();
   const initDesde = `${nowInit.getFullYear()}-${String(nowInit.getMonth() + 1).padStart(2, '0')}-01`;
@@ -231,7 +234,8 @@ export default function Dashboard() {
     cumplimientoPrev,
     gastoMensual,
     alertasCriticas,
-    saludFlota
+    saludFlota,
+    saludDocs
   } = React.useMemo(() => {
     
     // 1. Preventivas vs Correctivas - strictly for this company
@@ -277,24 +281,105 @@ export default function Dashboard() {
     const proximos = pizarraData.filter(p => p.estatus === 'PROXIMO').length;
     const alDia = pizarraData.filter(p => p.estatus === 'NORMAL').length;
 
-    // Alertas Críticas (Flota + Colaboradores + Legal Vehicular + Quiebre Stock Bodega)
+    // 2.b. Control Documental de Flota (Vehicular y Choferes - PRT, SOAP, Permiso, Licencias)
     const nowTs = new Date().getTime();
-    const alertasColaboradores = dbColaboradores.reduce((acc, col) => {
-      const docs = [col.vencimientoLicencia, col.vencimientoExamenSalud, col.vencimientoPsicosensotecnico, col.vencimientoManejoDefensivo];
-      const hasVencidos = docs.some(d => d && new Date(d).getTime() < nowTs);
-      return acc + (hasVencidos ? 1 : 0);
-    }, 0);
+    const aviso30DiasMs = 30 * 24 * 60 * 60 * 1000;
 
-    const alertasVehiculares = dbVehiculos.reduce((acc, v) => {
+    const parseDocDate = (dateStr: any): number | null => {
+      if (!dateStr || typeof dateStr !== 'string') return null;
+      const clean = dateStr.trim();
+      if (!clean) return null;
+      const parts = clean.split('T')[0].split('-');
+      if (parts.length === 3) {
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const d = parseInt(parts[2], 10);
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+          return new Date(y, m, d, 23, 59, 59, 999).getTime();
+        }
+      }
+      const dt = new Date(clean);
+      return isNaN(dt.getTime()) ? null : dt.getTime();
+    };
+
+    let vehiculosDocVencidos = 0;
+    let vehiculosDocProximos = 0;
+    let vehiculosDocAlDia = 0;
+    const detalleDocsVencidos = { rev: 0, seguro: 0, permiso: 0 };
+    const detalleDocsProximos = { rev: 0, seguro: 0, permiso: 0 };
+
+    const vehiculosAEvaluar = dbVehiculos.length > 0 ? dbVehiculos : (vehiculos || []);
+    const colaboradoresAEvaluar = dbColaboradores.length > 0 ? dbColaboradores : (personal || []);
+
+    vehiculosAEvaluar.forEach((v: any) => {
       const d = v.detalles || {};
+      const revDate = v.vencimiento_revision_tecnica || d.vencimiento_revision_tecnica || d.vencimientoRevisionTecnica || d.vencimientoRev;
+      const segDate = v.vencimiento_seguro || d.vencimiento_seguro || d.vencimientoSeguroSoap || d.vencimientoSoap || d.vencimientoSeguro;
+      const perDate = v.vencimiento_permiso_circulacion || d.vencimiento_permiso_circulacion || d.vencimientoPermisoCirculacion;
+
       const docs = [
-        v.vencimiento_revision_tecnica || d.vencimiento_revision_tecnica || d.vencimientoRevisionTecnica,
-        v.vencimiento_permiso_circulacion || d.vencimiento_permiso_circulacion || d.vencimientoPermisoCirculacion,
-        v.vencimiento_seguro || d.vencimiento_seguro || d.vencimientoSeguroSoap || d.vencimientoSoap
-      ];
-      const hasVencidos = docs.some(docDate => docDate && new Date(docDate).getTime() < nowTs);
-      return acc + (hasVencidos ? 1 : 0);
-    }, 0);
+        { tipo: 'rev', date: revDate },
+        { tipo: 'seguro', date: segDate },
+        { tipo: 'permiso', date: perDate }
+      ].filter(x => !!x.date);
+
+      if (docs.length === 0) return;
+
+      let tieneVencido = false;
+      let tieneProximo = false;
+
+      docs.forEach(doc => {
+        const docTs = parseDocDate(doc.date);
+        if (!docTs) return;
+        if (docTs < nowTs) {
+          tieneVencido = true;
+          if (doc.tipo === 'rev') detalleDocsVencidos.rev++;
+          else if (doc.tipo === 'seguro') detalleDocsVencidos.seguro++;
+          else if (doc.tipo === 'permiso') detalleDocsVencidos.permiso++;
+        } else if (docTs <= nowTs + aviso30DiasMs) {
+          tieneProximo = true;
+          if (doc.tipo === 'rev') detalleDocsProximos.rev++;
+          else if (doc.tipo === 'seguro') detalleDocsProximos.seguro++;
+          else if (doc.tipo === 'permiso') detalleDocsProximos.permiso++;
+        }
+      });
+
+      if (tieneVencido) vehiculosDocVencidos++;
+      else if (tieneProximo) vehiculosDocProximos++;
+      else vehiculosDocAlDia++;
+    });
+
+    let conductoresDocVencidos = 0;
+    let conductoresDocProximos = 0;
+
+    colaboradoresAEvaluar.forEach((col: any) => {
+      const d = col.detalles || {};
+      const licDate = col.vencimientoLicencia || d.vencimientoLicencia;
+      const exaDate = col.vencimientoExamenSalud || d.vencimientoExamenes || d.vencimientoSalud;
+
+      const docs = [
+        { tipo: 'lic', date: licDate },
+        { tipo: 'exa', date: exaDate }
+      ].filter(x => !!x.date);
+
+      let tieneVencido = false;
+      let tieneProximo = false;
+
+      docs.forEach(doc => {
+        const docTs = parseDocDate(doc.date);
+        if (!docTs) return;
+        if (docTs < nowTs) tieneVencido = true;
+        else if (docTs <= nowTs + aviso30DiasMs) tieneProximo = true;
+      });
+
+      if (d.estadoExamen === 'NO APTO') tieneVencido = true;
+
+      if (tieneVencido) conductoresDocVencidos++;
+      else if (tieneProximo) conductoresDocProximos++;
+    });
+
+    const alertasVehiculares = vehiculosDocVencidos;
+    const alertasColaboradores = conductoresDocVencidos;
 
     const alertasStock = (repuestos || []).filter((r: any) => {
       const stock = Number(r.stock_actual ?? r.stockActual ?? 0);
@@ -414,9 +499,19 @@ export default function Dashboard() {
       cumplimientoPrev: Number(cumpPrev.toFixed(1)),
       gastoMensual: gastoTotalMesActual,
       alertasCriticas: totalAlertasCriticas,
-      saludFlota: { vencidos: vencidosMantenimiento, proximos: proximos, alDia: alDia }
+      saludFlota: { vencidos: vencidosMantenimiento, proximos: proximos, alDia: alDia },
+      saludDocs: {
+        vencidos: vehiculosDocVencidos,
+        proximos: vehiculosDocProximos,
+        alDia: vehiculosDocAlDia,
+        conductoresVencidos: conductoresDocVencidos,
+        conductoresProximos: conductoresDocProximos,
+        detalleVencidos: detalleDocsVencidos,
+        detalleProximos: detalleDocsProximos,
+        totalAlertasDocs: vehiculosDocVencidos + conductoresDocVencidos
+      }
     };
-  }, [ordenesTrabajo, vehiculos, repuestos, dbVehiculos, dbColaboradores, activeFechaDesde, activeFechaHasta, currentCompany?.id]);
+  }, [ordenesTrabajo, vehiculos, repuestos, personal, dbVehiculos, dbColaboradores, activeFechaDesde, activeFechaHasta, currentCompany?.id]);
 
 
   const handleFilter = () => {
@@ -537,7 +632,13 @@ export default function Dashboard() {
 
         {/* Card 4 */}
         <div 
-          onClick={() => navigate('/flota/alertas')}
+          onClick={() => {
+            if ((saludDocs?.totalAlertasDocs || 0) > 0) {
+              navigate('/operaciones/control-documental');
+            } else {
+              navigate('/flota/alertas');
+            }
+          }}
           className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm p-4 relative overflow-hidden flex flex-col justify-between h-32 cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-500 hover:shadow-md transition-all group"
         >
           <div className="flex justify-between items-start">
@@ -550,8 +651,10 @@ export default function Dashboard() {
             </div>
           </div>
           <div className={`flex items-center text-xs font-medium ${alertasCriticas > 0 ? 'text-rose-500 dark:text-rose-400' : 'text-emerald-500 dark:text-emerald-400'}`}>
-            <span className="font-semibold ml-1">
-              {alertasCriticas === 0 ? 'Todo en orden normal' : 'Requieren atención urgente'}
+            <span className="font-semibold ml-1 truncate">
+              {alertasCriticas === 0 
+                ? 'Todo en orden normal' 
+                : `${saludDocs?.totalAlertasDocs || 0} docs + ${saludFlota.vencidos} mantención`}
             </span>
           </div>
         </div>
@@ -595,43 +698,200 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Card Salud de Flota (Pestañas Mantenimiento / Control Documental) */}
         <div 
-          onClick={() => navigate('/flota/mantenimiento')}
-          className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm p-5 cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-500 hover:shadow-md transition-all group"
+          onClick={() => navigate(saludTab === 'documentos' ? '/operaciones/control-documental' : '/flota/mantenimiento')}
+          className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm p-5 cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-500 hover:shadow-md transition-all group flex flex-col justify-between"
         >
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h3 className="text-base font-bold text-slate-800 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Salud de Flota</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Estado actual de mantenimientos</p>
-            </div>
-            <button className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-500/30 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 px-3 py-1.5 rounded flex items-center transition-colors">
-              Ver Detalle <ArrowRight className="w-3 h-3 ml-1" />
-            </button>
-          </div>
-          <div className="space-y-4 mt-8">
-            <div className="bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 rounded-lg p-4 flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div className="w-2.5 h-2.5 rounded-full bg-rose-400 dark:bg-rose-500"></div>
-                <span className="font-semibold text-rose-700 dark:text-rose-400">Vencidos</span>
+          <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-slate-800 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                    Salud de Flota
+                  </h3>
+                  {saludTab === 'documentos' && (saludDocs?.totalAlertasDocs || 0) > 0 && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 animate-pulse">
+                      <ShieldAlert className="w-3 h-3" />
+                      {saludDocs?.totalAlertasDocs} Alerta(s)
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  {saludTab === 'documentos'
+                    ? 'Control legal y vencimiento de documentos'
+                    : 'Estado actual de pautas de mantenimiento'}
+                </p>
               </div>
-              <span className="text-xl font-bold text-rose-700 dark:text-rose-400">{saludFlota.vencidos}</span>
-            </div>
-            
-            <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20 rounded-lg p-4 flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div className="w-2.5 h-2.5 rounded-full bg-amber-400 dark:bg-amber-500"></div>
-                <span className="font-semibold text-amber-700 dark:text-amber-400">Próximos</span>
+
+              {/* Selector de Pestaña Documental vs Mantenimiento */}
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700/60 p-1 rounded-lg self-start sm:self-auto shrink-0">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setSaludTab('documentos'); }}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
+                    saludTab === 'documentos'
+                      ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
+                  }`}
+                  title="Ver alertas de documentos de vehículos y choferes"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Documental</span>
+                  {(saludDocs?.totalAlertasDocs || 0) > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white leading-tight">
+                      {saludDocs?.totalAlertasDocs}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setSaludTab('mantenimiento'); }}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
+                    saludTab === 'mantenimiento'
+                      ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
+                  }`}
+                  title="Ver estado de pautas y kilometrajes de mantenimiento"
+                >
+                  <ClipboardCheck className="w-3.5 h-3.5" />
+                  <span>Mantenimiento</span>
+                  {(saludFlota?.vencidos || 0) > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white leading-tight">
+                      {saludFlota?.vencidos}
+                    </span>
+                  )}
+                </button>
               </div>
-              <span className="text-xl font-bold text-amber-700 dark:text-amber-400">{saludFlota.proximos}</span>
             </div>
 
-            <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 rounded-lg p-4 flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 dark:bg-emerald-500"></div>
-                <span className="font-semibold text-emerald-700 dark:text-emerald-400">Al Día</span>
+            {/* Contenido según pestaña activa */}
+            {saludTab === 'documentos' ? (
+              <div className="space-y-3 mt-4">
+                {/* Vencidos */}
+                <div className="bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 rounded-lg p-3.5 flex justify-between items-center transition-all hover:border-rose-300">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0"></div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm text-rose-700 dark:text-rose-400">Documentos Vencidos</span>
+                      </div>
+                      <p className="text-xs text-rose-600/80 dark:text-rose-400/80 mt-0.5">
+                        {saludDocs?.vencidos || 0} Vehículo(s) • {saludDocs?.conductoresVencidos || 0} Chofer(es)
+                      </p>
+                      {(saludDocs?.detalleVencidos?.rev > 0 || saludDocs?.detalleVencidos?.seguro > 0 || saludDocs?.detalleVencidos?.permiso > 0) && (
+                        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                          {saludDocs.detalleVencidos.rev > 0 && (
+                            <span className="text-[10px] bg-rose-200/70 dark:bg-rose-900/50 text-rose-800 dark:text-rose-200 font-bold px-1.5 py-0.5 rounded">
+                              PRT: {saludDocs.detalleVencidos.rev}
+                            </span>
+                          )}
+                          {saludDocs.detalleVencidos.seguro > 0 && (
+                            <span className="text-[10px] bg-rose-200/70 dark:bg-rose-900/50 text-rose-800 dark:text-rose-200 font-bold px-1.5 py-0.5 rounded">
+                              SOAP: {saludDocs.detalleVencidos.seguro}
+                            </span>
+                          )}
+                          {saludDocs.detalleVencidos.permiso > 0 && (
+                            <span className="text-[10px] bg-rose-200/70 dark:bg-rose-900/50 text-rose-800 dark:text-rose-200 font-bold px-1.5 py-0.5 rounded">
+                              Permiso: {saludDocs.detalleVencidos.permiso}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-2xl font-bold text-rose-700 dark:text-rose-400 ml-2">
+                    {(saludDocs?.vencidos || 0) + (saludDocs?.conductoresVencidos || 0)}
+                  </span>
+                </div>
+
+                {/* Próximos */}
+                <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20 rounded-lg p-3.5 flex justify-between items-center transition-all hover:border-amber-300">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0"></div>
+                    <div>
+                      <span className="font-semibold text-sm text-amber-700 dark:text-amber-400">Por Vencer (&lt; 30 días)</span>
+                      <p className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-0.5">
+                        {saludDocs?.proximos || 0} Vehículo(s) • {saludDocs?.conductoresProximos || 0} Chofer(es)
+                      </p>
+                      {(saludDocs?.detalleProximos?.rev > 0 || saludDocs?.detalleProximos?.seguro > 0 || saludDocs?.detalleProximos?.permiso > 0) && (
+                        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                          {saludDocs.detalleProximos.rev > 0 && (
+                            <span className="text-[10px] bg-amber-200/70 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 font-bold px-1.5 py-0.5 rounded">
+                              PRT: {saludDocs.detalleProximos.rev}
+                            </span>
+                          )}
+                          {saludDocs.detalleProximos.seguro > 0 && (
+                            <span className="text-[10px] bg-amber-200/70 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 font-bold px-1.5 py-0.5 rounded">
+                              SOAP: {saludDocs.detalleProximos.seguro}
+                            </span>
+                          )}
+                          {saludDocs.detalleProximos.permiso > 0 && (
+                            <span className="text-[10px] bg-amber-200/70 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 font-bold px-1.5 py-0.5 rounded">
+                              Permiso: {saludDocs.detalleProximos.permiso}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-2xl font-bold text-amber-700 dark:text-amber-400 ml-2">
+                    {(saludDocs?.proximos || 0) + (saludDocs?.conductoresProximos || 0)}
+                  </span>
+                </div>
+
+                {/* Al Día */}
+                <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 rounded-lg p-3.5 flex justify-between items-center transition-all hover:border-emerald-300">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0"></div>
+                    <div>
+                      <span className="font-semibold text-sm text-emerald-700 dark:text-emerald-400">Documentación Vigente</span>
+                      <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-0.5">
+                        Vehículos con todos sus papeles al día
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 ml-2">
+                    {saludDocs?.alDia || 0}
+                  </span>
+                </div>
               </div>
-              <span className="text-xl font-bold text-emerald-700 dark:text-emerald-400">{saludFlota.alDia}</span>
-            </div>
+            ) : (
+              <div className="space-y-4 mt-8">
+                <div className="bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 rounded-lg p-4 flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2.5 h-2.5 rounded-full bg-rose-400 dark:bg-rose-500"></div>
+                    <span className="font-semibold text-rose-700 dark:text-rose-400">Vencidos</span>
+                  </div>
+                  <span className="text-xl font-bold text-rose-700 dark:text-rose-400">{saludFlota.vencidos}</span>
+                </div>
+                
+                <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20 rounded-lg p-4 flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2.5 h-2.5 rounded-full bg-amber-400 dark:bg-amber-500"></div>
+                    <span className="font-semibold text-amber-700 dark:text-amber-400">Próximos</span>
+                  </div>
+                  <span className="text-xl font-bold text-amber-700 dark:text-amber-400">{saludFlota.proximos}</span>
+                </div>
+
+                <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 rounded-lg p-4 flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 dark:bg-emerald-500"></div>
+                    <span className="font-semibold text-emerald-700 dark:text-emerald-400">Al Día</span>
+                  </div>
+                  <span className="text-xl font-bold text-emerald-700 dark:text-emerald-400">{saludFlota.alDia}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50 flex items-center justify-between">
+            <span className="text-xs text-slate-400 dark:text-slate-500">
+              {saludTab === 'documentos' ? 'Ir a Control Documental' : 'Ir a Pizarra de Mantenimiento'}
+            </span>
+            <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+              Ver Gestión <ArrowRight className="w-3 h-3 ml-1" />
+            </span>
           </div>
         </div>
       </div>

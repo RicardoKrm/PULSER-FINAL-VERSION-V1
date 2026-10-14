@@ -40,7 +40,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const { companies, activeCompanyId, setActiveCompanyId } = useCompany();
-  const { currentUser, usuarios, setCurrentUser, ordenesTrabajo, repuestos } =
+  const { currentUser, usuarios, setCurrentUser, ordenesTrabajo, repuestos, vehiculos, personal } =
     useAppContext();
   const { signOut, user, profile } = useAuth();
   const [profileOpen, setProfileOpen] = useState(false);
@@ -56,9 +56,30 @@ export default function Layout() {
   const notifications = React.useMemo(() => {
     const list: any[] = [];
     const now = new Date();
+    const nowTs = now.getTime();
+    const aviso30DiasMs = 30 * 24 * 60 * 60 * 1000;
+
+    const parseDocDate = (dateStr: any): number | null => {
+      if (!dateStr || typeof dateStr !== 'string') return null;
+      const clean = dateStr.trim();
+      if (!clean) return null;
+      const parts = clean.split('T')[0].split('-');
+      if (parts.length === 3) {
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const d = parseInt(parts[2], 10);
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+          return new Date(y, m, d, 23, 59, 59, 999).getTime();
+        }
+      }
+      const dt = new Date(clean);
+      return isNaN(dt.getTime()) ? null : dt.getTime();
+    };
 
     const otList = ordenesTrabajo || [];
     const repList = repuestos || [];
+    const vehList = vehiculos || [];
+    const colList = personal || [];
 
     // 1. Trabajos en proceso
     const enProceso = otList.filter((o) => o?.estado === "EN_PROCESO");
@@ -69,7 +90,7 @@ export default function Layout() {
         title: "Trabajos en Proceso",
         description: `Hay ${enProceso.length} órdenes de trabajo ejecutándose actualmente.`,
         time: "Actual",
-        roles: ["Admin", "Súper Administrador", "Mecánico"],
+        roles: ["Admin", "Súper Administrador", "Super Administrador", "Mecánico"],
       });
     }
 
@@ -95,7 +116,7 @@ export default function Layout() {
         title: "Programación Atrasada",
         description: `${atrasadasProg.length} OT(s) programadas ya deberían haber comenzado.`,
         time: "Urgente",
-        roles: ["Admin", "Súper Administrador"],
+        roles: ["Admin", "Súper Administrador", "Super Administrador"],
       });
     }
 
@@ -117,7 +138,7 @@ export default function Layout() {
         title: "OT Fuera de Tiempo",
         description: `${pasadosDeTiempo.length} OT(s) han superado su Tiempo Fuera de Servicio (TFS) estimado.`,
         time: "Urgente",
-        roles: ["Admin", "Súper Administrador", "Mecánico"],
+        roles: ["Admin", "Súper Administrador", "Super Administrador", "Mecánico"],
       });
     }
 
@@ -138,7 +159,104 @@ export default function Layout() {
         title: "Stock Crítico en Bodega",
         description: `${stockCritico.length} repuesto(s) se encuentran en nivel crítico o por debajo del mínimo.`,
         time: "Aviso",
-        roles: ["Admin", "Súper Administrador"],
+        roles: ["Admin", "Súper Administrador", "Super Administrador"],
+      });
+    }
+
+    // 5. Documentos de Vehículos Vencidos y Próximos (PRT, SOAP, Permiso)
+    const vehiculosDocVencidos: string[] = [];
+    const vehiculosDocProximos: string[] = [];
+
+    vehList.forEach((v: any) => {
+      const d = v.detalles || {};
+      const revDate = v.vencimiento_revision_tecnica || d.vencimiento_revision_tecnica || d.vencimientoRevisionTecnica || d.vencimientoRev;
+      const segDate = v.vencimiento_seguro || d.vencimiento_seguro || d.vencimientoSeguroSoap || d.vencimientoSoap || d.vencimientoSeguro;
+      const perDate = v.vencimiento_permiso_circulacion || d.vencimiento_permiso_circulacion || d.vencimientoPermisoCirculacion;
+
+      const docs = [revDate, segDate, perDate].filter(Boolean);
+      if (docs.length === 0) return;
+
+      let vencido = false;
+      let proximo = false;
+
+      docs.forEach((doc: any) => {
+        const docTs = parseDocDate(doc);
+        if (!docTs) return;
+        if (docTs < nowTs) vencido = true;
+        else if (docTs <= nowTs + aviso30DiasMs) proximo = true;
+      });
+
+      const ident = v.patente || v.numeroInterno || 'Unidad';
+      if (vencido) vehiculosDocVencidos.push(ident);
+      else if (proximo) vehiculosDocProximos.push(ident);
+    });
+
+    if (vehiculosDocVencidos.length > 0) {
+      list.push({
+        id: "docs-vehiculos-vencidos",
+        type: "ALERTA_DOCUMENTAL",
+        title: "Docs. Vehículos Vencidos",
+        description: `${vehiculosDocVencidos.length} vehículo(s) con PRT, SOAP o Permiso vencido (${vehiculosDocVencidos.slice(0, 3).join(', ')}${vehiculosDocVencidos.length > 3 ? '...' : ''}).`,
+        time: "Urgente",
+        roles: ["Admin", "Súper Administrador", "Super Administrador", "Jefe de Operaciones"],
+      });
+    }
+
+    if (vehiculosDocProximos.length > 0) {
+      list.push({
+        id: "docs-vehiculos-proximos",
+        type: "AVISO_DOCUMENTAL",
+        title: "Docs. Vehículos por Vencer",
+        description: `${vehiculosDocProximos.length} vehículo(s) con documentación por vencer en menos de 30 días.`,
+        time: "Aviso",
+        roles: ["Admin", "Súper Administrador", "Super Administrador", "Jefe de Operaciones"],
+      });
+    }
+
+    // 6. Documentos de Conductores / Colaboradores Vencidos y Próximos
+    const personalDocVencidos: string[] = [];
+    const personalDocProximos: string[] = [];
+
+    colList.forEach((col: any) => {
+      const d = col.detalles || {};
+      const licDate = col.vencimientoLicencia || d.vencimientoLicencia;
+      const exaDate = col.vencimientoExamenSalud || d.vencimientoExamenes || d.vencimientoSalud;
+
+      const docs = [licDate, exaDate].filter(Boolean);
+      let vencido = d.estadoExamen === 'NO APTO';
+      let proximo = false;
+
+      docs.forEach((doc: any) => {
+        const docTs = parseDocDate(doc);
+        if (!docTs) return;
+        if (docTs < nowTs) vencido = true;
+        else if (docTs <= nowTs + aviso30DiasMs) proximo = true;
+      });
+
+      const nom = col.nombre || col.name || 'Conductor';
+      if (vencido) personalDocVencidos.push(nom);
+      else if (proximo) personalDocProximos.push(nom);
+    });
+
+    if (personalDocVencidos.length > 0) {
+      list.push({
+        id: "docs-personal-vencidos",
+        type: "ALERTA_DOCUMENTAL",
+        title: "Licencias Choferes Vencidas",
+        description: `${personalDocVencidos.length} conductor(es) con licencia de conducir o examen médico vencido o no apto.`,
+        time: "Urgente",
+        roles: ["Admin", "Súper Administrador", "Super Administrador", "Jefe de Operaciones"],
+      });
+    }
+
+    if (personalDocProximos.length > 0) {
+      list.push({
+        id: "docs-personal-proximos",
+        type: "AVISO_DOCUMENTAL",
+        title: "Licencias Choferes por Vencer",
+        description: `${personalDocProximos.length} conductor(es) con licencia o examen por vencer en menos de 30 días.`,
+        time: "Aviso",
+        roles: ["Admin", "Súper Administrador", "Super Administrador", "Jefe de Operaciones"],
       });
     }
 
@@ -148,10 +266,13 @@ export default function Layout() {
       .filter(
         (n) =>
           (n.roles || []).includes(userRole) ||
-          (n.roles || []).includes("Súper Administrador"),
+          (n.roles || []).includes("Súper Administrador") ||
+          (n.roles || []).includes("Super Administrador") ||
+          userRole === "Súper Administrador" ||
+          userRole === "Super Administrador"
       )
       .map((n) => ({ ...n, read: readNotificationIds?.has(n.id) || false }));
-  }, [ordenesTrabajo, repuestos, currentUser, profile, readNotificationIds]);
+  }, [ordenesTrabajo, repuestos, vehiculos, personal, currentUser, profile, readNotificationIds]);
 
   const markAllAsRead = () => {
     const newRead = new Set(readNotificationIds);
@@ -658,7 +779,9 @@ export default function Layout() {
                             newRead.add(notification.id);
                             setReadNotificationIds(newRead);
 
-                            if (notification.id === "ot-en-proceso")
+                            if (notification.id.startsWith("docs-"))
+                              navigate("/operaciones/control-documental");
+                            else if (notification.id === "ot-en-proceso")
                               navigate("/flota/mantenimiento");
                             else if (notification.id === "ot-prog-atrasado")
                               navigate("/flota/programacion");
@@ -676,9 +799,9 @@ export default function Layout() {
                             <div
                               className={cn(
                                 "w-2 h-2 rounded-full mt-1.5 shrink-0",
-                                notification.type === "ALERTA_FLOTA"
+                                notification.type === "ALERTA_FLOTA" || notification.type === "ALERTA_DOCUMENTAL"
                                   ? "bg-red-500"
-                                  : notification.type === "STOCK_CRITICO"
+                                  : notification.type === "STOCK_CRITICO" || notification.type === "AVISO_DOCUMENTAL"
                                     ? "bg-amber-500"
                                     : "bg-blue-500",
                               )}
