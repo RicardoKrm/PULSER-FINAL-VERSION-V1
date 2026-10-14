@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Calendar as CalendarIcon, Download, Filter, Search, GripVertical, Clock, ChevronLeft, ChevronRight, Plus, ArrowRight } from 'lucide-react';
+import { Calendar as CalendarIcon, Download, Filter, Search, GripVertical, Clock, ChevronLeft, ChevronRight, Plus, ArrowRight, Truck, Activity, ShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { Modal } from '../../components/ui/Modal';
 import { supabase } from '../../lib/supabase';
 import { useCompany } from '../../contexts/CompanyContext';
 import { useAuth } from '../../context/AuthContext';
+import MonitoreoAricaDetenciones from './MonitoreoAricaDetenciones';
 
 import { useNavigate } from 'react-router-dom';
 
@@ -60,6 +61,7 @@ export default function Programacion() {
   const { activeCompanyId, currentCompany } = useCompany();
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const [mainTab, setMainTab] = useState<'CALENDARIO' | 'MONITOREO_SOLON'>('MONITOREO_SOLON');
   const [viewMode, setViewMode] = useState<'Día' | 'Semana' | 'Mes' | 'Tabla'>('Semana');
   const [currentDate, setCurrentDate] = useState<Date>(INIT_DATE);
   const [draggedItem, setDraggedItem] = useState<any>(null);
@@ -557,10 +559,57 @@ export default function Programacion() {
   };
 
   return (
-    <div className="h-[calc(100vh-4rem)] -mt-6 -mx-6 flex bg-white dark:bg-slate-900 font-sans text-slate-800 dark:text-slate-200">
+    <div className="h-[calc(100vh-4rem)] -mt-6 -mx-6 flex flex-col bg-white dark:bg-slate-900 font-sans text-slate-800 dark:text-slate-200">
       
-      {/* Left Sidebar (Google Calendar Style) */}
-      <div className="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0">
+      {/* Top Selector de Modo Operacional */}
+      <div className="bg-slate-100 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 px-6 py-2.5 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setMainTab('CALENDARIO')}
+            className={cn(
+              "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2",
+              mainTab === 'CALENDARIO'
+                ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200 dark:border-slate-700"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+            )}
+          >
+            <CalendarIcon className="w-4 h-4" />
+            <span>📅 Programación & Calendario</span>
+          </button>
+
+          <button
+            onClick={() => setMainTab('MONITOREO_SOLON')}
+            className={cn(
+              "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 relative",
+              mainTab === 'MONITOREO_SOLON'
+                ? "bg-blue-600 text-white shadow-md shadow-blue-500/25 border border-blue-500"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+            )}
+          >
+            <Truck className="w-4 h-4" />
+            <span>🛰️ Monitoreo & Auditoría de Paradas (4 Tractos Arica • Solon Chavez)</span>
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+          </button>
+        </div>
+
+        <div className="hidden md:flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+            Telemetría GPS en Vivo
+          </span>
+          <span>•</span>
+          <span className="font-semibold text-slate-700 dark:text-slate-300">
+            Cliente: Solon Chavez
+          </span>
+        </div>
+      </div>
+
+      {mainTab === 'MONITOREO_SOLON' ? (
+        <MonitoreoAricaDetenciones />
+      ) : (
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Sidebar (Google Calendar Style) */}
+          <div className="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0">
          <div className="p-4 pt-6">
             <button onClick={() => setIsNewModalOpen(true)} className="w-full bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full py-2 pr-4 pl-3 flex items-center justify-start transition-colors">
               <Plus className="w-6 h-6 mr-2 text-blue-600 dark:text-blue-500" />
@@ -1287,6 +1336,8 @@ export default function Programacion() {
             <button onClick={() => setDayDetailsModal({ ...dayDetailsModal, isOpen: false })} className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Cerrar</button>
          </div>
       </Modal>
+        </div>
+      )}
     </div>
   );
 }
