@@ -223,7 +223,7 @@ function GestionRutasContent() {
             <MapIcon className="w-6 h-6 text-indigo-500" />
             Configuración Operacional
           </h1>
-          <p className="text-slate-500 mt-1 text-sm font-medium">Define las rutas de servicio y las geocercas para alimentar las alertas operativas del panel FleetSat.</p>
+          <p className="text-slate-500 mt-1 text-sm font-medium">Define las rutas de servicio y las geocercas para alimentar las alertas operativas del panel de Monitoreo GPS.</p>
         </div>
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <div className="relative w-full sm:w-auto">
@@ -405,7 +405,7 @@ function GestionRutasContent() {
              </div>
              
              <div className="bg-blue-50 text-blue-800 text-xs p-3 rounded border border-blue-100 mt-2 font-medium">
-               El corredor de tolerancia determinará cuándo el módulo FleetSat levantará una alerta de <strong className="font-black">Desvío de Ruta</strong>. Exceder los {toleranciaRuta}m del eje principal se considerará anomalía.
+               El corredor de tolerancia determinará cuándo el módulo GPS levantará una alerta de <strong className="font-black">Desvío de Ruta</strong>. Exceder los {toleranciaRuta}m del eje principal se considerará anomalía.
              </div>
 
              <div className="pt-4 flex justify-end gap-3 border-t border-slate-200 dark:border-slate-800 mt-6">
@@ -450,7 +450,7 @@ function GestionRutasContent() {
               </div>
               
               <div className="bg-amber-50 text-amber-800 text-xs p-3 rounded border border-amber-100 mt-2 font-medium">
-                 Cualquier detención dentro de este perímetro <strong className="font-black">menor a {geoTiempoTolerancia || 'X'} min</strong> se considerará Espera Normal. Si supera este tiempo, FleetSat emitirá alerta <strong className="font-black text-red-700">Tiempo Excedido</strong>.
+                 Cualquier detención dentro de este perímetro <strong className="font-black">menor a {geoTiempoTolerancia || 'X'} min</strong> se considerará Espera Normal. Si supera este tiempo, el sistema GPS emitirá alerta <strong className="font-black text-red-700">Tiempo Excedido</strong>.
               </div>
 
               <div>
@@ -486,7 +486,7 @@ function GeocercaMapPicker({ geoCoords, setGeoCoords }: any) {
             zoom={11}
             className="w-full h-full"
          >
-            <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             <MapEvents />
             {geoCoords && (
                <Marker position={[geoCoords.lat, geoCoords.lng]} />
@@ -596,7 +596,7 @@ function MapRouteBuilder({ origen, setOrigen, destino, setDestino, setDistanciaK
             zoom={10}
             className="w-full h-full"
          >
-            <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             <MapRouteEvents />
             {mapOriginCoords && (
                <Marker position={[mapOriginCoords.lat, mapOriginCoords.lng]} />

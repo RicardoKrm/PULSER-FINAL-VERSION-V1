@@ -451,8 +451,8 @@ export default function Layout() {
             if (item.submodules) {
               filteredSubmodules = item.submodules.filter((sub) => {
                 const key = `${item.title}:${sub.title}`;
-                const legacyKey = sub.title === 'GPS FleetSat' ? `${item.title}:GPS` : key;
-                return perms.includes(key) || perms.includes(legacyKey);
+                const legacyKey = (sub.title === 'Monitor GPS' || sub.title === 'GPS FleetSat') ? `${item.title}:GPS` : key;
+                return perms.includes(key) || perms.includes(legacyKey) || perms.includes(`${item.title}:GPS FleetSat`) || perms.includes(`${item.title}:Monitor GPS`);
               });
             }
             acc.push({

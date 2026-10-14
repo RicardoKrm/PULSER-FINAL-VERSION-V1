@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -183,17 +183,27 @@ const mockRouteReal: [number, number][] = [
 ];
 
 export default function GPS() {
-  const { activeCompanyId } = useCompany();
+  const { activeCompanyId, currentCompany } = useCompany();
 
+  // Dynamic Base Coordinates per Tenant (Arica for Solon Chavez, Tarapaca for Araksaya/others)
+  const isArica = Boolean(
+    currentCompany?.name?.toLowerCase().includes('solon') || 
+    currentCompany?.name?.toLowerCase().includes('chavez') || 
+    currentCompany?.name?.toLowerCase().includes('arica')
+  );
+  const baseLat = isArica ? -18.4783 : -20.2167;
+  const baseLng = isArica ? -70.3126 : -70.1422;
+
+  const [mapLayer, setMapLayer] = useState<'streets' | 'satellite'>('streets');
   const [vehiculosGPS, setVehiculosGPS] = useState<any[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isGlobalMonitorOpen, setIsGlobalMonitorOpen] = useState(false);
 
   // Map Navigation State
   const [centerEvent, setCenterEvent] = useState({
-    lat: -20.59,
-    lng: -69.31,
-    zoom: 11,
+    lat: baseLat,
+    lng: baseLng,
+    zoom: isArica ? 12 : 11,
     force: false,
     updateTick: 0,
   });
@@ -277,11 +287,11 @@ export default function GPS() {
           let lat =
             v.detalles?.ultima_ubicacion?.lat !== undefined
               ? v.detalles.ultima_ubicacion.lat
-              : -20.59 + (Math.random() * 0.1 - 0.05);
+              : baseLat + (Math.random() * 0.08 - 0.04);
           let lng =
             v.detalles?.ultima_ubicacion?.lng !== undefined
               ? v.detalles.ultima_ubicacion.lng
-              : -69.31 + (Math.random() * 0.1 - 0.05);
+              : baseLng + (Math.random() * 0.08 - 0.04);
           let velocidad = v.detalles?.ultima_ubicacion?.velocidad || 0;
           let newKm = v.kilometraje_actual || 0;
           let gpsName = prov || "dominio";
@@ -517,10 +527,17 @@ export default function GPS() {
 
   useEffect(() => {
     if (!activeCompanyId) return;
+    setCenterEvent({
+      lat: baseLat,
+      lng: baseLng,
+      zoom: isArica ? 12 : 11,
+      force: true,
+      updateTick: Date.now()
+    });
     fetchGpsVehicles();
     const interval = setInterval(() => fetchGpsVehicles(), 60000); // Only poll every 60s
     return () => clearInterval(interval);
-  }, [activeCompanyId]);
+  }, [activeCompanyId, baseLat, baseLng, isArica]);
 
   const handleForceCenter = (lat: number, lng: number, zoom = 14) => {
     setCenterEvent({ lat, lng, zoom, force: true, updateTick: Date.now() });
@@ -537,10 +554,10 @@ export default function GPS() {
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-4 px-1">
         <div>
           <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-            Monitor GPS FleetSat
+            Monitor GPS en Vivo
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm font-medium">
-            Control dinámico de rutas, geocercas y seguimiento de flota.
+            Control dinámico de rutas, geocercas y seguimiento de flota en tiempo real.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -626,9 +643,9 @@ export default function GPS() {
             <button
               onClick={() =>
                 handleForceCenter(
-                  vehiculosGPS[0]?.lat || -20.59,
-                  vehiculosGPS[0]?.lng || -69.31,
-                  9,
+                  vehiculosGPS[0]?.lat || baseLat,
+                  vehiculosGPS[0]?.lng || baseLng,
+                  isArica ? 12 : 9,
                 )
               }
               className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded-lg text-slate-700 transition"
@@ -670,6 +687,26 @@ export default function GPS() {
               />
               <span className="text-xs font-bold">Heatmap Congestión</span>
             </button>
+
+            <div className="pt-2 mt-1 border-t border-slate-100 flex items-center justify-between px-1">
+              <span className="text-slate-500 text-[10px] uppercase font-bold">Mapa:</span>
+              <div className="flex bg-slate-100 p-0.5 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setMapLayer('streets')}
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${mapLayer === 'streets' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  Calles
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMapLayer('satellite')}
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${mapLayer === 'satellite' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  Satelital
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="bg-white/95 backdrop-blur-p-3 p-3 rounded-xl shadow-lg border border-slate-200 w-48">
@@ -937,7 +974,15 @@ export default function GPS() {
               selectedLng={selectedVehicleData?.lng}
             />
 
-            <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+            <TileLayer
+              key={mapLayer}
+              url={
+                mapLayer === 'satellite'
+                  ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                  : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              }
+              maxZoom={19}
+            />
 
             {/* Heatmap Simulation Overlay */}
             {showHeatmap && (

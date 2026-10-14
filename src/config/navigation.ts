@@ -81,7 +81,7 @@ export const navigation = [
       { title: 'Programación', icon: CalendarClock, href: '/operaciones/programacion' },
       { title: 'Control Documental', icon: FileCheck, href: '/operaciones/control-documental' },
       { title: 'Historial', icon: Activity, href: '/operaciones/historial' },
-      { title: 'GPS FleetSat', icon: MapPin, href: '/operaciones/gps' },
+      { title: 'Monitor GPS', icon: MapPin, href: '/operaciones/gps' },
       { title: 'Portal Conductor', icon: UserCircle, href: '/operaciones/portal-conductor' },
       { title: 'Gestión de Rutas', icon: MapIcon, href: '/operaciones/rutas' },
     ],
