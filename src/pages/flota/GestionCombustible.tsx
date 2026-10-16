@@ -66,30 +66,44 @@ const CustomChartTooltip = ({ active, payload, label }: any) => {
           </div>
 
           {data.rendimientoKmL !== null && (
-            <div className="flex justify-between items-center bg-blue-50/80 dark:bg-blue-950/40 p-2 rounded-lg border border-blue-200/60 dark:border-blue-900/40">
-              <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
-                <span className="font-medium text-slate-700 dark:text-slate-200">
-                  Ruta ({data.vehiculosKmLCount} {data.vehiculosKmLCount === 1 ? 'vehículo' : 'vehículos'}):
+            <div className="bg-blue-50/80 dark:bg-blue-950/40 p-2 rounded-lg border border-blue-200/60 dark:border-blue-900/40 space-y-1">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+                  <span className="font-medium text-slate-700 dark:text-slate-200">
+                    Ruta ({data.vehiculosKmLCount} {data.vehiculosKmLCount === 1 ? 'vehículo' : 'vehículos'}):
+                  </span>
+                </div>
+                <span className="font-bold text-blue-700 dark:text-blue-300 font-mono text-xs">
+                  {data.rendimientoKmL} km/L
                 </span>
               </div>
-              <span className="font-bold text-blue-700 dark:text-blue-300 font-mono text-xs">
-                {data.rendimientoKmL} km/L
-              </span>
+              {data.vehiculosKmLNombres?.length > 0 && (
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-snug">
+                  {data.vehiculosKmLNombres.join(', ')}
+                </div>
+              )}
             </div>
           )}
 
           {data.consumoLh !== null && (
-            <div className="flex justify-between items-center bg-amber-50/80 dark:bg-amber-950/40 p-2 rounded-lg border border-amber-200/60 dark:border-amber-900/40">
-              <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div>
-                <span className="font-medium text-slate-700 dark:text-slate-200">
-                  Faena ({data.vehiculosLhCount} {data.vehiculosLhCount === 1 ? 'maquinaria' : 'maquinarias'}):
+            <div className="bg-amber-50/80 dark:bg-amber-950/40 p-2 rounded-lg border border-amber-200/60 dark:border-amber-900/40 space-y-1">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div>
+                  <span className="font-medium text-slate-700 dark:text-slate-200">
+                    Faena ({data.vehiculosLhCount} {data.vehiculosLhCount === 1 ? 'maquinaria' : 'maquinarias'}):
+                  </span>
+                </div>
+                <span className="font-bold text-amber-700 dark:text-amber-300 font-mono text-xs">
+                  {data.consumoLh} L/h
                 </span>
               </div>
-              <span className="font-bold text-amber-700 dark:text-amber-300 font-mono text-xs">
-                {data.consumoLh} L/h
-              </span>
+              {data.vehiculosLhNombres?.length > 0 && (
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-snug">
+                  {data.vehiculosLhNombres.join(', ')}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -338,13 +352,17 @@ export default function GestionCombustible() {
          return c;
        }));
 
-       // Persistencia en Supabase
-       const { error } = await supabase.from('vehiculo').update({
+       // Persistencia en Supabase (select() permite comprobar que la fila fue realmente actualizada)
+       const { data: updated, error } = await supabase.from('vehiculo').update({
          detalles: updatedDetalles
-       }).eq('id', formMeta.vehiculo_id);
+       }).eq('id', formMeta.vehiculo_id).select('id, detalles');
 
-       if (error) {
-         console.error("Error al actualizar vehículo en Supabase:", error);
+       if (error || !updated || updated.length === 0) {
+         console.error("No se pudo guardar tipo de medición en Supabase:", error, updated);
+         alert("⚠️ El cambio NO se guardó en el servidor" + (error ? `: ${error.message}` : " (0 filas actualizadas; posible restricción de permisos RLS sobre la tabla vehiculo).") + "\nLa vista se revertirá al valor guardado.");
+         setIsAjustarMetasOpen(false);
+         fetchData();
+         return;
        }
 
        setIsAjustarMetasOpen(false);
@@ -857,6 +875,10 @@ export default function GestionCombustible() {
           : null;
 
         const allVehIds = new Set([...g.vehiculosKmLIds, ...g.vehiculosLhIds]);
+        const nombreDe = (id: string) => {
+          const vv = vehiculoMap[id];
+          return vv ? (vv.detalles?.numero_interno || vv.numero_interno || vv.patente || String(id)) : String(id);
+        };
 
         return {
           date: d,
@@ -867,6 +889,8 @@ export default function GestionCombustible() {
           rendimiento: avgRendKmL,
           vehiculosKmLCount: g.vehiculosKmLIds.size,
           vehiculosLhCount: g.vehiculosLhIds.size,
+          vehiculosKmLNombres: Array.from(g.vehiculosKmLIds).map(nombreDe),
+          vehiculosLhNombres: Array.from(g.vehiculosLhIds).map(nombreDe),
           totalVehiculos: allVehIds.size,
         };
      });
