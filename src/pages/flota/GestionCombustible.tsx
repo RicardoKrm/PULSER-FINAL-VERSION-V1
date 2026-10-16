@@ -21,7 +21,8 @@ import {
   History,
   Info,
   X,
-  Target
+  Target,
+  RotateCcw
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Badge } from '../../components/ui/Badge';
@@ -29,7 +30,6 @@ import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip as Recha
 
 export default function GestionCombustible() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'vehiculos' | 'cargas'>('dashboard');
-  const [busqueda, setBusqueda] = useState('');
   
   // Modal states
   const [isAjustarMetasOpen, setIsAjustarMetasOpen] = useState(false);
@@ -43,6 +43,18 @@ export default function GestionCombustible() {
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState<any | null>(null);
+
+  // Filtros multidimensionales para Rend. Vehículos
+  const [filtroTexto, setFiltroTexto] = useState('');
+  const [filtroMarca, setFiltroMarca] = useState('todos');
+  const [filtroModelo, setFiltroModelo] = useState('todos');
+  const [filtroTipo, setFiltroTipo] = useState('todos');
+  const [filtroRuta, setFiltroRuta] = useState('todos');
+  const [filtroAplicacion, setFiltroAplicacion] = useState('todos');
+
+  // Filtros para panel Cargas
+  const [filtroCargasVehiculo, setFiltroCargasVehiculo] = useState('todos');
+  const [busquedaCargas, setBusquedaCargas] = useState('');
   const { currentCompany } = useCompany();
 
   // Real data state
@@ -162,17 +174,40 @@ export default function GestionCombustible() {
     }
   };
 
-  // Procesar KPIs
+  // 1. Filtrado base de cargas por rango de fecha (afecta a Dashboard, Rend. Vehículos y Cargas)
+  const cargasFiltradasPorFecha = React.useMemo(() => {
+    return cargasRegistradas.filter(c => {
+      const cDate = c.fecha ? c.fecha.substring(0, 10) : '';
+      if (fechaDesde && cDate < fechaDesde) return false;
+      if (fechaHasta && cDate > fechaHasta) return false;
+      return true;
+    });
+  }, [cargasRegistradas, fechaDesde, fechaHasta]);
+
+  // 2. Procesar KPIs (basados en el rango de fechas seleccionado)
   const kpis = React.useMemo(() => {
     let costoTotal30d = 0;
     let totalLitros = 0;
-    let totalKm = 0; // approximate
-    cargasRegistradas.forEach(c => {
+    let totalKm = 0;
+
+    vehiculos.forEach(v => {
+      const vCargas = cargasFiltradasPorFecha.filter(c => c.vehiculo_id === v.id);
+      if (vCargas.length >= 2) {
+        const sorted = [...vCargas].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+        const odoStart = parseFloat(sorted[0]?.odometro) || 0;
+        const odoEnd = parseFloat(sorted[sorted.length - 1]?.odometro) || 0;
+        if (odoEnd > odoStart) totalKm += (odoEnd - odoStart);
+      }
+    });
+
+    cargasFiltradasPorFecha.forEach(c => {
        costoTotal30d += parseFloat(c.costo_total) || 0;
        totalLitros += parseFloat(c.litros) || 0;
-       // simplistic km sum based on previous to current if sorted correctly, or just fallback
-       totalKm += (parseFloat(c.litros) || 0) * 2.5; // fallback avg 2.5
     });
+
+    if (totalKm === 0 && totalLitros > 0) {
+       totalKm = totalLitros * 2.8;
+    }
     
     return {
       costoTotal30d,
@@ -181,18 +216,37 @@ export default function GestionCombustible() {
       rendimientoPromedio: totalLitros > 0 ? (totalKm / totalLitros).toFixed(1) : '0',
       costoKmPromedio: totalKm > 0 ? Math.round(costoTotal30d / totalKm) : 0,
     };
-  }, [cargasRegistradas]);
+  }, [cargasFiltradasPorFecha, vehiculos]);
 
+  // 3. Procesar tabla de la flota (con cálculo delta y atributos de tipo, ruta y aplicación)
   const tablaFlota = React.useMemo(() => {
     return vehiculos.map(v => {
-       const vCargas = cargasRegistradas.filter(c => c.vehiculo_id === v.id);
+       const vCargas = cargasFiltradasPorFecha.filter(c => c.vehiculo_id === v.id);
        const vTotalCosto = vCargas.reduce((acc, c) => acc + (parseFloat(c.costo_total)||0), 0);
        const vTotalLitros = vCargas.reduce((acc, c) => acc + (parseFloat(c.litros)||0), 0);
        const rendimientoObjetivo = parseFloat(v.detalles?.rendimiento_objetivo || '2.5');
-       // Dummy KM for logic:
-       const vTotalKm = vTotalLitros * (rendimientoObjetivo * 0.9); // assuming we are 90% optimal by default if no data to delta 
        
-       const rendimientoHistorico = vTotalLitros > 0 ? vTotalKm / vTotalLitros : 0;
+       let vTotalKm = 0;
+       let rendimientoHistorico = 0;
+
+       if (vCargas.length >= 2) {
+          const sorted = [...vCargas].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+          const odoStart = parseFloat(sorted[0]?.odometro) || 0;
+          const odoEnd = parseFloat(sorted[sorted.length - 1]?.odometro) || 0;
+          const deltaKm = (odoEnd > odoStart) ? (odoEnd - odoStart) : 0;
+          const litrosConsumidos = sorted.slice(1).reduce((acc, c) => acc + (parseFloat(c.litros) || 0), 0);
+          
+          if (deltaKm > 0 && litrosConsumidos > 0) {
+             vTotalKm = deltaKm;
+             rendimientoHistorico = Number((deltaKm / litrosConsumidos).toFixed(2));
+          }
+       }
+
+       if (rendimientoHistorico === 0 && vTotalLitros > 0) {
+          vTotalKm = vTotalLitros * (rendimientoObjetivo * 0.9);
+          rendimientoHistorico = Number((vTotalKm / vTotalLitros).toFixed(2));
+       }
+       
        const costoKm30d = vTotalKm > 0 ? Math.round(vTotalCosto / vTotalKm) : 0;
        
        let estado = 'N/A';
@@ -204,44 +258,182 @@ export default function GestionCombustible() {
           estado = 'Sin Datos';
        }
 
+       const desviacionPct = (rendimientoObjetivo > 0 && rendimientoHistorico > 0)
+          ? Number((((rendimientoHistorico - rendimientoObjetivo) / rendimientoObjetivo) * 100).toFixed(1))
+          : 0;
+
+       const rutasCargas = Array.from(new Set(vCargas.map(c => c.ruta).filter(Boolean))) as string[];
+       const rutaPrincipal = rutasCargas.length > 0 ? rutasCargas[0] : (v.detalles?.ruta || 'General');
+
        return {
           id: v.id,
           patente: v.patente,
           numeroInterno: v.detalles?.numero_interno || v.patente,
-          marca: v.marca || 'N/A',
-          modelo: v.modelo || 'N/A',
+          marca: v.marca || v.detalles?.marca || 'N/A',
+          modelo: v.modelo || v.detalles?.modelo || 'N/A',
+          tipo: v.tipo || v.detalles?.tipo || v.detalles?.tipo_vehiculo || 'Bus / Camión',
+          aplicacion: v.detalles?.tipo_uso || v.detalles?.aplicacion || v.detalles?.faena || 'Operación General',
+          ruta: rutaPrincipal,
+          rutas: rutasCargas,
           rendimientoObjetivo,
           rendimientoHistorico,
+          desviacionPct,
           costoKm30d,
           estado
        };
     });
-  }, [vehiculos, cargasRegistradas]);
+  }, [vehiculos, cargasFiltradasPorFecha]);
+
+  const alertasFlota = React.useMemo(() => {
+    return tablaFlota.filter(v => v.estado === 'Crítico' || v.estado === 'Regular');
+  }, [tablaFlota]);
 
   const vehiculosCriticos = tablaFlota.filter(v => v.estado === 'Crítico').length;
+  const alertasRegularesCount = tablaFlota.filter(v => v.estado === 'Regular').length;
 
+  // 4. Opciones dinámicas para filtros multidimensionales en Rend. Vehículos
+  const opcionesMarcas = React.useMemo(() => {
+    const s = new Set<string>();
+    tablaFlota.forEach(v => { if (v.marca && v.marca !== 'N/A') s.add(v.marca); });
+    return Array.from(s).sort();
+  }, [tablaFlota]);
+
+  const opcionesModelos = React.useMemo(() => {
+    const s = new Set<string>();
+    tablaFlota.forEach(v => {
+      if (filtroMarca !== 'todos' && v.marca !== filtroMarca) return;
+      if (v.modelo && v.modelo !== 'N/A') s.add(v.modelo);
+    });
+    return Array.from(s).sort();
+  }, [tablaFlota, filtroMarca]);
+
+  const opcionesTipos = React.useMemo(() => {
+    const s = new Set<string>();
+    tablaFlota.forEach(v => { if (v.tipo && v.tipo !== 'N/A') s.add(v.tipo); });
+    return Array.from(s).sort();
+  }, [tablaFlota]);
+
+  const opcionesRutas = React.useMemo(() => {
+    const s = new Set<string>();
+    tablaFlota.forEach(v => {
+      if (v.ruta && v.ruta !== 'General') s.add(v.ruta);
+      if (Array.isArray(v.rutas)) v.rutas.forEach((r: string) => s.add(r));
+    });
+    cargasFiltradasPorFecha.forEach(c => { if (c.ruta) s.add(c.ruta); });
+    return Array.from(s).sort();
+  }, [tablaFlota, cargasFiltradasPorFecha]);
+
+  const opcionesAplicaciones = React.useMemo(() => {
+    const s = new Set<string>();
+    tablaFlota.forEach(v => { if (v.aplicacion) s.add(v.aplicacion); });
+    return Array.from(s).sort();
+  }, [tablaFlota]);
+
+  // 5. Filtrado multidimensional de vehículos
+  const filteredFlota = React.useMemo(() => {
+    return tablaFlota.filter(v => {
+      if (filtroTexto.trim()) {
+        const query = filtroTexto.toLowerCase().trim();
+        const matchNum = v.numeroInterno?.toLowerCase().includes(query);
+        const matchPat = v.patente?.toLowerCase().includes(query);
+        if (!matchNum && !matchPat) return false;
+      }
+      if (filtroMarca !== 'todos' && v.marca !== filtroMarca) return false;
+      if (filtroModelo !== 'todos' && v.modelo !== filtroModelo) return false;
+      if (filtroTipo !== 'todos' && v.tipo !== filtroTipo) return false;
+      if (filtroRuta !== 'todos') {
+        const hasRuta = v.ruta === filtroRuta || (Array.isArray(v.rutas) && v.rutas.includes(filtroRuta));
+        if (!hasRuta) return false;
+      }
+      if (filtroAplicacion !== 'todos' && v.aplicacion !== filtroAplicacion) return false;
+      return true;
+    });
+  }, [tablaFlota, filtroTexto, filtroMarca, filtroModelo, filtroTipo, filtroRuta, filtroAplicacion]);
+
+  const hayFiltrosActivosVehiculos = 
+    filtroTexto.trim() !== '' || 
+    filtroMarca !== 'todos' || 
+    filtroModelo !== 'todos' || 
+    filtroTipo !== 'todos' || 
+    filtroRuta !== 'todos' || 
+    filtroAplicacion !== 'todos';
+
+  const limpiarFiltrosVehiculos = () => {
+    setFiltroTexto('');
+    setFiltroMarca('todos');
+    setFiltroModelo('todos');
+    setFiltroTipo('todos');
+    setFiltroRuta('todos');
+    setFiltroAplicacion('todos');
+  };
+
+  // 6. Filtrado para el panel de Cargas
+  const cargasFiltradasTab = React.useMemo(() => {
+    return cargasFiltradasPorFecha.filter(c => {
+      if (filtroCargasVehiculo !== 'todos' && c.vehiculo_id !== filtroCargasVehiculo) {
+        return false;
+      }
+      if (busquedaCargas.trim()) {
+        const q = busquedaCargas.toLowerCase().trim();
+        const matchVeh = c.vehiculoName?.toLowerCase().includes(q) || c.patente?.toLowerCase().includes(q);
+        const matchCond = c.conductor?.toLowerCase().includes(q);
+        const matchRuta = c.ruta?.toLowerCase().includes(q);
+        if (!matchVeh && !matchCond && !matchRuta) return false;
+      }
+      return true;
+    });
+  }, [cargasFiltradasPorFecha, filtroCargasVehiculo, busquedaCargas]);
+
+  const totalLitrosCargasTab = React.useMemo(() => {
+    return cargasFiltradasTab.reduce((acc, c) => acc + (parseFloat(c.litros) || 0), 0);
+  }, [cargasFiltradasTab]);
+
+  const totalCostoCargasTab = React.useMemo(() => {
+    return cargasFiltradasTab.reduce((acc, c) => acc + (parseFloat(c.costo_total) || 0), 0);
+  }, [cargasFiltradasTab]);
+
+  // 7. Gráfico histórico agrupado por fecha (calculando km reales de lecturas consecutivas)
   const chartData = React.useMemo(() => {
-     // Agrupar por fecha  
-     const grouped: Record<string, { costo: number, litros: number, km: number }> = {};
-     cargasRegistradas.forEach(c => {
-        const d = c.fechaFormateada;
-        if (!grouped[d]) grouped[d] = { costo: 0, litros: 0, km: 0 };
-        grouped[d].costo += parseFloat(c.costo_total) || 0;
-        grouped[d].litros += parseFloat(c.litros) || 0;
-        grouped[d].km += (parseFloat(c.litros) || 0) * 2.5;
-     });
-     
-     return Object.keys(grouped).map(d => ({
-        date: d.substring(0,5), // e.g. "20/05"
-        costo: grouped[d].costo,
-        rendimiento: grouped[d].litros > 0 ? (grouped[d].km / grouped[d].litros) : 0
-     })).slice(0, 10).reverse(); // Last 10 days
-  }, [cargasRegistradas]);
+     const allSorted = [...cargasRegistradas].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+     const deltaKmByCargaId: Record<string, number> = {};
+     const prevOdoByVehiculo: Record<string, number> = {};
 
-  const filteredFlota = tablaFlota.filter(v => 
-    v.patente.toLowerCase().includes(busqueda.toLowerCase()) || 
-    v.numeroInterno.toLowerCase().includes(busqueda.toLowerCase())
-  );
+     allSorted.forEach(c => {
+        const vId = c.vehiculo_id;
+        const odo = parseFloat(c.odometro) || 0;
+        if (prevOdoByVehiculo[vId] !== undefined && odo > prevOdoByVehiculo[vId]) {
+           deltaKmByCargaId[c.id] = odo - prevOdoByVehiculo[vId];
+        }
+        prevOdoByVehiculo[vId] = odo;
+     });
+
+     const sortedFiltradas = [...cargasFiltradasPorFecha].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+     const grouped: Record<string, { costo: number, litros: number, km: number }> = {};
+
+     sortedFiltradas.forEach(c => {
+        const d = c.fecha ? c.fecha.substring(0, 10) : (c.fechaFormateada || '');
+        const parts = d.split('-');
+        const shortDate = parts.length === 3 ? `${parts[2]}/${parts[1]}` : d.substring(0, 5);
+
+        if (!grouped[shortDate]) grouped[shortDate] = { costo: 0, litros: 0, km: 0 };
+        const litros = parseFloat(c.litros) || 0;
+        grouped[shortDate].costo += parseFloat(c.costo_total) || 0;
+        grouped[shortDate].litros += litros;
+        
+        const delta = deltaKmByCargaId[c.id];
+        if (delta && delta > 0) {
+           grouped[shortDate].km += delta;
+        } else {
+           grouped[shortDate].km += litros * 2.8;
+        }
+     });
+
+     return Object.keys(grouped).map(d => ({
+        date: d,
+        costo: grouped[d].costo,
+        rendimiento: grouped[d].litros > 0 ? Number((grouped[d].km / grouped[d].litros).toFixed(2)) : 0
+     }));
+  }, [cargasFiltradasPorFecha, cargasRegistradas]);
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto w-full relative">
@@ -259,25 +451,39 @@ export default function GestionCombustible() {
 
       {!selectedVehicle && (
         <div className="flex flex-col md:flex-row gap-4 items-start md:items-center bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border dark:border-slate-800 justify-between overflow-x-auto">
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 font-medium">
-              <Calendar className="w-4 h-4" /> Desde:
+              <Calendar className="w-4 h-4 text-blue-500" /> Rango Fecha:
             </div>
-            <input 
-               type="date" 
-               value={fechaDesde}
-               onChange={e => setFechaDesde(e.target.value)}
-               className="p-2 border rounded-md dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 text-sm"
-            />
-            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 font-medium ml-2">
-              Hasta:
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-500">Desde:</span>
+              <input 
+                 type="date" 
+                 value={fechaDesde}
+                 onChange={e => setFechaDesde(e.target.value)}
+                 className="p-1.5 px-2.5 border rounded-lg dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 text-sm shadow-sm"
+              />
             </div>
-            <input 
-               type="date" 
-               value={fechaHasta}
-               onChange={e => setFechaHasta(e.target.value)}
-               className="p-2 border rounded-md dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 text-sm"
-            />
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-500">Hasta:</span>
+              <input 
+                 type="date" 
+                 value={fechaHasta}
+                 onChange={e => setFechaHasta(e.target.value)}
+                 className="p-1.5 px-2.5 border rounded-lg dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 text-sm shadow-sm"
+              />
+            </div>
+            {(fechaDesde || fechaHasta) && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => { setFechaDesde(''); setFechaHasta(''); }}
+                className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-1 h-8 px-2"
+                title="Limpiar filtro de fechas"
+              >
+                <X className="w-3.5 h-3.5" /> Limpiar fechas
+              </Button>
+            )}
           </div>
           
           <div className="flex bg-slate-100/50 dark:bg-slate-900/50 p-1 rounded-xl shadow-inner border border-slate-200/50 dark:border-slate-800/50">
@@ -377,84 +583,180 @@ export default function GestionCombustible() {
               </Card>
             </div>
 
-          <div className="grid lg:grid-cols-3 gap-6">
-            <Card className="col-span-full lg:col-span-2 shadow-sm">
-              <CardHeader>
-                <CardTitle>Evolución Consumo vs Costo</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-80 w-full mt-4">
-                  {chartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart
-                        data={chartData}
-                        margin={{ top: 20, right: 20, bottom: 20, left: 10 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                        <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
-                        <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(value) => `${value / 1000}k`} />
-                        <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} type="number" domain={[10, 15]} tick={{ fontSize: 12, fill: '#64748b' }} />
-                        <RechartsTooltip 
-                           contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', color: '#0f172a' }}
-                           formatter={(value, name) => {
-                             if (name === 'Costo ($)') return [`$${(value as number).toLocaleString()}`, name];
-                             if (name === 'Rendimiento (km/L)') return [`${(value as number).toFixed(1)} km/L`, name];
-                             return [value, name];
-                           }}
-                        />
-                        <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                        <Bar yAxisId="left" dataKey="costo" name="Costo ($)" fill="#93c5fd" radius={[4, 4, 0, 0]} barSize={40} />
-                        <Line yAxisId="right" type="monotone" dataKey="rendimiento" name="Rendimiento (km/L)" stroke="#3b82f6" strokeWidth={3} dot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 8 }} />
-                      </ComposedChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900/50">
-                       <BarChart3 className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-3" />
-                       <p className="text-slate-500 font-medium">No hay suficientes datos registrados</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+          {/* Gráfica de evolución a ancho completo */}
+          <Card className="shadow-sm border dark:border-slate-800">
+            <CardHeader className="flex flex-row items-center justify-between border-b dark:border-slate-800 pb-4">
+              <div>
+                <CardTitle className="text-base font-bold flex items-center gap-2 text-slate-800 dark:text-white">
+                  <BarChart3 className="w-5 h-5 text-blue-500" />
+                  Evolución Consumo vs Costo
+                </CardTitle>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Comparativa temporal de gasto ($) y rendimiento promedio (km/L) en la flota
+                </p>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80 w-full mt-4">
+                {chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart
+                      data={chartData}
+                      margin={{ top: 20, right: 20, bottom: 20, left: 10 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                      <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
+                      <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(value) => `${value / 1000}k`} />
+                      <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} type="number" domain={[0, 'auto']} tick={{ fontSize: 12, fill: '#64748b' }} unit=" km/L" />
+                      <RechartsTooltip 
+                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', color: '#0f172a' }}
+                         formatter={(value, name) => {
+                           if (name === 'Costo ($)') return [`$${(value as number).toLocaleString()}`, name];
+                           if (name === 'Rendimiento (km/L)') return [`${(value as number).toFixed(1)} km/L`, name];
+                           return [value, name];
+                         }}
+                      />
+                      <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                      <Bar yAxisId="left" dataKey="costo" name="Costo ($)" fill="#93c5fd" radius={[4, 4, 0, 0]} barSize={40} />
+                      <Line yAxisId="right" type="monotone" dataKey="rendimiento" name="Rendimiento (km/L)" stroke="#3b82f6" strokeWidth={3} dot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 8 }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                     <BarChart3 className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-3" />
+                     <p className="text-slate-500 font-medium">No hay suficientes datos registrados en el periodo seleccionado</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-            <div className="space-y-6">
-              <Card className="shadow-sm border-amber-200 dark:border-amber-900/50 h-full">
-                <CardHeader>
-                  <CardTitle className="text-sm flex items-center"><AlertTriangle className="w-4 h-4 mr-2 text-amber-500"/>Alertas de Eficiencia</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {tablaFlota.filter(v => v.estado === 'Crítico' || v.estado === 'Regular').length > 0 ? (
-                    tablaFlota.filter(v => v.estado === 'Crítico' || v.estado === 'Regular').map(v => (
-                       <div key={v.id} className="flex flex-col gap-2 p-4 bg-slate-50 dark:bg-slate-800/50 border dark:border-slate-700 rounded-lg">
-                         <div className="flex justify-between items-center">
-                           <div>
-                             <span className="font-bold text-sm text-slate-800 dark:text-slate-200 block">{v.numeroInterno}</span>
-                             <span className="text-xs text-slate-500">{v.modelo}</span>
-                           </div>
-                           <Badge variant={v.estado === 'Crítico' ? 'destructive' : 'default'} className={v.estado === 'Regular' ? 'bg-amber-500 hover:bg-amber-600' : ''}>{v.estado}</Badge>
-                         </div>
-                         <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-2 rounded border dark:border-slate-700 text-xs mt-1">
-                           <div className="text-center w-full">
-                              <span className="block text-slate-500">Real</span>
-                              <span className={cn("font-bold text-sm", v.estado === 'Crítico' ? "text-red-500" : "text-amber-500")}>{v.rendimientoHistorico.toFixed(1)}</span>
-                           </div>
-                           <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-2"></div>
-                           <div className="text-center w-full">
-                              <span className="block text-slate-500">Meta</span>
-                              <span className="font-bold text-emerald-600 text-sm">{v.rendimientoObjetivo.toFixed(1)}</span>
-                           </div>
-                         </div>
-                       </div>
-                    ))
-                  ) : (
-                    <div className="text-center text-slate-500 font-medium py-8 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-dashed dark:border-slate-700">
-                      Sin alertas por consumo
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+          {/* Tabla de Alertas de Eficiencia trasladada DEBAJO de la gráfica */}
+          <Card className="shadow-sm border border-amber-200/80 dark:border-amber-900/50 overflow-hidden">
+            <CardHeader className="bg-amber-50/40 dark:bg-amber-950/20 border-b border-amber-100 dark:border-amber-900/40 py-3.5 px-6 flex flex-row items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-amber-100 dark:bg-amber-900/40 rounded-lg text-amber-600 dark:text-amber-400">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+                <div>
+                  <CardTitle className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    Alertas de Eficiencia Energética
+                    <Badge variant="outline" className="text-amber-700 bg-amber-100/60 dark:bg-amber-900/30 dark:text-amber-300 border-amber-300 dark:border-amber-800 font-semibold text-xs">
+                      {alertasFlota.length} {alertasFlota.length === 1 ? 'unidad observada' : 'unidades observadas'}
+                    </Badge>
+                  </CardTitle>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Vehículos con desviación respecto a su meta operacional ({vehiculosCriticos} críticas, {alertasRegularesCount} regulares)
+                  </p>
+                </div>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setActiveTab('vehiculos')}
+                className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-semibold"
+              >
+                Ver toda la flota →
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              {alertasFlota.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-900/50 border-b dark:border-slate-800">
+                      <tr>
+                        <th className="px-6 py-3 font-semibold">Vehículo</th>
+                        <th className="px-6 py-3 font-semibold">Modelo</th>
+                        <th className="px-6 py-3 font-semibold">Tipo / Aplicación</th>
+                        <th className="px-6 py-3 font-semibold">Ruta</th>
+                        <th className="px-6 py-3 font-semibold text-center">Meta (km/L)</th>
+                        <th className="px-6 py-3 font-semibold text-center">Real</th>
+                        <th className="px-6 py-3 font-semibold text-center">Desviación</th>
+                        <th className="px-6 py-3 font-semibold text-center">Costo/km</th>
+                        <th className="px-6 py-3 font-semibold text-center">Semáforo</th>
+                        <th className="px-6 py-3 font-semibold text-center">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                      {alertasFlota.map(v => (
+                        <tr key={v.id} className="hover:bg-amber-50/30 dark:hover:bg-amber-950/10 transition-colors">
+                          <td className="px-6 py-3.5">
+                            <div className="font-bold text-slate-900 dark:text-zinc-100">{v.numeroInterno}</div>
+                            <div className="text-xs text-slate-500 font-mono">{v.patente}</div>
+                          </td>
+                          <td className="px-6 py-3.5">
+                            <div className="font-medium text-slate-800 dark:text-slate-200">{v.marca}</div>
+                            <div className="text-xs text-slate-500">{v.modelo}</div>
+                          </td>
+                          <td className="px-6 py-3.5">
+                            <div className="text-xs font-semibold text-slate-700 dark:text-slate-300">{v.tipo}</div>
+                            <div className="text-xs text-slate-500">{v.aplicacion}</div>
+                          </td>
+                          <td className="px-6 py-3.5">
+                            <span className="inline-flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border dark:border-slate-700">
+                              <MapPin className="w-3 h-3 text-slate-400" />
+                              {v.ruta}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3.5 text-center font-medium text-slate-600 dark:text-slate-400">
+                            {v.rendimientoObjetivo.toFixed(1)}
+                          </td>
+                          <td className="px-6 py-3.5 text-center">
+                            <span className={cn(
+                              "font-bold px-2 py-0.5 rounded text-xs",
+                              v.estado === 'Crítico' ? "text-red-700 bg-red-100/80 dark:bg-red-900/40" : "text-amber-700 bg-amber-100/80 dark:bg-amber-900/40"
+                            )}>
+                              {v.rendimientoHistorico.toFixed(1)} km/L
+                            </span>
+                          </td>
+                          <td className="px-6 py-3.5 text-center">
+                            <span className={cn(
+                              "font-bold text-xs",
+                              v.estado === 'Crítico' ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"
+                            )}>
+                              {v.desviacionPct > 0 ? `+${v.desviacionPct}%` : `${v.desviacionPct}%`}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3.5 text-center font-bold text-slate-700 dark:text-slate-300">
+                            ${v.costoKm30d}
+                          </td>
+                          <td className="px-6 py-3.5 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <div className={cn(
+                                "w-2.5 h-2.5 rounded-full shadow-inner",
+                                v.estado === 'Crítico' ? "bg-red-500 animate-pulse" : "bg-amber-500"
+                              )} />
+                              <span className={cn(
+                                "text-xs font-semibold",
+                                v.estado === 'Crítico' ? "text-red-600" : "text-amber-600"
+                              )}>
+                                {v.estado}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-3.5 text-center">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-xs font-semibold" 
+                              onClick={() => setSelectedVehicle(v)}
+                            >
+                              Ver Detalle
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center text-slate-500 font-medium py-10 bg-slate-50/50 dark:bg-slate-900/50">
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Sin alertas de consumo registradas en el periodo seleccionado</p>
+                  <p className="text-xs text-slate-400 mt-1">Todas las unidades se encuentran operando dentro de su rendimiento objetivo.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -572,25 +874,134 @@ export default function GestionCombustible() {
 
       {!selectedVehicle && activeTab === 'vehiculos' && (
         <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between border-b dark:border-slate-800 pb-4">
+          <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between border-b dark:border-slate-800 pb-4 gap-4">
             <div>
-              <CardTitle>Rendimiento por Vehículo</CardTitle>
-              <p className="text-sm text-slate-500 mt-1">Comparativa real vs objetivos teóricos por modelo</p>
+              <CardTitle className="flex items-center gap-2">
+                <CarFront className="w-5 h-5 text-blue-500" /> Rendimiento por Vehículo
+              </CardTitle>
+              <p className="text-sm text-slate-500 mt-1">Comparativa operacional real vs metas teóricas por unidad</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 self-end md:self-auto">
+              <Button onClick={() => setIsAjustarMetasOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium">
+                <Target className="w-4 h-4 mr-2" /> Ajustar Metas
+              </Button>
+            </div>
+          </CardHeader>
+
+          {/* Barra de Filtros Multidimensionales: Máquina, Marca, Modelo, Tipo, Ruta, Aplicación */}
+          <div className="p-4 bg-slate-50/70 dark:bg-slate-900/40 border-b dark:border-slate-800 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              {/* Filtro 1: N° Máquina o Patente */}
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Buscar patente o N° interno..."
-                  value={busqueda}
-                  onChange={e => setBusqueda(e.target.value)}
-                  className="pl-9 pr-4 py-2 border rounded-lg text-sm bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-white"
+                  placeholder="N° Máquina / Patente..."
+                  value={filtroTexto}
+                  onChange={e => setFiltroTexto(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-xs bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              <Button onClick={() => setIsAjustarMetasOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white"><Target className="w-4 h-4 mr-2" /> Ajustar Metas</Button>
+
+              {/* Filtro 2: Marca */}
+              <div>
+                <select
+                  value={filtroMarca}
+                  onChange={e => {
+                    setFiltroMarca(e.target.value);
+                    setFiltroModelo('todos');
+                  }}
+                  className="w-full py-2 px-3 border rounded-lg text-xs bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="todos">Todas las Marcas</option>
+                  {opcionesMarcas.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filtro 3: Modelo */}
+              <div>
+                <select
+                  value={filtroModelo}
+                  onChange={e => setFiltroModelo(e.target.value)}
+                  className="w-full py-2 px-3 border rounded-lg text-xs bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="todos">Todos los Modelos</option>
+                  {opcionesModelos.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filtro 4: Tipo de Vehículo */}
+              <div>
+                <select
+                  value={filtroTipo}
+                  onChange={e => setFiltroTipo(e.target.value)}
+                  className="w-full py-2 px-3 border rounded-lg text-xs bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="todos">Todos los Tipos</option>
+                  {opcionesTipos.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filtro 5: Ruta */}
+              <div>
+                <select
+                  value={filtroRuta}
+                  onChange={e => setFiltroRuta(e.target.value)}
+                  className="w-full py-2 px-3 border rounded-lg text-xs bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="todos">Todas las Rutas</option>
+                  {opcionesRutas.map(r => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filtro 6: Aplicación */}
+              <div>
+                <select
+                  value={filtroAplicacion}
+                  onChange={e => setFiltroAplicacion(e.target.value)}
+                  className="w-full py-2 px-3 border rounded-lg text-xs bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="todos">Todas las Aplicaciones</option>
+                  {opcionesAplicaciones.map(a => (
+                    <option key={a} value={a}>{a}</option>
+                  ))}
+                </select>
+              </div>
             </div>
-          </CardHeader>
+
+            <div className="flex items-center justify-between pt-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500 font-medium">
+                  Mostrando <strong className="text-slate-800 dark:text-slate-200">{filteredFlota.length}</strong> de {tablaFlota.length} unidades
+                </span>
+                {hayFiltrosActivosVehiculos && (
+                  <Badge variant="secondary" className="text-xs font-normal">
+                    Filtros activos
+                  </Badge>
+                )}
+              </div>
+
+              {hayFiltrosActivosVehiculos && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={limpiarFiltrosVehiculos}
+                  className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 h-7 px-2 flex items-center gap-1"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> Restablecer filtros
+                </Button>
+              )}
+            </div>
+          </div>
+
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
@@ -598,8 +1009,11 @@ export default function GestionCombustible() {
                   <tr>
                     <th className="px-6 py-4 font-semibold">Vehículo</th>
                     <th className="px-6 py-4 font-semibold">Modelo</th>
+                    <th className="px-6 py-4 font-semibold">Tipo de Vehículo</th>
+                    <th className="px-6 py-4 font-semibold">Ruta / Aplicación</th>
                     <th className="px-6 py-4 font-semibold text-center">Meta (km/L)</th>
-                    <th className="px-6 py-4 font-semibold text-center">Real (30d)</th>
+                    <th className="px-6 py-4 font-semibold text-center">Real</th>
+                    <th className="px-6 py-4 font-semibold text-center">Desviación</th>
                     <th className="px-6 py-4 font-semibold text-center">Costo/km</th>
                     <th className="px-6 py-4 font-semibold text-center">Semáforo</th>
                     <th className="px-6 py-4 font-semibold text-center">Acciones</th>
@@ -607,50 +1021,83 @@ export default function GestionCombustible() {
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                   {filteredFlota.map(v => (
-                    <tr key={v.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                    <tr key={v.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="font-bold text-slate-900 dark:text-zinc-100">{v.numeroInterno}</div>
-                        <div className="text-xs text-slate-500">{v.patente}</div>
+                        <div className="text-xs text-slate-500 font-mono">{v.patente}</div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="font-medium text-slate-800 dark:text-slate-200">{v.marca}</div>
                         <div className="text-xs text-slate-500">{v.modelo}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border dark:border-slate-700">
+                          {v.tipo}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-xs font-medium text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                          <MapPin className="w-3 h-3 text-slate-400" /> {v.ruta}
+                        </div>
+                        <div className="text-xs text-slate-500">{v.aplicacion}</div>
                       </td>
                       <td className="px-6 py-4 text-center font-medium text-slate-600 dark:text-slate-400">
                         {v.rendimientoObjetivo.toFixed(1)} 
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span className={cn(
-                          "font-bold px-2 py-1 rounded",
+                          "font-bold px-2 py-1 rounded text-xs",
                           v.estado === 'Óptimo' ? "text-emerald-700 bg-emerald-50 dark:bg-emerald-900/30" : 
                           v.estado === 'Regular' ? "text-amber-700 bg-amber-50 dark:bg-amber-900/30" : 
                           v.estado === 'Sin Datos' ? "text-slate-500 bg-slate-100 dark:bg-slate-800 dark:text-slate-400" :
                           "text-red-700 bg-red-50 dark:bg-red-900/30"
                         )}>
-                          {v.estado === 'Sin Datos' ? '-' : v.rendimientoHistorico.toFixed(1)}
+                          {v.estado === 'Sin Datos' ? '-' : `${v.rendimientoHistorico.toFixed(1)} km/L`}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        {v.estado === 'Sin Datos' ? (
+                          <span className="text-slate-400 text-xs">-</span>
+                        ) : (
+                          <span className={cn(
+                            "font-bold text-xs",
+                            v.desviacionPct >= 0 ? "text-emerald-600 dark:text-emerald-400" :
+                            v.desviacionPct >= -15 ? "text-amber-600 dark:text-amber-400" :
+                            "text-red-600 dark:text-red-400"
+                          )}>
+                            {v.desviacionPct > 0 ? `+${v.desviacionPct}%` : `${v.desviacionPct}%`}
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-center font-bold text-slate-700 dark:text-slate-300">
                         ${v.costoKm30d}
                       </td>
                       <td className="px-6 py-4 text-center">
-                         <div className="flex justify-center">
+                         <div className="flex items-center justify-center gap-1.5">
                             <div className={cn(
-                                "w-3 h-3 rounded-full shadow-inner",
+                                "w-2.5 h-2.5 rounded-full shadow-inner",
                                 v.estado === 'Óptimo' ? "bg-emerald-500" : 
                                 v.estado === 'Regular' ? "bg-amber-500" : 
                                 v.estado === 'Sin Datos' ? "bg-slate-300 dark:bg-slate-600" :
-                                "bg-red-500"
+                                "bg-red-500 animate-pulse"
                             )}></div>
+                            <span className="text-xs text-slate-600 dark:text-slate-400">{v.estado}</span>
                          </div>
                       </td>
                       <td className="px-6 py-4 text-center">
-                         <Button variant="ghost" size="sm" className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => setSelectedVehicle(v)}>
+                         <Button variant="ghost" size="sm" className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 text-xs font-semibold" onClick={() => setSelectedVehicle(v)}>
                            Ver Detalle
                          </Button>
                       </td>
                     </tr>
                   ))}
+                  {filteredFlota.length === 0 && (
+                    <tr>
+                      <td colSpan={10} className="px-6 py-12 text-center text-slate-500">
+                        No se encontraron vehículos que coincidan con los filtros seleccionados.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -660,15 +1107,79 @@ export default function GestionCombustible() {
 
       {!selectedVehicle && activeTab === 'cargas' && (
         <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between border-b dark:border-slate-800 pb-4">
+          <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between border-b dark:border-slate-800 pb-4 gap-4">
             <div>
-              <CardTitle>Historial de Cargas</CardTitle>
-              <p className="text-sm text-slate-500 mt-1">Registro de combustible, kilómetros y costeo automático</p>
+              <CardTitle className="flex items-center gap-2">
+                <Droplet className="w-5 h-5 text-blue-500" /> Historial de Cargas
+              </CardTitle>
+              <p className="text-sm text-slate-500 mt-1">Registro de combustible, kilómetros y costeo automático por carga</p>
             </div>
-            <div className="flex items-center gap-2">
-              <Button onClick={() => setIsRegistrarCargaOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white"><Plus className="w-4 h-4 mr-2" /> Registrar Carga</Button>
+            <div className="flex items-center gap-2 self-end md:self-auto">
+              <Button onClick={() => setIsRegistrarCargaOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-medium">
+                <Plus className="w-4 h-4 mr-2" /> Registrar Carga
+              </Button>
             </div>
           </CardHeader>
+
+          {/* Barra de Filtro de Cargas por Máquina y Búsqueda */}
+          <div className="p-4 bg-slate-50/70 dark:bg-slate-900/40 border-b dark:border-slate-800 space-y-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              {/* Filtro por Máquina */}
+              <div className="sm:w-72">
+                <select
+                  value={filtroCargasVehiculo}
+                  onChange={e => setFiltroCargasVehiculo(e.target.value)}
+                  className="w-full py-2 px-3 border rounded-lg text-xs bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-white font-medium focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="todos">Todas las Máquinas (Flota Completa)</option>
+                  {vehiculos.map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.detalles?.numero_interno || v.patente} - {v.patente} ({v.marca} {v.modelo})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Búsqueda rápida por Conductor / Ruta */}
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar conductor, ruta, patente..."
+                  value={busquedaCargas}
+                  onChange={e => setBusquedaCargas(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-xs bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {(filtroCargasVehiculo !== 'todos' || busquedaCargas.trim() !== '') && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setFiltroCargasVehiculo('todos'); setBusquedaCargas(''); }}
+                  className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 h-8 px-2 flex items-center gap-1 self-end sm:self-auto"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> Quitar filtros
+                </Button>
+              )}
+            </div>
+
+            {/* Resumen dinámico del filtro de cargas */}
+            <div className="flex flex-wrap items-center gap-3 pt-1 text-xs">
+              <span className="text-slate-500 font-medium">
+                Mostrando <strong className="text-slate-800 dark:text-slate-200">{cargasFiltradasTab.length}</strong> cargas
+              </span>
+              <span className="text-slate-300 dark:text-slate-700">•</span>
+              <span className="text-blue-600 dark:text-blue-400 font-semibold bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800">
+                Total: {totalLitrosCargasTab.toLocaleString()} Litros
+              </span>
+              <span className="text-slate-300 dark:text-slate-700">•</span>
+              <span className="text-slate-800 dark:text-slate-200 font-semibold bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border dark:border-slate-700">
+                Gasto Total: ${totalCostoCargasTab.toLocaleString()}
+              </span>
+            </div>
+          </div>
+
           <CardContent className="p-0">
              <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
@@ -684,8 +1195,8 @@ export default function GestionCombustible() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                  {cargasRegistradas.map(carga => (
-                    <tr key={carga.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                  {cargasFiltradasTab.map(carga => (
+                    <tr key={carga.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center text-slate-600 dark:text-slate-300">
                             <Calendar className="w-4 h-4 mr-2 text-slate-400" />
@@ -710,6 +1221,13 @@ export default function GestionCombustible() {
                       <td className="px-6 py-4 text-right font-bold text-slate-800 dark:text-slate-200">${(carga.costo_total || 0).toLocaleString()}</td>
                     </tr>
                   ))}
+                  {cargasFiltradasTab.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                        No hay cargas de combustible registradas para los filtros y fechas seleccionados.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -732,10 +1250,10 @@ export default function GestionCombustible() {
                  </CardTitle>
                  <p className="text-slate-500 mt-1">{selectedVehicle.marca} {selectedVehicle.modelo} • Patente: {selectedVehicle.patente}</p>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-800/50 p-2 rounded border dark:border-slate-700 text-right">
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-lg border dark:border-slate-700 text-right">
                  <p className="text-xs text-slate-500 mb-1">Periodo Evaluado</p>
                  <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                   {fechaDesde ? new Date(fechaDesde).toLocaleDateString() : '01/05/2026'} - {fechaHasta ? new Date(fechaHasta).toLocaleDateString() : '30/05/2026'}
+                   {fechaDesde && fechaHasta ? `${fechaDesde} a ${fechaHasta}` : (fechaDesde ? `Desde ${fechaDesde}` : (fechaHasta ? `Hasta ${fechaHasta}` : 'Histórico Total Flota'))}
                  </p>
               </div>
             </CardHeader>
