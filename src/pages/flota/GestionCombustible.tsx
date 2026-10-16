@@ -98,6 +98,19 @@ const CustomChartTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+const parseDetalles = (detalles: any): Record<string, any> => {
+  if (!detalles) return {};
+  if (typeof detalles === 'object') return detalles;
+  if (typeof detalles === 'string') {
+    try {
+      return JSON.parse(detalles);
+    } catch {
+      return {};
+    }
+  }
+  return {};
+};
+
 export default function GestionCombustible() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'vehiculos' | 'cargas'>('dashboard');
   
@@ -160,11 +173,12 @@ export default function GestionCombustible() {
 
   const handleOpenAjustarMetas = (vehiculo?: any) => {
     if (vehiculo) {
-      const tipoMed = (vehiculo.tipoMedicion || vehiculo.detalles?.tipo_medicion || 'km_l') as 'km_l' | 'l_h';
+      const det = parseDetalles(vehiculo.detalles);
+      const tipoMed = (vehiculo.tipoMedicion || det.tipo_medicion || 'km_l') as 'km_l' | 'l_h';
       const obj = vehiculo.rendimientoObjetivo !== undefined 
         ? String(vehiculo.rendimientoObjetivo) 
-        : (vehiculo.detalles?.rendimiento_objetivo !== undefined 
-            ? String(vehiculo.detalles.rendimiento_objetivo) 
+        : (det.rendimiento_objetivo !== undefined 
+            ? String(det.rendimiento_objetivo) 
             : (tipoMed === 'l_h' ? '15.0' : '2.8'));
       setFormMeta({
         vehiculo_id: vehiculo.id,
@@ -174,8 +188,9 @@ export default function GestionCombustible() {
     } else if (vehiculos.length > 0) {
       const currentId = formMeta.vehiculo_id || vehiculos[0].id;
       const v = vehiculos.find(veh => veh.id === currentId) || vehiculos[0];
-      const tipoMed = (v.detalles?.tipo_medicion as 'km_l' | 'l_h') || 'km_l';
-      const obj = v.detalles?.rendimiento_objetivo !== undefined ? String(v.detalles.rendimiento_objetivo) : (tipoMed === 'l_h' ? '15.0' : '2.8');
+      const det = parseDetalles(v.detalles);
+      const tipoMed = (v.tipoMedicion || det.tipo_medicion || 'km_l') as 'km_l' | 'l_h';
+      const obj = det.rendimiento_objetivo !== undefined ? String(det.rendimiento_objetivo) : (tipoMed === 'l_h' ? '15.0' : '2.8');
       setFormMeta({
         vehiculo_id: v.id,
         tipo_medicion: tipoMed,
@@ -203,10 +218,9 @@ export default function GestionCombustible() {
       
       const newPrecios: Record<string, number> = {};
       if (preciosRes.data) {
-         // Because it's ordered by latest first, we only take the first occurrence of each type
          preciosRes.data.forEach(log => {
             try {
-               const det = JSON.parse(log.detalles || '{}');
+               const det = parseDetalles(log.detalles);
                if (det.tipo && det.precio && !newPrecios[det.tipo]) {
                   newPrecios[det.tipo] = Number(det.precio);
                }
@@ -215,19 +229,46 @@ export default function GestionCombustible() {
       }
       setPreciosActuales(newPrecios);
 
+      let dataSorted: any[] = [];
       if (vehiculoRes.data) {
-        const dataSorted = [...vehiculoRes.data].sort((a, b) => {
-          const valA = a.numero_interno || (a.detalles ? a.detalles.numero_interno : '');
-          const valB = b.numero_interno || (b.detalles ? b.detalles.numero_interno : '');
+        dataSorted = [...vehiculoRes.data].map(v => {
+          const det = parseDetalles(v.detalles);
+          return {
+            ...v,
+            detalles: det,
+            tipoMedicion: (det.tipo_medicion || 'km_l') as 'km_l' | 'l_h'
+          };
+        }).sort((a, b) => {
+          const valA = a.numero_interno || a.detalles?.numero_interno || '';
+          const valB = b.numero_interno || b.detalles?.numero_interno || '';
           return String(valA).localeCompare(String(valB), undefined, { numeric: true });
         });
         setVehiculos(dataSorted);
       }
-      if (cargasRes.data) setCargasRegistradas(cargasRes.data.map((c: any) => ({
-         ...c,
-         vehiculoName: c.vehiculo ? (c.vehiculo.detalles?.numero_interno || c.vehiculo.patente) : c.patente,
-         fechaFormateada: new Date(c.fecha).toLocaleDateString()
-      })));
+
+      if (cargasRes.data) {
+        const cargasNormalizadas = cargasRes.data.map((c: any) => {
+          const vMatched = dataSorted.find(v => 
+            (c.vehiculo_id && (v.id === c.vehiculo_id || String(v.id) === String(c.vehiculo_id))) ||
+            (c.patente && (v.patente === c.patente || v.numero_interno === c.patente || v.detalles?.numero_interno === c.patente)) ||
+            (c.vehiculo?.patente && (v.patente === c.vehiculo.patente || v.detalles?.numero_interno === c.vehiculo.patente))
+          );
+          
+          const vId = vMatched ? vMatched.id : c.vehiculo_id;
+          const vDet = vMatched ? vMatched.detalles : parseDetalles(c.vehiculo?.detalles);
+          const numInterno = vMatched?.detalles?.numero_interno || vMatched?.numero_interno || vDet?.numero_interno || c.vehiculo?.patente || c.patente;
+          const tMed = (vMatched?.tipoMedicion || vDet?.tipo_medicion || 'km_l') as 'km_l' | 'l_h';
+
+          return {
+            ...c,
+            vehiculo_id: vId,
+            vehiculoName: numInterno,
+            tipoMedicion: tMed,
+            fechaFormateada: new Date(c.fecha).toLocaleDateString()
+          };
+        });
+        setCargasRegistradas(cargasNormalizadas);
+      }
     } catch (error) {
       console.error("Error fetching fuel data:", error);
     } finally {
@@ -271,14 +312,41 @@ export default function GestionCombustible() {
     try {
        const selectedV = vehiculos.find(v => v.id === formMeta.vehiculo_id);
        const obj = parseFloat(formMeta.rendimiento_objetivo);
-       const detalles = selectedV?.detalles || {};
-       await supabase.from('vehiculo').update({
-         detalles: {
-           ...detalles,
-           tipo_medicion: formMeta.tipo_medicion,
-           rendimiento_objetivo: obj
+       const det = parseDetalles(selectedV?.detalles);
+       const updatedDetalles = {
+         ...det,
+         tipo_medicion: formMeta.tipo_medicion,
+         rendimiento_objetivo: obj
+       };
+
+       // Actualización inmediata en estado local para reactividad instantánea en la interfaz
+       setVehiculos(prev => prev.map(v => v.id === formMeta.vehiculo_id ? { 
+         ...v, 
+         detalles: updatedDetalles,
+         tipoMedicion: formMeta.tipo_medicion 
+       } : v));
+
+       setCargasRegistradas(prev => prev.map(c => {
+         const isMatch = (c.vehiculo_id && (c.vehiculo_id === formMeta.vehiculo_id || String(c.vehiculo_id) === String(formMeta.vehiculo_id))) ||
+           (selectedV && (c.patente === selectedV.patente || c.vehiculoName === selectedV.patente || c.vehiculoName === selectedV.detalles?.numero_interno));
+         if (isMatch) {
+           return {
+             ...c,
+             tipoMedicion: formMeta.tipo_medicion
+           };
          }
+         return c;
+       }));
+
+       // Persistencia en Supabase
+       const { error } = await supabase.from('vehiculo').update({
+         detalles: updatedDetalles
        }).eq('id', formMeta.vehiculo_id);
+
+       if (error) {
+         console.error("Error al actualizar vehículo en Supabase:", error);
+       }
+
        setIsAjustarMetasOpen(false);
        fetchData();
     } catch (err: any) {
@@ -338,22 +406,32 @@ export default function GestionCombustible() {
   // 1.2 Mapa maestro de deltas (km u horas) y rendimientos/consumos reales calculados por carga en base a odómetros/horómetros históricos
   const metricasPorCarga = React.useMemo(() => {
     const cargasPorVehiculo: Record<string, any[]> = {};
+    const vehiculoMap: Record<string, any> = {};
+    vehiculos.forEach(v => { vehiculoMap[v.id] = v; });
+
     cargasRegistradas.forEach(c => {
-      if (!cargasPorVehiculo[c.vehiculo_id]) cargasPorVehiculo[c.vehiculo_id] = [];
-      cargasPorVehiculo[c.vehiculo_id].push(c);
+      let vId = c.vehiculo_id;
+      if (!vehiculoMap[vId]) {
+        const v = vehiculos.find(veh => 
+          (c.vehiculo_id && (veh.id === c.vehiculo_id || String(veh.id) === String(c.vehiculo_id))) ||
+          (c.patente && (veh.patente === c.patente || veh.numero_interno === c.patente || veh.detalles?.numero_interno === c.patente)) ||
+          (c.vehiculoName && (veh.detalles?.numero_interno === c.vehiculoName || veh.patente === c.vehiculoName || veh.numero_interno === c.vehiculoName))
+        );
+        if (v) vId = v.id;
+      }
+      const groupKey = vId || c.patente || c.vehiculoName || 'desconocido';
+      if (!cargasPorVehiculo[groupKey]) cargasPorVehiculo[groupKey] = [];
+      cargasPorVehiculo[groupKey].push(c);
     });
 
     const deltaMap: Record<string, number> = {};
     const rendMap: Record<string, number> = {};
 
-    const vehiculoMap: Record<string, any> = {};
-    vehiculos.forEach(v => { vehiculoMap[v.id] = v; });
+    Object.keys(cargasPorVehiculo).forEach(vKey => {
+      const v = vehiculoMap[vKey];
+      const tipoMedicion = (v?.tipoMedicion || v?.detalles?.tipo_medicion || 'km_l') as 'km_l' | 'l_h';
 
-    Object.keys(cargasPorVehiculo).forEach(vId => {
-      const v = vehiculoMap[vId];
-      const tipoMedicion = (v?.detalles?.tipo_medicion || 'km_l') as 'km_l' | 'l_h';
-
-      const sorted = [...cargasPorVehiculo[vId]].sort((a, b) => {
+      const sorted = [...cargasPorVehiculo[vKey]].sort((a, b) => {
         const tA = new Date(a.fecha).getTime();
         const tB = new Date(b.fecha).getTime();
         if (tA !== tB) return tA - tB;
@@ -389,12 +467,16 @@ export default function GestionCombustible() {
   // 2. Procesar tabla de la flota (con cálculo delta y atributos de tipo, ruta, aplicación y unidad km/L o L/h)
   const tablaFlota = React.useMemo(() => {
     return vehiculos.map(v => {
-       const tipoMedicion = (v.detalles?.tipo_medicion || 'km_l') as 'km_l' | 'l_h';
+       const tipoMedicion = (v.tipoMedicion || v.detalles?.tipo_medicion || 'km_l') as 'km_l' | 'l_h';
        const unidadMedida = tipoMedicion === 'l_h' ? 'L/h' : 'km/L';
        const unidadDelta = tipoMedicion === 'l_h' ? 'hrs' : 'km';
        const unidadCosto = tipoMedicion === 'l_h' ? '$/h' : '$/km';
 
-       const vCargas = cargasFiltradasPorFecha.filter(c => c.vehiculo_id === v.id);
+       const vCargas = cargasFiltradasPorFecha.filter(c => 
+         (c.vehiculo_id && (c.vehiculo_id === v.id || String(c.vehiculo_id) === String(v.id))) ||
+         (c.patente && (c.patente === v.patente || c.patente === v.detalles?.numero_interno || c.patente === v.numero_interno)) ||
+         (c.vehiculoName && (c.vehiculoName === v.detalles?.numero_interno || c.vehiculoName === v.patente || c.vehiculoName === v.numero_interno))
+       );
        const vTotalCosto = vCargas.reduce((acc, c) => acc + (parseFloat(c.costo_total)||0), 0);
        const vTotalLitros = vCargas.reduce((acc, c) => acc + (parseFloat(c.litros)||0), 0);
        const rendimientoObjetivo = parseFloat(v.detalles?.rendimiento_objetivo || (tipoMedicion === 'l_h' ? '15.0' : '2.5'));
@@ -513,7 +595,7 @@ export default function GestionCombustible() {
        totalLitros += lit;
 
        const v = vehiculoMap[c.vehiculo_id];
-       const tipoMed = v?.detalles?.tipo_medicion || 'km_l';
+       const tipoMed = c.tipoMedicion || v?.tipoMedicion || v?.detalles?.tipo_medicion || 'km_l';
        if (tipoMed === 'l_h') {
          costoTotalLh += cost;
          litrosLh += lit;
@@ -654,8 +736,11 @@ export default function GestionCombustible() {
   // 6. Filtrado para el panel de Cargas
   const cargasFiltradasTab = React.useMemo(() => {
     return cargasFiltradasPorFecha.filter(c => {
-      if (filtroCargasVehiculo !== 'todos' && c.vehiculo_id !== filtroCargasVehiculo) {
-        return false;
+      if (filtroCargasVehiculo !== 'todos') {
+        const vSel = vehiculos.find(v => v.id === filtroCargasVehiculo);
+        const matchId = c.vehiculo_id === filtroCargasVehiculo || String(c.vehiculo_id) === String(filtroCargasVehiculo);
+        const matchPat = vSel && (c.patente === vSel.patente || c.vehiculoName === vSel.patente || c.vehiculoName === vSel.detalles?.numero_interno);
+        if (!matchId && !matchPat) return false;
       }
       if (busquedaCargas.trim()) {
         const q = busquedaCargas.toLowerCase().trim();
@@ -666,7 +751,7 @@ export default function GestionCombustible() {
       }
       return true;
     });
-  }, [cargasFiltradasPorFecha, filtroCargasVehiculo, busquedaCargas]);
+  }, [cargasFiltradasPorFecha, filtroCargasVehiculo, busquedaCargas, vehiculos]);
 
   const totalLitrosCargasTab = React.useMemo(() => {
     return cargasFiltradasTab.reduce((acc, c) => acc + (parseFloat(c.litros) || 0), 0);
@@ -680,7 +765,11 @@ export default function GestionCombustible() {
     const vehiculoMap: Record<string, any> = {};
     vehiculos.forEach(v => { vehiculoMap[v.id] = v; });
     return cargasFiltradasTab
-      .filter(c => vehiculoMap[c.vehiculo_id]?.detalles?.tipo_medicion !== 'l_h')
+      .filter(c => {
+        const v = vehiculoMap[c.vehiculo_id];
+        const tipoMed = c.tipoMedicion || v?.tipoMedicion || v?.detalles?.tipo_medicion || 'km_l';
+        return tipoMed !== 'l_h';
+      })
       .reduce((acc, c) => acc + (metricasPorCarga.deltaMap[c.id] || 0), 0);
   }, [cargasFiltradasTab, vehiculos, metricasPorCarga]);
 
@@ -688,7 +777,11 @@ export default function GestionCombustible() {
     const vehiculoMap: Record<string, any> = {};
     vehiculos.forEach(v => { vehiculoMap[v.id] = v; });
     return cargasFiltradasTab
-      .filter(c => vehiculoMap[c.vehiculo_id]?.detalles?.tipo_medicion === 'l_h')
+      .filter(c => {
+        const v = vehiculoMap[c.vehiculo_id];
+        const tipoMed = c.tipoMedicion || v?.tipoMedicion || v?.detalles?.tipo_medicion || 'km_l';
+        return tipoMed === 'l_h';
+      })
       .reduce((acc, c) => acc + (metricasPorCarga.deltaMap[c.id] || 0), 0);
   }, [cargasFiltradasTab, vehiculos, metricasPorCarga]);
 
@@ -726,7 +819,7 @@ export default function GestionCombustible() {
         grouped[shortDate].litros += parseFloat(c.litros) || 0;
         
         const v = vehiculoMap[c.vehiculo_id];
-        const tipoMed = v?.detalles?.tipo_medicion || 'km_l';
+        const tipoMed = c.tipoMedicion || v?.tipoMedicion || v?.detalles?.tipo_medicion || 'km_l';
         
         if (tipoMed === 'l_h') {
           grouped[shortDate].vehiculosLhIds.add(c.vehiculo_id);
@@ -1786,40 +1879,61 @@ export default function GestionCombustible() {
                     <th className="px-6 py-4 font-semibold">Vehículo</th>
                     <th className="px-6 py-4 font-semibold">Conductor</th>
                     <th className="px-6 py-4 font-semibold">Ruta</th>
-                    <th className="px-6 py-4 font-semibold text-right">Lectura (km / hrs)</th>
+                    <th className="px-6 py-4 font-semibold text-right">Lectura (Odóm. / Horóm.)</th>
                     <th className="px-6 py-4 font-semibold text-right">Litros</th>
                     <th className="px-6 py-4 font-semibold text-right">Costo Total</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                  {cargasFiltradasTab.map(carga => (
-                    <tr key={carga.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center text-slate-600 dark:text-slate-300">
-                            <Calendar className="w-4 h-4 mr-2 text-slate-400" />
-                            {carga.fechaFormateada}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 font-bold text-slate-900 dark:text-zinc-100">{carga.vehiculoName}</td>
-                      <td className="px-6 py-4 text-slate-700 dark:text-slate-300">
-                         <div className="flex items-center">
-                            <User className="w-4 h-4 mr-2 text-slate-400" />
-                            {carga.conductor || 'No asignado'}
-                         </div>
-                      </td>
-                      <td className="px-6 py-4 text-slate-700 dark:text-slate-300">
-                         <div className="flex items-center">
-                            <MapPin className="w-4 h-4 mr-2 text-slate-400" />
-                            {carga.ruta || 'S/N'}
-                         </div>
-                      </td>
-                      <td className="px-6 py-4 text-right font-mono text-slate-600 dark:text-slate-400">
-                        {(carga.odometro || 0).toLocaleString()} {vehiculos.find(v => v.id === carga.vehiculo_id)?.detalles?.tipo_medicion === 'l_h' ? 'hrs' : 'km'}
-                      </td>
-                      <td className="px-6 py-4 text-right font-semibold text-blue-600 dark:text-blue-400">{carga.litros} L</td>
-                      <td className="px-6 py-4 text-right font-bold text-slate-800 dark:text-slate-200">${(carga.costo_total || 0).toLocaleString()}</td>
-                    </tr>
-                  ))}
+                  {cargasFiltradasTab.map(carga => {
+                    const vObj = vehiculos.find(v => v.id === carga.vehiculo_id);
+                    const isHoras = carga.tipoMedicion === 'l_h' || vObj?.tipoMedicion === 'l_h' || vObj?.detalles?.tipo_medicion === 'l_h';
+                    const delta = metricasPorCarga.deltaMap[carga.id] || 0;
+
+                    return (
+                      <tr key={carga.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center text-slate-600 dark:text-slate-300">
+                              <Calendar className="w-4 h-4 mr-2 text-slate-400" />
+                              {carga.fechaFormateada}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 font-bold text-slate-900 dark:text-zinc-100">{carga.vehiculoName}</td>
+                        <td className="px-6 py-4 text-slate-700 dark:text-slate-300">
+                           <div className="flex items-center">
+                              <User className="w-4 h-4 mr-2 text-slate-400" />
+                              {carga.conductor || 'No asignado'}
+                           </div>
+                        </td>
+                        <td className="px-6 py-4 text-slate-700 dark:text-slate-300">
+                           <div className="flex items-center">
+                              <MapPin className="w-4 h-4 mr-2 text-slate-400" />
+                              {carga.ruta || 'S/N'}
+                           </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="font-mono font-bold text-slate-800 dark:text-slate-100 flex items-center justify-end gap-1.5">
+                            <span>{(carga.odometro || 0).toLocaleString()}</span>
+                            <span className={cn(
+                              "text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-bold",
+                              isHoras 
+                                ? "text-amber-700 bg-amber-100/80 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-300 dark:border-amber-800" 
+                                : "text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300 border dark:border-slate-700"
+                            )}>
+                              {isHoras ? 'hrs' : 'km'}
+                            </span>
+                          </div>
+                          {delta > 0 && (
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                              +{delta.toLocaleString()} {isHoras ? 'hrs trabajadas' : 'km recorridos'}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right font-semibold text-blue-600 dark:text-blue-400">{carga.litros} L</td>
+                        <td className="px-6 py-4 text-right font-bold text-slate-800 dark:text-slate-200">${(carga.costo_total || 0).toLocaleString()}</td>
+                      </tr>
+                    );
+                  })}
                   {cargasFiltradasTab.length === 0 && (
                     <tr>
                       <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
