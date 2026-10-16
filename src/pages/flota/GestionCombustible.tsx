@@ -227,41 +227,7 @@ export default function GestionCombustible() {
     return cargasFiltradasPorFecha.filter(c => vehiculosDashboardIds.has(c.vehiculo_id));
   }, [cargasFiltradasPorFecha, vehiculosDashboardIds]);
 
-  // 2. Procesar KPIs del Dashboard (filtrados por fechas, marca y modelo seleccionados)
-  const kpis = React.useMemo(() => {
-    let costoTotal30d = 0;
-    let totalLitros = 0;
-    let totalKm = 0;
-
-    vehiculosDashboard.forEach(v => {
-      const vCargas = cargasDashboard.filter(c => c.vehiculo_id === v.id);
-      if (vCargas.length >= 2) {
-        const sorted = [...vCargas].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
-        const odoStart = parseFloat(sorted[0]?.odometro) || 0;
-        const odoEnd = parseFloat(sorted[sorted.length - 1]?.odometro) || 0;
-        if (odoEnd > odoStart) totalKm += (odoEnd - odoStart);
-      }
-    });
-
-    cargasDashboard.forEach(c => {
-       costoTotal30d += parseFloat(c.costo_total) || 0;
-       totalLitros += parseFloat(c.litros) || 0;
-    });
-
-    if (totalKm === 0 && totalLitros > 0) {
-       totalKm = totalLitros * 2.8;
-    }
-    
-    return {
-      costoTotal30d,
-      totalLitros,
-      totalKm,
-      rendimientoPromedio: totalLitros > 0 ? (totalKm / totalLitros).toFixed(1) : '0',
-      costoKmPromedio: totalKm > 0 ? Math.round(costoTotal30d / totalKm) : 0,
-    };
-  }, [cargasDashboard, vehiculosDashboard]);
-
-  // 3. Procesar tabla de la flota (con cálculo delta y atributos de tipo, ruta y aplicación)
+  // 2. Procesar tabla de la flota (con cálculo delta y atributos de tipo, ruta y aplicación)
   const tablaFlota = React.useMemo(() => {
     return vehiculos.map(v => {
        const vCargas = cargasFiltradasPorFecha.filter(c => c.vehiculo_id === v.id);
@@ -322,6 +288,9 @@ export default function GestionCombustible() {
           rendimientoHistorico,
           desviacionPct,
           costoKm30d,
+          vTotalKm,
+          vTotalLitros,
+          vTotalCosto,
           estado
        };
     });
@@ -338,6 +307,36 @@ export default function GestionCombustible() {
 
   const vehiculosCriticos = tablaFlotaDashboard.filter(v => v.estado === 'Crítico').length;
   const alertasRegularesCount = tablaFlotaDashboard.filter(v => v.estado === 'Regular').length;
+
+  // 3. Procesar KPIs del Dashboard (calculados en base a las unidades de la flota evaluada)
+  const kpis = React.useMemo(() => {
+    let costoTotal30d = 0;
+    let totalLitros = 0;
+
+    cargasDashboard.forEach(c => {
+       costoTotal30d += parseFloat(c.costo_total) || 0;
+       totalLitros += parseFloat(c.litros) || 0;
+    });
+
+    const totalKm = tablaFlotaDashboard.reduce((acc, v) => acc + (v.vTotalKm || 0), 0);
+
+    // Rendimiento Promedio: Promedio aritmético de los rendimientos individuales de la flota
+    const vehiculosConRendimiento = tablaFlotaDashboard.filter(v => v.rendimientoHistorico > 0);
+    const sumaRendimientos = vehiculosConRendimiento.reduce((acc, v) => acc + v.rendimientoHistorico, 0);
+    const rendimientoPromedio = vehiculosConRendimiento.length > 0 
+      ? (sumaRendimientos / vehiculosConRendimiento.length).toFixed(2)
+      : '0';
+
+    return {
+      costoTotal30d,
+      totalLitros,
+      totalKm,
+      vehiculosEvaluados: vehiculosConRendimiento.length,
+      sumaRendimientos: Number(sumaRendimientos.toFixed(2)),
+      rendimientoPromedio,
+      costoKmPromedio: totalKm > 0 ? Math.round(costoTotal30d / totalKm) : 0,
+    };
+  }, [cargasDashboard, tablaFlotaDashboard]);
 
   // 4. Opciones dinámicas para filtros multidimensionales en Rend. Vehículos
   const opcionesMarcas = React.useMemo(() => {
@@ -880,7 +879,7 @@ export default function GestionCombustible() {
                  <div>
                    <strong className="block mb-1">FÓRMULA:</strong>
                    {selectedKpi === 'costo' && "Costo Total (30d) = ∑ (Litros consumidos × Precio del litro vigente en cada carga)"}
-                   {selectedKpi === 'rendimiento' && "Rendimiento Promedio = Distancia total recorrida (km) / Litros totales consumidos"}
+                   {selectedKpi === 'rendimiento' && "Rendimiento Promedio Flota = ∑ Rendimientos individuales / N° Unidades operacionales"}
                    {selectedKpi === 'costokm' && "Costo/km Flota = Suma total de gasto en combustible / Kilómetros totales producidos"}
                    {selectedKpi === 'alertas' && "Desviaciones Críticas = Conteo de vehículos cuyo rendimiento real es < (Objetivo - 15%)"}
                  </div>
@@ -909,7 +908,15 @@ export default function GestionCombustible() {
                 {selectedKpi === 'rendimiento' && (
                   <div className="space-y-4">
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                      <span className="text-slate-600 dark:text-slate-400">Kilómetros Totales</span>
+                      <span className="text-slate-600 dark:text-slate-400">Unidades Evaluadas</span>
+                      <span className="font-bold text-slate-900 dark:text-white">{kpis.vehiculosEvaluados} Vehículos</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <span className="text-slate-600 dark:text-slate-400">Suma Rendimientos Parciales</span>
+                      <span className="font-bold text-slate-900 dark:text-white">{kpis.sumaRendimientos} km/L</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <span className="text-slate-600 dark:text-slate-400">Distancia Total Recorrida</span>
                       <span className="font-bold text-slate-900 dark:text-white">{(kpis.totalKm || 0).toLocaleString()} km</span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
@@ -917,7 +924,7 @@ export default function GestionCombustible() {
                       <span className="font-bold text-slate-900 dark:text-white">{(kpis.totalLitros || 0).toLocaleString()} L</span>
                     </div>
                     <div className="flex justify-between items-center p-4 bg-emerald-600 text-white rounded-lg shadow-inner">
-                      <span className="font-medium">Promedio Global</span>
+                      <span className="font-medium">Promedio de Flota</span>
                       <span className="font-black text-xl">{kpis.rendimientoPromedio} km/L</span>
                     </div>
                   </div>
