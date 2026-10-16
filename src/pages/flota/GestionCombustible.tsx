@@ -44,6 +44,10 @@ export default function GestionCombustible() {
   const [fechaHasta, setFechaHasta] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState<any | null>(null);
 
+  // Filtros específicos para el Dashboard (Marca y Modelo)
+  const [dashMarca, setDashMarca] = useState('todos');
+  const [dashModelo, setDashModelo] = useState('todos');
+
   // Filtros multidimensionales para Rend. Vehículos
   const [filtroTexto, setFiltroTexto] = useState('');
   const [filtroMarca, setFiltroMarca] = useState('todos');
@@ -184,14 +188,53 @@ export default function GestionCombustible() {
     });
   }, [cargasRegistradas, fechaDesde, fechaHasta]);
 
-  // 2. Procesar KPIs (basados en el rango de fechas seleccionado)
+  // 1.1 Opciones y segmentación específica para el Dashboard (Marca y Modelo)
+  const opcionesDashMarcas = React.useMemo(() => {
+    const s = new Set<string>();
+    vehiculos.forEach(v => {
+      const m = v.marca || v.detalles?.marca;
+      if (m && m !== 'N/A') s.add(m);
+    });
+    return Array.from(s).sort();
+  }, [vehiculos]);
+
+  const opcionesDashModelos = React.useMemo(() => {
+    const s = new Set<string>();
+    vehiculos.forEach(v => {
+      const m = v.marca || v.detalles?.marca;
+      if (dashMarca !== 'todos' && m !== dashMarca) return;
+      const mod = v.modelo || v.detalles?.modelo;
+      if (mod && mod !== 'N/A') s.add(mod);
+    });
+    return Array.from(s).sort();
+  }, [vehiculos, dashMarca]);
+
+  const vehiculosDashboard = React.useMemo(() => {
+    return vehiculos.filter(v => {
+      const m = v.marca || v.detalles?.marca;
+      const mod = v.modelo || v.detalles?.modelo;
+      if (dashMarca !== 'todos' && m !== dashMarca) return false;
+      if (dashModelo !== 'todos' && mod !== dashModelo) return false;
+      return true;
+    });
+  }, [vehiculos, dashMarca, dashModelo]);
+
+  const vehiculosDashboardIds = React.useMemo(() => {
+    return new Set(vehiculosDashboard.map(v => v.id));
+  }, [vehiculosDashboard]);
+
+  const cargasDashboard = React.useMemo(() => {
+    return cargasFiltradasPorFecha.filter(c => vehiculosDashboardIds.has(c.vehiculo_id));
+  }, [cargasFiltradasPorFecha, vehiculosDashboardIds]);
+
+  // 2. Procesar KPIs del Dashboard (filtrados por fechas, marca y modelo seleccionados)
   const kpis = React.useMemo(() => {
     let costoTotal30d = 0;
     let totalLitros = 0;
     let totalKm = 0;
 
-    vehiculos.forEach(v => {
-      const vCargas = cargasFiltradasPorFecha.filter(c => c.vehiculo_id === v.id);
+    vehiculosDashboard.forEach(v => {
+      const vCargas = cargasDashboard.filter(c => c.vehiculo_id === v.id);
       if (vCargas.length >= 2) {
         const sorted = [...vCargas].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
         const odoStart = parseFloat(sorted[0]?.odometro) || 0;
@@ -200,7 +243,7 @@ export default function GestionCombustible() {
       }
     });
 
-    cargasFiltradasPorFecha.forEach(c => {
+    cargasDashboard.forEach(c => {
        costoTotal30d += parseFloat(c.costo_total) || 0;
        totalLitros += parseFloat(c.litros) || 0;
     });
@@ -216,7 +259,7 @@ export default function GestionCombustible() {
       rendimientoPromedio: totalLitros > 0 ? (totalKm / totalLitros).toFixed(1) : '0',
       costoKmPromedio: totalKm > 0 ? Math.round(costoTotal30d / totalKm) : 0,
     };
-  }, [cargasFiltradasPorFecha, vehiculos]);
+  }, [cargasDashboard, vehiculosDashboard]);
 
   // 3. Procesar tabla de la flota (con cálculo delta y atributos de tipo, ruta y aplicación)
   const tablaFlota = React.useMemo(() => {
@@ -284,12 +327,17 @@ export default function GestionCombustible() {
     });
   }, [vehiculos, cargasFiltradasPorFecha]);
 
-  const alertasFlota = React.useMemo(() => {
-    return tablaFlota.filter(v => v.estado === 'Crítico' || v.estado === 'Regular');
-  }, [tablaFlota]);
+  // Segmentación de alertas y flota para el Dashboard
+  const tablaFlotaDashboard = React.useMemo(() => {
+    return tablaFlota.filter(v => vehiculosDashboardIds.has(v.id));
+  }, [tablaFlota, vehiculosDashboardIds]);
 
-  const vehiculosCriticos = tablaFlota.filter(v => v.estado === 'Crítico').length;
-  const alertasRegularesCount = tablaFlota.filter(v => v.estado === 'Regular').length;
+  const alertasDashboard = React.useMemo(() => {
+    return tablaFlotaDashboard.filter(v => v.estado === 'Crítico' || v.estado === 'Regular');
+  }, [tablaFlotaDashboard]);
+
+  const vehiculosCriticos = tablaFlotaDashboard.filter(v => v.estado === 'Crítico').length;
+  const alertasRegularesCount = tablaFlotaDashboard.filter(v => v.estado === 'Regular').length;
 
   // 4. Opciones dinámicas para filtros multidimensionales en Rend. Vehículos
   const opcionesMarcas = React.useMemo(() => {
@@ -407,7 +455,7 @@ export default function GestionCombustible() {
         prevOdoByVehiculo[vId] = odo;
      });
 
-     const sortedFiltradas = [...cargasFiltradasPorFecha].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+     const sortedFiltradas = [...cargasDashboard].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
      const grouped: Record<string, { costo: number, litros: number, km: number }> = {};
 
      sortedFiltradas.forEach(c => {
@@ -433,7 +481,7 @@ export default function GestionCombustible() {
         costo: grouped[d].costo,
         rendimiento: grouped[d].litros > 0 ? Number((grouped[d].km / grouped[d].litros).toFixed(2)) : 0
      }));
-  }, [cargasFiltradasPorFecha, cargasRegistradas]);
+  }, [cargasDashboard, cargasRegistradas]);
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto w-full relative">
@@ -520,7 +568,52 @@ export default function GestionCombustible() {
 
       {!selectedVehicle && activeTab === 'dashboard' && (
         <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Barra de Filtros del Dashboard: Marca y Modelo */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3.5 px-4 rounded-xl shadow-sm border dark:border-slate-800">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <Filter className="w-3.5 h-3.5 text-blue-500" /> Segmentar Dashboard:
+              </div>
+              <div className="w-48">
+                <select
+                  value={dashMarca}
+                  onChange={e => { setDashMarca(e.target.value); setDashModelo('todos'); }}
+                  className="w-full py-1.5 px-3 border rounded-lg text-xs bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-white font-medium focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="todos">Todas las Marcas</option>
+                  {opcionesDashMarcas.map(m => (<option key={m} value={m}>{m}</option>))}
+                </select>
+              </div>
+              <div className="w-48">
+                <select
+                  value={dashModelo}
+                  onChange={e => setDashModelo(e.target.value)}
+                  className="w-full py-1.5 px-3 border rounded-lg text-xs bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-white font-medium focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="todos">Todos los Modelos</option>
+                  {opcionesDashModelos.map(m => (<option key={m} value={m}>{m}</option>))}
+                </select>
+              </div>
+              {(dashMarca !== 'todos' || dashModelo !== 'todos') && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setDashMarca('todos'); setDashModelo('todos'); }}
+                  className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 h-7 px-2 flex items-center gap-1"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> Restablecer
+                </Button>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+              <span>Mostrando <strong className="text-slate-800 dark:text-slate-200">{vehiculosDashboard.length}</strong> de {vehiculos.length} unidades</span>
+              {(dashMarca !== 'todos' || dashModelo !== 'todos') && (
+                <Badge variant="outline" className="text-blue-600 border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/30 text-xs">Segmentado</Badge>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card 
                 className={cn("bg-gradient-to-br from-blue-500 to-blue-600 text-white border-none shadow-md cursor-pointer transition-transform hover:scale-[1.02]", selectedKpi === 'costo' && "ring-2 ring-blue-300")}
                 onClick={() => setSelectedKpi('costo')}
@@ -642,7 +735,7 @@ export default function GestionCombustible() {
                   <CardTitle className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                     Alertas de Eficiencia Energética
                     <Badge variant="outline" className="text-amber-700 bg-amber-100/60 dark:bg-amber-900/30 dark:text-amber-300 border-amber-300 dark:border-amber-800 font-semibold text-xs">
-                      {alertasFlota.length} {alertasFlota.length === 1 ? 'unidad observada' : 'unidades observadas'}
+                      {alertasDashboard.length} {alertasDashboard.length === 1 ? 'unidad observada' : 'unidades observadas'}
                     </Badge>
                   </CardTitle>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -660,7 +753,7 @@ export default function GestionCombustible() {
               </Button>
             </CardHeader>
             <CardContent className="p-0">
-              {alertasFlota.length > 0 ? (
+              {alertasDashboard.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm text-left">
                     <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-900/50 border-b dark:border-slate-800">
@@ -678,7 +771,7 @@ export default function GestionCombustible() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                      {alertasFlota.map(v => (
+                      {alertasDashboard.map(v => (
                         <tr key={v.id} className="hover:bg-amber-50/30 dark:hover:bg-amber-950/10 transition-colors">
                           <td className="px-6 py-3.5">
                             <div className="font-bold text-slate-900 dark:text-zinc-100">{v.numeroInterno}</div>
@@ -849,15 +942,15 @@ export default function GestionCombustible() {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                       <span className="text-slate-600 dark:text-slate-400">Flota Evaluada</span>
-                      <span className="font-bold text-slate-900 dark:text-white">{tablaFlota.length} Vehículos</span>
+                      <span className="font-bold text-slate-900 dark:text-white">{tablaFlotaDashboard.length} Vehículos</span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                       <span className="text-slate-600 dark:text-slate-400 text-emerald-600">Dentro de Meta</span>
-                      <span className="font-bold text-slate-900 dark:text-white">{tablaFlota.filter(v => v.estado === 'Óptimo').length} Vehículos</span>
+                      <span className="font-bold text-slate-900 dark:text-white">{tablaFlotaDashboard.filter(v => v.estado === 'Óptimo').length} Vehículos</span>
                     </div>
                     <div className="space-y-2 mt-4 border-t dark:border-slate-800 pt-4">
                       <p className="text-sm font-semibold text-red-600 flex items-center"><AlertTriangle className="w-4 h-4 mr-2" /> Vehículos Críticos</p>
-                      {tablaFlota.filter(v => v.estado === 'Crítico').map(v => (
+                      {tablaFlotaDashboard.filter(v => v.estado === 'Crítico').map(v => (
                          <div key={v.id} className="flex justify-between text-sm p-2 border-l-4 border-red-500 bg-red-50 dark:bg-red-900/10 rounded-r">
                            <span className="font-medium">{v.numeroInterno}</span>
                            <span className="text-red-600">{v.rendimientoHistorico} km/L (Meta: {v.rendimientoObjetivo})</span>
