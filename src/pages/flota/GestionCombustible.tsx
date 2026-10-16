@@ -227,6 +227,45 @@ export default function GestionCombustible() {
     return cargasFiltradasPorFecha.filter(c => vehiculosDashboardIds.has(c.vehiculo_id));
   }, [cargasFiltradasPorFecha, vehiculosDashboardIds]);
 
+  // 1.2 Mapa maestro de deltas de km y rendimientos reales calculados por carga en base a odómetros históricos
+  const metricasPorCarga = React.useMemo(() => {
+    const cargasPorVehiculo: Record<string, any[]> = {};
+    cargasRegistradas.forEach(c => {
+      if (!cargasPorVehiculo[c.vehiculo_id]) cargasPorVehiculo[c.vehiculo_id] = [];
+      cargasPorVehiculo[c.vehiculo_id].push(c);
+    });
+
+    const deltaMap: Record<string, number> = {};
+    const rendMap: Record<string, number> = {};
+
+    Object.keys(cargasPorVehiculo).forEach(vId => {
+      const sorted = [...cargasPorVehiculo[vId]].sort((a, b) => {
+        const tA = new Date(a.fecha).getTime();
+        const tB = new Date(b.fecha).getTime();
+        if (tA !== tB) return tA - tB;
+        return (parseFloat(a.odometro) || 0) - (parseFloat(b.odometro) || 0);
+      });
+
+      for (let i = 0; i < sorted.length; i++) {
+        const c = sorted[i];
+        const odo = parseFloat(c.odometro) || 0;
+        const litros = parseFloat(c.litros) || 0;
+
+        if (i === 0) {
+          deltaMap[c.id] = 0;
+          rendMap[c.id] = 0;
+        } else {
+          const prevOdo = parseFloat(sorted[i - 1].odometro) || 0;
+          const delta = odo > prevOdo ? (odo - prevOdo) : 0;
+          deltaMap[c.id] = delta;
+          rendMap[c.id] = (delta > 0 && litros > 0) ? Number((delta / litros).toFixed(2)) : 0;
+        }
+      }
+    });
+
+    return { deltaMap, rendMap };
+  }, [cargasRegistradas]);
+
   // 2. Procesar tabla de la flota (con cálculo delta y atributos de tipo, ruta y aplicación)
   const tablaFlota = React.useMemo(() => {
     return vehiculos.map(v => {
@@ -234,32 +273,34 @@ export default function GestionCombustible() {
        const vTotalCosto = vCargas.reduce((acc, c) => acc + (parseFloat(c.costo_total)||0), 0);
        const vTotalLitros = vCargas.reduce((acc, c) => acc + (parseFloat(c.litros)||0), 0);
        const rendimientoObjetivo = parseFloat(v.detalles?.rendimiento_objetivo || '2.5');
+       const tieneCargasEnPeriodo = vCargas.length > 0;
        
        let vTotalKm = 0;
        let rendimientoHistorico = 0;
 
-       if (vCargas.length >= 2) {
-          const sorted = [...vCargas].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
-          const odoStart = parseFloat(sorted[0]?.odometro) || 0;
-          const odoEnd = parseFloat(sorted[sorted.length - 1]?.odometro) || 0;
-          const deltaKm = (odoEnd > odoStart) ? (odoEnd - odoStart) : 0;
-          const litrosConsumidos = sorted.slice(1).reduce((acc, c) => acc + (parseFloat(c.litros) || 0), 0);
-          
-          if (deltaKm > 0 && litrosConsumidos > 0) {
-             vTotalKm = deltaKm;
-             rendimientoHistorico = Number((deltaKm / litrosConsumidos).toFixed(2));
-          }
-       }
+       if (tieneCargasEnPeriodo) {
+          // Sumar km reales calculados en base al odómetro previo de cada carga en todo el historial
+          vTotalKm = vCargas.reduce((acc, c) => acc + (metricasPorCarga.deltaMap[c.id] || 0), 0);
 
-       if (rendimientoHistorico === 0 && vTotalLitros > 0) {
-          vTotalKm = vTotalLitros * (rendimientoObjetivo * 0.9);
-          rendimientoHistorico = Number((vTotalKm / vTotalLitros).toFixed(2));
+          // Obtener los rendimientos operacionales válidos de las cargas en este periodo
+          const rendsValidos = vCargas
+            .map(c => metricasPorCarga.rendMap[c.id])
+            .filter(r => r !== undefined && r > 0);
+
+          if (rendsValidos.length > 0) {
+             rendimientoHistorico = Number((rendsValidos.reduce((a, b) => a + b, 0) / rendsValidos.length).toFixed(2));
+          } else if (vTotalKm > 0 && vTotalLitros > 0) {
+             rendimientoHistorico = Number((vTotalKm / vTotalLitros).toFixed(2));
+          } else {
+             // Si no hay delta previo (primera carga histórica del vehículo), usar su meta
+             rendimientoHistorico = rendimientoObjetivo;
+          }
        }
        
        const costoKm30d = vTotalKm > 0 ? Math.round(vTotalCosto / vTotalKm) : 0;
        
        let estado = 'N/A';
-       if (rendimientoHistorico > 0) {
+       if (tieneCargasEnPeriodo && rendimientoHistorico > 0) {
           if (rendimientoHistorico < rendimientoObjetivo * 0.85) estado = 'Crítico';
           else if (rendimientoHistorico < rendimientoObjetivo * 0.95) estado = 'Regular';
           else estado = 'Óptimo';
@@ -267,7 +308,7 @@ export default function GestionCombustible() {
           estado = 'Sin Datos';
        }
 
-       const desviacionPct = (rendimientoObjetivo > 0 && rendimientoHistorico > 0)
+       const desviacionPct = (tieneCargasEnPeriodo && rendimientoObjetivo > 0 && rendimientoHistorico > 0)
           ? Number((((rendimientoHistorico - rendimientoObjetivo) / rendimientoObjetivo) * 100).toFixed(1))
           : 0;
 
@@ -291,10 +332,12 @@ export default function GestionCombustible() {
           vTotalKm,
           vTotalLitros,
           vTotalCosto,
+          tieneCargasEnPeriodo,
+          totalCargas: vCargas.length,
           estado
        };
     });
-  }, [vehiculos, cargasFiltradasPorFecha]);
+  }, [vehiculos, cargasFiltradasPorFecha, metricasPorCarga]);
 
   // Segmentación de alertas y flota para el Dashboard
   const tablaFlotaDashboard = React.useMemo(() => {
@@ -302,11 +345,11 @@ export default function GestionCombustible() {
   }, [tablaFlota, vehiculosDashboardIds]);
 
   const alertasDashboard = React.useMemo(() => {
-    return tablaFlotaDashboard.filter(v => v.estado === 'Crítico' || v.estado === 'Regular');
+    return tablaFlotaDashboard.filter(v => v.tieneCargasEnPeriodo && (v.estado === 'Crítico' || v.estado === 'Regular'));
   }, [tablaFlotaDashboard]);
 
-  const vehiculosCriticos = tablaFlotaDashboard.filter(v => v.estado === 'Crítico').length;
-  const alertasRegularesCount = tablaFlotaDashboard.filter(v => v.estado === 'Regular').length;
+  const vehiculosCriticos = tablaFlotaDashboard.filter(v => v.tieneCargasEnPeriodo && v.estado === 'Crítico').length;
+  const alertasRegularesCount = tablaFlotaDashboard.filter(v => v.tieneCargasEnPeriodo && v.estado === 'Regular').length;
 
   // 3. Procesar KPIs del Dashboard (calculados en base a las unidades de la flota evaluada)
   const kpis = React.useMemo(() => {
@@ -320,8 +363,8 @@ export default function GestionCombustible() {
 
     const totalKm = tablaFlotaDashboard.reduce((acc, v) => acc + (v.vTotalKm || 0), 0);
 
-    // Rendimiento Promedio: Promedio aritmético de los rendimientos individuales de la flota
-    const vehiculosConRendimiento = tablaFlotaDashboard.filter(v => v.rendimientoHistorico > 0);
+    // Rendimiento Promedio: Promedio aritmético de los rendimientos individuales de las unidades con cargas en el periodo
+    const vehiculosConRendimiento = tablaFlotaDashboard.filter(v => v.tieneCargasEnPeriodo && v.rendimientoHistorico > 0);
     const sumaRendimientos = vehiculosConRendimiento.reduce((acc, v) => acc + v.rendimientoHistorico, 0);
     const rendimientoPromedio = vehiculosConRendimiento.length > 0 
       ? (sumaRendimientos / vehiculosConRendimiento.length).toFixed(2)
@@ -378,7 +421,12 @@ export default function GestionCombustible() {
 
   // 5. Filtrado multidimensional de vehículos
   const filteredFlota = React.useMemo(() => {
+    const hayFiltroFecha = Boolean(fechaDesde || fechaHasta);
+
     return tablaFlota.filter(v => {
+      // Si hay un filtro de fecha activo, solo mostrar unidades que tuvieron cargas en ese periodo
+      if (hayFiltroFecha && !v.tieneCargasEnPeriodo) return false;
+
       if (filtroTexto.trim()) {
         const query = filtroTexto.toLowerCase().trim();
         const matchNum = v.numeroInterno?.toLowerCase().includes(query);
@@ -395,7 +443,7 @@ export default function GestionCombustible() {
       if (filtroAplicacion !== 'todos' && v.aplicacion !== filtroAplicacion) return false;
       return true;
     });
-  }, [tablaFlota, filtroTexto, filtroMarca, filtroModelo, filtroTipo, filtroRuta, filtroAplicacion]);
+  }, [tablaFlota, fechaDesde, fechaHasta, filtroTexto, filtroMarca, filtroModelo, filtroTipo, filtroRuta, filtroAplicacion]);
 
   const hayFiltrosActivosVehiculos = 
     filtroTexto.trim() !== '' || 
@@ -439,48 +487,44 @@ export default function GestionCombustible() {
     return cargasFiltradasTab.reduce((acc, c) => acc + (parseFloat(c.costo_total) || 0), 0);
   }, [cargasFiltradasTab]);
 
-  // 7. Gráfico histórico agrupado por fecha (calculando km reales de lecturas consecutivas)
+  // 7. Gráfico histórico agrupado por fecha (calculando costo acumulado y rendimiento promedio operacional de la flota para cada día)
   const chartData = React.useMemo(() => {
-     const allSorted = [...cargasRegistradas].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
-     const deltaKmByCargaId: Record<string, number> = {};
-     const prevOdoByVehiculo: Record<string, number> = {};
-
-     allSorted.forEach(c => {
-        const vId = c.vehiculo_id;
-        const odo = parseFloat(c.odometro) || 0;
-        if (prevOdoByVehiculo[vId] !== undefined && odo > prevOdoByVehiculo[vId]) {
-           deltaKmByCargaId[c.id] = odo - prevOdoByVehiculo[vId];
-        }
-        prevOdoByVehiculo[vId] = odo;
-     });
-
      const sortedFiltradas = [...cargasDashboard].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
-     const grouped: Record<string, { costo: number, litros: number, km: number }> = {};
+     const grouped: Record<string, { costo: number, litros: number, rendimientos: number[] }> = {};
 
      sortedFiltradas.forEach(c => {
         const d = c.fecha ? c.fecha.substring(0, 10) : (c.fechaFormateada || '');
         const parts = d.split('-');
         const shortDate = parts.length === 3 ? `${parts[2]}/${parts[1]}` : d.substring(0, 5);
 
-        if (!grouped[shortDate]) grouped[shortDate] = { costo: 0, litros: 0, km: 0 };
-        const litros = parseFloat(c.litros) || 0;
+        if (!grouped[shortDate]) grouped[shortDate] = { costo: 0, litros: 0, rendimientos: [] };
         grouped[shortDate].costo += parseFloat(c.costo_total) || 0;
-        grouped[shortDate].litros += litros;
+        grouped[shortDate].litros += parseFloat(c.litros) || 0;
         
-        const delta = deltaKmByCargaId[c.id];
-        if (delta && delta > 0) {
-           grouped[shortDate].km += delta;
+        const rend = metricasPorCarga.rendMap[c.id];
+        if (rend && rend > 0) {
+           grouped[shortDate].rendimientos.push(rend);
         } else {
-           grouped[shortDate].km += litros * 2.8;
+           // Si no tiene delta histórico (primera carga base del vehículo), usar su meta operacional
+           const v = vehiculos.find(veh => veh.id === c.vehiculo_id);
+           const rendObj = parseFloat(v?.detalles?.rendimiento_objetivo || '3.0');
+           grouped[shortDate].rendimientos.push(rendObj);
         }
      });
 
-     return Object.keys(grouped).map(d => ({
-        date: d,
-        costo: grouped[d].costo,
-        rendimiento: grouped[d].litros > 0 ? Number((grouped[d].km / grouped[d].litros).toFixed(2)) : 0
-     }));
-  }, [cargasDashboard, cargasRegistradas]);
+     return Object.keys(grouped).map(d => {
+        const rends = grouped[d].rendimientos;
+        const avgRend = rends.length > 0 
+          ? Number((rends.reduce((a, b) => a + b, 0) / rends.length).toFixed(1))
+          : 0;
+
+        return {
+          date: d,
+          costo: grouped[d].costo,
+          rendimiento: avgRend
+        };
+     });
+  }, [cargasDashboard, metricasPorCarga, vehiculos]);
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto w-full relative">
@@ -605,7 +649,13 @@ export default function GestionCombustible() {
               )}
             </div>
             <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-              <span>Mostrando <strong className="text-slate-800 dark:text-slate-200">{vehiculosDashboard.length}</strong> de {vehiculos.length} unidades</span>
+              <span>
+                {Boolean(fechaDesde || fechaHasta) ? (
+                  <>Mostrando <strong className="text-slate-800 dark:text-slate-200">{kpis.vehiculosEvaluados}</strong> unidades con cargas ({vehiculosDashboard.length} en segmento)</>
+                ) : (
+                  <>Mostrando <strong className="text-slate-800 dark:text-slate-200">{vehiculosDashboard.length}</strong> de {vehiculos.length} unidades</>
+                )}
+              </span>
               {(dashMarca !== 'todos' || dashModelo !== 'todos') && (
                 <Badge variant="outline" className="text-blue-600 border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/30 text-xs">Segmentado</Badge>
               )}
@@ -1080,7 +1130,11 @@ export default function GestionCombustible() {
             <div className="flex items-center justify-between pt-1">
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-500 font-medium">
-                  Mostrando <strong className="text-slate-800 dark:text-slate-200">{filteredFlota.length}</strong> de {tablaFlota.length} unidades
+                  {Boolean(fechaDesde || fechaHasta) ? (
+                    <>Mostrando <strong className="text-slate-800 dark:text-slate-200">{filteredFlota.length}</strong> unidades con cargas en el periodo (de {tablaFlota.length} en flota)</>
+                  ) : (
+                    <>Mostrando <strong className="text-slate-800 dark:text-slate-200">{filteredFlota.length}</strong> de {tablaFlota.length} unidades</>
+                  )}
                 </span>
                 {hayFiltrosActivosVehiculos && (
                   <Badge variant="secondary" className="text-xs font-normal">
