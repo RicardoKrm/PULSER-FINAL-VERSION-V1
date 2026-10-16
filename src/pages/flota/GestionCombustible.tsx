@@ -22,7 +22,9 @@ import {
   Info,
   X,
   Target,
-  RotateCcw
+  RotateCcw,
+  Gauge,
+  Clock
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Badge } from '../../components/ui/Badge';
@@ -78,10 +80,42 @@ export default function GestionCombustible() {
     tipo_combustible: 'Diésel'
   });
   
-  const [formMeta, setFormMeta] = useState({
+  const [formMeta, setFormMeta] = useState<{
+    vehiculo_id: string;
+    tipo_medicion: 'km_l' | 'l_h';
+    rendimiento_objetivo: string;
+  }>({
     vehiculo_id: '',
+    tipo_medicion: 'km_l',
     rendimiento_objetivo: ''
   });
+
+  const handleOpenAjustarMetas = (vehiculo?: any) => {
+    if (vehiculo) {
+      const tipoMed = (vehiculo.tipoMedicion || vehiculo.detalles?.tipo_medicion || 'km_l') as 'km_l' | 'l_h';
+      const obj = vehiculo.rendimientoObjetivo !== undefined 
+        ? String(vehiculo.rendimientoObjetivo) 
+        : (vehiculo.detalles?.rendimiento_objetivo !== undefined 
+            ? String(vehiculo.detalles.rendimiento_objetivo) 
+            : (tipoMed === 'l_h' ? '15.0' : '2.8'));
+      setFormMeta({
+        vehiculo_id: vehiculo.id,
+        tipo_medicion: tipoMed,
+        rendimiento_objetivo: obj
+      });
+    } else if (vehiculos.length > 0) {
+      const currentId = formMeta.vehiculo_id || vehiculos[0].id;
+      const v = vehiculos.find(veh => veh.id === currentId) || vehiculos[0];
+      const tipoMed = (v.detalles?.tipo_medicion as 'km_l' | 'l_h') || 'km_l';
+      const obj = v.detalles?.rendimiento_objetivo !== undefined ? String(v.detalles.rendimiento_objetivo) : (tipoMed === 'l_h' ? '15.0' : '2.8');
+      setFormMeta({
+        vehiculo_id: v.id,
+        tipo_medicion: tipoMed,
+        rendimiento_objetivo: obj
+      });
+    }
+    setIsAjustarMetasOpen(true);
+  };
 
   const [preciosActuales, setPreciosActuales] = useState<Record<string, number>>({});
 
@@ -169,8 +203,14 @@ export default function GestionCombustible() {
     try {
        const selectedV = vehiculos.find(v => v.id === formMeta.vehiculo_id);
        const obj = parseFloat(formMeta.rendimiento_objetivo);
-       const detalles = selectedV.detalles || {};
-       await supabase.from('vehiculo').update({ detalles: { ...detalles, rendimiento_objetivo: obj } }).eq('id', formMeta.vehiculo_id);
+       const detalles = selectedV?.detalles || {};
+       await supabase.from('vehiculo').update({
+         detalles: {
+           ...detalles,
+           tipo_medicion: formMeta.tipo_medicion,
+           rendimiento_objetivo: obj
+         }
+       }).eq('id', formMeta.vehiculo_id);
        setIsAjustarMetasOpen(false);
        fetchData();
     } catch (err: any) {
@@ -227,7 +267,7 @@ export default function GestionCombustible() {
     return cargasFiltradasPorFecha.filter(c => vehiculosDashboardIds.has(c.vehiculo_id));
   }, [cargasFiltradasPorFecha, vehiculosDashboardIds]);
 
-  // 1.2 Mapa maestro de deltas de km y rendimientos reales calculados por carga en base a odómetros históricos
+  // 1.2 Mapa maestro de deltas (km u horas) y rendimientos/consumos reales calculados por carga en base a odómetros/horómetros históricos
   const metricasPorCarga = React.useMemo(() => {
     const cargasPorVehiculo: Record<string, any[]> = {};
     cargasRegistradas.forEach(c => {
@@ -238,7 +278,13 @@ export default function GestionCombustible() {
     const deltaMap: Record<string, number> = {};
     const rendMap: Record<string, number> = {};
 
+    const vehiculoMap: Record<string, any> = {};
+    vehiculos.forEach(v => { vehiculoMap[v.id] = v; });
+
     Object.keys(cargasPorVehiculo).forEach(vId => {
+      const v = vehiculoMap[vId];
+      const tipoMedicion = (v?.detalles?.tipo_medicion || 'km_l') as 'km_l' | 'l_h';
+
       const sorted = [...cargasPorVehiculo[vId]].sort((a, b) => {
         const tA = new Date(a.fecha).getTime();
         const tB = new Date(b.fecha).getTime();
@@ -258,31 +304,42 @@ export default function GestionCombustible() {
           const prevOdo = parseFloat(sorted[i - 1].odometro) || 0;
           const delta = odo > prevOdo ? (odo - prevOdo) : 0;
           deltaMap[c.id] = delta;
-          rendMap[c.id] = (delta > 0 && litros > 0) ? Number((delta / litros).toFixed(2)) : 0;
+          if (tipoMedicion === 'l_h') {
+            // Litros por Hora: litros consumidos / delta horas
+            rendMap[c.id] = (delta > 0 && litros > 0) ? Number((litros / delta).toFixed(2)) : 0;
+          } else {
+            // Kilómetros por Litro: delta km / litros consumidos
+            rendMap[c.id] = (delta > 0 && litros > 0) ? Number((delta / litros).toFixed(2)) : 0;
+          }
         }
       }
     });
 
     return { deltaMap, rendMap };
-  }, [cargasRegistradas]);
+  }, [cargasRegistradas, vehiculos]);
 
-  // 2. Procesar tabla de la flota (con cálculo delta y atributos de tipo, ruta y aplicación)
+  // 2. Procesar tabla de la flota (con cálculo delta y atributos de tipo, ruta, aplicación y unidad km/L o L/h)
   const tablaFlota = React.useMemo(() => {
     return vehiculos.map(v => {
+       const tipoMedicion = (v.detalles?.tipo_medicion || 'km_l') as 'km_l' | 'l_h';
+       const unidadMedida = tipoMedicion === 'l_h' ? 'L/h' : 'km/L';
+       const unidadDelta = tipoMedicion === 'l_h' ? 'hrs' : 'km';
+       const unidadCosto = tipoMedicion === 'l_h' ? '$/h' : '$/km';
+
        const vCargas = cargasFiltradasPorFecha.filter(c => c.vehiculo_id === v.id);
        const vTotalCosto = vCargas.reduce((acc, c) => acc + (parseFloat(c.costo_total)||0), 0);
        const vTotalLitros = vCargas.reduce((acc, c) => acc + (parseFloat(c.litros)||0), 0);
-       const rendimientoObjetivo = parseFloat(v.detalles?.rendimiento_objetivo || '2.5');
+       const rendimientoObjetivo = parseFloat(v.detalles?.rendimiento_objetivo || (tipoMedicion === 'l_h' ? '15.0' : '2.5'));
        const tieneCargasEnPeriodo = vCargas.length > 0;
        
-       let vTotalKm = 0;
+       let vTotalKm = 0; // Total deltas (km u horas según tipoMedicion)
        let rendimientoHistorico = 0;
 
        if (tieneCargasEnPeriodo) {
-          // Sumar km reales calculados en base al odómetro previo de cada carga en todo el historial
+          // Sumar deltas reales (km u horas) calculados en base al odómetro/horómetro previo
           vTotalKm = vCargas.reduce((acc, c) => acc + (metricasPorCarga.deltaMap[c.id] || 0), 0);
 
-          // Obtener los rendimientos operacionales válidos de las cargas en este periodo
+          // Obtener los rendimientos/consumos operacionales válidos de las cargas en este periodo
           const rendsValidos = vCargas
             .map(c => metricasPorCarga.rendMap[c.id])
             .filter(r => r !== undefined && r > 0);
@@ -290,7 +347,11 @@ export default function GestionCombustible() {
           if (rendsValidos.length > 0) {
              rendimientoHistorico = Number((rendsValidos.reduce((a, b) => a + b, 0) / rendsValidos.length).toFixed(2));
           } else if (vTotalKm > 0 && vTotalLitros > 0) {
-             rendimientoHistorico = Number((vTotalKm / vTotalLitros).toFixed(2));
+             if (tipoMedicion === 'l_h') {
+               rendimientoHistorico = Number((vTotalLitros / vTotalKm).toFixed(2));
+             } else {
+               rendimientoHistorico = Number((vTotalKm / vTotalLitros).toFixed(2));
+             }
           } else {
              // Si no hay delta previo (primera carga histórica del vehículo), usar su meta
              rendimientoHistorico = rendimientoObjetivo;
@@ -300,17 +361,27 @@ export default function GestionCombustible() {
        const costoKm30d = vTotalKm > 0 ? Math.round(vTotalCosto / vTotalKm) : 0;
        
        let estado = 'N/A';
+       let desviacionPct = 0;
+
        if (tieneCargasEnPeriodo && rendimientoHistorico > 0) {
-          if (rendimientoHistorico < rendimientoObjetivo * 0.85) estado = 'Crítico';
-          else if (rendimientoHistorico < rendimientoObjetivo * 0.95) estado = 'Regular';
-          else estado = 'Óptimo';
+          if (tipoMedicion === 'l_h') {
+             // Para Litros / Hora: menor es mejor!
+             // Si el consumo supera la meta en >15%, es Crítico; entre 5% y 15% es Regular; <=5% es Óptimo
+             desviacionPct = Number((((rendimientoHistorico - rendimientoObjetivo) / rendimientoObjetivo) * 100).toFixed(1));
+             if (rendimientoHistorico > rendimientoObjetivo * 1.15) estado = 'Crítico';
+             else if (rendimientoHistorico > rendimientoObjetivo * 1.05) estado = 'Regular';
+             else estado = 'Óptimo';
+          } else {
+             // Para km/L: mayor es mejor!
+             // Si el rendimiento cae por debajo del 85% de la meta es Crítico; entre 85% y 95% es Regular; >=95% es Óptimo
+             desviacionPct = Number((((rendimientoHistorico - rendimientoObjetivo) / rendimientoObjetivo) * 100).toFixed(1));
+             if (rendimientoHistorico < rendimientoObjetivo * 0.85) estado = 'Crítico';
+             else if (rendimientoHistorico < rendimientoObjetivo * 0.95) estado = 'Regular';
+             else estado = 'Óptimo';
+          }
        } else {
           estado = 'Sin Datos';
        }
-
-       const desviacionPct = (tieneCargasEnPeriodo && rendimientoObjetivo > 0 && rendimientoHistorico > 0)
-          ? Number((((rendimientoHistorico - rendimientoObjetivo) / rendimientoObjetivo) * 100).toFixed(1))
-          : 0;
 
        const rutasCargas = Array.from(new Set(vCargas.map(c => c.ruta).filter(Boolean))) as string[];
        const rutaPrincipal = rutasCargas.length > 0 ? rutasCargas[0] : (v.detalles?.ruta || 'General');
@@ -325,6 +396,10 @@ export default function GestionCombustible() {
           aplicacion: v.detalles?.tipo_uso || v.detalles?.aplicacion || v.detalles?.faena || 'Operación General',
           ruta: rutaPrincipal,
           rutas: rutasCargas,
+          tipoMedicion,
+          unidadMedida,
+          unidadDelta,
+          unidadCosto,
           rendimientoObjetivo,
           rendimientoHistorico,
           desviacionPct,
@@ -361,22 +436,34 @@ export default function GestionCombustible() {
        totalLitros += parseFloat(c.litros) || 0;
     });
 
-    const totalKm = tablaFlotaDashboard.reduce((acc, v) => acc + (v.vTotalKm || 0), 0);
+    const totalKm = tablaFlotaDashboard.filter(v => v.tipoMedicion !== 'l_h').reduce((acc, v) => acc + (v.vTotalKm || 0), 0);
+    const totalHoras = tablaFlotaDashboard.filter(v => v.tipoMedicion === 'l_h').reduce((acc, v) => acc + (v.vTotalKm || 0), 0);
 
-    // Rendimiento Promedio: Promedio aritmético de los rendimientos individuales de las unidades con cargas en el periodo
-    const vehiculosConRendimiento = tablaFlotaDashboard.filter(v => v.tieneCargasEnPeriodo && v.rendimientoHistorico > 0);
-    const sumaRendimientos = vehiculosConRendimiento.reduce((acc, v) => acc + v.rendimientoHistorico, 0);
-    const rendimientoPromedio = vehiculosConRendimiento.length > 0 
-      ? (sumaRendimientos / vehiculosConRendimiento.length).toFixed(2)
+    // Rendimiento Promedio: Promedio aritmético de los rendimientos individuales de las unidades km/L con cargas en el periodo
+    const vehiculosKmL = tablaFlotaDashboard.filter(v => v.tieneCargasEnPeriodo && v.tipoMedicion !== 'l_h' && v.rendimientoHistorico > 0);
+    const sumaRendimientosKmL = vehiculosKmL.reduce((acc, v) => acc + v.rendimientoHistorico, 0);
+    const rendimientoPromedio = vehiculosKmL.length > 0 
+      ? (sumaRendimientosKmL / vehiculosKmL.length).toFixed(2)
       : '0';
+
+    // Consumo Promedio Maquinaria (L/h)
+    const vehiculosLh = tablaFlotaDashboard.filter(v => v.tieneCargasEnPeriodo && v.tipoMedicion === 'l_h' && v.rendimientoHistorico > 0);
+    const sumaConsumoLh = vehiculosLh.reduce((acc, v) => acc + v.rendimientoHistorico, 0);
+    const consumoPromedioLh = vehiculosLh.length > 0
+      ? (sumaConsumoLh / vehiculosLh.length).toFixed(1)
+      : null;
 
     return {
       costoTotal30d,
       totalLitros,
       totalKm,
-      vehiculosEvaluados: vehiculosConRendimiento.length,
-      sumaRendimientos: Number(sumaRendimientos.toFixed(2)),
+      totalHoras,
+      vehiculosEvaluados: vehiculosKmL.length + vehiculosLh.length,
+      vehiculosKmLCount: vehiculosKmL.length,
+      vehiculosLhCount: vehiculosLh.length,
+      sumaRendimientos: Number(sumaRendimientosKmL.toFixed(2)),
       rendimientoPromedio,
+      consumoPromedioLh,
       costoKmPromedio: totalKm > 0 ? Math.round(costoTotal30d / totalKm) : 0,
     };
   }, [cargasDashboard, tablaFlotaDashboard]);
@@ -501,14 +588,19 @@ export default function GestionCombustible() {
         grouped[shortDate].costo += parseFloat(c.costo_total) || 0;
         grouped[shortDate].litros += parseFloat(c.litros) || 0;
         
-        const rend = metricasPorCarga.rendMap[c.id];
-        if (rend && rend > 0) {
-           grouped[shortDate].rendimientos.push(rend);
-        } else {
-           // Si no tiene delta histórico (primera carga base del vehículo), usar su meta operacional
-           const v = vehiculos.find(veh => veh.id === c.vehiculo_id);
-           const rendObj = parseFloat(v?.detalles?.rendimiento_objetivo || '3.0');
-           grouped[shortDate].rendimientos.push(rendObj);
+        const v = vehiculos.find(veh => veh.id === c.vehiculo_id);
+        const tipoMed = v?.detalles?.tipo_medicion || 'km_l';
+        
+        // Solo agregar al promedio de km/L del gráfico si es vehículo con medición km/L
+        if (tipoMed !== 'l_h') {
+          const rend = metricasPorCarga.rendMap[c.id];
+          if (rend && rend > 0) {
+             grouped[shortDate].rendimientos.push(rend);
+          } else {
+             // Si no tiene delta histórico (primera carga base del vehículo), usar su meta operacional
+             const rendObj = parseFloat(v?.detalles?.rendimiento_objetivo || '3.0');
+             grouped[shortDate].rendimientos.push(rendObj);
+          }
         }
      });
 
@@ -811,10 +903,10 @@ export default function GestionCombustible() {
                         <th className="px-6 py-3 font-semibold">Modelo</th>
                         <th className="px-6 py-3 font-semibold">Tipo / Aplicación</th>
                         <th className="px-6 py-3 font-semibold">Ruta</th>
-                        <th className="px-6 py-3 font-semibold text-center">Meta (km/L)</th>
+                        <th className="px-6 py-3 font-semibold text-center">Meta</th>
                         <th className="px-6 py-3 font-semibold text-center">Real</th>
                         <th className="px-6 py-3 font-semibold text-center">Desviación</th>
-                        <th className="px-6 py-3 font-semibold text-center">Costo/km</th>
+                        <th className="px-6 py-3 font-semibold text-center">Costo / Unidad</th>
                         <th className="px-6 py-3 font-semibold text-center">Semáforo</th>
                         <th className="px-6 py-3 font-semibold text-center">Acciones</th>
                       </tr>
@@ -831,7 +923,12 @@ export default function GestionCombustible() {
                             <div className="text-xs text-slate-500">{v.modelo}</div>
                           </td>
                           <td className="px-6 py-3.5">
-                            <div className="text-xs font-semibold text-slate-700 dark:text-slate-300">{v.tipo}</div>
+                            <div className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                              {v.tipo}
+                              <Badge variant="outline" className="text-[10px] px-1 py-0 font-bold border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                                {v.unidadMedida}
+                              </Badge>
+                            </div>
                             <div className="text-xs text-slate-500">{v.aplicacion}</div>
                           </td>
                           <td className="px-6 py-3.5">
@@ -841,14 +938,14 @@ export default function GestionCombustible() {
                             </span>
                           </td>
                           <td className="px-6 py-3.5 text-center font-medium text-slate-600 dark:text-slate-400">
-                            {v.rendimientoObjetivo.toFixed(1)}
+                            {v.rendimientoObjetivo.toFixed(1)} <span className="text-[10px] text-slate-400 font-normal">{v.unidadMedida}</span>
                           </td>
                           <td className="px-6 py-3.5 text-center">
                             <span className={cn(
                               "font-bold px-2 py-0.5 rounded text-xs",
                               v.estado === 'Crítico' ? "text-red-700 bg-red-100/80 dark:bg-red-900/40" : "text-amber-700 bg-amber-100/80 dark:bg-amber-900/40"
                             )}>
-                              {v.rendimientoHistorico.toFixed(1)} km/L
+                              {v.rendimientoHistorico.toFixed(1)} {v.unidadMedida}
                             </span>
                           </td>
                           <td className="px-6 py-3.5 text-center">
@@ -860,7 +957,7 @@ export default function GestionCombustible() {
                             </span>
                           </td>
                           <td className="px-6 py-3.5 text-center font-bold text-slate-700 dark:text-slate-300">
-                            ${v.costoKm30d}
+                            ${v.costoKm30d} <span className="text-[10px] text-slate-400 font-normal">{v.unidadCosto}</span>
                           </td>
                           <td className="px-6 py-3.5 text-center">
                             <div className="flex items-center justify-center gap-1.5">
@@ -877,14 +974,25 @@ export default function GestionCombustible() {
                             </div>
                           </td>
                           <td className="px-6 py-3.5 text-center">
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-xs font-semibold" 
-                              onClick={() => setSelectedVehicle(v)}
-                            >
-                              Ver Detalle
-                            </Button>
+                            <div className="flex items-center justify-center gap-1">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-xs font-semibold" 
+                                onClick={() => setSelectedVehicle(v)}
+                              >
+                                Ver Detalle
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                onClick={() => handleOpenAjustarMetas(v)}
+                                title="Ajustar Meta / Tipo"
+                              >
+                                <Target className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -927,11 +1035,11 @@ export default function GestionCombustible() {
               <div className="bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 p-4 rounded-xl border border-blue-100 dark:border-blue-900/50 flex gap-3 text-sm">
                  <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                  <div>
-                   <strong className="block mb-1">FÓRMULA:</strong>
-                   {selectedKpi === 'costo' && "Costo Total (30d) = ∑ (Litros consumidos × Precio del litro vigente en cada carga)"}
-                   {selectedKpi === 'rendimiento' && "Rendimiento Promedio Flota = ∑ Rendimientos individuales / N° Unidades operacionales"}
+                   <strong className="block mb-1">FÓRMULA Y MÉTRICA:</strong>
+                   {selectedKpi === 'costo' && "Costo Total = ∑ (Litros consumidos × Precio del litro vigente en cada carga)"}
+                   {selectedKpi === 'rendimiento' && "Rendimiento Flota: Promedio de km/L en unidades de ruta (o L/h en faena/maquinaria)"}
                    {selectedKpi === 'costokm' && "Costo/km Flota = Suma total de gasto en combustible / Kilómetros totales producidos"}
-                   {selectedKpi === 'alertas' && "Desviaciones Críticas = Conteo de vehículos cuyo rendimiento real es < (Objetivo - 15%)"}
+                   {selectedKpi === 'alertas' && "Desviaciones Críticas = Conteo de unidades cuyo rendimiento/consumo excede el 15% del objetivo"}
                  </div>
               </div>
 
@@ -962,21 +1070,33 @@ export default function GestionCombustible() {
                       <span className="font-bold text-slate-900 dark:text-white">{kpis.vehiculosEvaluados} Vehículos</span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                      <span className="text-slate-600 dark:text-slate-400">Suma Rendimientos Parciales</span>
+                      <span className="text-slate-600 dark:text-slate-400">Suma Rendimientos (km/L)</span>
                       <span className="font-bold text-slate-900 dark:text-white">{kpis.sumaRendimientos} km/L</span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                      <span className="text-slate-600 dark:text-slate-400">Distancia Total Recorrida</span>
+                      <span className="text-slate-600 dark:text-slate-400">Distancia Total (Ruta)</span>
                       <span className="font-bold text-slate-900 dark:text-white">{(kpis.totalKm || 0).toLocaleString()} km</span>
                     </div>
+                    {kpis.totalHoras > 0 && (
+                      <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                        <span className="text-slate-600 dark:text-slate-400">Horas Totales (Maquinaria)</span>
+                        <span className="font-bold text-slate-900 dark:text-white">{kpis.totalHoras.toLocaleString()} hrs</span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                       <span className="text-slate-600 dark:text-slate-400">Total Litros Consumidos</span>
                       <span className="font-bold text-slate-900 dark:text-white">{(kpis.totalLitros || 0).toLocaleString()} L</span>
                     </div>
                     <div className="flex justify-between items-center p-4 bg-emerald-600 text-white rounded-lg shadow-inner">
-                      <span className="font-medium">Promedio de Flota</span>
+                      <span className="font-medium">Promedio de Flota (Ruta)</span>
                       <span className="font-black text-xl">{kpis.rendimientoPromedio} km/L</span>
                     </div>
+                    {kpis.consumoPromedioLh && (
+                      <div className="flex justify-between items-center p-4 bg-blue-600 text-white rounded-lg shadow-inner">
+                        <span className="font-medium">Consumo Promedio (Maquinaria)</span>
+                        <span className="font-black text-xl">{kpis.consumoPromedioLh} L/h</span>
+                      </div>
+                    )}
                   </div>
                 )}
                 {selectedKpi === 'costokm' && (
@@ -989,8 +1109,14 @@ export default function GestionCombustible() {
                       <span className="text-slate-600 dark:text-slate-400">Kilómetros Totales</span>
                       <span className="font-bold text-slate-900 dark:text-white">{(kpis.totalKm || 0).toLocaleString()} km</span>
                     </div>
+                    {kpis.totalHoras > 0 && (
+                      <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                        <span className="text-slate-600 dark:text-slate-400">Horas Totales (Maquinaria)</span>
+                        <span className="font-bold text-slate-900 dark:text-white">{kpis.totalHoras.toLocaleString()} hrs</span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center p-4 bg-slate-800 dark:bg-slate-950 text-white rounded-lg shadow-inner">
-                      <span className="font-medium">Costo por KM</span>
+                      <span className="font-medium">Costo por KM Promedio</span>
                       <span className="font-black text-xl">${kpis.costoKmPromedio}</span>
                     </div>
                   </div>
@@ -1010,7 +1136,7 @@ export default function GestionCombustible() {
                       {tablaFlotaDashboard.filter(v => v.estado === 'Crítico').map(v => (
                          <div key={v.id} className="flex justify-between text-sm p-2 border-l-4 border-red-500 bg-red-50 dark:bg-red-900/10 rounded-r">
                            <span className="font-medium">{v.numeroInterno}</span>
-                           <span className="text-red-600">{v.rendimientoHistorico} km/L (Meta: {v.rendimientoObjetivo})</span>
+                           <span className="text-red-600">{v.rendimientoHistorico} {v.unidadMedida} (Meta: {v.rendimientoObjetivo} {v.unidadMedida})</span>
                          </div>
                       ))}
                     </div>
@@ -1032,7 +1158,7 @@ export default function GestionCombustible() {
               <p className="text-sm text-slate-500 mt-1">Comparativa operacional real vs metas teóricas por unidad</p>
             </div>
             <div className="flex items-center gap-2 self-end md:self-auto">
-              <Button onClick={() => setIsAjustarMetasOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium">
+              <Button onClick={() => handleOpenAjustarMetas()} className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium">
                 <Target className="w-4 h-4 mr-2" /> Ajustar Metas
               </Button>
             </div>
@@ -1165,10 +1291,10 @@ export default function GestionCombustible() {
                     <th className="px-6 py-4 font-semibold">Modelo</th>
                     <th className="px-6 py-4 font-semibold">Tipo de Vehículo</th>
                     <th className="px-6 py-4 font-semibold">Ruta / Aplicación</th>
-                    <th className="px-6 py-4 font-semibold text-center">Meta (km/L)</th>
+                    <th className="px-6 py-4 font-semibold text-center">Meta</th>
                     <th className="px-6 py-4 font-semibold text-center">Real</th>
                     <th className="px-6 py-4 font-semibold text-center">Desviación</th>
-                    <th className="px-6 py-4 font-semibold text-center">Costo/km</th>
+                    <th className="px-6 py-4 font-semibold text-center">Costo / Unidad</th>
                     <th className="px-6 py-4 font-semibold text-center">Semáforo</th>
                     <th className="px-6 py-4 font-semibold text-center">Acciones</th>
                   </tr>
@@ -1185,9 +1311,14 @@ export default function GestionCombustible() {
                         <div className="text-xs text-slate-500">{v.modelo}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border dark:border-slate-700">
-                          {v.tipo}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border dark:border-slate-700">
+                            {v.tipo}
+                          </span>
+                          <Badge variant="outline" className="text-[10px] px-1 py-0 font-bold border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                            {v.unidadMedida}
+                          </Badge>
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-xs font-medium text-slate-800 dark:text-slate-200 flex items-center gap-1">
@@ -1196,7 +1327,7 @@ export default function GestionCombustible() {
                         <div className="text-xs text-slate-500">{v.aplicacion}</div>
                       </td>
                       <td className="px-6 py-4 text-center font-medium text-slate-600 dark:text-slate-400">
-                        {v.rendimientoObjetivo.toFixed(1)} 
+                        {v.rendimientoObjetivo.toFixed(1)} <span className="text-[10px] text-slate-400 font-normal">{v.unidadMedida}</span>
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span className={cn(
@@ -1206,7 +1337,7 @@ export default function GestionCombustible() {
                           v.estado === 'Sin Datos' ? "text-slate-500 bg-slate-100 dark:bg-slate-800 dark:text-slate-400" :
                           "text-red-700 bg-red-50 dark:bg-red-900/30"
                         )}>
-                          {v.estado === 'Sin Datos' ? '-' : `${v.rendimientoHistorico.toFixed(1)} km/L`}
+                          {v.estado === 'Sin Datos' ? '-' : `${v.rendimientoHistorico.toFixed(1)} ${v.unidadMedida}`}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-center">
@@ -1215,8 +1346,8 @@ export default function GestionCombustible() {
                         ) : (
                           <span className={cn(
                             "font-bold text-xs",
-                            v.desviacionPct >= 0 ? "text-emerald-600 dark:text-emerald-400" :
-                            v.desviacionPct >= -15 ? "text-amber-600 dark:text-amber-400" :
+                            v.estado === 'Óptimo' ? "text-emerald-600 dark:text-emerald-400" :
+                            v.estado === 'Regular' ? "text-amber-600 dark:text-amber-400" :
                             "text-red-600 dark:text-red-400"
                           )}>
                             {v.desviacionPct > 0 ? `+${v.desviacionPct}%` : `${v.desviacionPct}%`}
@@ -1224,7 +1355,7 @@ export default function GestionCombustible() {
                         )}
                       </td>
                       <td className="px-6 py-4 text-center font-bold text-slate-700 dark:text-slate-300">
-                        ${v.costoKm30d}
+                        ${v.costoKm30d} <span className="text-[10px] text-slate-400 font-normal">{v.unidadCosto}</span>
                       </td>
                       <td className="px-6 py-4 text-center">
                          <div className="flex items-center justify-center gap-1.5">
@@ -1239,9 +1370,20 @@ export default function GestionCombustible() {
                          </div>
                       </td>
                       <td className="px-6 py-4 text-center">
-                         <Button variant="ghost" size="sm" className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 text-xs font-semibold" onClick={() => setSelectedVehicle(v)}>
-                           Ver Detalle
-                         </Button>
+                         <div className="flex items-center justify-center gap-1">
+                           <Button variant="ghost" size="sm" className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-xs font-semibold" onClick={() => setSelectedVehicle(v)}>
+                             Ver Detalle
+                           </Button>
+                           <Button 
+                             variant="ghost" 
+                             size="sm" 
+                             className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" 
+                             onClick={() => handleOpenAjustarMetas(v)}
+                             title="Ajustar Meta / Tipo"
+                           >
+                             <Target className="w-3.5 h-3.5" />
+                           </Button>
+                         </div>
                       </td>
                     </tr>
                   ))}
@@ -1343,7 +1485,7 @@ export default function GestionCombustible() {
                     <th className="px-6 py-4 font-semibold">Vehículo</th>
                     <th className="px-6 py-4 font-semibold">Conductor</th>
                     <th className="px-6 py-4 font-semibold">Ruta</th>
-                    <th className="px-6 py-4 font-semibold text-right">Kilometraje</th>
+                    <th className="px-6 py-4 font-semibold text-right">Lectura (km / hrs)</th>
                     <th className="px-6 py-4 font-semibold text-right">Litros</th>
                     <th className="px-6 py-4 font-semibold text-right">Costo Total</th>
                   </tr>
@@ -1370,7 +1512,9 @@ export default function GestionCombustible() {
                             {carga.ruta || 'S/N'}
                          </div>
                       </td>
-                      <td className="px-6 py-4 text-right font-mono text-slate-600 dark:text-slate-400">{(carga.odometro || 0).toLocaleString()} km</td>
+                      <td className="px-6 py-4 text-right font-mono text-slate-600 dark:text-slate-400">
+                        {(carga.odometro || 0).toLocaleString()} {vehiculos.find(v => v.id === carga.vehiculo_id)?.detalles?.tipo_medicion === 'l_h' ? 'hrs' : 'km'}
+                      </td>
                       <td className="px-6 py-4 text-right font-semibold text-blue-600 dark:text-blue-400">{carga.litros} L</td>
                       <td className="px-6 py-4 text-right font-bold text-slate-800 dark:text-slate-200">${(carga.costo_total || 0).toLocaleString()}</td>
                     </tr>
@@ -1396,42 +1540,80 @@ export default function GestionCombustible() {
           </Button>
 
           <Card className="shadow-sm border-t-4 border-t-blue-500">
-            <CardHeader className="border-b dark:border-slate-800 pb-4 flex flex-row items-center justify-between">
+            <CardHeader className="border-b dark:border-slate-800 pb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                  <CardTitle className="text-2xl flex items-center gap-2">
                    {selectedVehicle.numeroInterno} 
-                   <Badge variant={selectedVehicle.estado === 'Crítico' ? 'destructive' : 'default'} className={selectedVehicle.estado === 'Regular' ? 'bg-amber-500 hover:bg-amber-600' : ''}>{selectedVehicle.estado}</Badge>
+                   <Badge variant={selectedVehicle.estado === 'Crítico' ? 'destructive' : 'default'} className={selectedVehicle.estado === 'Regular' ? 'bg-amber-500 hover:bg-amber-600' : ''}>
+                     {selectedVehicle.estado}
+                   </Badge>
+                   <Badge variant="outline" className="text-xs font-mono font-bold border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300">
+                     {selectedVehicle.unidadMedida}
+                   </Badge>
                  </CardTitle>
-                 <p className="text-slate-500 mt-1">{selectedVehicle.marca} {selectedVehicle.modelo} • Patente: {selectedVehicle.patente}</p>
+                 <p className="text-slate-500 mt-1">{selectedVehicle.marca} {selectedVehicle.modelo} • Patente: {selectedVehicle.patente} • {selectedVehicle.tipo}</p>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-lg border dark:border-slate-700 text-right">
-                 <p className="text-xs text-slate-500 mb-1">Periodo Evaluado</p>
-                 <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                   {fechaDesde && fechaHasta ? `${fechaDesde} a ${fechaHasta}` : (fechaDesde ? `Desde ${fechaDesde}` : (fechaHasta ? `Hasta ${fechaHasta}` : 'Histórico Total Flota'))}
-                 </p>
+              <div className="flex items-center gap-3">
+                 <Button 
+                   size="sm" 
+                   variant="outline" 
+                   onClick={() => handleOpenAjustarMetas(selectedVehicle)} 
+                   className="text-xs flex items-center gap-1.5 h-9 font-semibold border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                 >
+                   <Target className="w-3.5 h-3.5 text-emerald-600" /> Ajustar Meta / Tipo
+                 </Button>
+                 <div className="bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg border dark:border-slate-700 text-right">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider">Periodo Evaluado</p>
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {fechaDesde && fechaHasta ? `${fechaDesde} a ${fechaHasta}` : (fechaDesde ? `Desde ${fechaDesde}` : (fechaHasta ? `Hasta ${fechaHasta}` : 'Histórico Total Flota'))}
+                    </p>
+                 </div>
               </div>
             </CardHeader>
             <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 mt-4">
                 <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border dark:border-slate-700 shadow-sm relative overflow-hidden">
                   <div className="absolute right-0 top-0 w-2 h-full bg-blue-500"></div>
-                  <p className="text-sm text-slate-500 mb-1">Rendimiento Actual</p>
-                  <p className="text-3xl font-black text-slate-800 dark:text-slate-100">{selectedVehicle.rendimientoHistorico} <span className="text-base text-slate-400 font-medium">km/L</span></p>
+                  <p className="text-sm text-slate-500 mb-1">
+                    {selectedVehicle.tipoMedicion === 'l_h' ? 'Consumo Horario Actual' : 'Rendimiento Actual'}
+                  </p>
+                  <p className="text-3xl font-black text-slate-800 dark:text-slate-100">
+                    {selectedVehicle.rendimientoHistorico} <span className="text-base text-slate-400 font-medium">{selectedVehicle.unidadMedida}</span>
+                  </p>
                   <p className="text-xs text-slate-500 mt-2 flex items-center">
-                    Meta Operacional: <strong className="ml-1 text-slate-700 dark:text-slate-300">{selectedVehicle.rendimientoObjetivo} km/L</strong>
+                    {selectedVehicle.tipoMedicion === 'l_h' ? 'Meta Máxima:' : 'Meta Operacional:'}{' '}
+                    <strong className="ml-1 text-slate-700 dark:text-slate-300">
+                      {selectedVehicle.rendimientoObjetivo} {selectedVehicle.unidadMedida}
+                    </strong>
                   </p>
                 </div>
                 <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border dark:border-slate-700 shadow-sm relative overflow-hidden">
                   <div className="absolute right-0 top-0 w-2 h-full bg-emerald-500"></div>
-                  <p className="text-sm text-slate-500 mb-1">Costo por KM</p>
-                  <p className="text-3xl font-black text-slate-800 dark:text-slate-100">${selectedVehicle.costoKm30d}</p>
-                  <p className="text-xs text-slate-500 mt-2">Promedio flota meta: <strong className="ml-1 text-slate-700 dark:text-slate-300">${kpis.costoKmPromedio}</strong></p>
+                  <p className="text-sm text-slate-500 mb-1">
+                    {selectedVehicle.tipoMedicion === 'l_h' ? 'Costo por Hora' : 'Costo por KM'}
+                  </p>
+                  <p className="text-3xl font-black text-slate-800 dark:text-slate-100">
+                    ${selectedVehicle.costoKm30d} <span className="text-base text-slate-400 font-medium">{selectedVehicle.unidadCosto}</span>
+                  </p>
+                  <p className="text-xs text-slate-500 mt-2">
+                    {selectedVehicle.tipoMedicion === 'l_h' ? 'Costo operacional por hora' : `Promedio flota: $${kpis.costoKmPromedio}/km`}
+                  </p>
                 </div>
                 <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border dark:border-slate-700 shadow-sm relative overflow-hidden">
-                   <div className="absolute right-0 top-0 w-2 h-full bg-slate-300 dark:bg-slate-700"></div>
-                   <p className="text-sm text-slate-500 mb-1 flex items-center gap-1"><MapPin className="w-3 h-3"/> Telemetría GPS</p>
-                   <p className="text-3xl font-black text-slate-500">Sin Datos</p>
-                   <p className="text-xs text-slate-500 mt-2">Conecte GPS para alertas</p>
+                   <div className="absolute right-0 top-0 w-2 h-full bg-purple-500"></div>
+                   <p className="text-sm text-slate-500 mb-1 flex items-center gap-1">
+                     {selectedVehicle.tipoMedicion === 'l_h' ? (
+                       <><Clock className="w-3.5 h-3.5 text-blue-500"/> Horómetro de Operación</>
+                     ) : (
+                       <><MapPin className="w-3.5 h-3.5 text-blue-500"/> Distancia Recorrida</>
+                     )}
+                   </p>
+                   <p className="text-3xl font-black text-slate-800 dark:text-slate-100">
+                     {(selectedVehicle.vTotalKm || 0).toLocaleString()} <span className="text-base text-slate-400 font-medium">{selectedVehicle.unidadDelta}</span>
+                   </p>
+                   <p className="text-xs text-slate-500 mt-2">
+                     En {selectedVehicle.totalCargas || 0} cargas ({selectedVehicle.vTotalLitros?.toLocaleString()} L consumidos)
+                   </p>
                 </div>
               </div>
 
@@ -1456,34 +1638,122 @@ export default function GestionCombustible() {
       )}
       
       {/* Modals */}
-      <Modal isOpen={isAjustarMetasOpen} onClose={() => setIsAjustarMetasOpen(false)} title="Ajustar Meta de Rendimiento">
+      <Modal isOpen={isAjustarMetasOpen} onClose={() => setIsAjustarMetasOpen(false)} title="Configurar Meta y Modo de Eficiencia">
         <div className="space-y-4">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Seleccione el vehículo para establecer una nueva meta de rendimiento (km/L) a evaluar.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Define la unidad de cálculo y meta operacional para la unidad seleccionada. Esto ajustará los cálculos en los paneles de control, reportes y alertas.
+          </p>
+
           <div className="space-y-2">
-            <label className="text-sm font-medium">Vehículo</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Vehículo / Unidad</label>
             <select 
                value={formMeta.vehiculo_id || ''}
-               onChange={(e) => setFormMeta({...formMeta, vehiculo_id: e.target.value})}
-               className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm"
+               onChange={(e) => {
+                 const vId = e.target.value;
+                 const v = vehiculos.find(item => item.id === vId);
+                 const tMed = (v?.detalles?.tipo_medicion as 'km_l' | 'l_h') || 'km_l';
+                 const obj = v?.detalles?.rendimiento_objetivo !== undefined 
+                   ? String(v.detalles.rendimiento_objetivo) 
+                   : (tMed === 'l_h' ? '15.0' : '2.8');
+                 setFormMeta({
+                   vehiculo_id: vId,
+                   tipo_medicion: tMed,
+                   rendimiento_objetivo: obj
+                 });
+               }}
+               className="w-full p-2.5 border rounded-lg dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm font-medium focus:ring-2 focus:ring-emerald-500"
             >
                <option value="" disabled>Seleccione un vehículo</option>
                {vehiculos.map(v => (
-                 <option key={v.id} value={v.id}>{v.detalles?.numero_interno || v.patente} ({v.modelo})</option>
+                 <option key={v.id} value={v.id}>
+                   {v.detalles?.numero_interno || v.patente} - {v.marca} {v.modelo} ({v.patente}) [{v.detalles?.tipo_medicion === 'l_h' ? 'L/h' : 'km/L'}]
+                 </option>
                ))}
             </select>
           </div>
+
           <div className="space-y-2">
-            <label className="text-sm font-medium">Nuevo Objetivo (km/L)</label>
-            <input 
-               type="number" step="0.1" placeholder="Ej: 2.8" 
-               value={formMeta.rendimiento_objetivo}
-               onChange={(e) => setFormMeta({...formMeta, rendimiento_objetivo: e.target.value})}
-               className="w-full p-2 border rounded-md dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm" 
-            />
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+              Tipo de Medición / Cálculo Operacional
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setFormMeta({ ...formMeta, tipo_medicion: 'km_l' })}
+                className={cn(
+                  "p-3.5 rounded-xl border text-left transition-all flex flex-col gap-1.5 relative cursor-pointer",
+                  formMeta.tipo_medicion === 'km_l'
+                    ? "border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-100 ring-2 ring-emerald-500"
+                    : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                )}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="font-bold text-sm flex items-center gap-1.5">
+                    <Gauge className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    Km / Litro
+                  </span>
+                  <Badge variant="outline" className={cn("text-xs font-mono font-bold", formMeta.tipo_medicion === 'km_l' ? "border-emerald-500 bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200" : "")}>
+                    Km/L
+                  </Badge>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Ruta y Transporte en carretera. Rendimiento por distancia: mayor es mejor.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFormMeta({ ...formMeta, tipo_medicion: 'l_h' })}
+                className={cn(
+                  "p-3.5 rounded-xl border text-left transition-all flex flex-col gap-1.5 relative cursor-pointer",
+                  formMeta.tipo_medicion === 'l_h'
+                    ? "border-blue-500 bg-blue-50/70 dark:bg-blue-950/30 text-blue-900 dark:text-blue-100 ring-2 ring-blue-500"
+                    : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                )}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="font-bold text-sm flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    Litros / Hora
+                  </span>
+                  <Badge variant="outline" className={cn("text-xs font-mono font-bold", formMeta.tipo_medicion === 'l_h' ? "border-blue-500 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" : "")}>
+                    L/H
+                  </Badge>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Maquinaria, Faena y Horómetro. Consumo por hora trabajada: menor es mejor.
+                </p>
+              </button>
+            </div>
           </div>
-          <div className="flex justify-end gap-2 mt-6">
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+              {formMeta.tipo_medicion === 'l_h' ? 'Meta de Consumo Máximo (Litros / Hora)' : 'Meta de Rendimiento Objetivo (Kilómetros / Litro)'}
+            </label>
+            <div className="relative">
+              <input 
+                 type="number" 
+                 step="0.1" 
+                 placeholder={formMeta.tipo_medicion === 'l_h' ? "Ej: 14.5" : "Ej: 2.8"}
+                 value={formMeta.rendimiento_objetivo}
+                 onChange={(e) => setFormMeta({...formMeta, rendimiento_objetivo: e.target.value})}
+                 className="w-full p-2.5 pr-14 border rounded-lg dark:border-slate-700 dark:bg-slate-900 dark:text-white text-sm font-semibold focus:ring-2 focus:ring-emerald-500" 
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 font-mono">
+                {formMeta.tipo_medicion === 'l_h' ? 'L/h' : 'km/L'}
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {formMeta.tipo_medicion === 'l_h' 
+                ? 'Límite operacional en faena: el semáforo y las alertas se activarán si el consumo por hora supera esta meta.'
+                : 'Objetivo operacional en ruta: el semáforo y las alertas se activarán si el rendimiento cae por debajo de esta meta.'}
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t dark:border-slate-800 mt-4">
             <Button variant="outline" onClick={() => setIsAjustarMetasOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSaveMeta} className="bg-emerald-600 hover:bg-emerald-700 text-white">Guardar Meta</Button>
+            <Button onClick={handleSaveMeta} className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">Guardar Configuración</Button>
           </div>
         </div>
       </Modal>
@@ -1530,7 +1800,12 @@ export default function GestionCombustible() {
           </div>
           <div className="space-y-2">
             <div className="flex justify-between items-center">
-              <label className="text-sm font-medium">Kilometraje Total (Odómetro)</label>
+              <label className="text-sm font-medium">
+                {(() => {
+                  const vSel = vehiculos.find(v => v.id === formCarga.vehiculo_id);
+                  return vSel?.detalles?.tipo_medicion === 'l_h' ? 'Horas de Trabajo (Horómetro)' : 'Kilometraje Total (Odómetro)';
+                })()}
+              </label>
               <div className="flex items-center gap-2">
                 <input 
                    type="checkbox" 
@@ -1545,7 +1820,7 @@ export default function GestionCombustible() {
             <div className="relative">
               <input 
                 type="number" 
-                placeholder={!isKmManual ? "Obteniendo del GPS..." : "Ej: 45000"} 
+                placeholder={!isKmManual ? "Obteniendo lectura..." : (vehiculos.find(v => v.id === formCarga.vehiculo_id)?.detalles?.tipo_medicion === 'l_h' ? "Ej: 1450 hrs" : "Ej: 45000 km")} 
                 disabled={!isKmManual}
                 value={formCarga.odometro}
                 onChange={(e) => setFormCarga({...formCarga, odometro: e.target.value})}
@@ -1556,7 +1831,13 @@ export default function GestionCombustible() {
               />
               {!isKmManual && <MapPin className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 animate-pulse" />}
             </div>
-            {!isKmManual && <p className="text-xs text-blue-600 dark:text-blue-400">Lectura de odómetro extraída desde telemetría GPS.</p>}
+            {!isKmManual && (
+              <p className="text-xs text-blue-600 dark:text-blue-400">
+                {vehiculos.find(v => v.id === formCarga.vehiculo_id)?.detalles?.tipo_medicion === 'l_h' 
+                  ? 'Lectura de horómetro extraída desde telemetría de máquina.' 
+                  : 'Lectura de odómetro extraída desde telemetría GPS.'}
+              </p>
+            )}
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Litros Cargados</label>
