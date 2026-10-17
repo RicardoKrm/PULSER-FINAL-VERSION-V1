@@ -456,7 +456,15 @@ export default function Dashboard() {
 
     // 3. Costos y Tendencias Semestrales (Últimos 6 meses continuos vs Meta)
     const endRef = parseLocalDate(activeFechaHasta, true);
-    const dynamicMonths = [];
+    const dynamicMonths: Array<{
+      month: number;
+      year: number;
+      name: string;
+      downtime: number;
+      prev: number;
+      corr: number;
+      vehiculosConOt: Set<string>;
+    }> = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date(endRef.getFullYear(), endRef.getMonth() - i, 1);
       dynamicMonths.push({
@@ -465,7 +473,8 @@ export default function Dashboard() {
         name: d.toLocaleString('es-ES', { month: 'short' }).substring(0, 3).toUpperCase() + ' ' + d.getFullYear().toString().slice(-2),
         downtime: 0,
         prev: 0,
-        corr: 0
+        corr: 0,
+        vehiculosConOt: new Set<string>()
       });
     }
 
@@ -476,11 +485,27 @@ export default function Dashboard() {
       const m = dynamicMonths.find(dm => dm.month === d.getMonth() && dm.year === d.getFullYear());
       
       if (m) {
-        if (ot.tiempoTrabajadoSegundos && ot.tiempoTrabajadoSegundos > 0) {
-          m.downtime += Number((ot.tiempoTrabajadoSegundos / 3600).toFixed(1));
-        } else if (['ABIERTA', 'EN_PROCESO', 'PAUSADA', 'PROGRAMADA', 'POR_ASIGNAR'].includes(ot.estado)) {
-          m.downtime += 8; 
+        let h = 0;
+        if (ot.tiempoTrabajadoSegundos && Number(ot.tiempoTrabajadoSegundos) > 0) {
+          h = Number(ot.tiempoTrabajadoSegundos) / 3600;
+        } else if (ot.inicio_proceso && ot.termino_proceso) {
+          h = Math.max(0, (new Date(ot.termino_proceso).getTime() - new Date(ot.inicio_proceso).getTime()) / (1000 * 3600));
+        } else if (ot.tareasRealizadas && Array.isArray(ot.tareasRealizadas) && ot.tareasRealizadas.length > 0) {
+          const mins = ot.tareasRealizadas.reduce((acc: number, t: any) => acc + (Number(t.tiempo_real_minutos) || Number(t.tarea_estandar?.tiempoEstandarMinutos) || 0), 0);
+          if (mins > 0) h = mins / 60;
         }
+        if (h === 0) {
+          if (['ABIERTA', 'EN_PROCESO', 'PAUSADA', 'PROGRAMADA', 'POR_ASIGNAR'].includes(ot.estado)) {
+            h = String(ot.tipo || '').includes('PREVENTIVA') ? 4.0 : 8.0;
+          } else if (ot.estado === 'FINALIZADA') {
+            h = String(ot.tipo || '').includes('PREVENTIVA') ? 3.0 : 6.0;
+          }
+        }
+        m.downtime += h;
+
+        const vId = String(ot.vehiculoId || ot.vehiculo_id || '');
+        if (vId) m.vehiculosConOt.add(vId);
+
         const cost = (Number(ot.costoManoObraTareas) || 0) + (Number(ot.costoInsumos) || 0) + (Number(ot.costoManoObraHH) || 0);
         if (ot.tipo?.includes('PREVENTIVA')) {
            m.prev += cost;
@@ -490,10 +515,46 @@ export default function Dashboard() {
       }
     });
 
-    const hrsMes = 24 * 30; // approx
-    const tendencia = dynamicMonths.map(m => {
-       const disp = Math.max(0, 100 * (1 - (m.downtime / hrsMes)));
-       return { name: m.name, value: Number(disp.toFixed(1)) };
+    const tendencia = dynamicMonths.map((m, idx) => {
+      let val = 100;
+      const isCurrentMonth = (idx === dynamicMonths.length - 1);
+      const daysInMonth = new Date(m.year, m.month + 1, 0).getDate();
+      const hrsTotalesMes = daysInMonth * 24 * totalVehiculosFlota;
+      const hrsDemandaMes = daysInMonth * 10 * totalVehiculosFlota;
+
+      if (dispTab === 'actual') {
+        if (isCurrentMonth) {
+          val = disp;
+        } else {
+          // Histórico de operatividad: % de disponibilidad promedio no afectada por taller
+          const hrsBase = 24 * 30;
+          val = Math.max(0, Math.min(100, 100 * (1 - (m.downtime / hrsBase))));
+        }
+      } else if (dispTab === 'calendario') {
+        if (isCurrentMonth) {
+          val = disponibilidadCalendario;
+        } else {
+          val = hrsTotalesMes > 0 
+            ? Math.max(0, Math.min(100, ((hrsTotalesMes - m.downtime) / hrsTotalesMes) * 100))
+            : 100;
+        }
+      } else if (dispTab === 'operacional') {
+        if (isCurrentMonth) {
+          val = disponibilidadOperacional;
+        } else {
+          const hrsOp = Math.max(0, hrsDemandaMes - m.downtime);
+          const sum = hrsOp + m.downtime;
+          val = sum > 0 ? Math.max(0, Math.min(100, (hrsOp / sum) * 100)) : 100;
+        }
+      }
+
+      return { 
+        name: m.name, 
+        value: Number(val.toFixed(1)),
+        downtime: Number(m.downtime.toFixed(1)),
+        prev: m.prev, 
+        corr: m.corr 
+      };
     });
     
     const costos = dynamicMonths.map(m => ({ name: m.name, prev: m.prev, corr: m.corr }));
@@ -570,7 +631,7 @@ export default function Dashboard() {
         totalAlertasDocs: vehiculosDocVencidos + conductoresDocVencidos
       }
     };
-  }, [ordenesTrabajo, vehiculos, repuestos, personal, dbVehiculos, dbColaboradores, activeFechaDesde, activeFechaHasta, currentCompany?.id]);
+  }, [ordenesTrabajo, vehiculos, repuestos, personal, dbVehiculos, dbColaboradores, activeFechaDesde, activeFechaHasta, currentCompany?.id, dispTab]);
 
 
   const handleFilter = () => {
@@ -801,13 +862,79 @@ export default function Dashboard() {
           onClick={() => navigate('/dashboard/kpi-flota')}
           className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm p-5 lg:col-span-2 cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-500 hover:shadow-md transition-all group"
         >
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
             <div>
-              <h3 className="text-base font-bold text-slate-800 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Tendencia de Disponibilidad</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Evolución semestral vs Meta</p>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-800 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                  Tendencia de Disponibilidad
+                </h3>
+                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
+                  dispTab === 'actual'
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
+                    : dispTab === 'calendario'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
+                    : 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400'
+                }`}>
+                  {dispTab === 'actual' ? 'Instantánea' : dispTab === 'calendario' ? '24/7 Mes' : 'Operacional'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                {dispTab === 'actual' && 'Evolución según disponibilidad instantánea de flota vs Meta'}
+                {dispTab === 'calendario' && 'Evolución mensual Horas Totales Calendario 24/7 vs Meta'}
+                {dispTab === 'operacional' && 'Evolución mensual Rendimiento Operacional en Faena vs Meta'}
+              </p>
             </div>
-            <div className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1 rounded-full text-xs font-bold">
-              Meta: 95%
+            
+            <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+              {/* Sincronizador de modo en la misma gráfica */}
+              <div 
+                className="inline-flex bg-slate-100 dark:bg-slate-700/60 p-0.5 rounded-lg border border-slate-200/60 dark:border-slate-600"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setDispTab('actual'); }}
+                  className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${
+                    dispTab === 'actual'
+                      ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+                >
+                  Actual
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setDispTab('calendario'); }}
+                  className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${
+                    dispTab === 'calendario'
+                      ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+                >
+                  24/7 Mes
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setDispTab('operacional'); }}
+                  className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${
+                    dispTab === 'operacional'
+                      ? 'bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+                >
+                  Operacional
+                </button>
+              </div>
+
+              <div className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                dispTab === 'actual'
+                  ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                  : dispTab === 'calendario'
+                  ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                  : 'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400'
+              }`}>
+                Meta: {dispTab === 'operacional' ? '90%' : '95%'}
+              </div>
             </div>
           </div>
           <div className="h-64 w-full">
@@ -815,19 +942,52 @@ export default function Dashboard() {
               <AreaChart data={tendenciaData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    <stop 
+                      offset="5%" 
+                      stopColor={dispTab === 'actual' ? '#10b981' : dispTab === 'calendario' ? '#3b82f6' : '#8b5cf6'} 
+                      stopOpacity={0.25}
+                    />
+                    <stop 
+                      offset="95%" 
+                      stopColor={dispTab === 'actual' ? '#10b981' : dispTab === 'calendario' ? '#3b82f6' : '#8b5cf6'} 
+                      stopOpacity={0}
+                    />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} domain={[80, 100]} />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 12, fill: '#64748b' }} 
+                  domain={[dataMin => Math.max(50, Math.floor((Number(dataMin) - 3) / 5) * 5), 100]} 
+                />
                 <Tooltip 
                   contentStyle={{ borderRadius: '8px', border: 'none', backgroundColor: '#1e293b', color: '#f8fafc', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  itemStyle={{ color: '#f8fafc' }}
+                  formatter={(val: any, _name: any, item: any) => {
+                    const dt = item?.payload?.downtime ?? 0;
+                    const modeLabel = dispTab === 'actual' ? 'Instantánea' : dispTab === 'calendario' ? '24/7 Mes' : 'Operacional';
+                    return [
+                      `${val}% (${modeLabel} · ${dt}h taller)`,
+                      'Disponibilidad'
+                    ];
+                  }}
+                  labelStyle={{ fontWeight: 'bold', color: '#f8fafc', marginBottom: '4px' }}
                 />
-                <ReferenceLine y={95} stroke="#64748b" strokeDasharray="3 4" strokeWidth={2} />
-                <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorValue)" />
+                <ReferenceLine 
+                  y={dispTab === 'operacional' ? 90 : 95} 
+                  stroke="#64748b" 
+                  strokeDasharray="3 4" 
+                  strokeWidth={2} 
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="value" 
+                  stroke={dispTab === 'actual' ? '#10b981' : dispTab === 'calendario' ? '#3b82f6' : '#8b5cf6'} 
+                  strokeWidth={2.5} 
+                  fillOpacity={1} 
+                  fill="url(#colorValue)" 
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>
