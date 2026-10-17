@@ -6,13 +6,47 @@ import {
   XAxis, YAxis, CartesianGrid, LineChart, Line, Tooltip, Legend
 } from 'recharts';
 import { useAppContext } from '../../context/AppContext';
+import { useCompany } from '../../contexts/CompanyContext';
 
 // Mock Data
 const motifsPausa = ['Falta Repuesto', 'Espera Autorización', 'Personal Ocupado', 'Turno Noche'];
 
 export default function KpiFlota() {
   const { ordenesTrabajo, vehiculos } = useAppContext();
+  const { currentCompany } = useCompany();
   const [activeDetail, setActiveDetail] = useState<string | null>(null);
+
+  // Períodos de tiempo recomendados para control y análisis de confiabilidad
+  const [periodoTipo, setPeriodoTipo] = useState<'mensual' | 'trimestral' | 'anual' | 'personalizado'>('trimestral');
+
+  const getInitialDates = (tipo: 'mensual' | 'trimestral' | 'anual') => {
+    const hasta = new Date();
+    const desde = new Date();
+    if (tipo === 'mensual') {
+      desde.setDate(desde.getDate() - 30);
+    } else if (tipo === 'trimestral') {
+      desde.setDate(desde.getDate() - 90);
+    } else {
+      desde.setDate(desde.getDate() - 365);
+    }
+    return {
+      desdeStr: desde.toISOString().split('T')[0],
+      hastaStr: hasta.toISOString().split('T')[0]
+    };
+  };
+
+  const initial = getInitialDates('trimestral');
+  const [fechaDesde, setFechaDesde] = useState<string>(initial.desdeStr);
+  const [fechaHasta, setFechaHasta] = useState<string>(initial.hastaStr);
+  const [filtroMarca, setFiltroMarca] = useState<string>('TODAS');
+  const [filtroModelo, setFiltroModelo] = useState<string>('TODOS');
+
+  const handlePeriodoSelect = (tipo: 'mensual' | 'trimestral' | 'anual') => {
+    setPeriodoTipo(tipo);
+    const { desdeStr, hastaStr } = getInitialDates(tipo);
+    setFechaDesde(desdeStr);
+    setFechaHasta(hastaStr);
+  };
 
   // Real data calculations
   const { 
@@ -26,25 +60,78 @@ export default function KpiFlota() {
     badActors,
     rankingData,
     detailsData,
-    motivosPausaData
+    motivosPausaData,
+    globalDisp,
+    globalMtbf,
+    globalConf,
+    horasOperacionGlobal,
+    horasTotalesGlobal,
+    numeroFallasGlobal,
+    diasPeriodoGlobal,
+    marcasDisponibles,
+    modelosDisponibles
   } = useMemo(() => {
-    const totalOTs = ordenesTrabajo.length;
-    
-    // Distribución
-    const preventivas = ordenesTrabajo.filter(ot => ot.tipo.includes('PREVENTIVA'));
-    const correctivas = ordenesTrabajo.filter(ot => ot.tipo.includes('CORRECTIVA') || ot.tipo.includes('INSPECCION'));
-    const evaluativas = ordenesTrabajo.filter(ot => !ot.tipo.includes('PREVENTIVA') && !ot.tipo.includes('CORRECTIVA') && !ot.tipo.includes('INSPECCION'));
+    const currentEmpresaId = currentCompany?.id;
+    // 1. Filtrar vehículos de la empresa activa
+    const vehiculosEmpresa = (vehiculos || []).filter((v: any) => !currentEmpresaId || v.empresa_id === currentEmpresaId);
+
+    // Opciones para filtros de Marca y Modelo
+    const marcasDisponibles = Array.from(new Set(vehiculosEmpresa.map((v: any) => v.marca).filter(Boolean))) as string[];
+    const modelosDisponibles = Array.from(new Set(
+      vehiculosEmpresa
+        .filter((v: any) => filtroMarca === 'TODAS' || v.marca === filtroMarca)
+        .map((v: any) => v.modelo)
+        .filter(Boolean)
+    )) as string[];
+
+    // 2. Filtrar vehículos según Marca y Modelo seleccionados
+    const vehiculosFiltrados = vehiculosEmpresa.filter((v: any) => {
+      if (filtroMarca !== 'TODAS' && v.marca !== filtroMarca) return false;
+      if (filtroModelo !== 'TODOS' && v.modelo !== filtroModelo) return false;
+      return true;
+    });
+    const vehiculosIdsSet = new Set(vehiculosFiltrados.map((v: any) => String(v.id)));
+
+    // 3. Rango de fechas
+    const parseLocalDate = (dateStr: string, isEnd = false) => {
+      if (!dateStr) return new Date();
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const [y, m, d] = parts.map(Number);
+        return isEnd ? new Date(y, m - 1, d, 23, 59, 59, 999) : new Date(y, m - 1, d, 0, 0, 0, 0);
+      }
+      return new Date(dateStr);
+    };
+
+    const start = parseLocalDate(fechaDesde, false);
+    const end = parseLocalDate(fechaHasta, true);
+
+    // 4. Filtrar OTs en el período y vehículos correspondientes
+    const otsFiltradas = (ordenesTrabajo || []).filter((ot: any) => {
+      if (currentEmpresaId && ot.empresa_id && ot.empresa_id !== currentEmpresaId) return false;
+      const vId = String(ot.vehiculoId || ot.vehiculo_id || '');
+      if (vehiculosIdsSet.size > 0 && !vehiculosIdsSet.has(vId)) return false;
+      const fStr = ot.fechaCreacion || ot.fecha_creacion;
+      if (!fStr) return false;
+      const d = new Date(fStr);
+      return d >= start && d <= end;
+    });
+
+    const totalOTs = otsFiltradas.length;
+    const preventivas = otsFiltradas.filter((ot: any) => ot.tipo?.includes('PREVENTIVA'));
+    const correctivas = otsFiltradas.filter((ot: any) => ot.tipo?.includes('CORRECTIVA') || ot.tipo?.includes('FALLA'));
+    const evaluativas = otsFiltradas.filter((ot: any) => !ot.tipo?.includes('PREVENTIVA') && !ot.tipo?.includes('CORRECTIVA') && !ot.tipo?.includes('FALLA'));
     
     const prevCount = preventivas.length;
     const corrCount = correctivas.length;
-    
+
     const distribucionOTs = [
       { name: 'Preventivas', value: prevCount },
       { name: 'Correctivas', value: corrCount }
     ];
 
     // Avance Preventivas
-    const prevCompletadas = preventivas.filter(ot => ot.estado === 'FINALIZADA' || ot.estado === 'CERRADA_MECANICO' || ot.estado === 'CERRADA_POR_MECANICO').length;
+    const prevCompletadas = preventivas.filter((ot: any) => ot.estado === 'FINALIZADA' || ot.estado === 'CERRADA_MECANICO' || ot.estado === 'CERRADA_POR_MECANICO').length;
     const prevPendientes = Math.max(0, prevCount - prevCompletadas);
     const avancePreventivas = [
       { name: 'Completadas', value: prevCompletadas },
@@ -52,111 +139,160 @@ export default function KpiFlota() {
     ];
 
     // Avance Correctivas
-    const corrCompletadas = correctivas.filter(ot => ot.estado === 'FINALIZADA' || ot.estado === 'CERRADA_MECANICO' || ot.estado === 'CERRADA_POR_MECANICO').length;
+    const corrCompletadas = correctivas.filter((ot: any) => ot.estado === 'FINALIZADA' || ot.estado === 'CERRADA_MECANICO' || ot.estado === 'CERRADA_POR_MECANICO').length;
     const corrPendientes = Math.max(0, corrCount - corrCompletadas);
     const avanceCorrectivas = [
       { name: 'Completadas', value: corrCompletadas },
       { name: 'Pendientes', value: corrPendientes }
     ];
 
-    // Vehículos Cost Map
-    const vMap: Record<string, { prev: number, corr: number, eva: number, cost: number, downTime: number }> = {};
-    vehiculos.forEach(v => {
-      vMap[v.id] = { prev: 0, corr: 0, eva: 0, cost: 0, downTime: 0 };
+    // 5. Cálculo estricto de MTBF y Disponibilidad según estándar de confiabilidad:
+    // Días del período
+    const diasPeriodo = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+    const vCount = Math.max(1, vehiculosFiltrados.length);
+    const horasTotalesPeriodo = diasPeriodo * 24 * vCount;
+
+    const vStatsMap: Record<string, { prev: number, corr: number, eva: number, cost: number, downTime: number }> = {};
+    vehiculosFiltrados.forEach((v: any) => {
+      vStatsMap[String(v.id)] = { prev: 0, corr: 0, eva: 0, cost: 0, downTime: 0 };
     });
 
     let totalCosto = 0;
-    ordenesTrabajo.forEach(ot => {
-      const costo = (ot.costoManoObraTareas || 0) + (ot.costoInsumos || 0) + (ot.costoManoObraHH || 0);
+    let horasTallerPeriodo = 0;
+    otsFiltradas.forEach((ot: any) => {
+      const costo = (Number(ot.costoManoObraTareas) || 0) + (Number(ot.costoInsumos) || 0) + (Number(ot.costoManoObraHH) || 0);
       totalCosto += costo;
-      
+
       let dT = 0;
-      if (ot.tiempoTrabajadoSegundos) dT += ot.tiempoTrabajadoSegundos / 3600;
-      if (ot.tfs_minutos) dT += ot.tfs_minutos / 60;
-      if (dT === 0) dT = 10; // estimate 10h if no data
-      
-      const v = ot.vehiculoId || ot.vehiculo_id;
-      if (v && vMap[v]) {
-        vMap[v].cost += costo;
-        vMap[v].downTime += dT;
-        if (ot.tipo.includes('PREVENTIVA')) vMap[v].prev++;
-        else if (ot.tipo.includes('CORRECTIVA')) vMap[v].corr++;
-        else vMap[v].eva++;
+      if (ot.tiempoTrabajadoSegundos && Number(ot.tiempoTrabajadoSegundos) > 0) {
+        dT = Number(ot.tiempoTrabajadoSegundos) / 3600;
+      } else if (ot.tfs_minutos) {
+        dT = Number(ot.tfs_minutos) / 60;
+      }
+      if (dT === 0) {
+        dT = ot.tipo?.includes('PREVENTIVA') ? 4.0 : 8.0;
+      }
+      horasTallerPeriodo += dT;
+
+      const v = String(ot.vehiculoId || ot.vehiculo_id || '');
+      if (v && vStatsMap[v]) {
+        vStatsMap[v].cost += costo;
+        vStatsMap[v].downTime += dT;
+        if (ot.tipo?.includes('PREVENTIVA')) vStatsMap[v].prev++;
+        else if (ot.tipo?.includes('CORRECTIVA') || ot.tipo?.includes('FALLA')) vStatsMap[v].corr++;
+        else vStatsMap[v].eva++;
       }
     });
 
-    const rankingDataObj = vehiculos.map(v => {
-      const stats = vMap[v.id];
-      const totalOtsV = stats.prev + stats.corr + stats.eva;
-      // MTBF = Theoretical Hours (720 per month) / Events
-      const mtbf = totalOtsV > 0 ? (720 / totalOtsV) : 720; 
-      // conf: R(24) = e^(-24/MTBF)
-      const conf = Math.exp(-24 / mtbf);
+    // Horas Totales de Operación = Horas Calendario - Horas en Taller (Preventivo + Correctivo)
+    const horasOperacion = Math.max(0, horasTotalesPeriodo - horasTallerPeriodo);
+    // Número de Fallas = OTs Correctivas (fallas imprevistas que requirieron detención y reparación)
+    const numeroFallas = corrCount;
 
-      let disp = 100 * (1 - (stats.downTime / 720));
-      if (disp < 0) disp = 0;
+    // Fórmula del MTBF = Horas Totales de Operación / Número de Fallas
+    const mtbfGlobalVal = numeroFallas > 0 ? (horasOperacion / numeroFallas) : horasOperacion;
+    const globalDispVal = horasTotalesPeriodo > 0 ? ((horasOperacion / horasTotalesPeriodo) * 100).toFixed(1) : "100";
+    const globalConfVal = (Math.exp(-24 / Math.max(1, mtbfGlobalVal)) * 100).toFixed(1);
+
+    // 6. Ranking individual por vehículo
+    const horasCalPorVehiculo = diasPeriodo * 24;
+    const rankingDataObj = vehiculosFiltrados.map((v: any) => {
+      const st = vStatsMap[String(v.id)] || { prev: 0, corr: 0, eva: 0, cost: 0, downTime: 0 };
+      const horasOpVeh = Math.max(0, horasCalPorVehiculo - st.downTime);
+      const fallasVeh = st.corr;
+      const mtbfVeh = fallasVeh > 0 ? (horasOpVeh / fallasVeh) : horasOpVeh;
+      const confVeh = Math.exp(-24 / Math.max(1, mtbfVeh));
+      const dispVeh = horasCalPorVehiculo > 0 ? (horasOpVeh / horasCalPorVehiculo) * 100 : 100;
 
       return {
         id: v.id,
         v: v.patente || `Vehículo ${v.id}`,
         name: `${v.marca || 'Marca'} ${v.modelo || ''}`,
-        prev: stats.prev,
-        corr: stats.corr,
-        eva: stats.eva,
-        costVal: stats.cost,
-        cost: `$${stats.cost.toLocaleString()}`,
-        mtbf: `${Math.round(mtbf)}h`,
-        c: `${(conf * 100).toFixed(1)}%`,
-        confNum: conf,
-        dispNum: disp
+        prev: st.prev,
+        corr: st.corr,
+        eva: st.eva,
+        costVal: st.cost,
+        cost: `$${Math.round(st.cost).toLocaleString('es-CL')}`,
+        mtbf: `${Math.round(mtbfVeh)}h`,
+        mtbfNum: mtbfVeh,
+        c: `${(confVeh * 100).toFixed(1)}%`,
+        confNum: confVeh,
+        dispNum: dispVeh,
+        horasOp: Math.round(horasOpVeh),
+        horasTaller: Math.round(st.downTime)
       };
     }).sort((a, b) => b.costVal - a.costVal);
 
-    const badActors = rankingDataObj.slice(0, 5);
-    const rankingData = rankingDataObj;
+    // Bad Actors: Equipos con mayor cantidad de fallas imprevistas / menor MTBF
+    const badActors = [...rankingDataObj]
+      .filter((r) => r.corr > 0)
+      .sort((a, b) => a.mtbfNum - b.mtbfNum)
+      .slice(0, 5);
 
-    const detailsData = rankingDataObj.map(r => ({
+    const rankingData = rankingDataObj;
+    const detailsData = rankingDataObj.map((r) => ({
       ...r,
       conf: r.c
     }));
 
-    // Generate monthly data from real OTs
-    const last12Months = Array.from({length: 12}, (_, i) => {
+    // 7. Generar evolución mensual de Disponibilidad y MTBF (Últimos 12 meses)
+    const otsHistoricoEmpresa = (ordenesTrabajo || []).filter((ot: any) => {
+      if (currentEmpresaId && ot.empresa_id && ot.empresa_id !== currentEmpresaId) return false;
+      const vId = String(ot.vehiculoId || ot.vehiculo_id || '');
+      if (vehiculosIdsSet.size > 0 && !vehiculosIdsSet.has(vId)) return false;
+      return true;
+    });
+
+    const last12Months = Array.from({ length: 12 }, (_, i) => {
       const d = new Date();
       d.setMonth(d.getMonth() - (11 - i));
+      const year = d.getFullYear();
+      const month = d.getMonth();
+      const daysInM = new Date(year, month + 1, 0).getDate();
       return { 
-        month: d.getMonth(), 
-        year: d.getFullYear(), 
-        name: d.toLocaleString('es', { month: 'short', timeZone: 'UTC' }).substring(0,3).toUpperCase(),
+        month, 
+        year, 
+        name: d.toLocaleString('es-ES', { month: 'short' }).substring(0, 3).toUpperCase(),
+        days: daysInM,
         ots: 0,
+        fallas: 0,
         downtime: 0
       };
     });
 
-    ordenesTrabajo.forEach(ot => {
-      if (!ot.fechaCreacion) return;
-      const d = new Date(ot.fechaCreacion);
-      const m = last12Months.find(x => x.month === d.getMonth() && x.year === d.getFullYear());
+    otsHistoricoEmpresa.forEach((ot: any) => {
+      const fStr = ot.fechaCreacion || ot.fecha_creacion;
+      if (!fStr) return;
+      const d = new Date(fStr);
+      const m = last12Months.find((x) => x.month === d.getMonth() && x.year === d.getFullYear());
       if (m) {
         m.ots++;
-        if (ot.tiempoTrabajadoSegundos) m.downtime += ot.tiempoTrabajadoSegundos / 3600;
-        else if (ot.tfs_minutos) m.downtime += ot.tfs_minutos / 60;
-        else m.downtime += 10; // guess 10h if no data
+        if (ot.tipo?.includes('CORRECTIVA') || ot.tipo?.includes('FALLA')) {
+          m.fallas++;
+        }
+        if (ot.tiempoTrabajadoSegundos && Number(ot.tiempoTrabajadoSegundos) > 0) {
+          m.downtime += Number(ot.tiempoTrabajadoSegundos) / 3600;
+        } else if (ot.tfs_minutos) {
+          m.downtime += Number(ot.tfs_minutos) / 60;
+        } else {
+          m.downtime += ot.tipo?.includes('PREVENTIVA') ? 4.0 : 8.0;
+        }
       }
     });
 
-    const vCount = vehiculos.length || 1;
-    const hrsMes = vCount * 720;
-    
-    const dispMensualData = last12Months.map(m => {
-       const d = Math.max(0, 100 * (1 - (m.downtime / hrsMes)));
-       return { name: m.name, disp: Number(d.toFixed(1)) };
+    const dispMensualData = last12Months.map((m) => {
+      const hrsTotalesMes = m.days * 24 * vCount;
+      const hrsOpMes = Math.max(0, hrsTotalesMes - m.downtime);
+      const d = hrsTotalesMes > 0 ? (hrsOpMes / hrsTotalesMes) * 100 : 100;
+      return { name: m.name, disp: Number(d.toFixed(1)) };
     });
 
-    const confMensualData = last12Months.map(m => {
-       const mtbf = m.ots > 0 ? (hrsMes / m.ots) : hrsMes;
-       const conf = Math.exp(-24 / mtbf) * 100;
-       return { name: m.name, conf: Number(conf.toFixed(1)) };
+    const confMensualData = last12Months.map((m) => {
+      const hrsTotalesMes = m.days * 24 * vCount;
+      const hrsOpMes = Math.max(0, hrsTotalesMes - m.downtime);
+      const mtbfMes = m.fallas > 0 ? (hrsOpMes / m.fallas) : hrsOpMes;
+      const conf = Math.exp(-24 / Math.max(1, mtbfMes)) * 100;
+      return { name: m.name, conf: Number(conf.toFixed(1)), mtbf: Math.round(mtbfMes) };
     });
 
     const dispVsConfData = dispMensualData.map((d, i) => ({
@@ -166,9 +302,9 @@ export default function KpiFlota() {
     }));
 
     const motivoCount: Record<string, number> = {};
-    ordenesTrabajo.forEach(ot => {
-      if (ot.historial) {
-        ot.historial.forEach(h => {
+    otsFiltradas.forEach((ot: any) => {
+      if (ot.historial && Array.isArray(ot.historial)) {
+        ot.historial.forEach((h: any) => {
           if (h.estado_nuevo === 'PAUSADA') {
             const motivo = h.comentario ? h.comentario.trim() : 'Sin Especificar';
             motivoCount[motivo] = (motivoCount[motivo] || 0) + 1;
@@ -193,21 +329,22 @@ export default function KpiFlota() {
       dispMensualData,
       confMensualData,
       dispVsConfData,
-      motivosPausaData
+      motivosPausaData,
+      globalDisp: globalDispVal,
+      globalMtbf: Math.round(mtbfGlobalVal).toLocaleString('es-CL'),
+      globalConf: globalConfVal,
+      horasOperacionGlobal: Math.round(horasOperacion),
+      horasTotalesGlobal: horasTotalesPeriodo,
+      numeroFallasGlobal: numeroFallas,
+      diasPeriodoGlobal: diasPeriodo,
+      marcasDisponibles,
+      modelosDisponibles
     };
-  }, [ordenesTrabajo, vehiculos]);
+  }, [ordenesTrabajo, vehiculos, currentCompany?.id, fechaDesde, fechaHasta, filtroMarca, filtroModelo]);
 
   // Overall calculations
   const globalPrevPct = totales.totalOTs > 0 ? (totales.prevCount / totales.totalOTs) * 100 : 0;
   const globalCorrPct = totales.totalOTs > 0 ? (totales.corrCount / totales.totalOTs) * 100 : 0;
-  
-  // Real global MTBF / Disp calculation
-  const totalDowntimeGlobal = dispMensualData.reduce((acc, m) => acc + ((100 - m.disp) / 100) * (vehiculos.length || 1) * 720, 0);
-  const totalTheoretical = 12 * (vehiculos.length || 1) * 720;
-  const globalDisp = totalTheoretical > 0 ? (100 * (1 - totalDowntimeGlobal / totalTheoretical)).toFixed(1) : "100"; 
-  const mtbfGlobal = totales.totalOTs > 0 ? totalTheoretical / totales.totalOTs : totalTheoretical;
-  const globalMtbf = Math.round(mtbfGlobal).toString(); 
-  const globalConf = (Math.exp(-24 / mtbfGlobal) * 100).toFixed(1);
 
   const handleDetailClick = (type: string) => {
     setActiveDetail(type);
@@ -231,9 +368,12 @@ export default function KpiFlota() {
               <div className="bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 p-4 rounded-xl flex items-start gap-3">
                 <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-xs font-bold text-blue-800 dark:text-blue-400 uppercase tracking-wider mb-1">Fórmula:</h4>
+                  <h4 className="text-xs font-bold text-blue-800 dark:text-blue-400 uppercase tracking-wider mb-1">Fórmula de Disponibilidad:</h4>
                   <p className="text-sm font-medium text-blue-700 dark:text-blue-300 leading-snug">
-                    Disponibilidad = (Horas Teóricas - Horas de Mantenimiento) / Horas Teóricas
+                    Disponibilidad = (Horas Totales de Operación / Horas Calendario del Período) × 100
+                  </p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                    Operación: {horasOperacionGlobal.toLocaleString('es-CL')}h / Capacidad Total: {horasTotalesGlobal.toLocaleString('es-CL')}h ({diasPeriodoGlobal} días)
                   </p>
                 </div>
               </div>
@@ -241,7 +381,7 @@ export default function KpiFlota() {
                 <thead className="border-b border-slate-200 dark:border-slate-800">
                   <tr>
                     <th className="text-left font-bold text-[10px] uppercase text-slate-400 tracking-wider pb-3">Vehículo</th>
-                    <th className="text-right font-bold text-[10px] uppercase text-slate-400 tracking-wider pb-3">Hrs Teóricas</th>
+                    <th className="text-right font-bold text-[10px] uppercase text-slate-400 tracking-wider pb-3">Hrs Op</th>
                     <th className="text-right font-bold text-[10px] uppercase text-slate-400 tracking-wider pb-3">Disponibilidad</th>
                   </tr>
                 </thead>
@@ -250,7 +390,7 @@ export default function KpiFlota() {
                     detailsData.map((row) => (
                       <tr key={row.id}>
                         <td className="py-3 font-bold text-slate-700 dark:text-slate-300">{row.v}</td>
-                        <td className="py-3 text-right font-medium text-slate-600 dark:text-slate-400">720h</td>
+                        <td className="py-3 text-right font-medium text-slate-600 dark:text-slate-400">{row.horasOp}h</td>
                         <td className="py-3 text-right font-bold text-emerald-500">{row.dispNum.toFixed(1)}%</td>
                       </tr>
                     ))
@@ -271,7 +411,7 @@ export default function KpiFlota() {
             <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-start">
               <div className="pr-4">
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white leading-tight">Detalle: MTBF y Confiabilidad</h2>
-                <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mt-2">Información Real Pulser</p>
+                <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mt-2">Cálculo de Ingeniería</p>
               </div>
               <button 
                 onClick={() => setActiveDetail(null)}
@@ -281,12 +421,15 @@ export default function KpiFlota() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              <div className="bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 p-4 rounded-xl flex items-start gap-3">
-                <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+              <div className="bg-purple-50/50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800/50 p-4 rounded-xl flex items-start gap-3">
+                <Info className="w-5 h-5 text-purple-500 flex-shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-xs font-bold text-blue-800 dark:text-blue-400 uppercase tracking-wider mb-1">Información Técnica:</h4>
-                  <p className="text-sm font-medium text-blue-700 dark:text-blue-300 leading-snug">
-                    MTBF = Capacidad Total / Total OTs. C = Probabilidad de no fallar en 24h.
+                  <h4 className="text-xs font-bold text-purple-800 dark:text-purple-400 uppercase tracking-wider mb-1">Fórmula MTBF:</h4>
+                  <p className="text-sm font-bold text-purple-900 dark:text-purple-200 leading-snug">
+                    MTBF = Horas Totales de Operación / Número de Fallas Correctivas
+                  </p>
+                  <p className="text-xs text-purple-700 dark:text-purple-300 mt-1">
+                    Horas Operación: {horasOperacionGlobal.toLocaleString('es-CL')}h | Fallas: {numeroFallasGlobal} ({periodoTipo.toUpperCase()} - {diasPeriodoGlobal} días)
                   </p>
                 </div>
               </div>
@@ -294,8 +437,10 @@ export default function KpiFlota() {
                 <thead className="border-b border-slate-200 dark:border-slate-800">
                   <tr>
                     <th className="text-left font-bold text-[10px] uppercase text-slate-400 tracking-wider pb-3">Vehículo</th>
+                    <th className="text-center font-bold text-[10px] uppercase text-slate-400 tracking-wider pb-3">Fallas</th>
+                    <th className="text-right font-bold text-[10px] uppercase text-slate-400 tracking-wider pb-3">Hrs Op</th>
                     <th className="text-right font-bold text-[10px] uppercase text-slate-400 tracking-wider pb-3">MTBF Ind.</th>
-                    <th className="text-right font-bold text-[10px] uppercase text-slate-400 tracking-wider pb-3">Conf. (C)</th>
+                    <th className="text-right font-bold text-[10px] uppercase text-slate-400 tracking-wider pb-3">Conf. (24h)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -303,13 +448,15 @@ export default function KpiFlota() {
                     detailsData.map((row) => (
                       <tr key={row.id}>
                         <td className="py-3 px-2 font-bold text-slate-700 dark:text-slate-300">{row.v}</td>
+                        <td className="py-3 px-2 text-center font-bold text-rose-500">{row.corr}</td>
+                        <td className="py-3 px-2 text-right font-medium text-slate-600 dark:text-slate-400">{row.horasOp}h</td>
                         <td className="py-3 px-2 text-right font-bold text-purple-600 dark:text-purple-400">{row.mtbf}</td>
                         <td className="py-3 px-2 text-right font-bold text-emerald-500">{row.conf}</td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={3} className="py-6 text-center text-slate-500 text-xs font-medium">Sin datos registrados</td>
+                      <td colSpan={5} className="py-6 text-center text-slate-500 text-xs font-medium">Sin datos registrados</td>
                     </tr>
                   )}
                 </tbody>
@@ -576,32 +723,101 @@ export default function KpiFlota() {
         </div>
 
         {/* Filters */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-sm flex flex-wrap items-center gap-6">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-400 uppercase">Desde:</span>
-            <div className="relative">
-              <input type="text" defaultValue="12 / 01 / 2026" className="pl-3 pr-10 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-medium w-36 outline-none dark:text-white" />
-              <Calendar className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-sm flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Quick Period Selector */}
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200/80 dark:border-slate-700">
+              <button
+                type="button"
+                onClick={() => handlePeriodoSelect('mensual')}
+                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                  periodoTipo === 'mensual'
+                    ? 'bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+                title="Control Operativo (30 días): desviaciones rápidas y corto plazo"
+              >
+                Mensual (30d)
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePeriodoSelect('trimestral')}
+                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                  periodoTipo === 'trimestral'
+                    ? 'bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+                title="Análisis de Confiabilidad estándar (90 días): estadísticamente recomendado"
+              >
+                Trimestral (90d)
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePeriodoSelect('anual')}
+                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                  periodoTipo === 'anual'
+                    ? 'bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+                title="Tendencias Anuales (365 días): ciclo completo consolidado"
+              >
+                Anual (365d)
+              </button>
+            </div>
+
+            <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block" />
+
+            {/* Date Pickers */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-400 uppercase">Desde:</span>
+              <input 
+                type="date" 
+                value={fechaDesde} 
+                onChange={(e) => { setPeriodoTipo('personalizado'); setFechaDesde(e.target.value); }}
+                className="px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-medium outline-none dark:text-white" 
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-400 uppercase">Hasta:</span>
+              <input 
+                type="date" 
+                value={fechaHasta} 
+                onChange={(e) => { setPeriodoTipo('personalizado'); setFechaHasta(e.target.value); }}
+                className="px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-medium outline-none dark:text-white" 
+              />
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-400 uppercase">Hasta:</span>
-            <div className="relative">
-              <input type="text" defaultValue="05 / 11 / 2026" className="pl-3 pr-10 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-medium w-36 outline-none dark:text-white" />
-              <Calendar className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Filter by Brand */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-400 uppercase">Marca:</span>
+              <select 
+                value={filtroMarca}
+                onChange={(e) => { setFiltroMarca(e.target.value); setFiltroModelo('TODOS'); }}
+                className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-medium outline-none dark:text-white"
+              >
+                <option value="TODAS">Todas las Marcas</option>
+                {marcasDisponibles.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-400 uppercase">Marca:</span>
-            <select className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-medium w-32 outline-none dark:text-white">
-              <option></option>
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-400 uppercase">Modelo:</span>
-            <select className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm font-medium w-48 outline-none dark:text-white">
-              <option>Todos los Modelos</option>
-            </select>
+
+            {/* Filter by Model */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-400 uppercase">Modelo:</span>
+              <select 
+                value={filtroModelo}
+                onChange={(e) => setFiltroModelo(e.target.value)}
+                className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-medium outline-none dark:text-white"
+              >
+                <option value="TODOS">Todos los Modelos</option>
+                {modelosDisponibles.map(mod => (
+                  <option key={mod} value={mod}>{mod}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -616,24 +832,33 @@ export default function KpiFlota() {
               <span className="text-4xl font-black text-emerald-500 dark:text-emerald-400">{globalDisp}%</span>
               <BarChart3 className="w-6 h-6 text-slate-300 dark:text-slate-600 mb-1" />
             </div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Meta Global {'>'} 90%</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              {horasOperacionGlobal.toLocaleString('es-CL')}h operadas / {horasTotalesGlobal.toLocaleString('es-CL')}h
+            </p>
           </div>
 
           <div 
             onClick={() => handleDetailClick('mtbf')}
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-xl shadow-sm cursor-pointer hover:border-blue-300 transition-colors"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-xl shadow-sm cursor-pointer hover:border-purple-300 transition-colors"
           >
-            <h3 className="text-xs font-extrabold text-purple-500 uppercase tracking-widest mb-3">MTBF (Confiabilidad)</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-extrabold text-purple-500 uppercase tracking-widest">MTBF (Confiabilidad)</h3>
+              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                {periodoTipo === 'mensual' ? 'Mensual (30d)' : periodoTipo === 'trimestral' ? 'Trimestral (90d)' : periodoTipo === 'anual' ? 'Anual (365d)' : 'Personalizado'}
+              </span>
+            </div>
             <div className="flex items-end gap-3 mb-2">
               <span className="text-4xl font-black text-slate-800 dark:text-slate-100">{globalMtbf} hrs</span>
               <History className="w-5 h-5 text-slate-300 dark:text-slate-600 mb-1" />
             </div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tiempo medio entre eventos</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">
+              {numeroFallasGlobal} {numeroFallasGlobal === 1 ? 'falla' : 'fallas'} · {horasOperacionGlobal.toLocaleString('es-CL')}h operadas
+            </p>
           </div>
 
           <div 
             onClick={() => handleDetailClick('mix_gasto')}
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-xl shadow-sm flex flex-col justify-between cursor-pointer hover:border-blue-300 transition-colors"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-xl shadow-sm flex flex-col justify-between cursor-pointer hover:border-orange-300 transition-colors"
           >
             <h3 className="text-xs font-extrabold text-orange-500 uppercase tracking-widest mb-1">Mix Gasto (70/30)</h3>
             <div className="flex items-center justify-between relative mt-2 mb-2">
@@ -657,9 +882,9 @@ export default function KpiFlota() {
 
           <div 
             onClick={() => handleDetailClick('confiabilidad_mision')}
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-xl shadow-sm cursor-pointer hover:border-blue-300 transition-colors"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-xl shadow-sm cursor-pointer hover:border-emerald-300 transition-colors"
           >
-            <h3 className="text-xs font-extrabold text-teal-500 uppercase tracking-widest mb-3">Confiabilidad de Misión</h3>
+            <h3 className="text-xs font-extrabold text-emerald-500 uppercase tracking-widest mb-3">Confiabilidad de Misión</h3>
             <div className="flex items-end gap-3 mb-2">
               <span className="text-4xl font-black text-emerald-500 dark:text-emerald-400">{globalConf}%</span>
               <Shield className="w-5 h-5 text-slate-300 dark:text-slate-600 mb-1" />
