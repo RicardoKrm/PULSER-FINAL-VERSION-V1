@@ -75,17 +75,19 @@ export default function OrdenesTrabajoDetail() {
 
   const otFromContext = ordenesTrabajo.find(o => o.id === id || o.folio === id);
   const [asyncOt, setAsyncOt] = useState<OrdenDeTrabajo | null>(null);
-  const [loadingOt, setLoadingOt] = useState(!otFromContext);
-  const ot = otFromContext || asyncOt;
+  const [loadingOt, setLoadingOt] = useState(!otFromContext && !asyncOt);
+  const ot = (asyncOt && (asyncOt.id === id || asyncOt.folio === id)) ? asyncOt : otFromContext;
 
   useEffect(() => {
-    if (otFromContext || !id) {
+    if (!id) {
       setLoadingOt(false);
       return;
     }
 
     let isMounted = true;
-    setLoadingOt(true);
+    if (!otFromContext && !asyncOt) {
+      setLoadingOt(true);
+    }
 
     const loadMissingOt = async () => {
       // 1. Caso ID de Línea Base virtual: "ot-base-..."
@@ -220,19 +222,29 @@ export default function OrdenesTrabajoDetail() {
                 costoManoObra: Number(t.costo_real || 0)
               }
             })),
-            insumos: (insumosRes.data || []).map((i: any) => ({
-              id: i.id,
-              orden_id: i.orden_id,
-              repuesto_id: i.repuesto_id,
-              cantidad: Number(i.cantidad || 0),
-              costo_unitario_aplicado: Number(i.costo_unitario_aplicado || i.costo_unitario || 0),
-              costo_total: Number(i.costo_total || 0),
-              repuesto: i.repuesto || {
+            insumos: (insumosRes.data || []).map((i: any) => {
+              const catalogRep = repuestos.find(r => r.id === i.repuesto_id);
+              const repObj = i.repuesto || (catalogRep ? {
+                id: catalogRep.id,
+                sku: catalogRep.sku,
+                nombre: catalogRep.nombre,
+                stock_actual: catalogRep.stock_actual,
+                costo_unitario: catalogRep.costo_unitario
+              } : {
                 id: i.repuesto_id,
                 nombre: 'Repuesto/Insumo',
                 costo_unitario: Number(i.costo_unitario_aplicado || 0)
-              }
-            })),
+              });
+              return {
+                id: i.id,
+                orden_id: i.orden_id,
+                repuesto_id: i.repuesto_id,
+                cantidad: Number(i.cantidad || 0),
+                costo_unitario_aplicado: Number(i.costo_unitario_aplicado || i.costo_unitario || 0),
+                costo_total: Number(i.costo_total || (Number(i.cantidad || 0) * Number(i.costo_unitario_aplicado || 0)) || 0),
+                repuesto: repObj
+              };
+            }),
             historial: (histRes.data || []).map((h: any) => ({
               id: h.id,
               orden_id: h.orden_id,
@@ -268,7 +280,7 @@ export default function OrdenesTrabajoDetail() {
     return () => {
       isMounted = false;
     };
-  }, [id, otFromContext, activeCompanyId, vehiculos]);
+  }, [id, activeCompanyId, vehiculos, repuestos]);
 
   React.useEffect(() => {
     if (ot) {
@@ -814,7 +826,7 @@ export default function OrdenesTrabajoDetail() {
       precioUnitario: 0
     }));
 
-    actualizarOrdenTrabajo({
+    const updatedOt: OrdenDeTrabajo = {
       ...ot,
       insumos: [...ot.insumos, ...nuevosInsumos],
       historial: [
@@ -827,13 +839,15 @@ export default function OrdenesTrabajoDetail() {
           usuario_nombre: profile?.nombre || 'General'
         }
       ]
-    });
+    };
+    setAsyncOt(updatedOt);
+    actualizarOrdenTrabajo(updatedOt);
     setSelectedKitToAdd('');
   };
 
   const agregarTarea = (tarea: any) => {
     if (!ot) return;
-    actualizarOrdenTrabajo({
+    const updatedOt: OrdenDeTrabajo = {
       ...ot,
       tareasRealizadas: [
         ...ot.tareasRealizadas,
@@ -857,7 +871,9 @@ export default function OrdenesTrabajoDetail() {
           usuario_nombre: profile?.nombre || 'General'
         }
       ]
-    });
+    };
+    setAsyncOt(updatedOt);
+    actualizarOrdenTrabajo(updatedOt);
     setIsTareaModalOpen(false);
     Swal.fire({
       title: 'Añadido',
@@ -918,7 +934,7 @@ export default function OrdenesTrabajoDetail() {
       }];
     }
 
-    actualizarOrdenTrabajo({
+    const updatedOt: OrdenDeTrabajo = {
       ...ot,
       insumos: nuevosInsumos,
       costoInsumos: nuevosInsumos.reduce((sum, item) => sum + item.costo_total, 0),
@@ -932,7 +948,10 @@ export default function OrdenesTrabajoDetail() {
           usuario_nombre: profile?.nombre || 'Taller'
         }
       ]
-    });
+    };
+
+    setAsyncOt(updatedOt);
+    actualizarOrdenTrabajo(updatedOt);
     setIsInsumoModalOpen(false);
     setInsumoSearch('');
     setInsumoQuantities({});
@@ -948,7 +967,7 @@ export default function OrdenesTrabajoDetail() {
   const eliminarTarea = (tareaId: string) => {
     if (!ot) return;
     const tareaObj = ot.tareasRealizadas.find(t => t.id === tareaId);
-    actualizarOrdenTrabajo({
+    const updatedOt: OrdenDeTrabajo = {
       ...ot,
       tareasRealizadas: ot.tareasRealizadas.filter(t => t.id !== tareaId),
       costoManoObraTareas: ot.costoManoObraTareas - (tareaObj?.costo_real || 0),
@@ -962,14 +981,16 @@ export default function OrdenesTrabajoDetail() {
           usuario_nombre: profile?.nombre || 'General'
         }
       ]
-    });
+    };
+    setAsyncOt(updatedOt);
+    actualizarOrdenTrabajo(updatedOt);
   };
 
   const eliminarInsumo = (insumoId: string) => {
     if (!ot) return;
     const insumoObj = ot.insumos.find(i => i.id === insumoId);
     const nuevosInsumos = ot.insumos.filter(i => i.id !== insumoId);
-    actualizarOrdenTrabajo({
+    const updatedOt: OrdenDeTrabajo = {
       ...ot,
       insumos: nuevosInsumos,
       costoInsumos: nuevosInsumos.reduce((sum, item) => sum + item.costo_total, 0),
@@ -983,7 +1004,9 @@ export default function OrdenesTrabajoDetail() {
           usuario_nombre: profile?.nombre || 'General'
         }
       ]
-    });
+    };
+    setAsyncOt(updatedOt);
+    actualizarOrdenTrabajo(updatedOt);
   };
 
   const crearSolicitud = () => {

@@ -222,7 +222,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // Supabase devuelve como máximo 1000 filas por consulta. Antes se leían TODAS las tablas hijas
         // sin paginar ni filtrar: cuando la OT 0004 acumuló muchos repuestos, parte del detalle quedaba
         // fuera de la respuesta y los repuestos "desaparecían" aunque el costo se mantenía.
-        const otIdsEmpresa = otsData.map((o: any) => o.id).filter(Boolean) as string[];
+        const localOTsPre = loadLocalOTs(companyId);
+        const otIdsEmpresa = Array.from(new Set([
+          ...otsData.map((o: any) => o.id),
+          ...localOTsPre.map((o: any) => o.id)
+        ])).filter(Boolean) as string[];
 
         let tareasAll: any[] = [];
         let insumosAll: any[] = [];
@@ -390,7 +394,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const merged: OrdenDeTrabajo[] = [...mappedDbOts];
         localOTs.forEach(lot => {
           if ((!lot.empresa_id || lot.empresa_id === companyId) && !merged.some(m => m.id === lot.id || (lot.folio && m.folio === lot.folio))) {
-            merged.push(lot);
+            const extraInsumos = insumosAll.filter((i: any) => i.orden_id === lot.id).map((i: any) => ({
+              id: i.id,
+              orden_id: i.orden_id,
+              repuesto_id: i.repuesto_id,
+              cantidad: Number(i.cantidad || 0),
+              costo_unitario_aplicado: Number(i.costo_unitario_aplicado || i.costo_unitario || 0),
+              costo_total: Number(i.costo_total || i.cantidad * (i.costo_unitario_aplicado || i.costo_unitario || 0) || 0),
+              repuesto: i.repuesto || {
+                id: i.repuesto_id,
+                nombre: 'Repuesto/Insumo',
+                costo_unitario: Number(i.costo_unitario_aplicado || i.costo_unitario || 0)
+              }
+            }));
+            const extraTareas = tareasAll.filter((t: any) => t.orden_id === lot.id).map((t: any) => ({
+              id: t.id,
+              orden_id: t.orden_id,
+              tarea_estandar_id: t.tarea_estandar_id,
+              tiempo_real_minutos: Number(t.tiempo_real_minutos || 0),
+              costo_real: Number(t.costo_real || 0),
+              tarea_estandar: t.tarea_estandar || {
+                id: t.tarea_estandar_id,
+                descripcion: 'Tarea',
+                costoManoObra: Number(t.costo_real || 0)
+              }
+            }));
+            merged.push({
+              ...lot,
+              insumos: (extraInsumos && extraInsumos.length > 0) ? extraInsumos : (lot.insumos || []),
+              tareasRealizadas: (extraTareas && extraTareas.length > 0) ? extraTareas : (lot.tareasRealizadas || [])
+            });
           }
         });
 
@@ -1267,6 +1300,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ? prev.map(ot => (ot.id === finalId || ot.id === otActualizada.id || (otActualizada.folio && ot.folio === otActualizada.folio)) ? otActualizada : ot)
         : [...prev, otActualizada];
       saveLocalOTs(nextList, activeCompanyId);
+      if (otActualizada.empresa_id && otActualizada.empresa_id !== activeCompanyId) {
+        saveLocalOTs(nextList, otActualizada.empresa_id);
+      }
       return nextList;
     });
 
@@ -1311,7 +1347,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         id: finalId,
         folio: otActualizada.folio,
         vehiculo_id: otActualizada.vehiculoId,
-        empresa_id: targetCompanyId,
+        empresa_id: otActualizada.empresa_id || otActualizada.empresaId || targetCompanyId,
         tecnico_responsable: otActualizada.tecnicoResponsable || otActualizada.personalOperativo || null,
         tipo: otActualizada.tipo,
         estado: otActualizada.estado,
