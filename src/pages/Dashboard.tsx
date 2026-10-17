@@ -16,7 +16,9 @@ import {
   FileText,
   FileCheck,
   ShieldAlert,
-  AlertCircle
+  AlertCircle,
+  Calendar,
+  Gauge
 } from 'lucide-react';
 import { 
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
@@ -39,6 +41,7 @@ export default function Dashboard() {
   const [dbColaboradores, setDbColaboradores] = useState<any[]>([]);
   const gavalCalibratedRef = React.useRef<boolean>(false);
   const [saludTab, setSaludTab] = useState<'mantenimiento' | 'documentos'>('documentos');
+  const [dispTab, setDispTab] = useState<'actual' | 'calendario' | 'operacional'>('actual');
 
   const nowInit = new Date();
   const initDesde = `${nowInit.getFullYear()}-${String(nowInit.getMonth() + 1).padStart(2, '0')}-01`;
@@ -231,6 +234,13 @@ export default function Dashboard() {
     costosData,
     cuellosData,
     disponibilidad,
+    disponibilidadCalendario,
+    disponibilidadOperacional,
+    vehiculosDisponibles,
+    totalVehiculos,
+    horasTotalesPeriodo,
+    horasMantenimientoPeriodo,
+    horasOperacionPeriodo,
     cumplimientoPrev,
     gastoMensual,
     alertasCriticas,
@@ -389,7 +399,7 @@ export default function Dashboard() {
 
     const totalAlertasCriticas = vencidosMantenimiento + alertasColaboradores + alertasVehiculares + alertasStock;
 
-    // Disponibilidad en tiempo real (independiente del filtro de fecha histórico)
+    // 1. Disponibilidad en tiempo real (independiente del filtro de fecha histórico)
     const otsActivas = otsEmpresaHistorico.filter((ot: any) => 
       ['ABIERTA', 'EN_PROCESO', 'PAUSADA', 'PROGRAMADA', 'POR_ASIGNAR'].includes(ot.estado)
     );
@@ -398,6 +408,48 @@ export default function Dashboard() {
     const totalDb = dbVehiculos.length;
     const vehiculosDisponibles = totalDb > 0 ? Math.max(0, totalDb - indisponiblesIds.size) : 0;
     const disp = totalDb > 0 ? (vehiculosDisponibles / totalDb) * 100 : 100;
+
+    // 2. Disponibilidad basada en Horas Totales (Calendario del Mes / Periodo 24/7)
+    // Horas Totales = días del periodo * 24 horas * cantidad de vehículos
+    const diasPeriodo = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+    const totalVehiculosFlota = Math.max(1, totalDb);
+    const horasTotalesPeriodo = diasPeriodo * 24 * totalVehiculosFlota;
+
+    // Horas que la flota estuvo en taller por mantenimiento (preventivo, correctivo o reparaciones)
+    let horasMantenimientoPeriodo = 0;
+    otsEmpresa.forEach((ot: any) => {
+      let h = 0;
+      if (ot.tiempoTrabajadoSegundos && Number(ot.tiempoTrabajadoSegundos) > 0) {
+        h = Number(ot.tiempoTrabajadoSegundos) / 3600;
+      } else if (ot.inicio_proceso && ot.termino_proceso) {
+        h = Math.max(0, (new Date(ot.termino_proceso).getTime() - new Date(ot.inicio_proceso).getTime()) / (1000 * 3600));
+      } else if (ot.tareasRealizadas && Array.isArray(ot.tareasRealizadas) && ot.tareasRealizadas.length > 0) {
+        const mins = ot.tareasRealizadas.reduce((acc: number, t: any) => acc + (Number(t.tiempo_real_minutos) || Number(t.tarea_estandar?.tiempoEstandarMinutos) || 0), 0);
+        if (mins > 0) h = mins / 60;
+      }
+      if (h === 0) {
+        h = String(ot.tipo || '').includes('PREVENTIVA') ? 4.0 : 8.0;
+      }
+      horasMantenimientoPeriodo += h;
+    });
+    horasMantenimientoPeriodo = Math.round(horasMantenimientoPeriodo * 10) / 10;
+
+    // Fórmula 1: Disponibilidad Calendario = ((Horas Totales Mes - Horas Mantenimiento) / Horas Totales Mes) * 100
+    const dispCalendarioVal = horasTotalesPeriodo > 0
+      ? Math.max(0, Math.min(100, ((horasTotalesPeriodo - horasMantenimientoPeriodo) / horasTotalesPeriodo) * 100))
+      : 100;
+    const disponibilidadCalendario = Number(dispCalendarioVal.toFixed(1));
+
+    // 3. Disponibilidad basada en Horas de Operación (Operacional)
+    // Horas demandadas en jornada estándar de ruta/faena (10 hrs diarias x días periodo x vehículos)
+    const horasDemandaOperativa = diasPeriodo * 10 * totalVehiculosFlota;
+    const horasOperacionPeriodo = Math.max(0, Math.round((horasDemandaOperativa - horasMantenimientoPeriodo) * 10) / 10);
+    const sumaOpMant = horasOperacionPeriodo + horasMantenimientoPeriodo;
+    // Fórmula 2: Disponibilidad Operacional = (Horas de Operación / (Horas de Operación + Horas de Mantenimiento)) * 100
+    const dispOperacionalVal = sumaOpMant > 0
+      ? Math.max(0, Math.min(100, (horasOperacionPeriodo / sumaOpMant) * 100))
+      : 100;
+    const disponibilidadOperacional = Number(dispOperacionalVal.toFixed(1));
 
     // Cumplimiento Preventivo real de la flota
     const cumpPrev = totalDb > 0 ? Math.max(0, Math.round(((totalDb - vencidosMantenimiento) / totalDb) * 100)) : 100;
@@ -496,6 +548,13 @@ export default function Dashboard() {
       costosData: costos,
       cuellosData: cuellosArr.slice(0, 5),
       disponibilidad: Number(disp.toFixed(1)),
+      disponibilidadCalendario,
+      disponibilidadOperacional,
+      vehiculosDisponibles,
+      totalVehiculos: totalDb,
+      horasTotalesPeriodo,
+      horasMantenimientoPeriodo,
+      horasOperacionPeriodo,
       cumplimientoPrev: Number(cumpPrev.toFixed(1)),
       gastoMensual: gastoTotalMesActual,
       alertasCriticas: totalAlertasCriticas,
@@ -576,26 +635,102 @@ export default function Dashboard() {
         {/* Card 1 */}
         <div 
           onClick={() => navigate('/flota/mantenimiento')}
-          className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm p-4 relative overflow-hidden flex flex-col justify-between h-32 cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-500 hover:shadow-md transition-all group"
+          className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm p-4 relative overflow-hidden flex flex-col justify-between min-h-[9.5rem] cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-500 hover:shadow-md transition-all group"
         >
-          <div className="flex justify-between items-start">
-            <div className="flex flex-col">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Disponibilidad Flota</span>
-              <span className="text-2xl font-bold text-slate-800 dark:text-white mt-1">{disponibilidad}%</span>
+          <div>
+            <div className="flex justify-between items-start">
+              <div className="flex flex-col">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Disponibilidad Flota</span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-2xl font-bold text-slate-800 dark:text-white">
+                    {dispTab === 'actual'
+                      ? `${disponibilidad}%`
+                      : dispTab === 'calendario'
+                      ? `${disponibilidadCalendario}%`
+                      : `${disponibilidadOperacional}%`}
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-tight">
+                    {dispTab === 'actual' ? 'Actual' : dispTab === 'calendario' ? '24/7 Mes' : 'Operacional'}
+                  </span>
+                </div>
+              </div>
+              <div className={`p-2 rounded-lg transition-colors ${
+                dispTab === 'actual' 
+                  ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 dark:text-emerald-400' 
+                  : dispTab === 'calendario' 
+                  ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-500 dark:text-blue-400' 
+                  : 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 dark:text-indigo-400'
+              }`}>
+                {dispTab === 'actual' && <CheckCircle2 className="w-5 h-5" />}
+                {dispTab === 'calendario' && <Calendar className="w-5 h-5" />}
+                {dispTab === 'operacional' && <Gauge className="w-5 h-5" />}
+              </div>
             </div>
-            <div className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 p-2 rounded-lg">
-              <CheckCircle2 className="w-5 h-5" />
+
+            {/* Selector de modo de disponibilidad: estilo píldora como Salud de Flota */}
+            <div className="grid grid-cols-3 gap-1 bg-slate-100 dark:bg-slate-700/60 p-0.5 rounded-lg w-full mt-2">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setDispTab('actual'); }}
+                className={`py-1 text-[10px] font-bold rounded transition-all text-center ${
+                  dispTab === 'actual'
+                    ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
+                }`}
+                title="Disponibilidad Actual: Porcentaje de unidades operativas en tiempo real (sin OT activa)"
+              >
+                Actual
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setDispTab('calendario'); }}
+                className={`py-1 text-[10px] font-bold rounded transition-all text-center ${
+                  dispTab === 'calendario'
+                    ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
+                }`}
+                title="Disponibilidad Calendario 24/7: ((Horas Totales Mes - Horas Mantenimiento) / Horas Totales Mes) * 100"
+              >
+                24/7 Mes
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setDispTab('operacional'); }}
+                className={`py-1 text-[10px] font-bold rounded transition-all text-center ${
+                  dispTab === 'operacional'
+                    ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
+                }`}
+                title="Disponibilidad Operacional: (Horas Operación / (Horas Operación + Horas Mantenimiento)) * 100"
+              >
+                Operacional
+              </button>
             </div>
           </div>
-          <div className="flex items-center text-xs font-medium text-slate-400 dark:text-slate-500">
-            <span className="font-normal ml-1">Sin datos históricos</span>
+
+          <div className="flex items-center text-xs font-medium text-slate-400 dark:text-slate-500 mt-2 truncate">
+            {dispTab === 'actual' && (
+              <span className="font-normal truncate">
+                {totalVehiculos > 0 ? `${vehiculosDisponibles} de ${totalVehiculos} unidades activas` : 'Sin datos de flota'}
+              </span>
+            )}
+            {dispTab === 'calendario' && (
+              <span className="font-normal truncate" title={`Total: ${horasTotalesPeriodo.toLocaleString('es-CL')}h | Taller: ${horasMantenimientoPeriodo.toLocaleString('es-CL')}h`}>
+                Total: {horasTotalesPeriodo.toLocaleString('es-CL')}h · Taller: {horasMantenimientoPeriodo.toLocaleString('es-CL')}h
+              </span>
+            )}
+            {dispTab === 'operacional' && (
+              <span className="font-normal truncate" title={`Operación: ${horasOperacionPeriodo.toLocaleString('es-CL')}h | Taller: ${horasMantenimientoPeriodo.toLocaleString('es-CL')}h`}>
+                Op: {horasOperacionPeriodo.toLocaleString('es-CL')}h · Taller: {horasMantenimientoPeriodo.toLocaleString('es-CL')}h
+              </span>
+            )}
           </div>
         </div>
 
         {/* Card 2 */}
         <div 
           onClick={() => navigate('/flota/mantenimiento')}
-          className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm p-4 relative overflow-hidden flex flex-col justify-between h-32 cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-500 hover:shadow-md transition-all group"
+          className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm p-4 relative overflow-hidden flex flex-col justify-between min-h-[9.5rem] cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-500 hover:shadow-md transition-all group"
         >
           <div className="flex justify-between items-start">
             <div className="flex flex-col">
@@ -614,7 +749,7 @@ export default function Dashboard() {
         {/* Card 3 */}
         <div 
           onClick={() => navigate('/dashboard/tco')}
-          className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm p-4 relative overflow-hidden flex flex-col justify-between h-32 cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-500 hover:shadow-md transition-all group"
+          className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm p-4 relative overflow-hidden flex flex-col justify-between min-h-[9.5rem] cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-500 hover:shadow-md transition-all group"
         >
           <div className="flex justify-between items-start">
             <div className="flex flex-col">
@@ -639,7 +774,7 @@ export default function Dashboard() {
               navigate('/flota/alertas');
             }
           }}
-          className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm p-4 relative overflow-hidden flex flex-col justify-between h-32 cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-500 hover:shadow-md transition-all group"
+          className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm p-4 relative overflow-hidden flex flex-col justify-between min-h-[9.5rem] cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-500 hover:shadow-md transition-all group"
         >
           <div className="flex justify-between items-start">
             <div className="flex flex-col">
@@ -704,8 +839,8 @@ export default function Dashboard() {
           className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm p-5 cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-500 hover:shadow-md transition-all group flex flex-col justify-between"
         >
           <div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-              <div>
+            <div className="flex flex-col gap-2.5 mb-4">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
                   <h3 className="text-base font-bold text-slate-800 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                     Salud de Flota
@@ -716,20 +851,26 @@ export default function Dashboard() {
                       {saludDocs?.totalAlertasDocs} Alerta(s)
                     </span>
                   )}
+                  {saludTab === 'mantenimiento' && (saludFlota?.vencidos || 0) > 0 && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 animate-pulse">
+                      <ShieldAlert className="w-3 h-3" />
+                      {saludFlota?.vencidos} Vencido(s)
+                    </span>
+                  )}
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  {saludTab === 'documentos'
-                    ? 'Control legal y vencimiento de documentos'
-                    : 'Estado actual de pautas de mantenimiento'}
-                </p>
               </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {saludTab === 'documentos'
+                  ? 'Control legal y vencimiento de documentos'
+                  : 'Estado actual de pautas de mantenimiento'}
+              </p>
 
-              {/* Selector de Pestaña Documental vs Mantenimiento */}
-              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700/60 p-1 rounded-lg self-start sm:self-auto shrink-0">
+              {/* Selector de Pestaña Documental vs Mantenimiento (100% contenido en el cuadro) */}
+              <div className="grid grid-cols-2 gap-1.5 bg-slate-100 dark:bg-slate-700/60 p-1 rounded-lg w-full mt-1">
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setSaludTab('documentos'); }}
-                  className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
+                  className={`px-2.5 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 ${
                     saludTab === 'documentos'
                       ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs'
                       : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
@@ -737,9 +878,9 @@ export default function Dashboard() {
                   title="Ver alertas de documentos de vehículos y choferes"
                 >
                   <FileText className="w-3.5 h-3.5" />
-                  <span>Documental</span>
+                  <span className="truncate">Documental</span>
                   {(saludDocs?.totalAlertasDocs || 0) > 0 && (
-                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white leading-tight">
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white leading-tight shrink-0">
                       {saludDocs?.totalAlertasDocs}
                     </span>
                   )}
@@ -747,7 +888,7 @@ export default function Dashboard() {
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setSaludTab('mantenimiento'); }}
-                  className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
+                  className={`px-2.5 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 ${
                     saludTab === 'mantenimiento'
                       ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs'
                       : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
@@ -755,9 +896,9 @@ export default function Dashboard() {
                   title="Ver estado de pautas y kilometrajes de mantenimiento"
                 >
                   <ClipboardCheck className="w-3.5 h-3.5" />
-                  <span>Mantenimiento</span>
+                  <span className="truncate">Mantenimiento</span>
                   {(saludFlota?.vencidos || 0) > 0 && (
-                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white leading-tight">
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white leading-tight shrink-0">
                       {saludFlota?.vencidos}
                     </span>
                   )}
