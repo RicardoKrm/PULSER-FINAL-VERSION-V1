@@ -6,6 +6,7 @@ import { cn } from '../../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { CrearOTModal } from '../../components/flota/CrearOTModal';
 import { useAppContext } from '../../context/AppContext';
+import { calculateShiftCutoff } from '../../lib/shiftUtils';
 
 type OTTipo = 'Preventiva' | 'Correctiva' | 'Evaluativa' | 'Preventiva Neumático' | 'Correctiva Neumático' | 'Evaluativa Neumático' | 'Inspección';
 
@@ -21,6 +22,8 @@ interface OtMock {
   fechaProgramada?: string; // YYYY-MM-DD
   isOverdue?: boolean;
   estado?: 'EN_PROCESO' | 'PAUSADA' | 'PAUSADA_MECANICO' | 'TERMINADA' | 'PROGRAMADA';
+  pausaMotivo?: string;
+  horasExtrasAutorizadas?: number;
   tiempoAplicacion?: string;
   tiempoAtraso?: string;
   progress?: number;
@@ -221,9 +224,25 @@ export default function PizarraProgramacion() {
       }
 
       let estado: OtMock['estado'] = 'PROGRAMADA';
-      if (ot.estado === 'EN_PROCESO') estado = 'EN_PROCESO';
-      else if (ot.estado === 'PAUSADA' || ot.estado === 'PAUSADA_MECANICO') estado = 'PAUSADA';
-      else if (ot.estado === 'FINALIZADA' || ot.estado === 'TERMINADA' || ot.estado === 'CERRADA_POR_MECANICO') estado = 'TERMINADA';
+      let pausaMotivo = ot.pausa_motivo;
+
+      if (ot.estado === 'EN_PROCESO') {
+        if (ot.inicio_proceso) {
+          const cutoff = calculateShiftCutoff(ot.inicio_proceso, ot.horaTerminoProgramada, ot.horasExtrasAutorizadas);
+          if (cutoff && cutoff.isPastCutoff) {
+            estado = 'PAUSADA';
+            pausaMotivo = 'OT detenida por término de jornada';
+          } else {
+            estado = 'EN_PROCESO';
+          }
+        } else {
+          estado = 'EN_PROCESO';
+        }
+      } else if (ot.estado === 'PAUSADA' || ot.estado === 'PAUSADA_MECANICO') {
+        estado = 'PAUSADA';
+      } else if (ot.estado === 'FINALIZADA' || ot.estado === 'TERMINADA' || ot.estado === 'CERRADA_POR_MECANICO') {
+        estado = 'TERMINADA';
+      }
 
       return {
         id: ot.id,
@@ -236,6 +255,8 @@ export default function PizarraProgramacion() {
         fechaProgramada: ot.fechaProgramada || undefined,
         isOverdue,
         estado,
+        pausaMotivo,
+        horasExtrasAutorizadas: ot.horasExtrasAutorizadas,
         tiempoAplicacion,
         startedLate,
         progress: ot.estado === 'EN_PROCESO' ? 50 : (ot.estado === 'FINALIZADA' || ot.estado === 'TERMINADA' || ot.estado === 'CERRADA_POR_MECANICO') ? 100 : 0
@@ -442,7 +463,7 @@ export default function PizarraProgramacion() {
       mecanicos.filter(m => m.selected).forEach(m => {
         m.ots.filter(ot => ot.fechaProgramada === dateStr).forEach(ot => {
           dailyEvents.push({
-            title: `${ot.startHour}:00 ${ot.tipo} ${ot.patente}`,
+            title: `${ot.startHour}:00 ${ot.tipo} ${ot.patente}${ot.pausaMotivo === 'OT detenida por término de jornada' ? ' [OT detenida por término de jornada]' : ''}`,
             color: getTipoColor(ot.tipo),
             isOverdue: ot.isOverdue,
             otId: ot.id
@@ -742,11 +763,20 @@ export default function PizarraProgramacion() {
      );
   };
 
+  const shiftPausedOts = ordenesTrabajo.filter(ot => 
+    ot.pausa_motivo === 'OT detenida por término de jornada' || 
+    (ot.estado === 'PAUSADA' && (
+      ot.observaciones?.includes('término de jornada') || 
+      ot.historial?.some(h => h.comentario?.includes('término de jornada'))
+    ))
+  );
+
   const atrasadasOts = ordenesTrabajo.filter(ot => {
-    if (ot.estado !== 'PROGRAMADA') return false;
+    if (ot.estado === 'FINALIZADA' || ot.estado === 'CERRADA_POR_MECANICO' || ot.estado === 'TERMINADA') return false;
     const progDate = ot.fechaProgramada || ot.fechaCreacion;
     if (!progDate) return false;
-    return new Date(progDate).getTime() < new Date().getTime();
+    const otDate = new Date(progDate.includes('T') ? progDate : `${progDate}T23:59:59`);
+    return otDate.getTime() < new Date().getTime();
   });
 
   return (
@@ -799,6 +829,31 @@ export default function PizarraProgramacion() {
                  })}
                </div>
             </div>
+
+            {/* OTs Detenidas por Término de Jornada */}
+            {shiftPausedOts.length > 0 && (
+              <div className="bg-amber-50/80 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-lg p-2.5">
+                <h3 className="text-xs font-bold text-amber-800 dark:text-amber-300 mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-amber-600" /> Detenidas por Jornada</span>
+                  <span className="bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 px-1.5 py-0.5 rounded-full text-[10px] font-bold">{shiftPausedOts.length}</span>
+                </h3>
+                <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                  {shiftPausedOts.map(ot => (
+                    <div
+                      key={ot.id}
+                      onClick={() => navigate(`/flota/ordenes-trabajo/${ot.id}`, { state: { fromPizarra: true } })}
+                      className="bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 p-2 rounded text-xs shadow-sm cursor-pointer hover:border-amber-500 transition-all"
+                    >
+                      <div className="font-bold flex justify-between items-center text-[10px]">
+                        <span>{ot.folio}</span>
+                        <span className="text-[8px] bg-amber-500 text-white font-bold px-1 rounded">Detenida</span>
+                      </div>
+                      <div className="text-[10px] text-slate-700 dark:text-slate-300 font-medium truncate mt-0.5">{ot.tecnicoResponsable || 'Sin técnico'}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Pending OTs (Drag and Drop List) */}
             <div
@@ -944,6 +999,33 @@ export default function PizarraProgramacion() {
                <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-600 dark:text-slate-400"><CalendarIcon className="w-5 h-5" /></button>
             </div>
          </div>
+
+         {shiftPausedOts.length > 0 && (
+            <div className="bg-amber-500/15 border-b border-amber-300 dark:border-amber-800 px-4 py-2.5 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
+                <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                <p className="text-xs font-bold">
+                  Hay {shiftPausedOts.length} {shiftPausedOts.length === 1 ? 'orden de trabajo detenida por término de jornada' : 'órdenes de trabajo detenidas por término de jornada'} pendientes de reanudar en nueva jornada.
+                </p>
+              </div>
+              <button 
+                onClick={() => {
+                  setDayEventsModal({
+                    isOpen: true,
+                    date: 'Término de Jornada' as any,
+                    events: shiftPausedOts.map(ot => ({
+                      otId: ot.id,
+                      title: `${ot.folio} | ${ot.tecnicoResponsable || 'Sin Técnico'} | ${ot.tipo} - OT detenida por término de jornada`,
+                      color: 'bg-amber-600 text-white'
+                    }))
+                  });
+                }}
+                className="text-xs font-bold bg-amber-200 hover:bg-amber-300 dark:bg-amber-800 text-amber-900 dark:text-amber-100 px-3 py-1 rounded transition-colors shadow-sm"
+              >
+                Ver OTs Detenidas ({shiftPausedOts.length})
+              </button>
+            </div>
+         )}
 
          {atrasadasOts.length > 0 && (
            <div className="bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-900 px-4 py-3 flex items-center justify-between shrink-0">

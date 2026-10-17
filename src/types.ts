@@ -257,6 +257,16 @@ export interface OrdenDeTrabajo {
   tiempoTrabajadoSegundos: number;
   historial: HistorialOT[];
   solicitudes?: SolicitudRepuesto[];
+  horasExtrasAutorizadas?: number;
+  solicitudHorasExtras?: {
+    solicitadas: number;
+    motivo: string;
+    estado: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
+    solicitado_en?: string;
+    respondido_en?: string;
+    respondido_por?: string;
+  };
+  pausa_motivo?: string;
   firmaCertificado?: string;
 }
 

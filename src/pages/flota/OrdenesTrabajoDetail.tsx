@@ -16,6 +16,7 @@ import autoTable from 'jspdf-autotable';
 import { usePermissions } from '../../hooks/usePermissions';
 import { FormularioInspeccion } from './GestionNeumaticos';
 import { OrdenDeTrabajo } from '../../types';
+import { calculateShiftCutoff, cleanObservaciones, extractOtMeta } from '../../lib/shiftUtils';
 
 export default function OrdenesTrabajoDetail() {
   const { id } = useParams();
@@ -199,7 +200,10 @@ export default function OrdenesTrabajoDetail() {
             rutEmpresa: row.rut_empresa || undefined,
             valorHH: row.valor_hh ? Number(row.valor_hh) : undefined,
             presupuestoAprobado: row.presupuesto_aprobado ? Number(row.presupuesto_aprobado) : undefined,
-            observaciones: row.observaciones || undefined,
+            observaciones: cleanObservaciones(row.observaciones) || undefined,
+            horasExtrasAutorizadas: extractOtMeta(row.observaciones).horasExtrasAutorizadas,
+            solicitudHorasExtras: extractOtMeta(row.observaciones).solicitudHorasExtras,
+            pausa_motivo: extractOtMeta(row.observaciones).pausa_motivo,
             costoInsumos: Number(row.costo_insumos || 0),
             costoManoObraTareas: Number(row.costo_mano_obra_tareas || 0),
             costoManoObraHH: Number(row.costo_mano_obra_hh || 0),
@@ -314,23 +318,201 @@ export default function OrdenesTrabajoDetail() {
     }, []);
 
     const [timerDisplay, setTimerDisplay] = useState(ot?.tiempoTrabajadoSegundos || 0);
+    const [isHorasExtrasModalOpen, setIsHorasExtrasModalOpen] = useState(false);
+    const [horasExtrasSeleccionadas, setHorasExtrasSeleccionadas] = useState<number>(1);
+    const [motivoHorasExtras, setMotivoHorasExtras] = useState('');
+    const autoPausedRef = useRef(false);
+
+    const isSupervisorOrAdmin = profile?.rol?.nombre === 'Súper Administrador' || 
+                               profile?.rol === 'ADMIN' || 
+                               profile?.rol === 'SUPERVISOR' || 
+                               (profile as any)?.isSupervisor || 
+                               (profile as any)?.rol?.nombre?.toLowerCase().includes('supervisor') ||
+                               (profile as any)?.rol?.nombre?.toLowerCase().includes('administrador');
+
+    const handleDetenerPorTerminoJornada = async (cutoffInfo: any) => {
+        if (!ot || ot.estado !== 'EN_PROCESO' || autoPausedRef.current) return;
+        autoPausedRef.current = true;
+        const newTotal = (ot.tiempoTrabajadoSegundos || 0) + cutoffInfo.cappedElapsedSeconds;
+        setTimerDisplay(newTotal);
+        const cutoffDateStr = cutoffInfo.cutoffTime.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+
+        try {
+            await actualizarOrdenTrabajo({
+                ...ot,
+                estado: 'PAUSADA',
+                pausa_motivo: 'OT detenida por término de jornada',
+                tiempoTrabajadoSegundos: newTotal,
+                historial: [
+                    ...ot.historial,
+                    {
+                        id: Math.random().toString(36).substr(2, 9),
+                        orden_id: ot.id,
+                        comentario: `OT detenida por término de jornada laboral (${cutoffDateStr} hrs${cutoffInfo.horasExtras > 0 ? ` incl. ${cutoffInfo.horasExtras}h extras autorizadas` : ''}). Cronómetro pausado automáticamente hasta el día siguiente.`,
+                        created_at: new Date().toISOString(),
+                        estado_nuevo: 'PAUSADA',
+                        usuario_nombre: 'Sistema (Fin de Jornada)'
+                    }
+                ]
+            });
+        } catch (e) {
+            console.error('Error al auto-pausar OT por término de jornada:', e);
+        }
+    };
 
     React.useEffect(() => {
         let interval: NodeJS.Timeout;
         if (ot?.estado === 'EN_PROCESO') {
-            interval = setInterval(() => {
+            autoPausedRef.current = false;
+            const checkTimer = () => {
                 if (ot?.inicio_proceso) {
-                    const elapsedTime = Math.floor((Date.now() - new Date(ot.inicio_proceso).getTime()) / 1000);
-                    setTimerDisplay((ot.tiempoTrabajadoSegundos || 0) + elapsedTime);
+                    const cutoffInfo = calculateShiftCutoff(ot.inicio_proceso, ot.horaTerminoProgramada, ot.horasExtrasAutorizadas);
+                    if (cutoffInfo && cutoffInfo.isPastCutoff) {
+                        setTimerDisplay((ot.tiempoTrabajadoSegundos || 0) + cutoffInfo.cappedElapsedSeconds);
+                        handleDetenerPorTerminoJornada(cutoffInfo);
+                    } else if (cutoffInfo) {
+                        setTimerDisplay((ot.tiempoTrabajadoSegundos || 0) + cutoffInfo.cappedElapsedSeconds);
+                    } else {
+                        const elapsedTime = Math.floor((Date.now() - new Date(ot.inicio_proceso).getTime()) / 1000);
+                        setTimerDisplay((ot.tiempoTrabajadoSegundos || 0) + elapsedTime);
+                    }
                 } else {
                     setTimerDisplay(prev => prev + 1);
                 }
-            }, 1000);
+            };
+
+            checkTimer();
+            interval = setInterval(checkTimer, 1000);
         } else {
             setTimerDisplay(ot?.tiempoTrabajadoSegundos || 0);
         }
         return () => clearInterval(interval);
-    }, [ot?.estado, ot?.tiempoTrabajadoSegundos, ot?.inicio_proceso]);
+    }, [ot?.estado, ot?.tiempoTrabajadoSegundos, ot?.inicio_proceso, ot?.horaTerminoProgramada, ot?.horasExtrasAutorizadas]);
+
+    const handleSolicitarHorasExtras = async () => {
+        if (!ot) return;
+        const maxPermitido = 2; // Art. 31 Código del Trabajo de Chile
+        const cantidad = Math.min(Math.max(horasExtrasSeleccionadas, 1), maxPermitido);
+
+        if (isSupervisorOrAdmin) {
+            await actualizarOrdenTrabajo({
+                ...ot,
+                horasExtrasAutorizadas: cantidad,
+                solicitudHorasExtras: {
+                    solicitadas: cantidad,
+                    motivo: motivoHorasExtras || 'Autorización directa por Supervisor',
+                    estado: 'APROBADA',
+                    solicitado_en: new Date().toISOString(),
+                    respondido_en: new Date().toISOString(),
+                    respondido_por: profile?.nombre || 'Supervisor'
+                },
+                historial: [
+                    ...ot.historial,
+                    {
+                        id: Math.random().toString(36).substr(2, 9),
+                        orden_id: ot.id,
+                        comentario: `Autorizadas ${cantidad} hora(s) extra(s) por ${profile?.nombre || 'Supervisor'} (Máx. 2h legales). Jornada extendida. Motivo: ${motivoHorasExtras || 'Continuidad de trabajos'}`,
+                        created_at: new Date().toISOString(),
+                        usuario_nombre: profile?.nombre || 'Supervisor'
+                    }
+                ]
+            });
+            Swal.fire({
+                title: 'Horas Extras Autorizadas',
+                text: `Se autorizaron ${cantidad} hora(s) extra(s). La jornada se extendió conforme al límite legal (máximo 2h diarias).`,
+                icon: 'success',
+                confirmButtonColor: '#10b981'
+            });
+        } else {
+            await actualizarOrdenTrabajo({
+                ...ot,
+                solicitudHorasExtras: {
+                    solicitadas: cantidad,
+                    motivo: motivoHorasExtras || 'Requerimiento de tiempo adicional para terminar tareas',
+                    estado: 'PENDIENTE',
+                    solicitado_en: new Date().toISOString(),
+                    solicitado_por: profile?.nombre || ot.tecnicoResponsable || 'Técnico'
+                },
+                historial: [
+                    ...ot.historial,
+                    {
+                        id: Math.random().toString(36).substr(2, 9),
+                        orden_id: ot.id,
+                        comentario: `Solicitud de ${cantidad} hora(s) extra(s) enviada al supervisor por ${profile?.nombre || 'Técnico'}. Motivo: ${motivoHorasExtras || 'Tareas pendientes'}`,
+                        created_at: new Date().toISOString(),
+                        usuario_nombre: profile?.nombre || 'Técnico'
+                    }
+                ]
+            });
+            Swal.fire({
+                title: 'Solicitud Enviada',
+                text: `Se ha enviado la solicitud de ${cantidad} hora(s) extra(s) al supervisor para su autorización (máx. 2h por ley).`,
+                icon: 'info',
+                confirmButtonColor: '#3b82f6'
+            });
+        }
+        setIsHorasExtrasModalOpen(false);
+        setMotivoHorasExtras('');
+    };
+
+    const handleResponderSolicitudHorasExtras = async (aprobar: boolean) => {
+        if (!ot || !ot.solicitudHorasExtras) return;
+        const solicitadas = ot.solicitudHorasExtras.solicitadas || 1;
+        if (aprobar) {
+            await actualizarOrdenTrabajo({
+                ...ot,
+                horasExtrasAutorizadas: solicitadas,
+                solicitudHorasExtras: {
+                    ...ot.solicitudHorasExtras,
+                    estado: 'APROBADA',
+                    respondido_en: new Date().toISOString(),
+                    respondido_por: profile?.nombre || 'Supervisor'
+                },
+                historial: [
+                    ...ot.historial,
+                    {
+                        id: Math.random().toString(36).substr(2, 9),
+                        orden_id: ot.id,
+                        comentario: `Solicitud de ${solicitadas} hora(s) extra(s) APROBADA por supervisor ${profile?.nombre || 'Supervisor'}.`,
+                        created_at: new Date().toISOString(),
+                        usuario_nombre: profile?.nombre || 'Supervisor'
+                    }
+                ]
+            });
+            Swal.fire({
+                title: 'Solicitud Aprobada',
+                text: `Se autorizaron las ${solicitadas} hora(s) extra(s) solicitadas.`,
+                icon: 'success',
+                confirmButtonColor: '#10b981'
+            });
+        } else {
+            await actualizarOrdenTrabajo({
+                ...ot,
+                solicitudHorasExtras: {
+                    ...ot.solicitudHorasExtras,
+                    estado: 'RECHAZADA',
+                    respondido_en: new Date().toISOString(),
+                    respondido_por: profile?.nombre || 'Supervisor'
+                },
+                historial: [
+                    ...ot.historial,
+                    {
+                        id: Math.random().toString(36).substr(2, 9),
+                        orden_id: ot.id,
+                        comentario: `Solicitud de horas extras RECHAZADA por supervisor ${profile?.nombre || 'Supervisor'}. El trabajo se detendrá al final de la jornada estándar.`,
+                        created_at: new Date().toISOString(),
+                        usuario_nombre: profile?.nombre || 'Supervisor'
+                    }
+                ]
+            });
+            Swal.fire({
+                title: 'Solicitud Rechazada',
+                text: 'La solicitud de horas extras ha sido rechazada. La OT se detendrá al término de la jornada.',
+                icon: 'warning',
+                confirmButtonColor: '#64748b'
+            });
+        }
+    };
 
     const handleActualizarEstadoRapido = async (estadoStr: string, pausaInfo?: { id: string, nombre: string }, kmForzado?: number) => {
         if (!ot) return;
@@ -338,7 +520,12 @@ export default function OrdenesTrabajoDetail() {
         const now = new Date().toISOString();
 
         if (estadoStr === 'EN_PROCESO') {
+            autoPausedRef.current = false;
             updates.inicio_proceso = now;
+            updates.pausa_motivo = undefined;
+            if (ot.pausa_motivo === 'OT detenida por término de jornada') {
+                updates.horasExtrasAutorizadas = 0;
+            }
         }
         if (estadoStr === 'PAUSADA' || estadoStr === 'FINALIZADA' || estadoStr === 'CERRADA_POR_MECANICO') {
             updates.tiempoTrabajadoSegundos = timerDisplay;
@@ -352,7 +539,7 @@ export default function OrdenesTrabajoDetail() {
                 if (estadoStr === 'CERRADA_POR_MECANICO') {
                     kmIngresado = window.prompt('Por favor ingrese el Kilometraje de Cierre actual del vehículo:');
                 } else {
-                    kmIngresado = kmCierre; // if called quickly, though UI shouldn't allow it without prompt
+                    kmIngresado = kmCierre;
                     if (!kmIngresado) kmIngresado = window.prompt('Por favor ingrese el Kilometraje de Cierre actual del vehículo:');
                 }
                 kmVal = Number(kmIngresado);
@@ -374,7 +561,9 @@ export default function OrdenesTrabajoDetail() {
         }
 
         let comentario = `Cambio de estado a ${estadoStr}`;
-        if (estadoStr === 'EN_PROCESO') comentario += ' (Trabajo Iniciado)';
+        if (estadoStr === 'EN_PROCESO') {
+            comentario += ot.pausa_motivo === 'OT detenida por término de jornada' ? ' (Reanudación de trabajos - Nueva Jornada)' : ' (Trabajo Iniciado)';
+        }
         if (estadoStr === 'PAUSADA' && pausaInfo) comentario += ` - Motivo: ${pausaInfo.nombre}`;
 
         setIsUpdatingDb(true);
@@ -681,17 +870,47 @@ export default function OrdenesTrabajoDetail() {
 
   const agregarInsumo = (repuesto: any, cantidadToUse: number = 1) => {
     if (!ot) return;
-    const existe = ot.insumos.find(i => i.repuesto?.nombre === repuesto.nombre);
+
+    // --- Validación de stock: sin stock suficiente NO se carga a la OT ni se rebaja la bodega ---
+    const stockDisponible = Number(repuesto.stock_actual) || 0;
+    if (stockDisponible <= 0) {
+      Swal.fire({
+        title: 'Sin stock',
+        html: `<b>${repuesto.nombre}</b> no tiene stock disponible en bodega (stock: ${stockDisponible}).<br/>No es posible cargarlo a la OT.`,
+        icon: 'error',
+        confirmButtonColor: '#dc2626'
+      });
+      return;
+    }
+    if (cantidadToUse > stockDisponible) {
+      Swal.fire({
+        title: 'Stock insuficiente',
+        html: `<b>${repuesto.nombre}</b>: solicitaste <b>${cantidadToUse}</b> pero solo hay <b>${stockDisponible}</b> disponibles en bodega.`,
+        icon: 'warning',
+        confirmButtonColor: '#d97706'
+      });
+      return;
+    }
+
+    const nuevoUuid = () =>
+      (typeof crypto !== 'undefined' && (crypto as any).randomUUID)
+        ? (crypto as any).randomUUID()
+        : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16); });
+
+    const mismoRepuesto = (i: any) =>
+      (repuesto.id && (i.repuesto?.id === repuesto.id || i.repuesto_id === repuesto.id)) ||
+      i.repuesto?.nombre === repuesto.nombre;
+    const existe = ot.insumos.find(mismoRepuesto);
     
     let nuevosInsumos: any[] = [];
     if (existe) {
       const nuevaCantidad = existe.cantidad + cantidadToUse;
-      nuevosInsumos = ot.insumos.map(i => i.repuesto?.nombre === repuesto.nombre ? { ...i, cantidad: nuevaCantidad, costo_total: nuevaCantidad * i.costo_unitario_aplicado } : i);
+      nuevosInsumos = ot.insumos.map(i => mismoRepuesto(i) ? { ...i, cantidad: nuevaCantidad, costo_total: nuevaCantidad * i.costo_unitario_aplicado } : i);
     } else {
       nuevosInsumos = [...ot.insumos, { 
-        id: Math.random().toString(36).substr(2, 9), 
+        id: nuevoUuid(), 
         orden_id: ot.id,
-        repuesto_id: repuesto.id || Math.random().toString(36).substr(2, 9),
+        repuesto_id: repuesto.id || nuevoUuid(),
         repuesto: repuesto,
         cantidad: cantidadToUse, 
         costo_unitario_aplicado: repuesto.costo_unitario || 0,
@@ -1409,10 +1628,80 @@ export default function OrdenesTrabajoDetail() {
         </div>
       )}
 
+      {/* Banner de OT detenida por término de jornada */}
+      {ot.pausa_motivo === 'OT detenida por término de jornada' && (
+        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-lg p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 dark:text-amber-200 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-200 dark:bg-amber-900/60 rounded-full text-amber-700 dark:text-amber-300 shrink-0">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-bold text-sm flex items-center gap-2">
+                OT detenida por término de jornada
+                <span className="text-[10px] bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 px-2 py-0.5 rounded-full font-bold uppercase">Límite de Turno</span>
+              </p>
+              <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
+                El cronómetro se detuvo automáticamente al finalizar el turno legal para evitar acumulaciones fuera de horario. 
+                Al iniciar el nuevo turno de trabajo, presione <b>"Reanudar Trabajo (Nueva Jornada)"</b> para continuar registrando el tiempo real.
+              </p>
+            </div>
+          </div>
+          <Button onClick={() => handleActualizarEstadoRapido('EN_PROCESO')} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shrink-0 shadow-sm">
+            Reanudar Trabajo (Nueva Jornada)
+          </Button>
+        </div>
+      )}
+
+      {/* Banner de Solicitud de Horas Extras Pendiente */}
+      {ot.solicitudHorasExtras?.estado === 'PENDIENTE' && (
+        <div className="bg-blue-50 dark:bg-blue-950/40 border border-blue-300 dark:border-blue-800 rounded-lg p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-blue-900 dark:text-blue-200 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-200 dark:bg-blue-900/60 rounded-full text-blue-700 dark:text-blue-300 shrink-0">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-bold text-sm">Solicitud de Extensión de Jornada (HH Extras) Pendiente</p>
+              <p className="text-xs text-blue-800 dark:text-blue-300 mt-0.5">
+                El técnico <b>{ot.solicitudHorasExtras.solicitado_por}</b> solicita <b>{ot.solicitudHorasExtras.solicitadas} hora(s) extra(s)</b> (Art. 31 Código del Trabajo: máx. 2h diarias).
+                <br />
+                <span className="italic">Motivo: "{ot.solicitudHorasExtras.motivo}"</span>
+              </p>
+            </div>
+          </div>
+          {isSupervisorOrAdmin ? (
+            <div className="flex gap-2 shrink-0">
+              <Button onClick={() => handleResponderSolicitudHorasExtras(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-1.5 px-3">
+                Aprobar HH Extras
+              </Button>
+              <Button onClick={() => handleResponderSolicitudHorasExtras(false)} variant="outline" className="border-red-400 text-red-600 hover:bg-red-50 text-xs py-1.5 px-3">
+                Rechazar
+              </Button>
+            </div>
+          ) : (
+            <span className="text-xs font-semibold bg-blue-200 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1.5 rounded-full shrink-0">
+              En revisión por Supervisor
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border dark:border-slate-800">
         <Button variant="ghost" onClick={() => navigate(fromPizarra ? '/flota/programacion' : '/flota/ordenes-trabajo')}><ArrowLeft className="w-4 h-4 mr-2" />Volver a la vista anterior</Button>
         <div className="flex flex-col items-center">
-            <h1 className="text-xl font-bold">OT #{ot.folio} <Badge className="ml-2 bg-green-600 text-white">{ot.estado.replace('_', ' ')}</Badge></h1>
+            <h1 className="text-xl font-bold flex items-center flex-wrap gap-2">
+              OT #{ot.folio} 
+              <Badge className="bg-green-600 text-white">{ot.estado.replace('_', ' ')}</Badge>
+              {ot.pausa_motivo === 'OT detenida por término de jornada' && (
+                <Badge className="bg-amber-500 hover:bg-amber-600 text-white font-bold flex items-center gap-1 shadow-sm animate-pulse">
+                  <Clock className="w-3.5 h-3.5" /> OT detenida por término de jornada
+                </Badge>
+              )}
+              {ot.horasExtrasAutorizadas ? (
+                <Badge className="bg-blue-600 text-white font-medium text-xs">
+                  +{ot.horasExtrasAutorizadas}h Extras Autorizadas
+                </Badge>
+              ) : null}
+            </h1>
             <p className="text-xs text-slate-500 mt-1">
                 Responsable: <span className="font-semibold text-slate-700 dark:text-slate-300">{ot.tecnicoResponsable || 'N/A'}</span> 
                 {ot.personalOperativo && <span> | Apoyo: <span className="font-semibold text-slate-700 dark:text-slate-300">{ot.personalOperativo}</span></span>}
@@ -1424,7 +1713,15 @@ export default function OrdenesTrabajoDetail() {
                 <FileText className="w-4 h-4 mr-2" /> Realizar Inspección
               </Button>
             )}
-            <span className="flex items-center text-slate-600 dark:text-slate-400 mr-4"><Clock className="w-4 h-4 mr-1"/> {new Date(timerDisplay * 1000).toISOString().substr(11, 8)}</span>
+            <span className="flex items-center text-slate-600 dark:text-slate-400 mr-4 font-mono text-sm bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700" title="Horas acumuladas de trabajo real">
+              <Clock className="w-4 h-4 mr-1.5 text-cyan-600"/> 
+              {Math.floor(timerDisplay / 3600).toString().padStart(2, '0')}:{Math.floor((timerDisplay % 3600) / 60).toString().padStart(2, '0')}:{Math.floor(timerDisplay % 60).toString().padStart(2, '0')}
+            </span>
+
+            <Button onClick={() => setIsHorasExtrasModalOpen(true)} variant="outline" className="border-amber-400 dark:border-amber-600 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 font-semibold shadow-sm">
+              <Clock className="w-4 h-4 mr-1.5 text-amber-500" />
+              {ot.horasExtrasAutorizadas ? `HH Extras: +${ot.horasExtrasAutorizadas}h` : 'Solicitar HH Extras'}
+            </Button>
             
             <Button variant="outline" className="hidden lg:flex" onClick={() => handleExportarPDF(false)}><FileDown className="w-4 h-4 mr-2"/> Descargar OT</Button>
             <Button variant="outline" className="hidden lg:flex" onClick={() => handleExportarPDF(true)}><Printer className="w-4 h-4 mr-2"/> Imprimir OT</Button>
@@ -1432,7 +1729,7 @@ export default function OrdenesTrabajoDetail() {
 
             {ot.estado === 'PROGRAMADA' || ot.estado === 'ABIERTA' || ot.estado === 'PENDIENTE' || ot.estado === 'PAUSADA' ? (
               <Button onClick={() => handleActualizarEstadoRapido('EN_PROCESO')} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm font-bold">
-                 {ot.estado === 'PAUSADA' ? 'Reanudar Trabajo' : 'Iniciar Trabajo'}
+                 {ot.pausa_motivo === 'OT detenida por término de jornada' ? 'Reanudar Trabajo (Nueva Jornada)' : ot.estado === 'PAUSADA' ? 'Reanudar Trabajo' : 'Iniciar Trabajo'}
               </Button>
             ) : ot.estado === 'EN_PROCESO' ? (
               <>
@@ -2030,16 +2327,30 @@ export default function OrdenesTrabajoDetail() {
             />
           </div>
           <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
-            {filteredInsumos.slice(0, 50).length > 0 ? filteredInsumos.slice(0, 50).map(i => (
-               <div key={i.id} className="flex justify-between items-center p-3 border rounded-lg dark:border-slate-700">
+            {filteredInsumos.slice(0, 50).length > 0 ? filteredInsumos.slice(0, 50).map(i => {
+              const stockDisp = Number(i.stock_actual) || 0;
+              const cantSolicitada = insumoQuantities[i.id] ?? 1;
+              const sinStock = stockDisp <= 0;
+              const stockInsuficiente = !sinStock && cantSolicitada > stockDisp;
+              const bloqueado = sinStock || stockInsuficiente;
+              return (
+               <div key={i.id} className={`flex justify-between items-center p-3 border rounded-lg ${sinStock ? 'border-red-300 bg-red-50/60 dark:border-red-900 dark:bg-red-950/20' : stockInsuficiente ? 'border-amber-300 bg-amber-50/60 dark:border-amber-900 dark:bg-amber-950/20' : 'dark:border-slate-700'}`}>
                   <div>
                     <p className="font-bold text-sm uppercase">{i.nombre}</p>
-                    <p className="text-xs text-slate-500">SKU: {i.sku} | Stock: <span className="text-emerald-500 font-semibold">{i.stock_actual} disponibles ✓</span></p>
+                    <p className="text-xs text-slate-500">SKU: {i.sku} | Stock:{' '}
+                      {sinStock ? (
+                        <span className="text-red-600 font-bold">0 — SIN STOCK ✗</span>
+                      ) : stockInsuficiente ? (
+                        <span className="text-amber-600 font-bold">{stockDisp} disponibles — stock insuficiente para {cantSolicitada} ⚠</span>
+                      ) : (
+                        <span className="text-emerald-500 font-semibold">{stockDisp} disponibles ✓</span>
+                      )}
+                    </p>
                   </div>
                   <div className="flex gap-2 items-center">
                     <input 
                       type="number" 
-                      value={insumoQuantities[i.id] ?? 1} 
+                      value={cantSolicitada} 
                       min={1} 
                       onChange={(e) => setInsumoQuantities({
                         ...insumoQuantities,
@@ -2047,10 +2358,11 @@ export default function OrdenesTrabajoDetail() {
                       })}
                       className="w-16 border rounded p-1 text-center text-sm dark:bg-slate-800 dark:border-slate-700" 
                     />
-                    <Button size="sm" className="bg-[#0cf]" onClick={() => agregarInsumo(i, insumoQuantities[i.id] ?? 1)}>Añadir</Button>
+                    <Button size="sm" disabled={bloqueado} className={bloqueado ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-[#0cf]'} onClick={() => agregarInsumo(i, cantSolicitada)}>Añadir</Button>
                   </div>
                </div>
-            )) : (
+              );
+            }) : (
               <p className="text-center text-slate-500 text-sm mt-8">Los resultados aparecerán aquí.</p>
             )}
           </div>
@@ -2062,6 +2374,78 @@ export default function OrdenesTrabajoDetail() {
 
       <Modal isOpen={isInspeccionModalOpen} onClose={() => setIsInspeccionModalOpen(false)} title="Pauta Inspección Técnica de Neumáticos" size="5xl">
         <FormularioInspeccion prefilledVehiculoId={ot.vehiculoId} onClose={() => setIsInspeccionModalOpen(false)} />
+      </Modal>
+
+      {/* Modal de Horas Extras y Extensión de Jornada */}
+      <Modal isOpen={isHorasExtrasModalOpen} onClose={() => setIsHorasExtrasModalOpen(false)} title="Extensión de Jornada (Horas Extras)">
+        <div className="space-y-4">
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-xs text-amber-800 dark:text-amber-300 space-y-1">
+            <p className="font-bold flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-amber-600" /> Marco Legal - Art. 31 Código del Trabajo de Chile:
+            </p>
+            <p>
+              Las horas extraordinarias solo podrán pactarse para necesidades o situaciones temporales de la faena, hasta por un <b>máximo estricto de dos (2) horas por día</b>. Cualquier extensión superior a 2 horas diarias está prohibida por la normativa laboral.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+              Cantidad de Horas Extras a Solicitar / Autorizar:
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setHorasExtrasSeleccionadas(1)}
+                className={`p-3 rounded-lg border text-left transition-all ${horasExtrasSeleccionadas === 1 ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/40 ring-2 ring-amber-400' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}
+              >
+                <div className="font-bold text-sm text-slate-800 dark:text-slate-100">+1 Hora Extra</div>
+                <div className="text-xs text-slate-500 mt-0.5">Extiende el turno en 60 minutos (hasta 19:00 hrs)</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setHorasExtrasSeleccionadas(2)}
+                className={`p-3 rounded-lg border text-left transition-all ${horasExtrasSeleccionadas === 2 ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/40 ring-2 ring-amber-400' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}
+              >
+                <div className="font-bold text-sm text-slate-800 dark:text-slate-100 flex items-center justify-between">
+                  +2 Horas Extras
+                  <span className="text-[9px] bg-red-100 dark:bg-red-900/60 text-red-700 dark:text-red-300 font-bold px-1.5 py-0.5 rounded">Máx Legal</span>
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5">Extiende el turno en 120 minutos (hasta 20:00 hrs)</div>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold mb-1 text-slate-700 dark:text-slate-300">
+              Justificación / Tareas Pendientes (Obligatorio):
+            </label>
+            <textarea
+              className="w-full p-2.5 border rounded-lg dark:bg-slate-800 dark:border-slate-700 text-sm focus:ring-2 focus:ring-amber-500 outline-none"
+              rows={3}
+              value={motivoHorasExtras}
+              onChange={(e) => setMotivoHorasExtras(e.target.value)}
+              placeholder="Describa el motivo técnico por el cual se requiere tiempo adicional para completar los trabajos de la OT..."
+            />
+          </div>
+
+          <div className="flex justify-between items-center pt-2">
+            <span className="text-xs text-slate-500">
+              {isSupervisorOrAdmin ? 'Acción: Autorización Inmediata' : 'Acción: Solicitud a Supervisor'}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setIsHorasExtrasModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleSolicitarHorasExtras}
+                disabled={!motivoHorasExtras.trim()}
+                className="bg-amber-600 hover:bg-amber-700 text-white font-bold"
+              >
+                {isSupervisorOrAdmin ? 'Autorizar Horas Extras' : 'Enviar Solicitud'}
+              </Button>
+            </div>
+          </div>
+        </div>
       </Modal>
     </div>
   );

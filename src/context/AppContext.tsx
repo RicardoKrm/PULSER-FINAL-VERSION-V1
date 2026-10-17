@@ -5,6 +5,7 @@ import { useCompany } from '../contexts/CompanyContext';
 import { useSyncOdometers } from '../hooks/useSyncOdometers';
 import Swal from 'sweetalert2';
 import { ReservaTurismo, Conductor, Vehiculo, OrdenDeTrabajo, PautaMantenimiento, TareaEstandar, TipoFalla, KitRepuesto, Usuario, Proveedor, Collaborator, Repuesto, SolicitudRepuesto } from '../types';
+import { extractOtMeta, embedOtMeta, cleanObservaciones, calculateShiftCutoff } from '../lib/shiftUtils';
 
 interface AppContextType {
   reservasTurismo: ReservaTurismo[];
@@ -70,6 +71,50 @@ const saveLocalOTs = (ots: OrdenDeTrabajo[], empresaId?: string | null) => {
   } catch (e) {}
 };
 
+// Supabase limita cada consulta a 1000 filas: este helper lee TODAS las páginas.
+// Devuelve null si falla la primera página (para que el llamador pueda usar su respaldo local).
+const fetchAllPaged = async (
+  table: string,
+  filtro?: (q: any) => any,
+  columnaOrden = 'id'
+): Promise<any[] | null> => {
+  const pageSize = 1000;
+  let desde = 0;
+  let usarOrden = true;
+  const todo: any[] = [];
+  while (true) {
+    let q: any = supabase.from(table).select('*');
+    if (filtro) q = filtro(q);
+    if (usarOrden) q = q.order(columnaOrden, { ascending: true });
+    const { data, error } = await q.range(desde, desde + pageSize - 1);
+    if (error) {
+      if (usarOrden && desde === 0) {
+        // Puede que la columna de orden no exista: reintentar sin ordenar
+        usarOrden = false;
+        continue;
+      }
+      console.warn(`Error leyendo ${table} (desde ${desde}):`, error);
+      return todo.length > 0 ? todo : null;
+    }
+    if (!data || data.length === 0) break;
+    todo.push(...data);
+    if (data.length < pageSize) break;
+    desde += pageSize;
+  }
+  return todo;
+};
+
+// Lee todas las filas hijas (tareas, insumos, historial, solicitudes) de una lista de OTs, en bloques.
+const fetchHijosDeOTs = async (table: string, otIds: string[]): Promise<any[]> => {
+  const todo: any[] = [];
+  for (let i = 0; i < otIds.length; i += 100) {
+    const bloque = otIds.slice(i, i + 100);
+    const filas = await fetchAllPaged(table, q => q.in('orden_id', bloque));
+    if (filas) todo.push(...filas);
+  }
+  return todo;
+};
+
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -89,6 +134,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [personal, setPersonal] = useState<Collaborator[]>([]);
 
   const [repuestos, setRepuestos] = useState<Repuesto[]>([]);
+
+  // Cola para ejecutar en serie las sincronizaciones de OT con la BD y evitar condiciones de carrera
+  const otSyncQueue = React.useRef<Promise<void>>(Promise.resolve());
+  // IDs locales de historial que ya se insertaron en la BD (evita duplicarlos en cada actualización)
+  const historialSincronizado = React.useRef<Set<string>>(new Set());
 
   // Activa la sincronización del GPS en background cada vez que exista una compañía activa
   useSyncOdometers(activeCompanyId, setVehiculos);
@@ -110,7 +160,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       // 1. Obtener vehículos con mantención registrada previa
       const { data: vehsData } = await supabase.from('vehiculo').select('*').eq('empresa_id', companyId);
-      let { data: otsData } = await supabase.from('orden_de_trabajo').select('*').eq('empresa_id', companyId);
+      let otsData: any[] | null = await fetchAllPaged('orden_de_trabajo', q => q.eq('empresa_id', companyId));
 
       // 2. Si hay vehículos con km_ultima_mantencion > 0 que no tengan OT creada, generarles su OT inicial de línea base
       if (vehsData && Array.isArray(vehsData)) {
@@ -169,35 +219,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (otsData) {
+        // Supabase devuelve como máximo 1000 filas por consulta. Antes se leían TODAS las tablas hijas
+        // sin paginar ni filtrar: cuando la OT 0004 acumuló muchos repuestos, parte del detalle quedaba
+        // fuera de la respuesta y los repuestos "desaparecían" aunque el costo se mantenía.
+        const otIdsEmpresa = otsData.map((o: any) => o.id).filter(Boolean) as string[];
+
         let tareasAll: any[] = [];
         let insumosAll: any[] = [];
         let historialAll: any[] = [];
         let solicitudesAll: any[] = [];
 
         try {
-          const { data: tData } = await supabase.from('ot_tareas_realizadas').select('*');
-          if (tData) tareasAll = tData;
+          tareasAll = await fetchHijosDeOTs('ot_tareas_realizadas', otIdsEmpresa);
         } catch (e) {
           console.warn("Error loading ot_tareas_realizadas:", e);
         }
 
         try {
-          const { data: iData } = await supabase.from('detalle_insumo_ot').select('*');
-          if (iData) insumosAll = iData;
+          insumosAll = await fetchHijosDeOTs('detalle_insumo_ot', otIdsEmpresa);
         } catch (e) {
           console.warn("Error loading detalle_insumo_ot:", e);
         }
 
         try {
-          const { data: hData } = await supabase.from('historial_ot').select('*').order('created_at', { ascending: true });
-          if (hData) historialAll = hData;
+          historialAll = await fetchHijosDeOTs('historial_ot', otIdsEmpresa);
+          historialAll.sort((a: any, b: any) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+          // Marcar como ya sincronizado todo lo que viene de la BD
+          historialAll.forEach((h: any) => { if (h.id) historialSincronizado.current.add(h.id); });
         } catch (e) {
           console.warn("Error loading historial_ot:", e);
         }
 
         try {
-          const { data: sData } = await supabase.from('solicitud_repuesto_ot').select('*').order('created_at', { ascending: true });
-          if (sData) solicitudesAll = sData;
+          solicitudesAll = await fetchHijosDeOTs('solicitud_repuesto_ot', otIdsEmpresa);
+          solicitudesAll.sort((a: any, b: any) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
         } catch (e) {
           console.warn("Error loading solicitud_repuesto_ot:", e);
         }
@@ -261,6 +316,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               motivo_rechazo: s.motivo_rechazo || ''
             }));
 
+          const meta = extractOtMeta(row.observaciones);
+          const rawObs = cleanObservaciones(row.observaciones);
+
+          let finalEstado = row.estado as any;
+          let finalTiempoSegundos = Number(row.tiempo_trabajado_segundos || 0);
+          let finalPausaMotivo = meta.pausa_motivo;
+
+          // Detección automática de fin de jornada si la OT quedó en proceso pasada la jornada
+          if (finalEstado === 'EN_PROCESO' && row.inicio_proceso) {
+            const cutoffInfo = calculateShiftCutoff(row.inicio_proceso, row.hora_termino_programada, meta.horasExtrasAutorizadas);
+            if (cutoffInfo && cutoffInfo.isPastCutoff) {
+              finalEstado = 'PAUSADA';
+              finalPausaMotivo = 'OT detenida por término de jornada';
+              finalTiempoSegundos += cutoffInfo.cappedElapsedSeconds;
+            }
+          }
+
           return {
             id: row.id,
             folio: row.folio,
@@ -274,7 +346,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             externo_especialidad: row.externo_especialidad || undefined,
             externo_intervencion: row.externo_intervencion || undefined,
             tipo: row.tipo as any,
-            estado: row.estado as any,
+            estado: finalEstado,
+            pausa_motivo: finalPausaMotivo,
+            horasExtrasAutorizadas: meta.horasExtrasAutorizadas,
+            solicitudHorasExtras: meta.solicitudHorasExtras,
             prioridad: row.prioridad as any,
             inicio_proceso: row.inicio_proceso || undefined,
             kilometrajeApertura: Number(row.kilometraje_apertura || 0),
@@ -299,11 +374,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             rutEmpresa: row.rut_empresa || undefined,
             valorHH: row.valor_hh ? Number(row.valor_hh) : undefined,
             presupuestoAprobado: row.presupuesto_aprobado ? Number(row.presupuesto_aprobado) : undefined,
-            observaciones: row.observaciones || undefined,
+            observaciones: rawObs || undefined,
             costoInsumos: Number(row.costo_insumos || 0),
             costoManoObraTareas: Number(row.costo_mano_obra_tareas || 0),
             costoManoObraHH: Number(row.costo_mano_obra_hh || 0),
-            tiempoTrabajadoSegundos: Number(row.tiempo_trabajado_segundos || 0),
+            tiempoTrabajadoSegundos: finalTiempoSegundos,
             tareasRealizadas: otTareas,
             insumos: otInsumos,
             historial: otHistorial,
@@ -1131,6 +1206,53 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Devuelve la lista de repuestos que NO tienen stock suficiente para el aumento de cantidad solicitado en la OT.
+  const validarStockInsumosOT = async (ot: OrdenDeTrabajo): Promise<string[]> => {
+    try {
+      const { data: filasPrevias } = await supabase
+        .from('detalle_insumo_ot')
+        .select('repuesto_id, cantidad')
+        .eq('orden_id', ot.id);
+
+      const previo: Record<string, number> = {};
+      (filasPrevias || []).forEach((r: any) => {
+        if (r.repuesto_id) previo[r.repuesto_id] = (previo[r.repuesto_id] || 0) + Number(r.cantidad || 0);
+      });
+
+      const nuevo: Record<string, number> = {};
+      const nombres: Record<string, string> = {};
+      (ot.insumos || []).forEach((i: any) => {
+        const id = i.repuesto?.id || i.repuesto_id;
+        if (id) {
+          nuevo[id] = (nuevo[id] || 0) + Number(i.cantidad || 0);
+          nombres[id] = i.repuesto?.nombre || 'Repuesto';
+        }
+      });
+
+      const idsConAumento = Object.keys(nuevo).filter(id => nuevo[id] - (previo[id] || 0) > 0);
+      if (idsConAumento.length === 0) return [];
+
+      const { data: stocks, error } = await supabase
+        .from('logistica_repuestos')
+        .select('id, stock, nombre')
+        .in('id', idsConAumento);
+      if (error || !stocks) return [];
+
+      const faltantes: string[] = [];
+      stocks.forEach((s: any) => {
+        const necesita = nuevo[s.id] - (previo[s.id] || 0);
+        const disponible = Number(s.stock) || 0;
+        if (necesita > disponible) {
+          faltantes.push(`${s.nombre || nombres[s.id]} (requerido ${necesita}, disponible ${disponible})`);
+        }
+      });
+      return faltantes;
+    } catch (e) {
+      console.warn('No se pudo validar el stock en servidor:', e);
+      return [];
+    }
+  };
+
   const actualizarOrdenTrabajo = async (otActualizada: OrdenDeTrabajo) => {
     let finalId = otActualizada.id;
     const isVirtualId = !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(finalId);
@@ -1156,7 +1278,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }).catch(() => {});
     } catch (e) {}
 
+    const syncJob = async () => {
     try {
+      const companyIdSync = activeCompanyId || profile?.empresa_id || '57fa41da-645d-48ba-a671-65a35312d0e9';
+
+      // RED DE SEGURIDAD: nunca dejar que un repuesto quede con stock negativo.
+      // La interfaz ya valida, pero aquí se revalida contra el stock real de bodega.
+      if (otActualizada.insumos) {
+        const sinStock = await validarStockInsumosOT(otActualizada);
+        if (sinStock.length > 0) {
+          await Swal.fire({
+            title: 'Stock insuficiente',
+            html: `No se guardó el cambio. Stock insuficiente en bodega para:<br/><b>${sinStock.join('<br/>')}</b>`,
+            icon: 'error',
+            confirmButtonColor: '#dc2626'
+          });
+          await sincronizarYRecargarOTs(companyIdSync);
+          return;
+        }
+      }
+
       const clampNum = (val: string | number | undefined | null, maxVal = 99999999.99): number | null => {
         if (val === undefined || val === null || val === '') return null;
         const num = Number(val);
@@ -1198,7 +1339,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         rut_empresa: otActualizada.rutEmpresa || null,
         valor_hh: clampNum(otActualizada.valorHH),
         presupuesto_aprobado: clampNum(otActualizada.presupuestoAprobado),
-        observaciones: otActualizada.observaciones || null,
+        observaciones: embedOtMeta(otActualizada.observaciones, {
+          horasExtrasAutorizadas: otActualizada.horasExtrasAutorizadas,
+          solicitudHorasExtras: otActualizada.solicitudHorasExtras,
+          pausa_motivo: otActualizada.pausa_motivo
+        }) || null,
         tecnico_tipo: otActualizada.tecnico_tipo || 'INTERNO',
         externo_nombre: otActualizada.externo_nombre || null,
         externo_especialidad: otActualizada.externo_especialidad || null,
@@ -1268,15 +1413,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             console.error("No se pudieron cargar los insumos previos para calcular el delta:", eQuery);
           }
 
-          // B. Eliminar antiguos detalles
-          const { error: delInsumosErr } = await supabase.from('detalle_insumo_ot').delete().eq('orden_id', otActualizada.id);
-          if (delInsumosErr) {
-            console.error("Error deleting old detalle_insumo_ot:", delInsumosErr);
-            throw new Error(`No se pudieron limpiar los insumos anteriores: ${delInsumosErr.message}`);
-          }
+          // B/C. Escribir primero (upsert por id) y luego borrar solo lo que ya no está en la OT.
+          // Así, si algo falla en la escritura, los repuestos anteriores NO se pierden.
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+          const filasInsumos = otActualizada.insumos.map(i => ({
+            id: i.id && uuidRegex.test(i.id) ? i.id : generateUUID(),
+            orden_id: otActualizada.id,
+            repuesto_id: i.repuesto?.id || i.repuesto_id || null,
+            cantidad: i.cantidad || 0,
+            costo_unitario_aplicado: i.costo_unitario_aplicado || 0,
+            repuesto: i.repuesto || null
+          }));
 
-          // C. Insertar los nuevos
-          if (otActualizada.insumos.length > 0) {
+          if (filasInsumos.length > 0) {
             // Asegurar que existan en la tabla "repuesto" auxiliar
             for (const item of otActualizada.insumos) {
               if (item.repuesto) {
@@ -1294,18 +1443,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               }
             }
 
-            const insertPayload = otActualizada.insumos.map(i => ({
-              orden_id: otActualizada.id,
-              repuesto_id: i.repuesto?.id || i.repuesto_id || null,
-              cantidad: i.cantidad || 0,
-              costo_unitario_aplicado: i.costo_unitario_aplicado || 0,
-              repuesto: i.repuesto || null
-            }));
-            const { error: insInsumosErr } = await supabase.from('detalle_insumo_ot').insert(insertPayload);
-            if (insInsumosErr) {
-              console.error("Error inserting detalle_insumo_ot:", insInsumosErr);
-              throw new Error(`No se pudieron registrar los insumos de repuesto: ${insInsumosErr.message}`);
+            const { error: upsInsumosErr } = await supabase.from('detalle_insumo_ot').upsert(filasInsumos, { onConflict: 'id' });
+            if (upsInsumosErr) {
+              console.error("Error guardando detalle_insumo_ot:", upsInsumosErr);
+              throw new Error(`No se pudieron registrar los insumos de repuesto: ${upsInsumosErr.message}`);
             }
+          }
+
+          // Borrar filas que ya no pertenecen a la OT (eliminadas por el usuario)
+          const idsVigentes = filasInsumos.map(f => f.id);
+          let delQuery = supabase.from('detalle_insumo_ot').delete().eq('orden_id', otActualizada.id);
+          if (idsVigentes.length > 0) {
+            delQuery = delQuery.not('id', 'in', `(${idsVigentes.join(',')})`);
+          }
+          const { error: delInsumosErr } = await delQuery;
+          if (delInsumosErr) {
+            console.error("Error eliminando insumos sobrantes de detalle_insumo_ot:", delInsumosErr);
+            throw new Error(`No se pudieron limpiar los insumos anteriores: ${delInsumosErr.message}`);
           }
 
           // D. Calcular diferencia de cantidades, aplicar rebaja a "logistica_repuestos" y registrar en "logistica_movimientos"
@@ -1350,6 +1504,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                     .update({ stock: nuevoStockBD })
                     .eq('id', rId);
 
+                  // Reflejar de inmediato el nuevo stock en la memoria de la app (buscador de repuestos de la OT)
+                  setRepuestos(prev => prev.map(r => r.id === rId ? { ...r, stock_actual: nuevoStockBD } : r));
+
                   // Crear registro de movimiento hist_bodega
                   const otFolio = otActualizada.folio || otActualizada.id;
                   const latMovInsert = {
@@ -1381,7 +1538,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         
         // Historial de la OT
         if (otActualizada.historial) {
-          const nuevosHistorial = otActualizada.historial.filter(h => !h.id || h.id.length < 20);
+          const nuevosHistorial = otActualizada.historial.filter(h => (!h.id || h.id.length < 20) && !historialSincronizado.current.has(h.id));
           if (nuevosHistorial.length > 0) {
             const insertPayload = nuevosHistorial.map(h => ({
               orden_id: otActualizada.id,
@@ -1394,6 +1551,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               console.error("Error inserting historial_ot:", insHistErr);
               throw new Error(`No se pudo guardar el historial: ${insHistErr.message}`);
             }
+            nuevosHistorial.forEach(h => { if (h.id) historialSincronizado.current.add(h.id); });
           }
         }
 
@@ -1446,7 +1604,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         });
     } catch (err: any) {
       console.warn("Error updating in Supabase, keeping local state:", err);
-      saveLocalOTs(ordenesTrabajo);
       Swal.fire({
         title: "Cambios Guardados",
         text: "Los cambios han sido guardados localmente en tu sistema.",
@@ -1454,6 +1611,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         confirmButtonColor: "#0891b2"
       });
     }
+    };
+
+    // Las sincronizaciones con la BD se ejecutan EN SERIE (cola). Antes, dos cambios seguidos
+    // (agregar / eliminar / agregar repuesto) corrían en paralelo y sus DELETE/INSERT se pisaban,
+    // dejando la OT sin repuestos aunque el costo se mantuviera.
+    const trabajoActual = otSyncQueue.current.then(syncJob, syncJob);
+    otSyncQueue.current = trabajoActual.catch(() => {});
+    return trabajoActual;
   };
 
   const crearTipoFalla = (tipoFalla: TipoFalla) => {
